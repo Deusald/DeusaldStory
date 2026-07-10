@@ -350,6 +350,22 @@ select.field {
     width: 100%;
 }
 
+/* Spinner — inline loading indicator */
+.spinner {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    border: 1.5px solid var(--border-strong);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin .65s linear infinite;
+    flex: none;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
 /* -------------------------------------------------------------------------
    7. Reusable surfaces
    ------------------------------------------------------------------------- */

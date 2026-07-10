@@ -1,5 +1,321 @@
-﻿@page "/"
+@page "/"
+@layout MainLayout
+@inject ProjectStateService _ProjectState
+@inject UpdateService       _Update
+@inject NavigationManager   _Nav
+@inject RecentProjectsStore _Recents
+@implements IDisposable
 
-<h1>Hello, world!</h1>
+<div class="home-root">
 
-Welcome to your new app.
+    @* ── Left panel ───────────────────────────────────────────────────── *@
+    <div class="home-left">
+        <div>
+            @if (_UpdateInfo is not null)
+            {
+                <div class="home-update">
+                    <i class="bi bi-arrow-up-circle home-update-icon"></i>
+                    <div class="home-update-text">
+                        <span class="home-update-title">Update available</span>
+                        <span class="home-update-sub">Version @_UpdateInfo.LatestVersion is available.</span>
+                    </div>
+                    @if (_UpdateInfo.DownloadPageUrl is not null)
+                    {
+                        @* macOS: no in-place update — open the releases page to download manually. *@
+                        <button class="home-update-download" @onclick="OpenReleasePage">Download</button>
+                        <button class="home-update-dismiss" @onclick="() => _UpdateInfo = null" title="Dismiss">
+                            <i class="bi bi-x"></i>
+                        </button>
+                    }
+                    else if (_IsUpdating)
+                    {
+                        <button class="home-update-download" disabled>
+                            <span class="spinner" style="width:14px;height:14px;flex-shrink:0;"></span>
+                            <span>Installing… @_UpdateProgress%</span>
+                        </button>
+                    }
+                    else
+                    {
+                        <button class="home-update-download" @onclick="DownloadUpdate">Update</button>
+                        <button class="home-update-dismiss" @onclick="() => _UpdateInfo = null" title="Dismiss">
+                            <i class="bi bi-x"></i>
+                        </button>
+                    }
+                </div>
+            }
+
+            <div class="home-logo">
+                <svg class="home-logo-mark" width="34" height="34" viewBox="0 0 44 44" fill="none"
+                     xmlns="http://www.w3.org/2000/svg">
+                    <rect x="6" y="6" width="32" height="32" rx="9"
+                          style="fill:none;stroke:var(--border-strong)" stroke-width="1.6"/>
+                    <path d="M13.5 14.5 L30.5 29.5" style="stroke:var(--accent)" stroke-width="2.4"
+                          stroke-linecap="round"/>
+                    <circle cx="13.5" cy="14.5" r="4" style="fill:var(--accent)"/>
+                    <circle cx="30.5" cy="29.5" r="4" style="fill:var(--accent)"/>
+                    <circle cx="30" cy="14" r="2.6" style="fill:var(--success)"/>
+                </svg>
+                <div>
+                    <div class="home-logo-text-name">Deusald Story</div>
+                    <div class="home-logo-text-sub">VISUAL STORY EDITOR</div>
+                </div>
+            </div>
+
+            <h1 class="home-headline">Craft your game's story,<br/>node by node.</h1>
+            <p class="home-sub">Design branching narratives, write dialogue and manage every localization key — all in one place.</p>
+        </div>
+
+        <div>
+            @if (_ErrorMessage is not null)
+            {
+                <div class="home-error">
+                    <i class="bi bi-exclamation-triangle"></i>
+                    <span>@_ErrorMessage</span>
+                </div>
+            }
+
+            <div class="home-actions">
+                <button class="home-btn home-btn-primary"
+                        @onclick="OpenNewProjectModal" disabled="@_IsLoading">
+                    <span class="home-btn-icon">+</span>
+                    <span>New project</span>
+                </button>
+
+                <button class="home-btn home-btn-secondary"
+                        @onclick="PickFolder" disabled="@_IsLoading">
+                    @if (_IsLoading)
+                    {
+                        <span class="spinner" style="width:14px;height:14px;flex-shrink:0;"></span>
+                        <span>Opening…</span>
+                    }
+                    else
+                    {
+                        <span class="home-btn-icon"><i class="bi bi-folder2-open"></i></span>
+                        <span>Open project…</span>
+                    }
+                </button>
+            </div>
+
+            <div class="home-version">
+                <span>v@(BuildInfo.Version)</span>
+                @if (!string.IsNullOrEmpty(BuildInfo.CommitHash))
+                {
+                    <span class="home-version-sep">·</span>
+                    <span class="home-version-hash">@BuildInfo.CommitHash</span>
+                }
+                <button class="home-logs-btn" @onclick="OpenLogsFolder"
+                        title="Open logs folder">
+                    <i class="bi bi-bug"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    @* ── Right panel ──────────────────────────────────────────────────── *@
+    <div class="home-right">
+        <div class="home-recents-head">
+            <div class="home-recents-label">Recent projects</div>
+            @if (_RecentProjects.Count > 0)
+            {
+                <button class="home-clear-btn" @onclick="ClearRecentProjects">Clear</button>
+            }
+        </div>
+
+        @if (_RecentProjects.Count == 0)
+        {
+            <div class="home-empty">
+                <div class="home-empty-title">No recent projects</div>
+                <div class="home-empty-sub">Projects you open will appear here<br/>so you can get back to them quickly.</div>
+            </div>
+        }
+        else
+        {
+            <div class="home-recent-list">
+                @{ string[] swatches = ["var(--accent)", "var(--success)", "var(--purple)", "var(--orange)", "var(--info)"]; }
+                @for (int x = 0; x < _RecentProjects.Count; ++x)
+                {
+                    RecentProjectEntry recent  = _RecentProjects[x];
+                    string             initial = recent.ProjectName.Length > 0 ? recent.ProjectName[0].ToString().ToUpper() : "P";
+                    string             swatch  = swatches[x % swatches.Length];
+
+                    <div class="home-recent-item-wrap">
+                        <button class="home-recent-item"
+                                @onclick="() => LoadFromPath(recent.Path)"
+                                disabled="@_IsLoading"
+                                title="@recent.Path">
+                            <div class="home-recent-swatch" style="background: @swatch">@initial</div>
+                            <div class="home-recent-meta">
+                                <div class="home-recent-top">
+                                    <span class="home-recent-name">@recent.ProjectName</span>
+                                </div>
+                                <div class="home-recent-sub">@recent.LastEditedLabel</div>
+                            </div>
+                            <div class="home-recent-stats">
+                                <div class="home-recent-stat">
+                                    <span class="home-recent-stat-num">@recent.LocKeyCount</span>
+                                    <span class="home-recent-stat-label">loc</span>
+                                </div>
+                                <div class="home-recent-stat">
+                                    <span class="home-recent-stat-num">@recent.NodesCount</span>
+                                    <span class="home-recent-stat-label">nodes</span>
+                                </div>
+                            </div>
+                            <i class="bi bi-chevron-right home-recent-arrow"></i>
+                        </button>
+                        <button class="home-recent-remove"
+                                @onclick="() => RemoveRecent(recent)"
+                                disabled="@_IsLoading"
+                                title="Remove from recent">
+                            <i class="bi bi-x"></i>
+                        </button>
+                    </div>
+                }
+            </div>
+        }
+    </div>
+
+    <NewProjectModal OnConfirm="OnNewProjectConfirmed"
+                     OnCancel="() => { }"
+                     @ref="_NewProjectModal"/>
+
+</div>
+
+@code {
+    // ── State ─────────────────────────────────────────────────────────────
+
+    private bool                     _IsLoading;
+    private string?                  _ErrorMessage;
+    private List<RecentProjectEntry> _RecentProjects = [];
+
+    private NewProjectModal? _NewProjectModal;
+
+    private UpdateInfo? _UpdateInfo;
+    private bool        _IsUpdating;
+    private int         _UpdateProgress;
+
+    // ── Lifecycle ─────────────────────────────────────────────────────────
+
+    protected override void OnInitialized()
+    {
+        _ProjectState.ProjectChanged += OnProjectChanged;
+        _RecentProjects              =  _Recents.LoadRecentProjects();
+        _                            =  CheckForUpdateAsync();
+    }
+
+    private async Task CheckForUpdateAsync()
+    {
+        UpdateInfo? info = await _Update.CheckForUpdateAsync();
+        if (info is null) return;
+        _UpdateInfo = info;
+        await InvokeAsync(StateHasChanged);
+    }
+
+    // macOS path: the app can't update itself, so open the GitHub releases page for a manual download.
+    private async Task OpenReleasePage()
+    {
+        if (_UpdateInfo?.DownloadPageUrl is { } url)
+            await Launcher.Default.OpenAsync(url);
+    }
+
+    private async Task DownloadUpdate()
+    {
+        if (_UpdateInfo is null || _IsUpdating) return;
+
+        _IsUpdating = true;
+        StateHasChanged();
+
+        // The progress callback fires off the UI thread — marshal each tick back onto it.
+        bool ok = await _Update.DownloadAndApplyAsync(pct =>
+                      _ = InvokeAsync(() =>
+                      {
+                          _UpdateProgress = pct;
+                          StateHasChanged();
+                      }));
+
+        // On success the app relaunches into the new version and never returns here.
+        if (!ok)
+        {
+            _IsUpdating   = false;
+            _ErrorMessage = "The update could not be installed. Please try again later.";
+            StateHasChanged();
+        }
+    }
+
+    public void Dispose() => _ProjectState.ProjectChanged -= OnProjectChanged;
+
+    private void OnProjectChanged() => InvokeAsync(StateHasChanged);
+
+    // ── File operations ───────────────────────────────────────────────────
+
+    private async Task PickFolder()
+    {
+        _ErrorMessage = null;
+        try
+        {
+            FolderPickerResult result = await FolderPicker.Default.PickAsync();
+            if (result.IsSuccessful) await LoadFromPath(result.Folder.Path);
+        }
+        catch (Exception ex)
+        {
+            _ErrorMessage = $"Could not open folder picker: {ex.Message}";
+        }
+    }
+
+    private async Task LoadFromPath(string path)
+    {
+        _IsLoading    = true;
+        _ErrorMessage = null;
+        StateHasChanged();
+
+        try
+        {
+            StoryProject project = await DeusaldStoryRuntime.ProjectFileService.OpenAsync(path);
+            FinalizeLoad(project, path);
+        }
+        catch (DeusaldStoryRuntime.ProjectFolderException ex)
+        {
+            _ErrorMessage = $"Invalid project: {ex.Message}";
+            _IsLoading    = false;
+        }
+        catch (Exception ex)
+        {
+            _ErrorMessage = $"Failed to load project: {ex.Message}";
+            _IsLoading    = false;
+        }
+    }
+
+    private void FinalizeLoad(StoryProject project, string path)
+    {
+        _ProjectState.LoadProject(project, path, Guid.Empty, Guid.Empty);
+        _RecentProjects = _Recents.UpdateRecentProjects(project, path);
+        _IsLoading      = false;
+        _Nav.NavigateTo("/editor");
+    }
+
+    // ── New project ───────────────────────────────────────────────────────
+
+    // Opens the desktop log folder in Explorer / Finder so users can grab logs for a bug report.
+    private void OpenLogsFolder() => AppLog.OpenLogsFolder();
+
+    private void OpenNewProjectModal() => _NewProjectModal?.Show();
+
+    private void OnNewProjectConfirmed(NewProjectModal.NewProjectArgs args)
+    {
+        _ProjectState.CreateNewProject(args.Name, args.Slug, args.Description, args.MainLanguageCode);
+        _Nav.NavigateTo("/editor");
+    }
+
+    // ── Recents ───────────────────────────────────────────────────────────
+
+    private void ClearRecentProjects()
+    {
+        _RecentProjects.Clear();
+        _Recents.ClearRecentProjects();
+    }
+
+    private void RemoveRecent(RecentProjectEntry recent)
+    {
+        _RecentProjects = _Recents.RemoveRecentProject(recent);
+    }
+
+}
