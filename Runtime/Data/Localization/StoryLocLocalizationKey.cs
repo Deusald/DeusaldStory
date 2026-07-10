@@ -3,7 +3,7 @@ using System.Collections.Generic;
 
 namespace DeusaldStoryRuntime
 {
-    public class StoryLocLocalizationKey
+    public class StoryLocLocalizationKey : IFileWithId
     {
         public Guid     Id          { get; set; } = Guid.NewGuid();
         public Guid     CategoryId  { get; set; }

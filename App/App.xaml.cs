@@ -1,14 +1,20 @@
-﻿namespace App;
+﻿using DeusaldStoryWeb;
+
+namespace App;
 
 public partial class App : Application
 {
-	public App()
+	private readonly ProjectStateService _ProjectState;
+	
+	public App(ProjectStateService projectState)
 	{
+		_ProjectState = projectState;
+		
 		InitializeComponent();
 	}
 
 	protected override Window CreateWindow(IActivationState? activationState)
 	{
-		return new Window(new MainPage()) { Title = "Deusald Story" };
+		return new AppWindow(new MainPage(), _ProjectState) { Title = "Deusald Story" };
 	}
 }

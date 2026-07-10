@@ -5,7 +5,7 @@ namespace DeusaldStoryRuntime
     /// <summary>
     /// Organises keys into a hierarchy. ParentCategoryId = null means root category.
     /// </summary>
-    public class StoryLocCategory
+    public class StoryLocCategory : IFileWithId
     {
         public Guid   Id               { get; set; } = Guid.NewGuid();
         public Guid?  ParentCategoryId { get; set; }

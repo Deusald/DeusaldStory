@@ -1,0 +1,48 @@
+<Project Sdk="Microsoft.NET.Sdk.BlazorWebAssembly">
+
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <Nullable>enable</Nullable>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <RootNamespace>DeusaldStoryWeb</RootNamespace>
+        <AssemblyName>DeusaldStoryWeb</AssemblyName>
+        <Version>1.0.0</Version>
+        <OverrideHtmlAssetPlaceholders>true</OverrideHtmlAssetPlaceholders>
+        <ServiceWorkerAssetsManifest>service-worker-assets.js</ServiceWorkerAssetsManifest>
+        <!-- Load the full ICU dataset so every culture (e.g. Chinese) is available in
+             the browser. The default WASM build ships a reduced ICU shard, which drops
+             whole language families from CultureInfo.GetCultures. Costs ~1.5 MB. -->
+        <BlazorWebAssemblyLoadAllGlobalizationData>true</BlazorWebAssemblyLoadAllGlobalizationData>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" Version="10.0.8"/>
+        <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.DevServer" Version="10.0.8" PrivateAssets="all"/>
+    </ItemGroup>
+
+    <ItemGroup>
+        <ServiceWorker Include="wwwroot\service-worker.js" PublishedContent="wwwroot\service-worker.published.js"/>
+    </ItemGroup>
+
+    <ItemGroup>
+      <ProjectReference Include="..\WebCommon\WebCommon.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <_ContentIncludedByDefault Remove="Layout\MainLayout.razor" />
+    </ItemGroup>
+
+    <!-- Capture the short git commit hash and append it to the assembly's
+       informational version ("1.0.0+<hash>"). Read back at runtime via BuildInfo.
+       Falls back silently to no hash when git is unavailable (e.g. source-only build). -->
+    <Target Name="SetGitCommitHash" BeforeTargets="GetAssemblyVersion;GenerateAssemblyInfo" Condition="'$(SourceRevisionId)' == ''">
+        <Exec Command="git rev-parse --short HEAD" ConsoleToMSBuild="true" IgnoreExitCode="true" ContinueOnError="true" StandardOutputImportance="low">
+            <Output TaskParameter="ConsoleOutput" PropertyName="SourceRevisionId" />
+            <Output TaskParameter="ExitCode" PropertyName="_GitExitCode" />
+        </Exec>
+        <PropertyGroup Condition="'$(_GitExitCode)' != '0'">
+            <SourceRevisionId />
+        </PropertyGroup>
+    </Target>
+    
+</Project>
