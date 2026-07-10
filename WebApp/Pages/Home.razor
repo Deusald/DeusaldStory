@@ -1,7 +1,336 @@
-﻿@page "/"
+@page "/"
+@layout MainLayout
+@inject ProjectStateService  _ProjectState
+@inject IProjectStoreFactory _StoreFactory
+@inject IndexedDbInterop     _Idb
+@inject WebProjectArchive    _Archive
+@inject NavigationManager    _Nav
 
-<PageTitle>Home</PageTitle>
+<PageTitle>Deusald Story</PageTitle>
 
-<h1>Hello, world!</h1>
+<div class="home-root">
 
-Welcome to your new app.
+    @* ── Left panel ───────────────────────────────────────────────────── *@
+    <div class="home-left">
+        <div>
+            <div class="home-logo">
+                <svg class="home-logo-mark" width="34" height="34" viewBox="0 0 44 44" fill="none"
+                     xmlns="http://www.w3.org/2000/svg">
+                    <rect x="6" y="6" width="32" height="32" rx="9"
+                          style="fill:none;stroke:var(--border-strong)" stroke-width="1.6"/>
+                    <path d="M13.5 14.5 L30.5 29.5" style="stroke:var(--accent)" stroke-width="2.4"
+                          stroke-linecap="round"/>
+                    <circle cx="13.5" cy="14.5" r="4" style="fill:var(--accent)"/>
+                    <circle cx="30.5" cy="29.5" r="4" style="fill:var(--accent)"/>
+                    <circle cx="30" cy="14" r="2.6" style="fill:var(--success)"/>
+                </svg>
+                <div>
+                    <div class="home-logo-text-name">Deusald Story</div>
+                    <div class="home-logo-text-sub">VISUAL STORY EDITOR · WEB</div>
+                </div>
+            </div>
+
+            <h1 class="home-headline">Craft your game's story,<br/>node by node.</h1>
+            <p class="home-sub">Design branching narratives, write dialogue and manage every localization key — right in your browser.</p>
+        </div>
+
+        <div>
+            @if (_ErrorMessage is not null)
+            {
+                <div class="home-error">
+                    <i class="bi bi-exclamation-triangle"></i>
+                    <span>@_ErrorMessage</span>
+                </div>
+            }
+
+            <div class="home-actions">
+                <button class="home-btn home-btn-primary" @onclick="OpenNewProjectModal" disabled="@_IsBusy">
+                    <span class="home-btn-icon">+</span>
+                    <span>New project</span>
+                </button>
+
+                <button class="home-btn home-btn-secondary" @onclick="ImportZip" disabled="@_IsBusy">
+                    @if (_IsBusy)
+                    {
+                        <span class="spinner" style="width:14px;height:14px;flex-shrink:0;"></span>
+                        <span>Working…</span>
+                    }
+                    else
+                    {
+                        <span class="home-btn-icon"><i class="bi bi-file-earmark-zip"></i></span>
+                        <span>Import .zip…</span>
+                    }
+                </button>
+            </div>
+
+            <div class="home-version">
+                <span>v@(BuildInfo.Version)</span>
+                @if (!string.IsNullOrEmpty(BuildInfo.CommitHash))
+                {
+                    <span class="home-version-sep">·</span>
+                    <span class="home-version-hash">@BuildInfo.CommitHash</span>
+                }
+            </div>
+        </div>
+    </div>
+
+    @* ── Right panel ──────────────────────────────────────────────────── *@
+    <div class="home-right">
+        <div class="home-recents-head">
+            <div class="home-recents-label">Your projects</div>
+        </div>
+
+        @if (_Projects.Count == 0)
+        {
+            <div class="home-empty">
+                <div class="home-empty-title">No projects yet</div>
+                <div class="home-empty-sub">Create a new project or import a <code>.zip</code><br/>to get started. They're saved in this browser.</div>
+            </div>
+        }
+        else
+        {
+            <div class="home-recent-list">
+                @{ string[] swatches = ["var(--accent)", "var(--success)", "var(--purple)", "var(--orange)", "var(--info)"]; }
+                @for (int x = 0; x < _Projects.Count; ++x)
+                {
+                    ProjectSummary p       = _Projects[x];
+                    string         initial = p.Name.Length > 0 ? p.Name[0].ToString().ToUpper() : "P";
+                    string         swatch  = swatches[x % swatches.Length];
+
+                    <div class="home-recent-item-wrap">
+                        <button class="home-recent-item" @onclick="() => OpenProject(p.Location)" disabled="@_IsBusy" title="@p.Name">
+                            <div class="home-recent-swatch" style="background: @swatch">@initial</div>
+                            <div class="home-recent-meta">
+                                <div class="home-recent-top">
+                                    <span class="home-recent-name">@p.Name</span>
+                                </div>
+                                <div class="home-recent-sub">@LastEditedLabel(p.UpdatedAt)</div>
+                            </div>
+                            <div class="home-recent-stats">
+                                <div class="home-recent-stat">
+                                    <span class="home-recent-stat-num">@p.LocKeyCount</span>
+                                    <span class="home-recent-stat-label">loc</span>
+                                </div>
+                                <div class="home-recent-stat">
+                                    <span class="home-recent-stat-num">@p.NodesCount</span>
+                                    <span class="home-recent-stat-label">nodes</span>
+                                </div>
+                            </div>
+                            <i class="bi bi-chevron-right home-recent-arrow"></i>
+                        </button>
+                        <button class="home-recent-remove home-recent-export"
+                                @onclick="() => ExportProject(p)"
+                                disabled="@_IsBusy"
+                                title="Download a copy (.zip)">
+                            <i class="bi bi-download"></i>
+                        </button>
+                        <button class="home-recent-remove home-recent-delete"
+                                @onclick="() => AskDelete(p)"
+                                disabled="@_IsBusy"
+                                title="Delete from this browser">
+                            <i class="bi bi-x"></i>
+                        </button>
+                    </div>
+                }
+            </div>
+        }
+    </div>
+
+    <NewProjectModal OnConfirm="OnNewProjectConfirmed"
+                     OnCancel="() => { }"
+                     @ref="_NewProjectModal"/>
+
+    @* ── Delete confirmation ──────────────────────────────────────────── *@
+    @if (_PendingDelete is not null)
+    {
+        <div class="home-confirm-backdrop" @onclick="CancelDelete"></div>
+        <div class="home-confirm-box" @onclick:stopPropagation="true">
+            <div class="home-confirm-header">
+                <span class="home-confirm-title">Delete project?</span>
+            </div>
+            <div class="home-confirm-body">
+                <strong>@_PendingDelete.Name</strong> will be removed from this browser.
+            </div>
+            <div class="home-confirm-warn">
+                <i class="bi bi-exclamation-triangle-fill"></i>
+                <span>
+                    This project lives only in this browser — deleting it is permanent and
+                    cannot be undone. Download a copy (.zip) first if you want to keep it.
+                </span>
+            </div>
+            <div class="home-confirm-footer">
+                <button class="home-confirm-btn home-confirm-btn-ghost" @onclick="CancelDelete" disabled="@_IsBusy">Cancel</button>
+                <button class="home-confirm-btn home-confirm-btn-danger" @onclick="ConfirmDelete" disabled="@_IsBusy">Delete permanently</button>
+            </div>
+        </div>
+    }
+
+</div>
+
+@code {
+    private bool                 _IsBusy;
+    private string?              _ErrorMessage;
+    private List<ProjectSummary> _Projects = new();
+    private NewProjectModal?     _NewProjectModal;
+    private ProjectSummary?      _PendingDelete;
+
+    private sealed record ProjectSummary(
+        string   Location,
+        string   Name,
+        int      LocKeyCount,
+        int      NodesCount,
+        DateTime UpdatedAt);
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Ask the browser to keep our storage durable so offline projects aren't evicted.
+        await _Idb.PersistAsync();
+        await RefreshAsync();
+    }
+
+    private async Task RefreshAsync()
+    {
+        _ErrorMessage = null;
+        List<ProjectSummary> found = new();
+
+        try
+        {
+            foreach (string location in await _Idb.ListLocationsAsync())
+            {
+                IProjectFileStore store = _StoreFactory.Create(location);
+
+                // Fully open each project so the card can show the same stats as the desktop app.
+                // Skip anything that isn't a valid project folder.
+                StoryProject project;
+                try
+                {
+                    project = await DeusaldStoryRuntime.ProjectFileService.OpenAsync(store);
+                }
+                catch
+                {
+                    continue;
+                }
+
+                found.Add(new ProjectSummary(
+                    location,
+                    project.Metadata.Name,
+                    project.LocKeys.Count,
+                    project.GetNumberOfNodes(),
+                    project.Metadata.UpdatedAt));
+            }
+
+            _Projects = found.OrderByDescending(p => p.UpdatedAt).ToList();
+        }
+        catch (Exception ex)
+        {
+            _ErrorMessage = $"Could not read stored projects: {ex.Message}";
+        }
+    }
+
+    /// <summary>Mirrors <c>RecentProjectEntry.LastEditedLabel</c> so web cards read like the desktop ones.</summary>
+    private static string LastEditedLabel(DateTime lastEdited)
+    {
+        TimeSpan diff = DateTime.Now - lastEdited;
+        if (diff.TotalMinutes < 2) return "just now";
+        if (diff.TotalHours  < 1) return $"{(int)diff.TotalMinutes}m ago";
+        if (diff.TotalDays   < 1) return $"{(int)diff.TotalHours}h ago";
+        if (diff.TotalDays   < 7) return $"{(int)diff.TotalDays}d ago";
+        return lastEdited.ToString("MMM d");
+    }
+
+    private async Task OpenProject(string location)
+    {
+        _IsBusy       = true;
+        _ErrorMessage = null;
+        StateHasChanged();
+
+        try
+        {
+            IProjectFileStore store   = _StoreFactory.Create(location);
+            StoryProject      project = await DeusaldStoryRuntime.ProjectFileService.OpenAsync(store);
+
+            _ProjectState.LoadProject(project, location, Guid.Empty, Guid.Empty);
+            _Nav.NavigateTo("/editor");
+        }
+        catch (Exception ex)
+        {
+            _ErrorMessage = $"Failed to open project: {ex.Message}";
+            _IsBusy       = false;
+        }
+    }
+
+    private void OpenNewProjectModal() => _NewProjectModal?.Show();
+
+    private void OnNewProjectConfirmed(NewProjectModal.NewProjectArgs args)
+    {
+        _ProjectState.CreateNewProject(args.Name, args.Slug, args.Description, args.MainLanguageCode);
+        _Nav.NavigateTo("/editor");
+    }
+
+    private async Task ImportZip()
+    {
+        _IsBusy       = true;
+        _ErrorMessage = null;
+        StateHasChanged();
+
+        try
+        {
+            string? location = await _Archive.ImportAsync();
+            if (location is null)
+            {
+                _IsBusy = false;
+                return; // cancelled or not a project zip
+            }
+
+            await OpenProject(location);
+        }
+        catch (Exception ex)
+        {
+            _ErrorMessage = $"Import failed: {ex.Message}";
+            _IsBusy       = false;
+        }
+    }
+
+    private async Task ExportProject(ProjectSummary p)
+    {
+        try
+        {
+            string slug = string.IsNullOrWhiteSpace(p.Name) ? "project" : p.Name.Replace(' ', '-');
+            await _Archive.ExportAsync(p.Location, $"{slug}.zip");
+        }
+        catch (Exception ex)
+        {
+            _ErrorMessage = $"Export failed: {ex.Message}";
+        }
+    }
+
+    // ── Delete (with confirmation — removal from the browser is permanent) ──
+
+    private void AskDelete(ProjectSummary p) => _PendingDelete = p;
+
+    private void CancelDelete() => _PendingDelete = null;
+
+    private async Task ConfirmDelete()
+    {
+        if (_PendingDelete is null) return;
+
+        _IsBusy = true;
+        StateHasChanged();
+
+        try
+        {
+            await _Idb.DeleteLocationAsync(_PendingDelete.Location);
+            _PendingDelete = null;
+            await RefreshAsync();
+        }
+        catch (Exception ex)
+        {
+            _ErrorMessage = $"Delete failed: {ex.Message}";
+        }
+        finally
+        {
+            _IsBusy = false;
+        }
+    }
+
+}
