@@ -1,0 +1,178 @@
+@namespace DeusaldStoryWeb.Components.Common
+
+<div class="edg-root">
+
+    @* ── Floating toolbar ────────────────────────────────────────────── *@
+    <div class="edg-toolbar">
+        <button class="edg-tool-btn edg-tool-primary" @onclick="() => OnAddNode.InvokeAsync()">
+            <i class="bi bi-plus-lg"></i> Add node
+        </button>
+        <span class="edg-tool-count">@Nodes.Count nodes</span>
+    </div>
+
+    @* ── Canvas ──────────────────────────────────────────────────────── *@
+    <div class="edg-canvas"
+         @onpointerdown="CanvasDown"
+         @onpointermove="CanvasMove"
+         @onpointerup="CanvasUp"
+         @onpointerleave="CanvasUp"
+         @onwheel="OnWheel" @onwheel:preventDefault="true">
+
+        <div class="edg-world" style="transform: translate(@F(_PanX)px, @F(_PanY)px) scale(@F(_Scale));">
+
+            @{ Dictionary<Guid, EdNode> map = Nodes.ToDictionary(n => n.Id); }
+
+            @* Edge layer *@
+            <svg class="edg-edges" xmlns="http://www.w3.org/2000/svg">
+                @foreach (EdEdge edge in Edges)
+                {
+                    if (!map.TryGetValue(edge.From, out EdNode? from) || !map.TryGetValue(edge.To, out EdNode? to))
+                        continue;
+
+                    bool active = edge.From == SelectedId || edge.To == SelectedId;
+                    <path d="@EdgePath(from, to)"
+                          class="edg-edge @(active ? "edg-edge-active" : "")"
+                          fill="none"/>
+                }
+            </svg>
+
+            @* Nodes *@
+            @foreach (EdNode node in Nodes)
+            {
+                EdNode n = node;
+                <div class="edg-node @(n.Id == SelectedId ? "edg-node-sel" : "")"
+                     style="left:@F(n.X)px; top:@F(n.Y)px;"
+                     @onpointerdown="e => NodeDown(e, n)" @onpointerdown:stopPropagation="true">
+
+                    @if (n.Kind != StoryNodeKind.Start)
+                    {
+                        <span class="edg-port edg-port-in" style="background:@StoryStyle.NodeColor(n.Kind)"></span>
+                    }
+                    @if (n.Kind != StoryNodeKind.End)
+                    {
+                        <span class="edg-port edg-port-out" style="background:@StoryStyle.NodeColor(n.Kind)"></span>
+                    }
+
+                    <div class="edg-node-head">
+                        <span class="edg-node-kind" style="color:@StoryStyle.NodeColor(n.Kind)">
+                            <span class="edg-node-kind-dot" style="background:@StoryStyle.NodeColor(n.Kind)"></span>
+                            @StoryStyle.NodeLabel(n.Kind)
+                        </span>
+                        <span class="edg-node-tag">#@n.Tag</span>
+                    </div>
+                    <div class="edg-node-title">@n.Title</div>
+                    @if (!string.IsNullOrEmpty(n.Preview))
+                    {
+                        <div class="edg-node-preview">@n.Preview</div>
+                    }
+                </div>
+            }
+        </div>
+
+        @* ── Minimap ─────────────────────────────────────────────────── *@
+        @if (Nodes.Count > 0)
+        {
+            <div class="edg-minimap">
+                <div class="edg-minimap-label">MAP</div>
+                @{
+                    const double mapW = 168, mapH = 96, pad = 10, nodeH = 82;
+                    double minX = Nodes.Min(n => n.X), maxX = Nodes.Max(n => n.X) + NODE_W;
+                    double minY = Nodes.Min(n => n.Y), maxY = Nodes.Max(n => n.Y) + nodeH;
+                    double bw = Math.Max(1, maxX - minX), bh = Math.Max(1, maxY - minY);
+                    double s  = Math.Min((mapW - 2 * pad) / bw, (mapH - 2 * pad) / bh);
+                }
+                @foreach (EdNode node in Nodes)
+                {
+                    double mx = pad + (node.X - minX) * s;
+                    double my = pad + (node.Y - minY) * s;
+                    double mw = Math.Max(9, NODE_W * s);
+                    <span class="edg-minimap-node"
+                          style="left:@F(mx)px; top:@F(my)px; width:@F(mw)px; background:@StoryStyle.NodeColor(node.Kind)"></span>
+                }
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter] public List<EdNode>         Nodes           { get; set; } = [];
+    [Parameter] public List<EdEdge>         Edges           { get; set; } = [];
+    [Parameter] public Guid                 SelectedId      { get; set; }
+    [Parameter] public EventCallback<Guid>  SelectedChanged { get; set; }
+    [Parameter] public EventCallback        OnAddNode       { get; set; }
+
+    private const double NODE_W = 216;  // fixed card width (keep in sync with .edg-node)
+    private const double PORT_Y = 46;   // vertical anchor of the ports from the card top
+
+    private double _Scale = 1;
+    private double _PanX  = 24;
+    private double _PanY  = 28;
+
+    private bool    _Panning;
+    private EdNode? _DragNode;
+    private double  _LastClientX;
+    private double  _LastClientY;
+
+    // ── Pan / drag ─────────────────────────────────────────────────────────
+
+    private void CanvasDown(PointerEventArgs e)
+    {
+        _Panning     = true;
+        _LastClientX = e.ClientX;
+        _LastClientY = e.ClientY;
+    }
+
+    private async Task NodeDown(PointerEventArgs e, EdNode node)
+    {
+        _DragNode    = node;
+        _Panning     = false;
+        _LastClientX = e.ClientX;
+        _LastClientY = e.ClientY;
+        if (node.Id != SelectedId) await SelectedChanged.InvokeAsync(node.Id);
+    }
+
+    private void CanvasMove(PointerEventArgs e)
+    {
+        if (_DragNode is not null)
+        {
+            _DragNode.X += (e.ClientX - _LastClientX) / _Scale;
+            _DragNode.Y += (e.ClientY - _LastClientY) / _Scale;
+        }
+        else if (_Panning)
+        {
+            _PanX += e.ClientX - _LastClientX;
+            _PanY += e.ClientY - _LastClientY;
+        }
+        else
+        {
+            return;
+        }
+
+        _LastClientX = e.ClientX;
+        _LastClientY = e.ClientY;
+    }
+
+    private void CanvasUp(PointerEventArgs e)
+    {
+        _Panning  = false;
+        _DragNode = null;
+    }
+
+    private void OnWheel(WheelEventArgs e)
+    {
+        double factor = e.DeltaY < 0 ? 1.1 : 1 / 1.1;
+        _Scale = Math.Clamp(_Scale * factor, 0.35, 2.2);
+    }
+
+    // ── Edge geometry ──────────────────────────────────────────────────────
+
+    private static string EdgePath(EdNode from, EdNode to)
+    {
+        double x1 = from.X + NODE_W, y1 = from.Y + PORT_Y;
+        double x2 = to.X,            y2 = to.Y + PORT_Y;
+        double dx = Math.Max(40, Math.Abs(x2 - x1) / 2);
+        return $"M {F(x1)} {F(y1)} C {F(x1 + dx)} {F(y1)}, {F(x2 - dx)} {F(y2)}, {F(x2)} {F(y2)}";
+    }
+
+    private static string F(double v) => v.ToString(System.Globalization.CultureInfo.InvariantCulture);
+}

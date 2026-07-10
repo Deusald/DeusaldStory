@@ -1,0 +1,151 @@
+@namespace DeusaldStoryWeb.Components.Common
+@inject ProjectStateService _ProjectState
+@inject NavigationManager   _Nav
+@implements IDisposable
+
+@{ if (!_ProjectState.HasProject) return; }
+
+<div class="etb-root">
+
+    @* ── Left: back · logo · breadcrumb ──────────────────────────────── *@
+    <div class="etb-left">
+        <button class="etb-back-btn" @onclick="GoHome" title="Back to projects">
+            <i class="bi bi-chevron-left"></i>
+        </button>
+
+        <svg class="etb-logo" width="22" height="22" viewBox="0 0 44 44" fill="none"
+             xmlns="http://www.w3.org/2000/svg">
+            <rect x="6" y="6" width="32" height="32" rx="9"
+                  style="fill:none;stroke:var(--border-strong)" stroke-width="1.8"/>
+            <path d="M13.5 14.5 L30.5 29.5" style="stroke:var(--accent)" stroke-width="2.8" stroke-linecap="round"/>
+            <circle cx="13.5" cy="14.5" r="4.2" style="fill:var(--accent)"/>
+            <circle cx="30.5" cy="29.5" r="4.2" style="fill:var(--accent)"/>
+            <circle cx="30" cy="14" r="2.8" style="fill:var(--success)"/>
+        </svg>
+
+        <span class="etb-project-name">Deusald Story</span>
+
+        <nav class="etb-crumbs">
+            @for (int i = 0; i < Crumbs.Count; ++i)
+            {
+                int         index = i;
+                EditorCrumb crumb = Crumbs[i];
+                <span class="etb-sep">/</span>
+                @if (index == Crumbs.Count - 1)
+                {
+                    <span class="etb-crumb etb-crumb-current">@crumb.Name</span>
+                }
+                else
+                {
+                    <button class="etb-crumb" @onclick="() => CrumbClicked.InvokeAsync(index)">@crumb.Name</button>
+                }
+            }
+        </nav>
+    </div>
+
+    @* ── Center: Edit / Play ─────────────────────────────────────────── *@
+    <div class="etb-tabs">
+        <button class="etb-tab @(Mode == EditorMode.Edit ? "active" : "")"
+                @onclick="() => SetMode(EditorMode.Edit)">
+            <i class="bi bi-diagram-2"></i> Edit
+        </button>
+        <button class="etb-tab @(Mode == EditorMode.Play ? "active" : "")"
+                @onclick="() => SetMode(EditorMode.Play)">
+            <i class="bi bi-play-fill"></i> Play
+        </button>
+    </div>
+
+    @* ── Right: saved state · export · import ────────────────────────── *@
+    <div class="etb-right">
+        @if (_ProjectState.IsDirty)
+        {
+            <button class="etb-save-btn" @onclick="Save">
+                <i class="bi bi-check2"></i> Save
+            </button>
+        }
+        <span class="etb-status-pill @(_ProjectState.IsDirty ? "etb-status-warn" : "etb-status-ok")">
+            <span class="etb-status-dot"></span>
+            @(_ProjectState.IsDirty ? "Unsaved" : "Saved")
+        </span>
+
+        <div class="etb-menu-wrap">
+            <button class="etb-icon-btn" @onclick="() => _ExportOpen = !_ExportOpen" title="Export">
+                <i class="bi bi-box-arrow-up"></i>
+            </button>
+            @if (_ExportOpen)
+            {
+                <div class="etb-menu-backdrop" @onclick="() => _ExportOpen = false"></div>
+                <div class="etb-menu">
+                    <button class="etb-menu-item" @onclick="ExportStoryPdf">
+                        <i class="bi bi-filetype-pdf"></i>
+                        <div class="etb-menu-text">
+                            <span class="etb-menu-title">Story to PDF</span>
+                            <span class="etb-menu-sub">Export the narrative as a document</span>
+                        </div>
+                    </button>
+                    <button class="etb-menu-item" @onclick="ExportLocalization">
+                        <i class="bi bi-file-earmark-spreadsheet"></i>
+                        <div class="etb-menu-text">
+                            <span class="etb-menu-title">Localization to Excel / .loc</span>
+                            <span class="etb-menu-sub">Export every localization key</span>
+                        </div>
+                    </button>
+                </div>
+            }
+        </div>
+
+        <button class="etb-icon-btn" @onclick="ImportLocalization" title="Import localization from Excel / .loc">
+            <i class="bi bi-box-arrow-in-down"></i>
+        </button>
+    </div>
+
+</div>
+
+@code {
+    [Parameter] public EditorMode                   Mode         { get; set; }
+    [Parameter] public EventCallback<EditorMode>    ModeChanged  { get; set; }
+    [Parameter] public IReadOnlyList<EditorCrumb>   Crumbs       { get; set; } = [];
+    [Parameter] public EventCallback<int>           CrumbClicked { get; set; }
+
+    private bool _ExportOpen;
+
+    protected override void OnInitialized()
+    {
+        _ProjectState.DirtyStateChanged  += OnStateChanged;
+        _ProjectState.ProjectDataChanged += OnStateChanged;
+    }
+
+    private Task SetMode(EditorMode mode)
+    {
+        if (mode == Mode) return Task.CompletedTask;
+        Mode = mode;
+        return ModeChanged.InvokeAsync(mode);
+    }
+
+    private async Task Save()
+    {
+        await _ProjectState.SaveAsync();
+        StateHasChanged();
+    }
+
+    private void GoHome()
+    {
+        // NOTE: no confirm-on-unsaved yet — a leave-guard modal can come later.
+        _ProjectState.CloseProject();
+        // BaseUri (not "/" or "") so this works both in the MAUI WebView and under the web app's rewritten base href.
+        _Nav.NavigateTo(_Nav.BaseUri);
+    }
+
+    // ── Export / import (stubbed until the pipelines exist) ────────────────
+    private void ExportStoryPdf()     => _ExportOpen = false; // TODO: story → PDF
+    private void ExportLocalization() => _ExportOpen = false; // TODO: localization → Excel / .loc
+    private void ImportLocalization() { /* TODO: import localization from Excel / .loc */ }
+
+    private void OnStateChanged() => InvokeAsync(StateHasChanged);
+
+    public void Dispose()
+    {
+        _ProjectState.DirtyStateChanged  -= OnStateChanged;
+        _ProjectState.ProjectDataChanged -= OnStateChanged;
+    }
+}

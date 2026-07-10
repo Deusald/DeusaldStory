@@ -1,0 +1,134 @@
+@page "/editor"
+@layout EmptyLayout
+@namespace DeusaldStoryWeb.Components.Pages
+@inject ProjectStateService _ProjectState
+@inject NavigationManager   _Nav
+
+@if (!_ProjectState.HasProject)
+{
+    return;
+}
+
+<div class="ed-page">
+
+    <EditorTopBar Mode="_Mode"
+                  ModeChanged="OnModeChanged"
+                  Crumbs="_Crumbs"
+                  CrumbClicked="OnCrumbClicked"/>
+
+    <div class="ed-body">
+
+        <div class="ed-stage">
+            @if (_Mode == EditorMode.Edit)
+            {
+                <EditorGraph Nodes="_Nodes"
+                             Edges="_Edges"
+                             SelectedId="_SelectedId"
+                             SelectedChanged="OnSelect"
+                             OnAddNode="OnAddNode"/>
+            }
+            else
+            {
+                <div class="ed-play">
+                    <div class="ed-play-inner">
+                        <i class="bi bi-play-circle"></i>
+                        <div class="ed-play-title">Play mode</div>
+                        <div class="ed-play-sub">Step through the story from the start node. Runtime playback is coming next.</div>
+                    </div>
+                </div>
+            }
+        </div>
+
+        <div class="ed-inspector">
+            <EditorInspector Node="_SelectedNode"/>
+        </div>
+
+    </div>
+</div>
+
+@code {
+    private EditorMode        _Mode = EditorMode.Edit;
+    private Guid              _SelectedId;
+    private List<EditorCrumb> _Crumbs = [];
+    private List<EdNode>     _Nodes = [];
+    private List<EdEdge>     _Edges = [];
+
+    private EdNode? _SelectedNode => _Nodes.Find(n => n.Id == _SelectedId);
+
+    protected override void OnInitialized()
+    {
+        if (!_ProjectState.HasProject)
+        {
+            // Opened /editor directly with nothing loaded — send the user back to pick a project.
+            _Nav.NavigateTo(_Nav.BaseUri);
+            return;
+        }
+
+        _Crumbs = [new EditorCrumb(Guid.Empty, "Base")];
+        BuildSampleGraph();
+    }
+
+    private void OnModeChanged(EditorMode mode) => _Mode = mode;
+
+    private void OnSelect(Guid id) => _SelectedId = id;
+
+    private void OnCrumbClicked(int index)
+    {
+        // Drill back up to the clicked container (only the root exists for now).
+        if (index < _Crumbs.Count - 1)
+            _Crumbs = _Crumbs.GetRange(0, index + 1);
+    }
+
+    private void OnAddNode()
+    {
+        EdNode node = new()
+        {
+            Kind    = StoryNodeKind.Scene,
+            Tag     = "new",
+            Title   = "New scene",
+            Preview = "An empty scene. Add content blocks in the inspector.",
+            X       = 420 + _Nodes.Count % 5 * 26,
+            Y       = 520 + _Nodes.Count % 5 * 12
+        };
+        node.Blocks.Add(new EdBlock { Kind = StoryBlockKind.Narration, Text = "…" });
+        _Nodes.Add(node);
+        _SelectedId = node.Id;
+    }
+
+    // ── Mock story (mirrors the design mock-up) ────────────────────────────
+    // Placeholder data until the runtime model carries node kinds / blocks / positions.
+    private void BuildSampleGraph()
+    {
+        EdNode start  = Node(StoryNodeKind.Start,  "start",  "Prologue",              "The road to Vael narrows as the sun dies behind the hills.",  40,  210);
+        EdNode gate   = Node(StoryNodeKind.Scene,  "gate",   "Arrival at the Gate",   "Dusk bleeds over the walls. A single guard blocks the postern gate.", 320, 185);
+        EdNode guard  = Node(StoryNodeKind.Choice, "guard",  "The Guard's Question",  "\"State your business, traveler. The gate closes at dusk.\"", 610, 150);
+        EdNode turned = Node(StoryNodeKind.End,    "turned", "Turned Away",           "The gate stays shut. Night swallows the road behind you.",   610, 380);
+        EdNode bribe  = Node(StoryNodeKind.Scene,  "bribe",  "Bribe the Guard",       "Coins change hands in the dark. He pockets them without a word.", 910, 30);
+        EdNode lie    = Node(StoryNodeKind.Scene,  "lie",    "Word for the Magister", "A silver tongue and a name he dares not question.",          910, 180);
+        EdNode fight  = Node(StoryNodeKind.Scene,  "fight",  "Draw Steel",            "Blades ring out. The alarm bell will not stay silent long.", 910, 330);
+        EdNode enter  = Node(StoryNodeKind.Scene,  "enter",  "Enter the City",        "Vael opens before you, warm and rotten and alive.",          1210, 160);
+
+        guard.Blocks.Add(new EdBlock { Kind = StoryBlockKind.Narration, Text = "The guard lowers his halberd, eyes narrowing beneath the helm." });
+        guard.Blocks.Add(new EdBlock { Kind = StoryBlockKind.Dialogue, Speaker = "City Guard", Text = "State your business, traveler. The gate closes at dusk." });
+        guard.Blocks.Add(new EdBlock { Kind = StoryBlockKind.Choice, Text = "Offer him a coin" });
+        guard.Blocks.Add(new EdBlock { Kind = StoryBlockKind.Choice, Text = "Say you carry word for the Magister" });
+        guard.Blocks.Add(new EdBlock { Kind = StoryBlockKind.Choice, Text = "Rest a hand on your blade" });
+
+        start.Blocks.Add(new EdBlock { Kind = StoryBlockKind.Narration, Text = "The road to Vael narrows as the sun dies behind the hills." });
+        gate.Blocks.Add(new EdBlock { Kind = StoryBlockKind.Narration, Text = "Dusk bleeds over the walls. A single guard blocks the postern gate." });
+
+        _Nodes = [start, gate, guard, turned, bribe, lie, fight, enter];
+        _Edges =
+        [
+            Edge(start, gate), Edge(gate, guard),
+            Edge(guard, bribe), Edge(guard, lie), Edge(guard, fight), Edge(guard, turned),
+            Edge(bribe, enter), Edge(lie, enter)
+        ];
+        _SelectedId = guard.Id;
+    }
+
+    private static EdNode Node(StoryNodeKind kind, string tag, string title, string preview, double x, double y) =>
+        new() { Kind = kind, Tag = tag, Title = title, Preview = preview, X = x, Y = y };
+
+    private static EdEdge Edge(EdNode from, EdNode to) => new() { From = from.Id, To = to.Id };
+}

@@ -1,0 +1,83 @@
+@namespace DeusaldStoryWeb.Components.Common
+
+<div class="ins-root">
+
+    @if (Node is null)
+    {
+        <div class="ins-empty">
+            <i class="bi bi-boxes"></i>
+            <div class="ins-empty-title">No node selected</div>
+            <div class="ins-empty-sub">Select a node in the graph to inspect and edit its contents.</div>
+        </div>
+    }
+    else
+    {
+        @* ── Header ──────────────────────────────────────────────────── *@
+        <div class="ins-header">
+            <div class="ins-header-top">
+                <span class="ins-kind" style="color:@StoryStyle.NodeColor(Node.Kind)">
+                    <span class="ins-kind-dot" style="background:@StoryStyle.NodeColor(Node.Kind)"></span>
+                    @StoryStyle.NodeLabel(Node.Kind)
+                </span>
+                <span class="ins-tag">#@Node.Tag</span>
+            </div>
+            <div class="ins-title">@Node.Title</div>
+        </div>
+
+        @* ── Tabs ────────────────────────────────────────────────────── *@
+        <div class="ins-tabs">
+            @foreach (string tab in _Tabs)
+            {
+                string t = tab;
+                <button class="ins-tab @(t == _ActiveTab ? "active" : "")" @onclick="() => _ActiveTab = t">@t</button>
+            }
+        </div>
+
+        @* ── Body ────────────────────────────────────────────────────── *@
+        <div class="ins-body">
+            @if (_ActiveTab == "Content")
+            {
+                <div class="ins-section-head">
+                    <span class="ins-section-label">Content blocks</span>
+                    <span class="ins-section-count">@Node.Blocks.Count blocks</span>
+                </div>
+
+                @foreach (EdBlock block in Node.Blocks)
+                {
+                    <div class="ins-block">
+                        <div class="ins-block-head">
+                            <span class="ins-block-kind" style="color:@StoryStyle.BlockColor(block.Kind)">
+                                <span class="ins-block-dot" style="background:@StoryStyle.BlockColor(block.Kind)"></span>
+                                @StoryStyle.BlockLabel(block.Kind)
+                            </span>
+                            <button class="ins-block-menu" title="Block options"><i class="bi bi-three-dots"></i></button>
+                        </div>
+                        @if (!string.IsNullOrEmpty(block.Speaker))
+                        {
+                            <div class="ins-block-speaker">@block.Speaker</div>
+                        }
+                        <div class="ins-block-text">@block.Text</div>
+                    </div>
+                }
+
+                <button class="ins-add-block">
+                    <i class="bi bi-plus-lg"></i> Add block
+                </button>
+            }
+            else
+            {
+                <div class="ins-placeholder">
+                    <i class="bi bi-cone-striped"></i>
+                    <span>@_ActiveTab — coming soon</span>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public EdNode? Node { get; set; }
+
+    private static readonly string[] _Tabs = ["Content", "Localization", "Variables", "Lua"];
+    private string _ActiveTab = "Content";
+}
