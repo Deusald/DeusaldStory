@@ -9,7 +9,9 @@ namespace DeusaldStoryWeb
     /// </summary>
     public sealed class RecentProjectsStore(IPreferencesStore prefs)
     {
-        private const string _RECENT_PROJECTS_KEY = "RecentProjects";
+        // Namespaced so the web client does not clobber the Localizer app's recents: both run on the same
+        // origin (deusald.github.io) and share localStorage. Harmless on desktop (MAUI Preferences are sandboxed).
+        private const string _RECENT_PROJECTS_KEY = "story:RecentProjects";
         private const int    _MAX_RECENT_PROJECTS = 10;
 
         public List<RecentProjectEntry> LoadRecentProjects()
