@@ -6,12 +6,8 @@ name: Deploy WebApp to GitHub Pages
 
 on:
   push:
-    branches: [ main ]
-    paths:
-      - 'WebApp/**'
-      - 'WebCommon/**'
-      - 'Runtime/**'
-      - '.github/workflows/deploy-pages.yml'
+    tags:
+      - 'v*'
   workflow_dispatch:
 
 # The site lives at https://<owner>.github.io/DeusaldStory/, so every asset must
