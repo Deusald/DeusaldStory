@@ -1,0 +1,59 @@
+@namespace DeusaldStoryWeb.Components.Common
+
+@if (_Visible)
+{
+    <div class="rlm-backdrop"></div>
+
+    <div class="rlm-box">
+        <div class="rlm-header">
+            <i class="bi bi-link-45deg rlm-icon"></i>
+            <span class="rlm-title">Localization project not found</span>
+        </div>
+
+        <div class="rlm-body">
+            <p class="rlm-msg">
+                <strong>@_StoryName</strong> is linked to a localization project that couldn't be opened —
+                it may have been moved, deleted, or created on another device. Select a localization
+                project to continue.
+            </p>
+            <LocalizationProjectField @bind-Selected="_SelectedLoc"/>
+        </div>
+
+        <div class="rlm-footer">
+            <button class="rlm-btn rlm-btn-ghost" @onclick="Cancel">Cancel</button>
+            <button class="rlm-btn rlm-btn-primary" @onclick="Confirm" disabled="@(_SelectedLoc is null)">
+                Re-link
+            </button>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public EventCallback<LocProjectRef> OnConfirm { get; set; }
+    [Parameter] public EventCallback                OnCancel  { get; set; }
+
+    private bool           _Visible;
+    private string         _StoryName = "";
+    private LocProjectRef? _SelectedLoc;
+
+    public void Show(string storyName)
+    {
+        _StoryName   = storyName;
+        _SelectedLoc = null;
+        _Visible     = true;
+        StateHasChanged();
+    }
+
+    private async Task Confirm()
+    {
+        if (_SelectedLoc is null) return;
+        _Visible = false;
+        await OnConfirm.InvokeAsync(_SelectedLoc);
+    }
+
+    private async Task Cancel()
+    {
+        _Visible = false;
+        await OnCancel.InvokeAsync();
+    }
+}

@@ -56,6 +56,7 @@ public static class MauiProgram
         builder.Services.AddSingleton<IPreferencesStore, MauiPreferencesStore>();
         builder.Services.AddSingleton<IProjectStoreFactory, DiscProjectStoreFactory>();
         builder.Services.AddSingleton<IProjectLocationService, MauiProjectLocationService>();
+        builder.Services.AddSingleton<ILocalizationProjectPicker, MauiLocalizationProjectPicker>();
         builder.Services.AddSingleton<IExcelInterop, MauiExcelInterop>();
         builder.Services.AddSingleton<RecentProjectsStore>();
         builder.Services.AddSingleton<ProjectStateService>();

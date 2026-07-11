@@ -1,5 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
+using System;
 
 namespace DeusaldStoryRuntime
 {
@@ -13,10 +12,11 @@ namespace DeusaldStoryRuntime
         public Guid     EntryStoryContainerId { get; set; } = Guid.Empty;
         public int      FormatVersion         { get; set; } = 1;
 
-        /// <summary>BCP-47 code of the main/source language (e.g. "en-US").</summary>
-        public string MainLanguageId { get; set; } = string.Empty;
-
-        /// <summary>BCP-47 codes of every language in this project (includes the main language).</summary>
-        public List<string> Languages { get; } = new();
+        /// <summary>
+        /// Platform-local reference to the linked Deusald Localization project: a folder path on desktop,
+        /// a "loc:" IndexedDB handle on the web. The localization project is the source of truth for the
+        /// story's languages and keys — Story reads it through the shared DeusaldLocalizerCommon library.
+        /// </summary>
+        public string LocalizationProjectPath { get; set; } = string.Empty;
     }
 }

@@ -16,8 +16,6 @@ namespace DeusaldStoryRuntime
     ///
     /// Expected layout (paths are '/'-separated, relative to the store root):
     ///   metadata.json
-    ///   Categories/           {guid}.json  per StoryLocCategory
-    ///   Keys/                 {guid}.json  per StoryLocLocalizationKey
     ///   Containers/           {guid}.json  per StoryContainerNode
     ///   Logic/                {guid}.json  per StoryLogicNode
     ///
@@ -30,11 +28,9 @@ namespace DeusaldStoryRuntime
         // ── Constants ─────────────────────────────────────────────────────────
 
         public const string METADATA_FILE_NAME     = "metadata.json";
-        public const string CATEGORIES_FOLDER      = "LocCategories";
-        public const string KEYS_FOLDER            = "LocKeys";
         public const string CONTAINERS_FOLDER      = "Containers";
         public const string LOGIC_FOLDER           = "Logic";
-        public const int    CURRENT_FORMAT_VERSION = 1;
+        public const int    CURRENT_FORMAT_VERSION = 2;
 
         private static readonly JsonSerializerSettings _JsonSettings = new()
         {
@@ -71,20 +67,16 @@ namespace DeusaldStoryRuntime
             if (metadata.Id == Guid.Empty)
                 throw new ProjectFolderException($"'{METADATA_FILE_NAME}' contains an invalid project Id.");
 
-            if (string.IsNullOrWhiteSpace(metadata.MainLanguageId))
-                throw new ProjectFolderException($"'{METADATA_FILE_NAME}' is missing MainLanguageId.");
+            // The linked localization project is resolved by the caller (block-until-relink on open), so a
+            // story whose LocalizationProjectPath is empty or unreachable on this platform still opens here.
 
             // ── Read sub-folders ───────────────────────────────────────────────
-            List<StoryLocCategory>        locCategories  = await ReadFolderAsync<StoryLocCategory>(store, CATEGORIES_FOLDER);
-            List<StoryLocLocalizationKey> locKeys        = await ReadFolderAsync<StoryLocLocalizationKey>(store, KEYS_FOLDER);
-            List<StoryContainerNode>      containerNodes = await ReadFolderAsync<StoryContainerNode>(store, KEYS_FOLDER);
-            List<StoryLogicNode>          logicNodes     = await ReadFolderAsync<StoryLogicNode>(store, KEYS_FOLDER);
+            List<StoryContainerNode> containerNodes = await ReadFolderAsync<StoryContainerNode>(store, CONTAINERS_FOLDER);
+            List<StoryLogicNode>     logicNodes     = await ReadFolderAsync<StoryLogicNode>(store, LOGIC_FOLDER);
 
             return new StoryProject
             {
                 Metadata       = metadata,
-                LocCategories  = locCategories,
-                LocKeys        = locKeys,
                 ContainerNodes = containerNodes.ToDictionary(k => k.Id),
                 LogicNodes     = logicNodes.ToDictionary(k => k.Id)
             };
@@ -106,8 +98,6 @@ namespace DeusaldStoryRuntime
 
             await WriteJsonAsync(store, METADATA_FILE_NAME, project.Metadata);
 
-            await SaveFolderAsync(store, CATEGORIES_FOLDER, project.LocCategories,                  c => c.Id.ToString());
-            await SaveFolderAsync(store, KEYS_FOLDER,       project.LocKeys,                        k => k.Id.ToString());
             await SaveFolderAsync(store, CONTAINERS_FOLDER, project.ContainerNodes.Values.ToList(), n => n.Id.ToString());
             await SaveFolderAsync(store, LOGIC_FOLDER,      project.LogicNodes.Values.ToList(),     n => n.Id.ToString());
         }
@@ -117,19 +107,17 @@ namespace DeusaldStoryRuntime
             SaveIncrementalAsync(project, new DiscProjectFileStore(folderPath), dirtyKeyIds);
 
         /// <summary>
-        /// Saves the metadata/members/categories/enums and only the keys whose Ids are in <paramref name="dirtyKeyIds"/>.
-        /// Deleted keys (present in the store but not in the project) are also removed.
-        /// Use this in offline mode after the user edits translations locally.
+        /// Saves the metadata and only the nodes whose Ids are in <paramref name="dirtyKeyIds"/>.
+        /// Deleted nodes (present in the store but not in the project) are also removed.
+        /// Use this after the user edits the story graph locally.
         /// </summary>
         public static async Task SaveIncrementalAsync(StoryProject project, IProjectFileStore store, HashSet<Guid> dirtyKeyIds)
         {
             project.Metadata.UpdatedAt = DateTime.UtcNow;
 
-            // Always rewrite metadata (cheap, contains SyncId/UpdatedAt)
+            // Always rewrite metadata (cheap, contains UpdatedAt / the localization link)
             await WriteJsonAsync(store, METADATA_FILE_NAME, project.Metadata);
-            await SaveFolderAsync(store, CATEGORIES_FOLDER, project.LocCategories, c => c.Id.ToString());
 
-            await UpdateFilesWithIdAsync(project.LocKeys,                        KEYS_FOLDER);
             await UpdateFilesWithIdAsync(project.ContainerNodes.Values.ToList(), CONTAINERS_FOLDER);
             await UpdateFilesWithIdAsync(project.LogicNodes.Values.ToList(),     LOGIC_FOLDER);
 

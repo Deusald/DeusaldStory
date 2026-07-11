@@ -44,7 +44,11 @@ namespace DeusaldStoryWeb
             return projects;
         }
 
-        public List<RecentProjectEntry> UpdateRecentProjects(StoryProject project, string location)
+        /// <summary>
+        /// <paramref name="locKeyCount"/> comes from the story's linked localization project (0 when it can't
+        /// be resolved) — the caller computes it, so this store stays IO-free.
+        /// </summary>
+        public List<RecentProjectEntry> UpdateRecentProjects(StoryProject project, string location, int locKeyCount)
         {
             List<RecentProjectEntry> projects = LoadRecentProjects();
 
@@ -55,8 +59,7 @@ namespace DeusaldStoryWeb
                 ProjectName = project.Metadata.Name,
                 Path        = location,
                 NodesCount  = project.GetNumberOfNodes(),
-                LocKeyCount = project.LocKeys.Count,
-                LangCount   = project.Metadata.Languages.Count,
+                LocKeyCount = locKeyCount,
                 LastEdited  = project.Metadata.UpdatedAt
             });
 
@@ -75,7 +78,6 @@ namespace DeusaldStoryWeb
         public string   Path        { get; init; } = "";
         public int      NodesCount  { get; init; }
         public int      LocKeyCount { get; init; }
-        public int      LangCount   { get; init; }
         public DateTime LastEdited  { get; init; } = DateTime.Now;
 
         public string LastEditedLabel

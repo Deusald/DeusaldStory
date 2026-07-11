@@ -21,7 +21,13 @@ public class ProjectStateService(
 
     /// <summary>Path on disk where the current project was loaded from / last saved to.</summary>
     public string? CurrentProjectPath { get; private set; }
-    
+
+    /// <summary>
+    /// The localization project the current story is linked to, opened via the shared library. Null when no
+    /// project is open or its link could not be resolved (the open flow blocks and re-links before it gets here).
+    /// </summary>
+    public LocProject? CurrentLocalization { get; private set; }
+
     public HashSet<Guid> ChangedFileIds { get; } = new();
     
     /// <summary>True when a project is open and ready to use.</summary>
@@ -53,45 +59,81 @@ public class ProjectStateService(
 
     // ── Actions ──────────────────────────────────────────────────────────────
 
-    public void CreateNewProject(string name, string slug, string description, string mainLangCode)
+    /// <summary>
+    /// Creates a new story linked to <paramref name="localizationReference"/> (the loc project the user just
+    /// picked). The reference was validated by the picker, so its loc project is opened and held here.
+    /// </summary>
+    public async Task CreateNewProjectAsync(string name, string slug, string description, string localizationReference)
     {
         StoryProject newProject = new()
         {
             Metadata = new StoryProjectMetadata
             {
-                Name           = name,
-                Slug           = slug,
-                Description    = description,
-                MainLanguageId = mainLangCode,
-                UpdatedAt      = DateTime.UtcNow
+                Name                    = name,
+                Slug                    = slug,
+                Description             = description,
+                LocalizationProjectPath = localizationReference,
+                UpdatedAt               = DateTime.UtcNow
             }
         };
 
-        newProject.Metadata.Languages.Add(mainLangCode);
-
-        CurrentProject     = newProject;
-        CurrentProjectPath = null;
-        IsDirty            = true;
+        CurrentProject      = newProject;
+        CurrentProjectPath  = null;
+        CurrentLocalization = await ResolveLocalizationAsync(newProject);
+        IsDirty             = true;
         ChangedFileIds.Clear();
         ProjectChanged?.Invoke();
         DirtyStateChanged?.Invoke();
     }
 
-    public void LoadProject(StoryProject project, string folderPath, Guid userId, Guid accessToken)
+    public void LoadProject(StoryProject project, LocProject? localization, string folderPath, Guid userId, Guid accessToken)
     {
-        CurrentProject     = project;
-        CurrentProjectPath = folderPath;
-        IsDirty            = false;
+        CurrentProject      = project;
+        CurrentProjectPath  = folderPath;
+        CurrentLocalization = localization;
+        IsDirty             = false;
         ChangedFileIds.Clear();
         ProjectChanged?.Invoke();
         DirtyStateChanged?.Invoke();
+    }
+
+    /// <summary>
+    /// Opens the localization project referenced by <paramref name="project"/>'s metadata, via the shared
+    /// library and the platform store factory. Returns null when the reference is empty or unresolvable
+    /// (moved folder, deleted, or a handle minted on the other platform) — the caller re-links in that case.
+    /// </summary>
+    public async Task<LocProject?> ResolveLocalizationAsync(StoryProject project)
+    {
+        string locRef = project.Metadata.LocalizationProjectPath;
+        if (string.IsNullOrEmpty(locRef)) return null;
+
+        try
+        {
+            return await DeusaldLocalizerCommon.ProjectFileService.OpenAsync(storeFactory.Create(locRef));
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Points <paramref name="project"/> at a new localization reference, persists the metadata, and returns
+    /// the freshly opened loc project (null if the new reference still fails to resolve).
+    /// </summary>
+    public async Task<LocProject?> RelinkAndSaveAsync(StoryProject project, string storyLocation, string newReference)
+    {
+        project.Metadata.LocalizationProjectPath = newReference;
+        await DeusaldStoryRuntime.ProjectFileService.SaveMetadataOnlyAsync(project, storeFactory.Create(storyLocation));
+        return await ResolveLocalizationAsync(project);
     }
 
     public void CloseProject()
     {
-        CurrentProject     = null;
-        CurrentProjectPath = null;
-        IsDirty            = false;
+        CurrentProject      = null;
+        CurrentProjectPath  = null;
+        CurrentLocalization = null;
+        IsDirty             = false;
         ChangedFileIds.Clear();
         ProjectChanged?.Invoke();
         DirtyStateChanged?.Invoke();
@@ -116,7 +158,8 @@ public class ProjectStateService(
             MarkClean();
         }
 
-        if (!string.IsNullOrEmpty(CurrentProjectPath)) recents.UpdateRecentProjects(CurrentProject!, CurrentProjectPath!);
+        if (!string.IsNullOrEmpty(CurrentProjectPath))
+            recents.UpdateRecentProjects(CurrentProject!, CurrentProjectPath!, CurrentLocalization?.Keys.Count ?? 0);
     }
 
     /// <summary>Marks a key as edited.</summary>

@@ -15,6 +15,7 @@ builder.Services.AddScoped<WebProjectArchive>();
 builder.Services.AddScoped<IPreferencesStore, LocalStoragePreferencesStore>();
 builder.Services.AddScoped<IProjectStoreFactory, IndexedDbProjectStoreFactory>();
 builder.Services.AddScoped<IProjectLocationService, WebProjectLocationService>();
+builder.Services.AddScoped<ILocalizationProjectPicker, WebLocalizationProjectPicker>();
 builder.Services.AddScoped<IExcelInterop, WebExcelInterop>();
 builder.Services.AddScoped<RecentProjectsStore>();
 

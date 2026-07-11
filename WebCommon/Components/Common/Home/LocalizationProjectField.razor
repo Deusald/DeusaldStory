@@ -1,0 +1,94 @@
+@namespace DeusaldStoryWeb.Components.Common
+@inject ILocalizationProjectPicker _Picker
+
+<div class="lpf-root">
+    @if (_Picker.CanBrowse)
+    {
+        @* Desktop: browse to a localization project folder *@
+        @if (Selected is null)
+        {
+            <button class="lpf-browse" @onclick="Browse">
+                <i class="bi bi-folder2-open"></i> Browse for localization project…
+            </button>
+        }
+        else
+        {
+            <div class="lpf-selected">
+                <div class="lpf-selected-info">
+                    <span class="lpf-selected-name">@Selected.Name</span>
+                    <span class="lpf-selected-meta">@Selected.LanguageCount languages · main @Selected.MainLanguageId</span>
+                </div>
+                <button class="lpf-change" @onclick="Browse">Change</button>
+            </div>
+        }
+        @if (_Error is not null)
+        {
+            <div class="lpf-error">@_Error</div>
+        }
+    }
+    else
+    {
+        @* Web: pick from the localization projects stored in this browser *@
+        @if (_Loading)
+        {
+            <div class="lpf-loading"><span class="spinner"></span> Loading…</div>
+        }
+        else if (_List.Count == 0)
+        {
+            <div class="lpf-empty">No localization projects in this browser.<br/>Create one in Deusald Localizer first.</div>
+        }
+        else
+        {
+            <div class="lpf-list">
+                @foreach (LocProjectRef loc in _List)
+                {
+                    LocProjectRef item   = loc;
+                    bool          active = Selected?.Reference == item.Reference;
+                    <button class="lpf-item @(active ? "active" : "")" @onclick="() => Select(item)">
+                        <div class="lpf-item-info">
+                            <span class="lpf-item-name">@item.Name</span>
+                            <span class="lpf-item-meta">@item.LanguageCount languages · main @item.MainLanguageId</span>
+                        </div>
+                        @if (active)
+                        {
+                            <i class="bi bi-check2 lpf-item-check"></i>
+                        }
+                    </button>
+                }
+            </div>
+        }
+    }
+</div>
+
+@code {
+    [Parameter] public LocProjectRef?                Selected        { get; set; }
+    [Parameter] public EventCallback<LocProjectRef?> SelectedChanged { get; set; }
+
+    private IReadOnlyList<LocProjectRef> _List = [];
+    private bool                         _Loading;
+    private string?                      _Error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (_Picker.CanBrowse) return;
+        _Loading = true;
+        _List    = await _Picker.ListAsync();
+        _Loading = false;
+    }
+
+    private async Task Browse()
+    {
+        _Error = null;
+        try
+        {
+            if (await _Picker.BrowseAsync() is { } picked)
+                await SelectedChanged.InvokeAsync(picked);
+        }
+        catch (Exception ex)
+        {
+            _Error = $"Not a valid localization project: {ex.Message}";
+        }
+    }
+
+    private Task Select(LocProjectRef item) => SelectedChanged.InvokeAsync(item);
+}

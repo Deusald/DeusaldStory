@@ -1,0 +1,75 @@
+.rlm-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, .6);
+    backdrop-filter: blur(2px);
+    z-index: 100;
+}
+
+.rlm-box {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 101;
+    width: 440px;
+    max-width: calc(100vw - 32px);
+    background: var(--surface-1);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--r-lg);
+    box-shadow: var(--shadow-lg);
+    overflow: hidden;
+}
+
+.rlm-header {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    padding: 16px 20px 0;
+}
+.rlm-icon { font-size: 16px; color: var(--warning); }
+.rlm-title { font-size: 15px; font-weight: 600; color: var(--text-bright); }
+
+.rlm-body {
+    padding: 12px 20px 4px;
+}
+.rlm-msg {
+    font-size: 12.5px;
+    line-height: 1.55;
+    color: var(--text-dim);
+    margin-bottom: 14px;
+}
+.rlm-msg strong { color: var(--text-soft); font-weight: 600; }
+
+.rlm-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    padding: 16px 20px 20px;
+}
+
+.rlm-btn {
+    padding: 8px 16px;
+    border-radius: var(--r-sm);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    border: 1px solid transparent;
+    transition: background var(--dur) var(--ease), border-color var(--dur) var(--ease), filter var(--dur) var(--ease);
+}
+.rlm-btn:disabled { opacity: .45; cursor: not-allowed; }
+
+.rlm-btn-ghost {
+    background: transparent;
+    border-color: var(--border-strong);
+    color: var(--text-muted);
+}
+.rlm-btn-ghost:hover:not(:disabled) { background: var(--surface-3); color: var(--text-soft); }
+
+.rlm-btn-primary {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--accent-ink);
+    font-weight: 600;
+}
+.rlm-btn-primary:hover:not(:disabled) { filter: brightness(1.06); }

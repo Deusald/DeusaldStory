@@ -140,6 +140,10 @@
                      OnCancel="() => { }"
                      @ref="_NewProjectModal"/>
 
+    <RelinkLocalizationModal OnConfirm="OnRelinkConfirmed"
+                             OnCancel="OnRelinkCancelled"
+                             @ref="_RelinkModal"/>
+
     @* ── Delete confirmation ──────────────────────────────────────────── *@
     @if (_PendingDelete is not null)
     {
@@ -168,11 +172,16 @@
 </div>
 
 @code {
-    private bool                 _IsBusy;
-    private string?              _ErrorMessage;
-    private List<ProjectSummary> _Projects = new();
-    private NewProjectModal?     _NewProjectModal;
-    private ProjectSummary?      _PendingDelete;
+    private bool                     _IsBusy;
+    private string?                  _ErrorMessage;
+    private List<ProjectSummary>     _Projects = new();
+    private NewProjectModal?         _NewProjectModal;
+    private RelinkLocalizationModal? _RelinkModal;
+    private ProjectSummary?          _PendingDelete;
+
+    // Carries the story being opened across the re-link step when its localization link can't be resolved.
+    private StoryProject? _PendingStory;
+    private string?       _PendingLocation;
 
     private sealed record ProjectSummary(
         string   Location,
@@ -212,10 +221,24 @@
                     continue;
                 }
 
+                // Localization count comes from the linked loc project (shared store); fails soft to 0 when
+                // the link can't be resolved. The list must never block on it.
+                int locKeyCount = 0;
+                string locRef = project.Metadata.LocalizationProjectPath;
+                if (!string.IsNullOrEmpty(locRef))
+                {
+                    try
+                    {
+                        LocProject loc = await DeusaldLocalizerCommon.ProjectFileService.OpenAsync(_StoreFactory.Create(locRef));
+                        locKeyCount = loc.Keys.Count;
+                    }
+                    catch { /* unreachable / cross-platform / malformed */ }
+                }
+
                 found.Add(new ProjectSummary(
                     location,
                     project.Metadata.Name,
-                    project.LocKeys.Count,
+                    locKeyCount,
                     project.GetNumberOfNodes(),
                     project.Metadata.UpdatedAt));
             }
@@ -250,8 +273,19 @@
             IProjectFileStore store   = _StoreFactory.Create(location);
             StoryProject      project = await DeusaldStoryRuntime.ProjectFileService.OpenAsync(store);
 
-            _ProjectState.LoadProject(project, location, Guid.Empty, Guid.Empty);
-            _Nav.NavigateTo("/editor");
+            LocProject? loc = await _ProjectState.ResolveLocalizationAsync(project);
+            if (loc is null)
+            {
+                // The linked localization project couldn't be opened — block and make the user re-link.
+                _PendingStory    = project;
+                _PendingLocation = location;
+                _IsBusy          = false;
+                _RelinkModal?.Show(project.Metadata.Name);
+                StateHasChanged();
+                return;
+            }
+
+            FinalizeOpen(project, loc, location);
         }
         catch (Exception ex)
         {
@@ -260,11 +294,38 @@
         }
     }
 
+    private void FinalizeOpen(StoryProject project, LocProject loc, string location)
+    {
+        _ProjectState.LoadProject(project, loc, location, Guid.Empty, Guid.Empty);
+        _Nav.NavigateTo("/editor");
+    }
+
+    private async Task OnRelinkConfirmed(LocProjectRef reference)
+    {
+        if (_PendingStory is null || _PendingLocation is null) return;
+
+        LocProject? loc = await _ProjectState.RelinkAndSaveAsync(_PendingStory, _PendingLocation, reference.Reference);
+        if (loc is null)
+        {
+            _ErrorMessage = "The selected localization project could not be opened.";
+            return;
+        }
+
+        FinalizeOpen(_PendingStory, loc, _PendingLocation);
+    }
+
+    private void OnRelinkCancelled()
+    {
+        _PendingStory    = null;
+        _PendingLocation = null;
+        StateHasChanged();
+    }
+
     private void OpenNewProjectModal() => _NewProjectModal?.Show();
 
-    private void OnNewProjectConfirmed(NewProjectModal.NewProjectArgs args)
+    private async Task OnNewProjectConfirmed(NewProjectModal.NewProjectArgs args)
     {
-        _ProjectState.CreateNewProject(args.Name, args.Slug, args.Description, args.MainLanguageCode);
+        await _ProjectState.CreateNewProjectAsync(args.Name, args.Slug, args.Description, args.LocalizationReference);
         _Nav.NavigateTo("/editor");
     }
 

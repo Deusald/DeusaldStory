@@ -178,6 +178,10 @@
                      OnCancel="() => { }"
                      @ref="_NewProjectModal"/>
 
+    <RelinkLocalizationModal OnConfirm="OnRelinkConfirmed"
+                             OnCancel="OnRelinkCancelled"
+                             @ref="_RelinkModal"/>
+
 </div>
 
 @code {
@@ -187,7 +191,12 @@
     private string?                  _ErrorMessage;
     private List<RecentProjectEntry> _RecentProjects = [];
 
-    private NewProjectModal? _NewProjectModal;
+    private NewProjectModal?         _NewProjectModal;
+    private RelinkLocalizationModal? _RelinkModal;
+
+    // Carries the story being opened across the re-link step when its localization link can't be resolved.
+    private StoryProject? _PendingStory;
+    private string?       _PendingLocation;
 
     private UpdateInfo? _UpdateInfo;
     private bool        _IsUpdating;
@@ -270,7 +279,20 @@
         try
         {
             StoryProject project = await DeusaldStoryRuntime.ProjectFileService.OpenAsync(path);
-            FinalizeLoad(project, path);
+
+            LocProject? loc = await _ProjectState.ResolveLocalizationAsync(project);
+            if (loc is null)
+            {
+                // The linked localization project couldn't be opened — block and make the user re-link.
+                _PendingStory    = project;
+                _PendingLocation = path;
+                _IsLoading       = false;
+                _RelinkModal?.Show(project.Metadata.Name);
+                StateHasChanged();
+                return;
+            }
+
+            FinalizeOpen(project, loc, path);
         }
         catch (DeusaldStoryRuntime.ProjectFolderException ex)
         {
@@ -284,12 +306,33 @@
         }
     }
 
-    private void FinalizeLoad(StoryProject project, string path)
+    private void FinalizeOpen(StoryProject project, LocProject loc, string path)
     {
-        _ProjectState.LoadProject(project, path, Guid.Empty, Guid.Empty);
-        _RecentProjects = _Recents.UpdateRecentProjects(project, path);
+        _ProjectState.LoadProject(project, loc, path, Guid.Empty, Guid.Empty);
+        _RecentProjects = _Recents.UpdateRecentProjects(project, path, loc.Keys.Count);
         _IsLoading      = false;
         _Nav.NavigateTo("/editor");
+    }
+
+    private async Task OnRelinkConfirmed(LocProjectRef reference)
+    {
+        if (_PendingStory is null || _PendingLocation is null) return;
+
+        LocProject? loc = await _ProjectState.RelinkAndSaveAsync(_PendingStory, _PendingLocation, reference.Reference);
+        if (loc is null)
+        {
+            _ErrorMessage = "The selected localization project could not be opened.";
+            return;
+        }
+
+        FinalizeOpen(_PendingStory, loc, _PendingLocation);
+    }
+
+    private void OnRelinkCancelled()
+    {
+        _PendingStory    = null;
+        _PendingLocation = null;
+        StateHasChanged();
     }
 
     // ── New project ───────────────────────────────────────────────────────
@@ -299,9 +342,9 @@
 
     private void OpenNewProjectModal() => _NewProjectModal?.Show();
 
-    private void OnNewProjectConfirmed(NewProjectModal.NewProjectArgs args)
+    private async Task OnNewProjectConfirmed(NewProjectModal.NewProjectArgs args)
     {
-        _ProjectState.CreateNewProject(args.Name, args.Slug, args.Description, args.MainLanguageCode);
+        await _ProjectState.CreateNewProjectAsync(args.Name, args.Slug, args.Description, args.LocalizationReference);
         _Nav.NavigateTo("/editor");
     }
 
