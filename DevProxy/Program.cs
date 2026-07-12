@@ -1,4 +1,3 @@
-using System.Net;
 using System.Text;
 using Yarp.ReverseProxy.Configuration;
 using Yarp.ReverseProxy.Transforms;
@@ -21,9 +20,9 @@ using Yarp.ReverseProxy.Transforms;
 // http://localhost:8080 for Story and http://localhost:8080/loc/ for the Localizer.
 // ─────────────────────────────────────────────────────────────────────────────
 
-const string STORY_ADDRESS = "http://localhost:5125"; // Story    WebApp launch profile 'http'
-const string LOC_ADDRESS   = "http://localhost:5047"; // Localizer WebApp launch profile 'http'
-const string LOC_PREFIX    = "/loc";                  // sub-path the Localizer is mounted under
+const string story_Address = "http://localhost:5125"; // Story    WebApp launch profile 'http'
+const string loc_Address   = "http://localhost:5047"; // Localizer WebApp launch profile 'http'
+const string loc_Prefix    = "/loc";                  // sub-path the Localizer is mounted under
 
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 
@@ -34,7 +33,7 @@ RouteConfig[] routes =
     // Localizer under /loc/* — strip the prefix before forwarding, and rewrite its
     // <base href> so the app's relative assets (_framework, css, …) resolve back
     // through /loc/ and route here again. Order 1 so it wins over the root catch-all.
-    new RouteConfig
+    new()
     {
         RouteId = "loc",
         ClusterId = "loc",
@@ -42,7 +41,7 @@ RouteConfig[] routes =
         Match = new RouteMatch { Path = "/loc/{**catch-all}" },
     },
     // Everything else is the Story app at the origin root (base href stays "/").
-    new RouteConfig
+    new()
     {
         RouteId = "story",
         ClusterId = "story",
@@ -53,20 +52,20 @@ RouteConfig[] routes =
 
 ClusterConfig[] clusters =
 [
-    new ClusterConfig
+    new()
     {
         ClusterId = "story",
         Destinations = new Dictionary<string, DestinationConfig>
         {
-            ["d1"] = new DestinationConfig { Address = STORY_ADDRESS },
+            ["d1"] = new() { Address = story_Address },
         },
     },
-    new ClusterConfig
+    new()
     {
         ClusterId = "loc",
         Destinations = new Dictionary<string, DestinationConfig>
         {
-            ["d1"] = new DestinationConfig { Address = LOC_ADDRESS },
+            ["d1"] = new() { Address = loc_Address },
         },
     },
 ];
@@ -79,7 +78,7 @@ builder.Services
             if (context.Route.RouteId != "loc") return;
 
             // Strip the /loc mount prefix so the upstream dev server sees root-relative paths.
-            context.AddPathRemovePrefix(LOC_PREFIX);
+            context.AddPathRemovePrefix(loc_Prefix);
 
             // Ask upstream for uncompressed bytes so the HTML rewrite below can read the body
             // as text without having to inflate gzip/brotli first.
@@ -117,9 +116,9 @@ WebApplication app = builder.Build();
 // unlike endpoint routing, PathString compares the trailing slash literally.
 app.Use((ctx, next) =>
 {
-    if (ctx.Request.Path == LOC_PREFIX)
+    if (ctx.Request.Path == loc_Prefix)
     {
-        ctx.Response.Redirect(LOC_PREFIX + "/");
+        ctx.Response.Redirect(loc_Prefix + "/");
         return Task.CompletedTask;
     }
     return next();
@@ -128,6 +127,6 @@ app.Use((ctx, next) =>
 app.MapReverseProxy();
 
 app.Logger.LogInformation("Dev proxy on http://localhost:8080  →  Story '/'  |  Localizer '/loc/'");
-app.Logger.LogInformation("Start the Story WebApp ({Story}) and Localizer WebApp ({Loc}) too.", STORY_ADDRESS, LOC_ADDRESS);
+app.Logger.LogInformation("Start the Story WebApp ({Story}) and Localizer WebApp ({Loc}) too.", story_Address, loc_Address);
 
 app.Run();
