@@ -23,5 +23,8 @@ namespace DeusaldStoryCommon
 
         public List<Guid> Containers { get; } = new();
         public List<Guid> Logic      { get; } = new();
+
+        /// <summary>Wires between the connection points of this container's own boundary and its children.</summary>
+        public List<StoryConnection> Connections { get; } = new();
     }
 }

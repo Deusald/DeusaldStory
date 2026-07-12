@@ -8,7 +8,7 @@
             <i class="bi bi-plus-lg"></i> Add node
         </button>
         <span class="edg-tool-count">@Nodes.Count nodes</span>
-        <span class="edg-tool-hint">right-click the canvas to add</span>
+        <span class="edg-tool-hint">drag a port to connect · double-click a container to open it</span>
     </div>
 
     @* ── Canvas ──────────────────────────────────────────────────────── *@
@@ -22,30 +22,60 @@
 
         <div class="edg-world" style="transform: translate(@F(_PanX)px, @F(_PanY)px) scale(@F(_Scale));">
 
-            @{ Dictionary<Guid, EdNode> map = Nodes.ToDictionary(n => n.Id); }
+            @{
+                Dictionary<Guid, PortAnchor> anchors = BuildAnchors();
+                _Anchors = anchors;
+            }
 
             @* Edge layer *@
             <svg class="edg-edges" xmlns="http://www.w3.org/2000/svg">
                 @foreach (EdEdge edge in Edges)
                 {
-                    if (!map.TryGetValue(edge.From, out EdNode? from) || !map.TryGetValue(edge.To, out EdNode? to))
+                    if (!anchors.TryGetValue(edge.FromPoint, out PortAnchor from) ||
+                        !anchors.TryGetValue(edge.ToPoint,   out PortAnchor to))
                         continue;
 
-                    bool active = edge.From == SelectedId || edge.To == SelectedId;
-                    <path d="@EdgePath(from, to)"
+                    EdEdge e      = edge;
+                    bool   active = edge.Id == _SelectedEdgeId;
+                    <path d="@EdgePath(from.X, from.Y, to.X, to.Y)"
+                          class="edg-edge-hit"
+                          fill="none"
+                          @onpointerdown="() => SelectEdge(e.Id)" @onpointerdown:stopPropagation="true"
+                          @oncontextmenu="() => OnDisconnect.InvokeAsync(e.Id)"
+                          @oncontextmenu:stopPropagation="true" @oncontextmenu:preventDefault="true"/>
+                    <path d="@EdgePath(from.X, from.Y, to.X, to.Y)"
                           class="edg-edge @(active ? "edg-edge-active" : "")"
                           fill="none"/>
+
+                    @if (active)
+                    {
+                        double mx = (from.X + to.X) / 2, my = (from.Y + to.Y) / 2;
+                        <g class="edg-edge-del" transform="translate(@F(mx) @F(my))"
+                           @onpointerdown="() => OnDisconnect.InvokeAsync(e.Id)" @onpointerdown:stopPropagation="true">
+                            <circle r="9"/>
+                            <line x1="-3.5" y1="-3.5" x2="3.5" y2="3.5"/>
+                            <line x1="3.5" y1="-3.5" x2="-3.5" y2="3.5"/>
+                        </g>
+                    }
+                }
+
+                @* Temp edge while dragging a new connection *@
+                @if (_ConnFrom is Guid connFrom && anchors.TryGetValue(connFrom, out PortAnchor src))
+                {
+                    <path d="@EdgePath(src.X, src.Y, _ConnX, _ConnY)" class="edg-edge edg-edge-temp" fill="none"/>
                 }
             </svg>
 
             @* Nodes *@
             @foreach (EdNode node in Nodes)
             {
-                EdNode n = node;
+                EdNode n     = node;
                 string color = StoryStyle.NodeColor(n.Kind);
+                bool   sub   = HasSub(n);
                 <div class="edg-node @NodeClass(n)"
-                     style="left:@F(n.X)px; top:@F(n.Y)px;"
+                     style="left:@F(n.X)px; top:@F(n.Y)px; height:@F(NodeHeight(n))px;"
                      @onpointerdown="e => NodeDown(e, n)" @onpointerdown:stopPropagation="true"
+                     @ondblclick="() => OnNodeActivated.InvokeAsync(n)" @ondblclick:stopPropagation="true"
                      @oncontextmenu:stopPropagation="true" @oncontextmenu:preventDefault="true">
 
                     <div class="edg-node-head">
@@ -61,38 +91,39 @@
                         }
                     </div>
                     <div class="edg-node-title">@n.Title</div>
-                    @if (!string.IsNullOrEmpty(n.Subtitle))
+                    @if (sub)
                     {
                         <div class="edg-node-preview">@n.Subtitle</div>
                     }
 
-                    @* Ports live in their own row so their dots/labels never overlap the title. *@
-                    <div class="edg-node-ports">
-                        <div class="edg-ports-col edg-ports-in">
-                            @foreach (EdPort port in n.Inputs)
+                    @* Input ports — dots hang on the left border, connections drop onto them. *@
+                    @for (int i = 0; i < n.Inputs.Count; ++i)
+                    {
+                        EdPort port = n.Inputs[i];
+                        <div class="edg-port-anchor edg-port-in" style="top:@F(PortCenterY(n, i))px;">
+                            <span class="edg-port" style="background:@color"
+                                  @onpointerdown:stopPropagation="true"
+                                  @onpointerup="() => CompleteConnect(port.Id)" @onpointerup:stopPropagation="true"></span>
+                            @if (ShowPortLabels(n) && !string.IsNullOrEmpty(port.Name))
                             {
-                                <span class="edg-port-row">
-                                    <span class="edg-port" style="background:@color"></span>
-                                    @if (ShowPortLabels(n) && !string.IsNullOrEmpty(port.Name))
-                                    {
-                                        <span class="edg-port-label">@port.Name</span>
-                                    }
-                                </span>
+                                <span class="edg-port-label">@port.Name</span>
                             }
                         </div>
-                        <div class="edg-ports-col edg-ports-out">
-                            @foreach (EdPort port in n.Outputs)
+                    }
+
+                    @* Output ports — drag from a dot to start wiring the next node. *@
+                    @for (int i = 0; i < n.Outputs.Count; ++i)
+                    {
+                        EdPort port = n.Outputs[i];
+                        <div class="edg-port-anchor edg-port-out" style="top:@F(PortCenterY(n, i))px;">
+                            <span class="edg-port" style="background:@color"
+                                  @onpointerdown="e => StartConnect(e, port.Id)" @onpointerdown:stopPropagation="true"></span>
+                            @if (ShowPortLabels(n) && !string.IsNullOrEmpty(port.Name))
                             {
-                                <span class="edg-port-row">
-                                    @if (ShowPortLabels(n) && !string.IsNullOrEmpty(port.Name))
-                                    {
-                                        <span class="edg-port-label">@port.Name</span>
-                                    }
-                                    <span class="edg-port" style="background:@color"></span>
-                                </span>
+                                <span class="edg-port-label">@port.Name</span>
                             }
                         </div>
-                    </div>
+                    }
                 </div>
             }
         </div>
@@ -123,16 +154,31 @@
 </div>
 
 @code {
-    [Parameter] public List<EdNode>         Nodes           { get; set; } = [];
-    [Parameter] public List<EdEdge>         Edges           { get; set; } = [];
-    [Parameter] public Guid                 SelectedId      { get; set; }
-    [Parameter] public EventCallback<Guid>  SelectedChanged { get; set; }
-    [Parameter] public EventCallback             OnAddNode          { get; set; }
-    [Parameter] public EventCallback<EdNode>     OnNodeMoved        { get; set; }
+    [Parameter] public List<EdNode>              Nodes               { get; set; } = [];
+    [Parameter] public List<EdEdge>              Edges               { get; set; } = [];
+    [Parameter] public Guid                      SelectedId          { get; set; }
+    [Parameter] public EventCallback<Guid>       SelectedChanged     { get; set; }
+    [Parameter] public EventCallback             OnAddNode           { get; set; }
+    [Parameter] public EventCallback<EdNode>     OnNodeMoved         { get; set; }
+    [Parameter] public EventCallback<EdNode>     OnNodeActivated     { get; set; }
     [Parameter] public EventCallback<CanvasPoint> OnCanvasContextMenu { get; set; }
+    [Parameter] public EventCallback<EdConnectRequest> OnConnect     { get; set; }
+    [Parameter] public EventCallback<Guid>       OnDisconnect        { get; set; }
 
-    private const double NODE_W = 216;  // fixed card width (keep in sync with .edg-node)
-    private const double PORT_Y = 46;   // vertical anchor of the ports from the card top
+    // ── Node layout constants (must match the absolute positions in EditorGraph.razor.css) ──
+    private const double NODE_W       = 216; // fixed card width
+    private const double HEAD_TOP     = 12;  // kind row top
+    private const double HEAD_H       = 16;
+    private const double TITLE_GAP    = 8;
+    private const double TITLE_H      = 20;
+    private const double SUB_GAP      = 6;
+    private const double SUB_H        = 16;
+    private const double PORTS_GAP    = 14;  // space between the header block and the first port
+    private const double PORT_SLOT    = 24;  // vertical pitch of a port row
+    private const double PORTS_BOTTOM = 14;  // padding below the last port
+
+    /// <summary>A resolved connection-point position in world coordinates, keyed by point id.</summary>
+    private readonly record struct PortAnchor(double X, double Y, bool IsOutput);
 
     private double _Scale = 1;
     private double _PanX  = 24;
@@ -143,6 +189,38 @@
     private bool    _DragMoved;
     private double  _LastClientX;
     private double  _LastClientY;
+
+    private Guid?  _SelectedEdgeId;
+    private Guid?  _ConnFrom; // output point currently being dragged from
+    private double _ConnX;    // temp-edge end, world coordinates
+    private double _ConnY;
+
+    private Dictionary<Guid, PortAnchor> _Anchors = new();
+
+    // ── Node geometry ──────────────────────────────────────────────────────
+
+    private static bool HasSub(EdNode n) => !string.IsNullOrEmpty(n.Subtitle);
+
+    private static double PortsTop(EdNode n) =>
+        HEAD_TOP + HEAD_H + TITLE_GAP + TITLE_H + (HasSub(n) ? SUB_GAP + SUB_H : 0) + PORTS_GAP;
+
+    private static double PortCenterY(EdNode n, int slot) => PortsTop(n) + slot * PORT_SLOT + PORT_SLOT / 2;
+
+    private static double NodeHeight(EdNode n) =>
+        PortsTop(n) + Math.Max(1, Math.Max(n.Inputs.Count, n.Outputs.Count)) * PORT_SLOT + PORTS_BOTTOM;
+
+    private Dictionary<Guid, PortAnchor> BuildAnchors()
+    {
+        Dictionary<Guid, PortAnchor> anchors = new();
+        foreach (EdNode n in Nodes)
+        {
+            for (int i = 0; i < n.Inputs.Count; ++i)
+                anchors[n.Inputs[i].Id] = new PortAnchor(n.X, n.Y + PortCenterY(n, i), false);
+            for (int i = 0; i < n.Outputs.Count; ++i)
+                anchors[n.Outputs[i].Id] = new PortAnchor(n.X + NODE_W, n.Y + PortCenterY(n, i), true);
+        }
+        return anchors;
+    }
 
     // ── Node styling ───────────────────────────────────────────────────────
 
@@ -166,24 +244,31 @@
 
     private void CanvasDown(PointerEventArgs e)
     {
-        _Panning     = true;
-        _LastClientX = e.ClientX;
-        _LastClientY = e.ClientY;
+        _SelectedEdgeId = null;
+        _Panning        = true;
+        _LastClientX    = e.ClientX;
+        _LastClientY    = e.ClientY;
     }
 
     private async Task NodeDown(PointerEventArgs e, EdNode node)
     {
-        _DragNode    = node;
-        _DragMoved   = false;
-        _Panning     = false;
-        _LastClientX = e.ClientX;
-        _LastClientY = e.ClientY;
+        _SelectedEdgeId = null;
+        _DragNode       = node;
+        _DragMoved      = false;
+        _Panning        = false;
+        _LastClientX    = e.ClientX;
+        _LastClientY    = e.ClientY;
         if (node.Id != SelectedId) await SelectedChanged.InvokeAsync(node.Id);
     }
 
     private void CanvasMove(PointerEventArgs e)
     {
-        if (_DragNode is not null)
+        if (_ConnFrom is not null)
+        {
+            _ConnX += (e.ClientX - _LastClientX) / _Scale;
+            _ConnY += (e.ClientY - _LastClientY) / _Scale;
+        }
+        else if (_DragNode is not null)
         {
             _DragNode.X += (e.ClientX - _LastClientX) / _Scale;
             _DragNode.Y += (e.ClientY - _LastClientY) / _Scale;
@@ -211,6 +296,7 @@
         _Panning   = false;
         _DragNode  = null;
         _DragMoved = false;
+        _ConnFrom  = null; // released away from an input port — cancel the pending wire
     }
 
     private void OnWheel(WheelEventArgs e)
@@ -218,6 +304,30 @@
         double factor = e.DeltaY < 0 ? 1.1 : 1 / 1.1;
         _Scale = Math.Clamp(_Scale * factor, 0.35, 2.2);
     }
+
+    // ── Connecting ports ───────────────────────────────────────────────────
+
+    private void StartConnect(PointerEventArgs e, Guid fromPoint)
+    {
+        _ConnFrom       = fromPoint;
+        _SelectedEdgeId = null;
+        if (_Anchors.TryGetValue(fromPoint, out PortAnchor a))
+        {
+            _ConnX = a.X;
+            _ConnY = a.Y;
+        }
+        _LastClientX = e.ClientX;
+        _LastClientY = e.ClientY;
+    }
+
+    private async Task CompleteConnect(Guid toPoint)
+    {
+        if (_ConnFrom is Guid from && from != toPoint)
+            await OnConnect.InvokeAsync(new EdConnectRequest(from, toPoint));
+        _ConnFrom = null;
+    }
+
+    private void SelectEdge(Guid edgeId) => _SelectedEdgeId = edgeId;
 
     // ── Context menu ───────────────────────────────────────────────────────
 
@@ -231,10 +341,8 @@
 
     // ── Edge geometry ──────────────────────────────────────────────────────
 
-    private static string EdgePath(EdNode from, EdNode to)
+    private static string EdgePath(double x1, double y1, double x2, double y2)
     {
-        double x1 = from.X + NODE_W, y1 = from.Y + PORT_Y;
-        double x2 = to.X,            y2 = to.Y + PORT_Y;
         double dx = Math.Max(40, Math.Abs(x2 - x1) / 2);
         return $"M {F(x1)} {F(y1)} C {F(x1 + dx)} {F(y1)}, {F(x2 - dx)} {F(y2)}, {F(x2)} {F(y2)}";
     }

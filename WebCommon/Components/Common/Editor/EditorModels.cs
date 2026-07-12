@@ -69,12 +69,20 @@ namespace DeusaldStoryWeb
         public List<EdBlock> Blocks { get; } = new();
     }
 
-    /// <summary>A directed connection between two nodes (output of <see cref="From"/> → input of <see cref="To"/>).</summary>
+    /// <summary>
+    /// A directed connection drawn on the canvas: from an output port (<see cref="FromPoint"/>) to an input
+    /// port (<see cref="ToPoint"/>). Ports are identified by their connection-point id; the graph resolves each
+    /// to its owning node and exact anchor position.
+    /// </summary>
     public sealed class EdEdge
     {
-        public Guid From { get; init; }
-        public Guid To   { get; init; }
+        public Guid Id        { get; init; }
+        public Guid FromPoint { get; init; }
+        public Guid ToPoint   { get; init; }
     }
+
+    /// <summary>A user request to wire an output port to an input port, raised by the graph on drop.</summary>
+    public readonly record struct EdConnectRequest(Guid FromPoint, Guid ToPoint);
 
     /// <summary>A single content block shown in the inspector (mock — content authoring is a later step).</summary>
     public sealed class EdBlock
@@ -165,6 +173,12 @@ namespace DeusaldStoryWeb
 
             return nodes;
         }
+
+        /// <summary>Projects a container's persisted connections into canvas edges.</summary>
+        public static List<EdEdge> BuildEdges(StoryContainerNode container) =>
+            container.Connections
+                     .Select(c => new EdEdge { Id = c.Id, FromPoint = c.FromPoint, ToPoint = c.ToPoint })
+                     .ToList();
     }
 
     /// <summary>Maps the editor view-model kinds to their design-token colours and labels.</summary>

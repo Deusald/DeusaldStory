@@ -163,6 +163,37 @@ public class ProjectStateService(
         return node;
     }
 
+    /// <summary>
+    /// Wires an output point (<paramref name="fromPoint"/>) to an input point (<paramref name="toPoint"/>) inside
+    /// <paramref name="containerId"/>. An exit/output can only lead to one place, so any existing connection leaving
+    /// <paramref name="fromPoint"/> is replaced. A no-op (returns null) if the exact wire already exists.
+    /// </summary>
+    public StoryConnection? Connect(Guid containerId, Guid fromPoint, Guid toPoint)
+    {
+        if (!CurrentProject!.ContainerNodes.TryGetValue(containerId, out StoryContainerNode? container))
+            return null;
+
+        if (container.Connections.Exists(c => c.FromPoint == fromPoint && c.ToPoint == toPoint))
+            return null;
+
+        container.Connections.RemoveAll(c => c.FromPoint == fromPoint);
+
+        StoryConnection connection = new() { FromPoint = fromPoint, ToPoint = toPoint };
+        container.Connections.Add(connection);
+        MarkKeyDirty(containerId);
+        return connection;
+    }
+
+    /// <summary>Removes the connection with <paramref name="connectionId"/> from <paramref name="containerId"/>.</summary>
+    public void Disconnect(Guid containerId, Guid connectionId)
+    {
+        if (!CurrentProject!.ContainerNodes.TryGetValue(containerId, out StoryContainerNode? container))
+            return;
+
+        if (container.Connections.RemoveAll(c => c.Id == connectionId) > 0)
+            MarkKeyDirty(containerId);
+    }
+
     public void LoadProject(StoryProject project, LocProject? localization, string folderPath, Guid userId, Guid accessToken)
     {
         CurrentProject      = project;

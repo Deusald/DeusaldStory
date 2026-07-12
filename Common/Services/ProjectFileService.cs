@@ -30,7 +30,7 @@ namespace DeusaldStoryCommon
         public const string METADATA_FILE_NAME     = "metadata.json";
         public const string CONTAINERS_FOLDER      = "Containers";
         public const string LOGIC_FOLDER           = "Logic";
-        public const int    CURRENT_FORMAT_VERSION = 2;
+        public const int    CURRENT_FORMAT_VERSION = 3;
 
         private static readonly JsonSerializerSettings _JsonSettings = new()
         {

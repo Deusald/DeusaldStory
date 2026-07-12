@@ -29,6 +29,9 @@
                              SelectedChanged="OnSelect"
                              OnAddNode="OnAddNode"
                              OnNodeMoved="OnNodeMoved"
+                             OnNodeActivated="OnNodeActivated"
+                             OnConnect="OnConnect"
+                             OnDisconnect="OnDisconnect"
                              OnCanvasContextMenu="OnCanvasContextMenu"/>
             }
             else
@@ -99,9 +102,11 @@
         if (!Project.ContainerNodes.TryGetValue(_CurrentContainerId, out StoryContainerNode? container))
         {
             _Nodes = [];
+            _Edges = [];
             return;
         }
         _Nodes = EditorProjection.BuildNodes(Project, container, IsRootContainer);
+        _Edges = EditorProjection.BuildEdges(container);
     }
 
     private void OnModeChanged(EditorMode mode) => _Mode = mode;
@@ -117,6 +122,34 @@
             _CurrentContainerId = _Crumbs[^1].Id;
             RebuildNodes();
         }
+    }
+
+    // ── Drill-down / connections ───────────────────────────────────────────
+
+    /// <summary>Double-click a node: a container opens its inner graph (a logic node has none yet).</summary>
+    private void OnNodeActivated(EdNode node)
+    {
+        if (node.Kind != StoryNodeKind.Container) return;
+        if (!Project.ContainerNodes.TryGetValue(node.Id, out StoryContainerNode? child)) return;
+
+        _CurrentContainerId = child.Id;
+        _Crumbs.Add(new EditorCrumb(child.Id, child.Name));
+        _SelectedId = Guid.Empty;
+        RebuildNodes();
+    }
+
+    /// <summary>Wire an output port to an input port in the current container.</summary>
+    private void OnConnect(EdConnectRequest request)
+    {
+        _ProjectState.Connect(_CurrentContainerId, request.FromPoint, request.ToPoint);
+        RebuildNodes();
+    }
+
+    /// <summary>Remove a connection from the current container.</summary>
+    private void OnDisconnect(Guid connectionId)
+    {
+        _ProjectState.Disconnect(_CurrentContainerId, connectionId);
+        RebuildNodes();
     }
 
     // ── Add node (palette → detail modal) ──────────────────────────────────

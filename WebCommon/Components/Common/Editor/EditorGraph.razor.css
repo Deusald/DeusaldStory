@@ -96,13 +96,30 @@
     stroke: var(--accent);
     stroke-width: 2.5;
 }
+.edg-edge-temp {
+    stroke: var(--accent);
+    stroke-width: 2.5;
+    stroke-dasharray: 5 4;
+}
+
+/* Wide invisible path so thin edges are still easy to click / right-click. */
+.edg-edge-hit {
+    stroke: transparent;
+    stroke-width: 14;
+    pointer-events: stroke;
+    cursor: pointer;
+}
+
+/* Delete affordance at the midpoint of the selected edge. */
+.edg-edge-del { cursor: pointer; pointer-events: auto; }
+.edg-edge-del circle { fill: var(--danger); }
+.edg-edge-del line   { stroke: #fff; stroke-width: 1.6; stroke-linecap: round; }
 
 /* ── Node card ───────────────────────────────────────────────────────────── */
 
 .edg-node {
     position: absolute;
     width: 216px;
-    padding: 12px 14px;
     background: var(--surface-2);
     border: 1px solid var(--border);
     border-radius: var(--r-lg);
@@ -132,11 +149,15 @@
 }
 
 .edg-node-head {
+    position: absolute;
+    top: 12px;
+    left: 14px;
+    right: 12px;
+    height: 16px;
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 8px;
-    margin-bottom: 7px;
 }
 
 .edg-node-kind {
@@ -157,72 +178,76 @@
 }
 
 .edg-node-title {
+    position: absolute;
+    top: 36px;
+    left: 14px;
+    right: 14px;
+    height: 20px;
     font-size: 14px;
     font-weight: 600;
     color: var(--text-bright);
-    line-height: 1.25;
-    margin-bottom: 5px;
+    line-height: 20px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .edg-node-preview {
+    position: absolute;
+    top: 62px;
+    left: 14px;
+    right: 14px;
+    height: 16px;
     font-size: 11.5px;
-    line-height: 1.45;
+    line-height: 16px;
     color: var(--text-dim);
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
+    white-space: nowrap;
     overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 /* ── Ports ───────────────────────────────────────────────────────────────── */
 
-/* A dedicated row below the card body: inputs on the left, outputs on the right.
-   Kept in normal flow (not absolute) so dots and labels never overlap the title. */
-.edg-node-ports {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    gap: 14px;
-    margin-top: 10px;
+/* Each port is a zero-size anchor pinned at a computed Y; the dot is centred on the card's
+   left/right border and its label sits just inside. The anchor's top matches the exact
+   world Y used to route edges, so wires always meet the dot. */
+.edg-port-anchor {
+    position: absolute;
+    width: 0;
+    height: 0;
 }
-
-.edg-ports-col {
-    display: flex;
-    flex-direction: column;
-    gap: 7px;
-    min-width: 0;
-}
-.edg-ports-in  { align-items: flex-start; }
-.edg-ports-out { align-items: flex-end; }
-
-.edg-port-row {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    max-width: 100%;
-}
+.edg-port-in  { left: 0; }
+.edg-port-out { left: 216px; }
 
 .edg-port {
+    position: absolute;
+    top: 0;
+    left: 0;
     width: 11px;
     height: 11px;
     border-radius: 50%;
     border: 2.5px solid var(--surface-2);
     box-sizing: content-box;
-    flex-shrink: 0;
+    transform: translate(-50%, -50%);
+    cursor: crosshair;
+    transition: transform var(--dur) var(--ease);
 }
-/* Hang the dots on the card's border (card padding is 14px). */
-.edg-ports-in  .edg-port { margin-left: -19px; }
-.edg-ports-out .edg-port { margin-right: -19px; }
+.edg-port:hover { transform: translate(-50%, -50%) scale(1.25); }
 
 .edg-port-label {
+    position: absolute;
+    top: -7px;
     font-size: 10.5px;
     font-weight: 500;
     color: var(--text-dim);
+    line-height: 14px;
     white-space: nowrap;
-    max-width: 80px;
+    max-width: 84px;
     overflow: hidden;
     text-overflow: ellipsis;
 }
+.edg-port-in  .edg-port-label { left: 12px; }
+.edg-port-out .edg-port-label { right: 12px; text-align: right; }
 
 /* ── Minimap ─────────────────────────────────────────────────────────────── */
 
