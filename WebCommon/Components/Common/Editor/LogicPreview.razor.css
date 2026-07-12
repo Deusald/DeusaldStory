@@ -13,7 +13,9 @@
 
 /* Dark/Light toggle — flips only the inner screen. */
 .lpv-toolbar {
-    width: min(560px, 100%);
+    width: 50%;
+    min-width: 360px;
+    max-width: 100%;
     display: flex;
     justify-content: flex-end;
     margin-bottom: 16px;
@@ -48,7 +50,9 @@
 
 /* A screen: title heading + a framed icon/text row. */
 .lpv-screen {
-    width: min(560px, 100%);
+    width: 50%;
+    min-width: 360px;
+    max-width: 100%;
     background: var(--surface-1);
     border: 1px solid var(--border-strong);
     border-radius: var(--r-lg);
@@ -111,11 +115,6 @@
     max-width: 100%;
     max-height: 100%;
     image-rendering: pixelated;
-}
-.lpv-icon-empty {
-    color: var(--text-fainter);
-    font-size: 26px;
-    border-style: dashed;
 }
 
 .lpv-text {

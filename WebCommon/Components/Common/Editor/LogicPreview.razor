@@ -40,12 +40,6 @@
                     <img src="data:image/png;base64,@_IconData" alt="icon"/>
                 </div>
             }
-            else
-            {
-                <div class="lpv-icon lpv-icon-empty">
-                    <i class="bi bi-image"></i>
-                </div>
-            }
             <div class="lpv-text @(string.IsNullOrEmpty(_Title) ? "lpv-placeholder" : "")">
                 @(string.IsNullOrEmpty(_Title) ? "No text connected" : _Title)
             </div>
