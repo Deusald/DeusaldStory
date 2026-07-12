@@ -27,7 +27,8 @@
                              Edges="_Edges"
                              SelectedId="_SelectedId"
                              SelectedChanged="OnSelect"
-                             OnAddNode="OnAddNode"/>
+                             OnAddNode="OnAddNode"
+                             OnNodeMoved="OnNodeMoved"/>
             }
             else
             {
@@ -48,14 +49,21 @@
     </div>
 </div>
 
+<NewLogicNodeModal @ref="_NewLogicNodeModal" OnConfirm="OnNewLogicNodeConfirmed"/>
+
 @code {
     private EditorMode        _Mode = EditorMode.Edit;
     private Guid              _SelectedId;
+    private Guid              _CurrentContainerId;
     private List<EditorCrumb> _Crumbs = [];
-    private List<EdNode>     _Nodes = [];
-    private List<EdEdge>     _Edges = [];
+    private List<EdNode>      _Nodes  = [];
+    private List<EdEdge>      _Edges  = [];
+
+    private NewLogicNodeModal? _NewLogicNodeModal;
 
     private EdNode? _SelectedNode => _Nodes.Find(n => n.Id == _SelectedId);
+
+    private StoryProject Project => _ProjectState.CurrentProject!;
 
     protected override void OnInitialized()
     {
@@ -66,8 +74,25 @@
             return;
         }
 
-        _Crumbs = [new EditorCrumb(Guid.Empty, "Base")];
-        BuildSampleGraph();
+        _CurrentContainerId = Project.Metadata.RootStoryContainerNodeId;
+        _Crumbs             = [new EditorCrumb(_CurrentContainerId, RootName())];
+        RebuildNodes();
+    }
+
+    private string RootName() =>
+        Project.ContainerNodes.TryGetValue(_CurrentContainerId, out StoryContainerNode? root) ? root.Name : "Root";
+
+    private bool IsRootContainer => _CurrentContainerId == Project.Metadata.RootStoryContainerNodeId;
+
+    /// <summary>Re-projects the current container's persisted contents into the canvas view models.</summary>
+    private void RebuildNodes()
+    {
+        if (!Project.ContainerNodes.TryGetValue(_CurrentContainerId, out StoryContainerNode? container))
+        {
+            _Nodes = [];
+            return;
+        }
+        _Nodes = EditorProjection.BuildNodes(Project, container, IsRootContainer);
     }
 
     private void OnModeChanged(EditorMode mode) => _Mode = mode;
@@ -78,59 +103,68 @@
     {
         // Drill back up to the clicked container (only the root exists for now).
         if (index < _Crumbs.Count - 1)
-            _Crumbs = _Crumbs.GetRange(0, index + 1);
+        {
+            _Crumbs             = _Crumbs.GetRange(0, index + 1);
+            _CurrentContainerId = _Crumbs[^1].Id;
+            RebuildNodes();
+        }
     }
 
-    private void OnAddNode()
+    // ── Add logic node ─────────────────────────────────────────────────────
+
+    private void OnAddNode() => _NewLogicNodeModal?.Show();
+
+    private void OnNewLogicNodeConfirmed(NewLogicNodeModal.NewLogicNodeArgs args)
     {
-        EdNode node = new()
-        {
-            Kind    = StoryNodeKind.Scene,
-            Tag     = "new",
-            Title   = "New scene",
-            Preview = "An empty scene. Add content blocks in the inspector.",
-            X       = 420 + _Nodes.Count % 5 * 26,
-            Y       = 520 + _Nodes.Count % 5 * 12
-        };
-        node.Blocks.Add(new EdBlock { Kind = StoryBlockKind.Narration, Text = "…" });
-        _Nodes.Add(node);
+        StoryConnectionPoint entry = new() { Name = args.EntryName };
+        List<StoryConnectionPoint> exits = args.ExitNames
+                                               .Select(n => new StoryConnectionPoint { Name = n })
+                                               .ToList();
+
+        // Stagger new nodes so a burst of additions doesn't stack on one spot.
+        int count = Project.LogicNodes.Count;
+        double x  = 320 + count % 5 * 30;
+        double y  = 120 + count % 5 * 26;
+
+        StoryLogicNode node = _ProjectState.AddLogicNode(_CurrentContainerId, args.Name, args.Description, entry, exits, x, y);
+
+        RebuildNodes();
         _SelectedId = node.Id;
     }
 
-    // ── Mock story (mirrors the design mock-up) ────────────────────────────
-    // Placeholder data until the runtime model carries node kinds / blocks / positions.
-    private void BuildSampleGraph()
+    // ── Persist a drag ─────────────────────────────────────────────────────
+
+    private void OnNodeMoved(EdNode moved)
     {
-        EdNode start  = Node(StoryNodeKind.Start,  "start",  "Prologue",              "The road to Vael narrows as the sun dies behind the hills.",  40,  210);
-        EdNode gate   = Node(StoryNodeKind.Scene,  "gate",   "Arrival at the Gate",   "Dusk bleeds over the walls. A single guard blocks the postern gate.", 320, 185);
-        EdNode guard  = Node(StoryNodeKind.Choice, "guard",  "The Guard's Question",  "\"State your business, traveler. The gate closes at dusk.\"", 610, 150);
-        EdNode turned = Node(StoryNodeKind.End,    "turned", "Turned Away",           "The gate stays shut. Night swallows the road behind you.",   610, 380);
-        EdNode bribe  = Node(StoryNodeKind.Scene,  "bribe",  "Bribe the Guard",       "Coins change hands in the dark. He pockets them without a word.", 910, 30);
-        EdNode lie    = Node(StoryNodeKind.Scene,  "lie",    "Word for the Magister", "A silver tongue and a name he dares not question.",          910, 180);
-        EdNode fight  = Node(StoryNodeKind.Scene,  "fight",  "Draw Steel",            "Blades ring out. The alarm bell will not stay silent long.", 910, 330);
-        EdNode enter  = Node(StoryNodeKind.Scene,  "enter",  "Enter the City",        "Vael opens before you, warm and rotten and alive.",          1210, 160);
+        // A logic node moved.
+        if (Project.LogicNodes.TryGetValue(moved.Id, out StoryLogicNode? logic))
+        {
+            logic.X = moved.X;
+            logic.Y = moved.Y;
+            _ProjectState.MarkKeyDirty(logic.Id);
+            return;
+        }
 
-        guard.Blocks.Add(new EdBlock { Kind = StoryBlockKind.Narration, Text = "The guard lowers his halberd, eyes narrowing beneath the helm." });
-        guard.Blocks.Add(new EdBlock { Kind = StoryBlockKind.Dialogue, Speaker = "City Guard", Text = "State your business, traveler. The gate closes at dusk." });
-        guard.Blocks.Add(new EdBlock { Kind = StoryBlockKind.Choice, Text = "Offer him a coin" });
-        guard.Blocks.Add(new EdBlock { Kind = StoryBlockKind.Choice, Text = "Say you carry word for the Magister" });
-        guard.Blocks.Add(new EdBlock { Kind = StoryBlockKind.Choice, Text = "Rest a hand on your blade" });
+        // A child container moved.
+        if (Project.ContainerNodes.TryGetValue(moved.Id, out StoryContainerNode? child))
+        {
+            child.X = moved.X;
+            child.Y = moved.Y;
+            _ProjectState.MarkKeyDirty(child.Id);
+            return;
+        }
 
-        start.Blocks.Add(new EdBlock { Kind = StoryBlockKind.Narration, Text = "The road to Vael narrows as the sun dies behind the hills." });
-        gate.Blocks.Add(new EdBlock { Kind = StoryBlockKind.Narration, Text = "Dusk bleeds over the walls. A single guard blocks the postern gate." });
-
-        _Nodes = [start, gate, guard, turned, bribe, lie, fight, enter];
-        _Edges =
-        [
-            Edge(start, gate), Edge(gate, guard),
-            Edge(guard, bribe), Edge(guard, lie), Edge(guard, fight), Edge(guard, turned),
-            Edge(bribe, enter), Edge(lie, enter)
-        ];
-        _SelectedId = guard.Id;
+        // A connection point (Start/End/Entry/Exit) of the current container moved.
+        if (Project.ContainerNodes.TryGetValue(_CurrentContainerId, out StoryContainerNode? container))
+        {
+            StoryConnectionPoint? point = container.EntryPoints.Find(p => p.Id == moved.Id)
+                                       ?? container.ExitPoints.Find(p => p.Id == moved.Id);
+            if (point is not null)
+            {
+                point.X = moved.X;
+                point.Y = moved.Y;
+                _ProjectState.MarkKeyDirty(container.Id);
+            }
+        }
     }
-
-    private static EdNode Node(StoryNodeKind kind, string tag, string title, string preview, double x, double y) =>
-        new() { Kind = kind, Tag = tag, Title = title, Preview = preview, X = x, Y = y };
-
-    private static EdEdge Edge(EdNode from, EdNode to) => new() { From = from.Id, To = to.Id };
 }

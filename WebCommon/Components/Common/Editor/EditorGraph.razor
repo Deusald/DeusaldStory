@@ -5,7 +5,7 @@
     @* ── Floating toolbar ────────────────────────────────────────────── *@
     <div class="edg-toolbar">
         <button class="edg-tool-btn edg-tool-primary" @onclick="() => OnAddNode.InvokeAsync()">
-            <i class="bi bi-plus-lg"></i> Add node
+            <i class="bi bi-plus-lg"></i> Add logic node
         </button>
         <span class="edg-tool-count">@Nodes.Count nodes</span>
     </div>
@@ -40,30 +40,58 @@
             @foreach (EdNode node in Nodes)
             {
                 EdNode n = node;
-                <div class="edg-node @(n.Id == SelectedId ? "edg-node-sel" : "")"
+                string color = StoryStyle.NodeColor(n.Kind);
+                <div class="edg-node @NodeClass(n)"
                      style="left:@F(n.X)px; top:@F(n.Y)px;"
                      @onpointerdown="e => NodeDown(e, n)" @onpointerdown:stopPropagation="true">
 
-                    @if (n.Kind != StoryNodeKind.Start)
+                    @if (n.Inputs.Count > 0)
                     {
-                        <span class="edg-port edg-port-in" style="background:@StoryStyle.NodeColor(n.Kind)"></span>
+                        <div class="edg-ports edg-ports-in">
+                            @foreach (EdPort port in n.Inputs)
+                            {
+                                <span class="edg-port-row">
+                                    <span class="edg-port" style="background:@color"></span>
+                                    @if (ShowPortLabels(n) && !string.IsNullOrEmpty(port.Name))
+                                    {
+                                        <span class="edg-port-label">@port.Name</span>
+                                    }
+                                </span>
+                            }
+                        </div>
                     }
-                    @if (n.Kind != StoryNodeKind.End)
+                    @if (n.Outputs.Count > 0)
                     {
-                        <span class="edg-port edg-port-out" style="background:@StoryStyle.NodeColor(n.Kind)"></span>
+                        <div class="edg-ports edg-ports-out">
+                            @foreach (EdPort port in n.Outputs)
+                            {
+                                <span class="edg-port-row">
+                                    @if (ShowPortLabels(n) && !string.IsNullOrEmpty(port.Name))
+                                    {
+                                        <span class="edg-port-label">@port.Name</span>
+                                    }
+                                    <span class="edg-port" style="background:@color"></span>
+                                </span>
+                            }
+                        </div>
                     }
 
                     <div class="edg-node-head">
-                        <span class="edg-node-kind" style="color:@StoryStyle.NodeColor(n.Kind)">
-                            <span class="edg-node-kind-dot" style="background:@StoryStyle.NodeColor(n.Kind)"></span>
+                        <span class="edg-node-kind" style="color:@color">
+                            <span class="edg-node-kind-dot" style="background:@color"></span>
                             @StoryStyle.NodeLabel(n.Kind)
                         </span>
-                        <span class="edg-node-tag">#@n.Tag</span>
+                        @if (!n.Deletable)
+                        {
+                            <span class="edg-node-lock" title="Built-in node — edit via the container's entry/exit points">
+                                <i class="bi bi-lock-fill"></i>
+                            </span>
+                        }
                     </div>
                     <div class="edg-node-title">@n.Title</div>
-                    @if (!string.IsNullOrEmpty(n.Preview))
+                    @if (!string.IsNullOrEmpty(n.Subtitle))
                     {
-                        <div class="edg-node-preview">@n.Preview</div>
+                        <div class="edg-node-preview">@n.Subtitle</div>
                     }
                 </div>
             }
@@ -100,6 +128,7 @@
     [Parameter] public Guid                 SelectedId      { get; set; }
     [Parameter] public EventCallback<Guid>  SelectedChanged { get; set; }
     [Parameter] public EventCallback        OnAddNode       { get; set; }
+    [Parameter] public EventCallback<EdNode> OnNodeMoved    { get; set; }
 
     private const double NODE_W = 216;  // fixed card width (keep in sync with .edg-node)
     private const double PORT_Y = 46;   // vertical anchor of the ports from the card top
@@ -110,8 +139,27 @@
 
     private bool    _Panning;
     private EdNode? _DragNode;
+    private bool    _DragMoved;
     private double  _LastClientX;
     private double  _LastClientY;
+
+    // ── Node styling ───────────────────────────────────────────────────────
+
+    private string NodeClass(EdNode n)
+    {
+        string kind = n.Kind switch
+        {
+            StoryNodeKind.Logic     => "edg-node-logic",
+            StoryNodeKind.Container => "edg-node-container",
+            StoryNodeKind.Start or StoryNodeKind.Entry => "edg-node-entry",
+            StoryNodeKind.End   or StoryNodeKind.Exit  => "edg-node-exit",
+            _                                          => ""
+        };
+        return $"{kind} {(n.Id == SelectedId ? "edg-node-sel" : "")}";
+    }
+
+    private static bool ShowPortLabels(EdNode n) =>
+        n.Kind is StoryNodeKind.Logic or StoryNodeKind.Container;
 
     // ── Pan / drag ─────────────────────────────────────────────────────────
 
@@ -125,6 +173,7 @@
     private async Task NodeDown(PointerEventArgs e, EdNode node)
     {
         _DragNode    = node;
+        _DragMoved   = false;
         _Panning     = false;
         _LastClientX = e.ClientX;
         _LastClientY = e.ClientY;
@@ -137,6 +186,7 @@
         {
             _DragNode.X += (e.ClientX - _LastClientX) / _Scale;
             _DragNode.Y += (e.ClientY - _LastClientY) / _Scale;
+            _DragMoved   = true;
         }
         else if (_Panning)
         {
@@ -152,10 +202,14 @@
         _LastClientY = e.ClientY;
     }
 
-    private void CanvasUp(PointerEventArgs e)
+    private async Task CanvasUp(PointerEventArgs e)
     {
-        _Panning  = false;
-        _DragNode = null;
+        if (_DragNode is not null && _DragMoved)
+            await OnNodeMoved.InvokeAsync(_DragNode);
+
+        _Panning   = false;
+        _DragNode  = null;
+        _DragMoved = false;
     }
 
     private void OnWheel(WheelEventArgs e)

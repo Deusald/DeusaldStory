@@ -61,6 +61,13 @@
     line-height: 1.2;
 }
 
+.ins-subtitle {
+    margin-top: 6px;
+    font-size: 12.5px;
+    line-height: 1.5;
+    color: var(--text-dim);
+}
+
 /* ── Tabs ────────────────────────────────────────────────────────────────── */
 
 .ins-tabs {

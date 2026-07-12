@@ -1,0 +1,163 @@
+@namespace DeusaldStoryWeb.Components.Common
+
+@if (_Visible)
+{
+    <div class="modal-backdrop" @onclick="Cancel"></div>
+
+    <div class="modal-box nlm-box" @onclick:stopPropagation="true">
+
+        <div class="modal-header">
+            <span class="modal-title">New logic node</span>
+            <button class="modal-close" @onclick="Cancel" title="Close">
+                <i class="bi bi-x-lg"></i>
+            </button>
+        </div>
+
+        <div class="modal-body">
+
+            @* ── Name ──────────────────────────────────────────────────── *@
+            <div class="modal-field">
+                <label class="modal-label">Name</label>
+                <input class="modal-input"
+                       type="text"
+                       placeholder="Arrival at the Gate"
+                       @bind="_Name"
+                       @bind:event="oninput"
+                       maxlength="100"/>
+            </div>
+
+            @* ── Description ───────────────────────────────────────────── *@
+            <div class="modal-field">
+                <label class="modal-label">
+                    Description
+                    <span class="modal-label-hint">optional</span>
+                </label>
+                <textarea class="modal-input nlm-textarea"
+                          placeholder="A short description of what happens here…"
+                          @bind="_Description"
+                          @bind:event="oninput"
+                          rows="2"
+                          maxlength="500"></textarea>
+            </div>
+
+            @* ── Entry point ───────────────────────────────────────────── *@
+            <div class="modal-field">
+                <label class="modal-label">
+                    Entry point
+                    <span class="modal-label-hint">exactly one — where the story enters this node</span>
+                </label>
+                <div class="nlm-point nlm-point-entry">
+                    <span class="nlm-point-dot" style="background:var(--success)"></span>
+                    <input class="modal-input"
+                           type="text"
+                           placeholder="In"
+                           @bind="_EntryName"
+                           @bind:event="oninput"
+                           maxlength="60"/>
+                </div>
+            </div>
+
+            @* ── Exit points ───────────────────────────────────────────── *@
+            <div class="modal-field">
+                <label class="modal-label">
+                    Exit points
+                    <span class="modal-label-hint">at least one — the branches the story can take from here</span>
+                </label>
+                @for (int i = 0; i < _ExitNames.Count; i++)
+                {
+                    int index = i;
+                    <div class="nlm-point nlm-point-exit">
+                        <span class="nlm-point-dot" style="background:var(--danger)"></span>
+                        <input class="modal-input"
+                               type="text"
+                               placeholder="Success"
+                               value="@_ExitNames[index]"
+                               @oninput="e => SetExit(index, e)"
+                               maxlength="60"/>
+                        <button class="nlm-point-del"
+                                title="Remove exit"
+                                disabled="@(_ExitNames.Count <= 1)"
+                                @onclick="() => RemoveExit(index)">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </div>
+                }
+                <button class="nlm-add-exit" @onclick="AddExit">
+                    <i class="bi bi-plus-lg"></i> Add exit
+                </button>
+            </div>
+
+        </div>
+
+        <div class="modal-footer">
+            <button class="modal-btn modal-btn-ghost" @onclick="Cancel">Cancel</button>
+            <button class="modal-btn modal-btn-primary"
+                    @onclick="Confirm"
+                    disabled="@(!_CanConfirm)">
+                Create node
+            </button>
+        </div>
+
+    </div>
+}
+
+@code {
+    [Parameter] public EventCallback<NewLogicNodeArgs> OnConfirm { get; set; }
+
+    private bool         _Visible;
+    private string       _Name        = "";
+    private string       _Description = "";
+    private string       _EntryName   = "In";
+    private List<string> _ExitNames   = new() { "Out" };
+
+    public void Show()
+    {
+        _Name        = "";
+        _Description = "";
+        _EntryName   = "In";
+        _ExitNames   = new List<string> { "Out" };
+        _Visible     = true;
+        StateHasChanged();
+    }
+
+    private bool _CanConfirm =>
+        !string.IsNullOrWhiteSpace(_Name)      &&
+        !string.IsNullOrWhiteSpace(_EntryName) &&
+        _ExitNames.Any(n => !string.IsNullOrWhiteSpace(n));
+
+    private void SetExit(int index, ChangeEventArgs e) => _ExitNames[index] = e.Value?.ToString() ?? "";
+
+    private void AddExit() => _ExitNames.Add("");
+
+    private void RemoveExit(int index)
+    {
+        if (_ExitNames.Count <= 1) return;
+        _ExitNames.RemoveAt(index);
+    }
+
+    private async Task Confirm()
+    {
+        if (!_CanConfirm) return;
+        _Visible = false;
+
+        List<string> exits = _ExitNames
+                            .Select(n => n.Trim())
+                            .Where(n => !string.IsNullOrEmpty(n))
+                            .ToList();
+
+        await OnConfirm.InvokeAsync(new NewLogicNodeArgs(
+            _Name.Trim(),
+            _Description.Trim(),
+            _EntryName.Trim(),
+            exits));
+    }
+
+    private void Cancel() => _Visible = false;
+
+    /// <summary>Result passed back to the parent when the user confirms.</summary>
+    public record NewLogicNodeArgs(
+        string       Name,
+        string       Description,
+        string       EntryName,
+        List<string> ExitNames);
+}

@@ -77,13 +77,56 @@ public class ProjectStateService(
             }
         };
 
+        // Every project has a Root container. It holds the story's Start (entry) and End (exit) — both
+        // non-deletable — and the story plays from Start until it reaches End.
+        StoryContainerNode root = new() { Name = "Root" };
+        root.EntryPoints.Add(new StoryConnectionPoint { Name = "Start", X = 40,  Y = 220 });
+        root.ExitPoints.Add(new StoryConnectionPoint  { Name = "End",   X = 640, Y = 220 });
+        newProject.ContainerNodes.Add(root.Id, root);
+        newProject.Metadata.RootStoryContainerNodeId = root.Id;
+
         CurrentProject      = newProject;
         CurrentProjectPath  = null;
         CurrentLocalization = await ResolveLocalizationAsync(newProject);
         IsDirty             = true;
         ChangedFileIds.Clear();
+        ChangedFileIds.Add(root.Id);
         ProjectChanged?.Invoke();
         DirtyStateChanged?.Invoke();
+    }
+
+    /// <summary>
+    /// Adds a new logic node to <paramref name="parentContainerId"/>, marks it dirty and notifies listeners.
+    /// The node is placed at (<paramref name="x"/>, <paramref name="y"/>) on the container's canvas.
+    /// </summary>
+    public StoryLogicNode AddLogicNode(
+        Guid                              parentContainerId,
+        string                            name,
+        string                            description,
+        StoryConnectionPoint              entryPoint,
+        IEnumerable<StoryConnectionPoint> exitPoints,
+        double                            x,
+        double                            y)
+    {
+        StoryLogicNode node = new()
+        {
+            Name            = name,
+            Description     = description,
+            ParentContainer = parentContainerId,
+            EntryPoint      = entryPoint,
+            X               = x,
+            Y               = y
+        };
+        node.ExitPoints.AddRange(exitPoints);
+
+        CurrentProject!.LogicNodes.Add(node.Id, node);
+
+        if (CurrentProject.ContainerNodes.TryGetValue(parentContainerId, out StoryContainerNode? parent))
+            parent.Logic.Add(node.Id);
+
+        MarkKeyDirty(node.Id);
+        MarkKeyDirty(parentContainerId);
+        return node;
     }
 
     public void LoadProject(StoryProject project, LocProject? localization, string folderPath, Guid userId, Guid accessToken)

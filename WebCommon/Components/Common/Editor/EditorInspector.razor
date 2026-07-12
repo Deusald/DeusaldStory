@@ -19,9 +19,12 @@
                     <span class="ins-kind-dot" style="background:@StoryStyle.NodeColor(Node.Kind)"></span>
                     @StoryStyle.NodeLabel(Node.Kind)
                 </span>
-                <span class="ins-tag">#@Node.Tag</span>
             </div>
             <div class="ins-title">@Node.Title</div>
+            @if (!string.IsNullOrEmpty(Node.Subtitle))
+            {
+                <div class="ins-subtitle">@Node.Subtitle</div>
+            }
         </div>
 
         @* ── Tabs ────────────────────────────────────────────────────── *@
