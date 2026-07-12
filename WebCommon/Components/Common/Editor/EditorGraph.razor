@@ -108,7 +108,7 @@
                     {
                         EdPort port = n.Inputs[i];
                         <div class="edg-port-anchor edg-port-in" style="top:@F(PortCenterY(n, i))px;">
-                            <span class="edg-port @(_ConnFrom is not null ? "edg-port-target" : "")"
+                            <span class="edg-port @(IsCompatibleTarget(port) ? "edg-port-target" : "")"
                                   style="background:@color"
                                   @onpointerdown:stopPropagation="true"></span>
                             @if (ShowPortLabels(n) && !string.IsNullOrEmpty(port.Name))
@@ -213,7 +213,7 @@
     private const double SNAP_RADIUS  = 60;  // how close a drop must land to an input port to wire it
 
     /// <summary>A resolved connection-point position in world coordinates, keyed by point id.</summary>
-    private readonly record struct PortAnchor(Guid NodeId, double X, double Y, bool IsOutput);
+    private readonly record struct PortAnchor(Guid NodeId, double X, double Y, bool IsOutput, PortType Type);
 
     private double _Scale = 1;
     private double _PanX  = 24;
@@ -255,9 +255,9 @@
         foreach (EdNode n in Nodes)
         {
             for (int i = 0; i < n.Inputs.Count; ++i)
-                anchors[n.Inputs[i].Id] = new PortAnchor(n.Id, n.X, n.Y + PortCenterY(n, i), false);
+                anchors[n.Inputs[i].Id] = new PortAnchor(n.Id, n.X, n.Y + PortCenterY(n, i), false, n.Inputs[i].Type);
             for (int i = 0; i < n.Outputs.Count; ++i)
-                anchors[n.Outputs[i].Id] = new PortAnchor(n.Id, n.X + NODE_W, n.Y + PortCenterY(n, i), true);
+                anchors[n.Outputs[i].Id] = new PortAnchor(n.Id, n.X + NODE_W, n.Y + PortCenterY(n, i), true, n.Outputs[i].Type);
         }
         return anchors;
     }
@@ -270,16 +270,25 @@
         {
             StoryNodeKind.Logic     => "edg-node-logic",
             StoryNodeKind.Container => "edg-node-container",
-            StoryNodeKind.Start or StoryNodeKind.Entry => "edg-node-entry",
-            StoryNodeKind.End   or StoryNodeKind.Exit  => "edg-node-exit",
+            StoryNodeKind.Start or StoryNodeKind.Entry or StoryNodeKind.LogicEntry => "edg-node-entry",
+            StoryNodeKind.End   or StoryNodeKind.Exit  or StoryNodeKind.LogicExit  => "edg-node-exit",
             StoryNodeKind.PortalIn or StoryNodeKind.PortalOut => "edg-node-portal",
+            StoryNodeKind.Localization => "edg-node-loc",
+            StoryNodeKind.Icon         => "edg-node-icon",
             _                                          => ""
         };
         return $"{kind} {(n.Id == SelectedId ? "edg-node-sel" : "")}";
     }
 
     private static bool ShowPortLabels(EdNode n) =>
-        n.Kind is StoryNodeKind.Logic or StoryNodeKind.Container;
+        n.Kind is StoryNodeKind.Logic or StoryNodeKind.Container
+               or StoryNodeKind.LogicEntry or StoryNodeKind.LogicExit;
+
+    /// <summary>True when a wire is being dragged and this input port carries the same signal type as its source.</summary>
+    private bool IsCompatibleTarget(EdPort input) =>
+        _ConnFrom is Guid from
+        && _Anchors.TryGetValue(from, out PortAnchor src)
+        && src.Type == input.Type;
 
     // ── Pan / drag ─────────────────────────────────────────────────────────
 
@@ -374,13 +383,15 @@
     /// </summary>
     private Guid? NearestInputPoint(Guid fromPoint)
     {
-        Guid    sourceNode = _Anchors.TryGetValue(fromPoint, out PortAnchor src) ? src.NodeId : Guid.Empty;
-        Guid?   best       = null;
-        double  bestDist   = SNAP_RADIUS * SNAP_RADIUS;
+        bool     haveSrc    = _Anchors.TryGetValue(fromPoint, out PortAnchor src);
+        Guid     sourceNode = haveSrc ? src.NodeId : Guid.Empty;
+        PortType sourceType = haveSrc ? src.Type   : PortType.Flow;
+        Guid?    best       = null;
+        double   bestDist   = SNAP_RADIUS * SNAP_RADIUS;
 
         foreach ((Guid pointId, PortAnchor a) in _Anchors)
         {
-            if (a.IsOutput || a.NodeId == sourceNode) continue;
+            if (a.IsOutput || a.NodeId == sourceNode || a.Type != sourceType) continue;
             double dx = a.X - _ConnX, dy = a.Y - _ConnY;
             double d2 = dx * dx + dy * dy;
             if (d2 <= bestDist)
@@ -424,10 +435,12 @@
 
     private static string MenuNoun(EdNode n) => n.Kind switch
     {
-        StoryNodeKind.Logic     => "logic node",
-        StoryNodeKind.Container => "container",
-        StoryNodeKind.PortalIn  => "portal in",
-        StoryNodeKind.PortalOut => "portal",
+        StoryNodeKind.Logic        => "logic node",
+        StoryNodeKind.Container    => "container",
+        StoryNodeKind.PortalIn     => "portal in",
+        StoryNodeKind.PortalOut    => "portal",
+        StoryNodeKind.Localization => "localization node",
+        StoryNodeKind.Icon         => "icon node",
         _                       => "node"
     };
 

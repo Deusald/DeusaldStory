@@ -34,7 +34,7 @@ namespace DeusaldStoryCommon
         public const string LOGIC_FOLDER           = "Logic";
         public const string PORTALS_FOLDER         = "Portals";
         public const string IMAGES_FOLDER          = "Images";
-        public const int    CURRENT_FORMAT_VERSION = 5;
+        public const int    CURRENT_FORMAT_VERSION = 6;
 
         private static readonly JsonSerializerSettings _JsonSettings = new()
         {

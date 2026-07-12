@@ -1,0 +1,218 @@
+@namespace DeusaldStoryWeb.Components.Common
+@inject ProjectStateService _ProjectState
+@implements IDisposable
+
+@* ─────────────────────────────────────────────────────────────────────────
+   Picks a single localization key from the story's linked localization
+   project. Left column browses categories; the right column lists keys of
+   the selected category, filtered live by the search box. Used by both the
+   create and edit flows of a Localization node (see Editor).
+   ───────────────────────────────────────────────────────────────────────── *@
+
+@if (_Visible)
+{
+    <div class="modal-backdrop" @onclick="Cancel"></div>
+
+    <div class="modal-box lkp-box" @onclick:stopPropagation="true">
+
+        <div class="modal-header">
+            <span class="modal-title">Pick a localization key</span>
+            <button class="modal-close" @onclick="Cancel" title="Close">
+                <i class="bi bi-x-lg"></i>
+            </button>
+        </div>
+
+        <div class="modal-body lkp-body">
+
+            @if (_Loc is null)
+            {
+                <div class="lkp-empty">
+                    <i class="bi bi-translate"></i>
+                    <span>No localization project is linked to this story.</span>
+                </div>
+            }
+            else
+            {
+                <div class="lkp-search">
+                    <i class="bi bi-search"></i>
+                    <input class="modal-input"
+                           type="text"
+                           placeholder="Search keys by name, description or tag…"
+                           @bind="_Search"
+                           @bind:event="oninput"
+                           @ref="_SearchInput"/>
+                </div>
+
+                <div class="lkp-cols">
+
+                    @* Categories *@
+                    <div class="lkp-cats">
+                        <button class="lkp-cat @(_CategoryId is null ? "active" : "")"
+                                @onclick="() => SelectCategory(null)">
+                            <i class="bi bi-collection"></i> All keys
+                            <span class="lkp-cat-count">@_Loc.Keys.Count</span>
+                        </button>
+                        @foreach ((LocCategory cat, int depth) in FlatCategories())
+                        {
+                            LocCategory c = cat;
+                            <button class="lkp-cat @(_CategoryId == c.Id ? "active" : "")"
+                                    style="padding-left:@(10 + depth * 14)px"
+                                    @onclick="() => SelectCategory(c.Id)">
+                                <i class="bi bi-folder2"></i> @c.Name
+                                <span class="lkp-cat-count">@KeysInCategory(c.Id)</span>
+                            </button>
+                        }
+                    </div>
+
+                    @* Keys *@
+                    <div class="lkp-keys">
+                        @{
+                            List<LocLocalizationKey> keys = FilteredKeys().ToList();
+                        }
+                        @if (keys.Count == 0)
+                        {
+                            <div class="lkp-keys-empty">No keys match.</div>
+                        }
+                        else
+                        {
+                            @foreach (LocLocalizationKey key in keys)
+                            {
+                                LocLocalizationKey k = key;
+                                <button class="lkp-key @(_SelectedKeyId == k.Id ? "selected" : "")"
+                                        @onclick="() => _SelectedKeyId = k.Id">
+                                    <div class="lkp-key-name">@k.KeyName</div>
+                                    @{
+                                        string preview = MainText(k);
+                                    }
+                                    @if (!string.IsNullOrEmpty(preview))
+                                    {
+                                        <div class="lkp-key-text">@preview</div>
+                                    }
+                                </button>
+                            }
+                        }
+                    </div>
+
+                </div>
+            }
+
+        </div>
+
+        <div class="modal-footer">
+            <button class="modal-btn modal-btn-ghost" @onclick="Cancel">Cancel</button>
+            <button class="modal-btn modal-btn-primary"
+                    @onclick="Confirm"
+                    disabled="@(_SelectedKeyId == Guid.Empty)">
+                Select key
+            </button>
+        </div>
+
+    </div>
+}
+
+@code {
+    [Parameter] public EventCallback<LocalizationPickResult> OnConfirm { get; set; }
+
+    private bool             _Visible;
+    private Guid             _EditNodeId;   // empty = creating a new node
+    private Guid             _SelectedKeyId;
+    private string           _Search = "";
+    private Guid?            _CategoryId;    // null = All
+    private ElementReference _SearchInput;
+    private bool             _FocusPending;
+
+    private LocProject? _Loc => _ProjectState.CurrentLocalization;
+
+    protected override void OnInitialized() =>
+        _ProjectState.ProjectDataChanged += OnDataChanged;
+
+    /// <summary>Opens the picker. <paramref name="editNodeId"/> is empty to create a node, set to edit one.</summary>
+    public void Show(Guid editNodeId, Guid currentKeyId)
+    {
+        _EditNodeId    = editNodeId;
+        _SelectedKeyId = currentKeyId;
+        _Search        = "";
+        _CategoryId    = null;
+        _Visible       = true;
+        _FocusPending  = true;
+        StateHasChanged();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_FocusPending && _Visible && _Loc is not null)
+        {
+            _FocusPending = false;
+            try { await _SearchInput.FocusAsync(); } catch { /* not rendered yet */ }
+        }
+    }
+
+    private void SelectCategory(Guid? id) => _CategoryId = id;
+
+    /// <summary>Categories flattened depth-first (root → children), each with its indent depth.</summary>
+    private IEnumerable<(LocCategory Cat, int Depth)> FlatCategories()
+    {
+        if (_Loc is null) yield break;
+
+        IEnumerable<(LocCategory, int)> Walk(Guid? parent, int depth)
+        {
+            foreach (LocCategory cat in _Loc.Categories
+                                            .Where(c => c.ParentCategoryId == parent)
+                                            .OrderBy(c => c.Name, StringComparer.OrdinalIgnoreCase))
+            {
+                yield return (cat, depth);
+                foreach ((LocCategory, int) child in Walk(cat.Id, depth + 1))
+                    yield return child;
+            }
+        }
+
+        foreach ((LocCategory, int) item in Walk(null, 0))
+            yield return item;
+    }
+
+    private int KeysInCategory(Guid categoryId) =>
+        _Loc?.Keys.Count(k => k.CategoryId == categoryId) ?? 0;
+
+    /// <summary>Keys of the selected category (or all), then filtered by the search text.</summary>
+    private IEnumerable<LocLocalizationKey> FilteredKeys()
+    {
+        if (_Loc is null) return Enumerable.Empty<LocLocalizationKey>();
+
+        IEnumerable<LocLocalizationKey> keys = _Loc.Keys;
+        if (_CategoryId is Guid cid)
+            keys = keys.Where(k => k.CategoryId == cid);
+
+        string term = _Search.Trim();
+        if (term.Length > 0)
+            keys = keys.Where(k =>
+                k.KeyName.Contains(term, StringComparison.OrdinalIgnoreCase)     ||
+                k.Description.Contains(term, StringComparison.OrdinalIgnoreCase) ||
+                k.Tags.Any(t => t.Contains(term, StringComparison.OrdinalIgnoreCase)));
+
+        return keys.OrderBy(k => k.KeyName, StringComparer.OrdinalIgnoreCase);
+    }
+
+    /// <summary>The key's main-language text (empty when it has no source translation).</summary>
+    private string MainText(LocLocalizationKey key)
+    {
+        string? main = _Loc?.Metadata.MainLanguageId;
+        if (string.IsNullOrEmpty(main)) return "";
+        return key.Translations.Find(t => t.LanguageId == main)?.Text ?? "";
+    }
+
+    private async Task Confirm()
+    {
+        if (_SelectedKeyId == Guid.Empty) return;
+        _Visible = false;
+        await OnConfirm.InvokeAsync(new LocalizationPickResult(_EditNodeId, _SelectedKeyId));
+    }
+
+    private void Cancel() => _Visible = false;
+
+    private void OnDataChanged() => InvokeAsync(StateHasChanged);
+
+    public void Dispose() => _ProjectState.ProjectDataChanged -= OnDataChanged;
+
+    /// <summary>Result passed back to the parent. <see cref="EditNodeId"/> is empty for a create, set for an edit.</summary>
+    public record LocalizationPickResult(Guid EditNodeId, Guid KeyId);
+}

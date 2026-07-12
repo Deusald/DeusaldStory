@@ -1,0 +1,122 @@
+/* Wider than the default modal — two columns (categories + keys). */
+.lkp-box {
+    width: 720px;
+    height: min(640px, calc(100vh - 64px));
+}
+
+.lkp-body {
+    gap: 12px;
+}
+
+/* Search row */
+.lkp-search {
+    position: relative;
+    flex: none;
+}
+.lkp-search > i {
+    position: absolute;
+    left: 11px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-faint);
+    font-size: 13px;
+    pointer-events: none;
+}
+.lkp-search .modal-input {
+    padding-left: 32px;
+}
+
+/* Two columns */
+.lkp-cols {
+    display: grid;
+    grid-template-columns: 210px 1fr;
+    gap: 12px;
+    flex: 1;
+    min-height: 0;
+}
+
+.lkp-cats,
+.lkp-keys {
+    background: var(--surface-input);
+    border: 1px solid var(--border);
+    border-radius: var(--r-md);
+    overflow-y: auto;
+    padding: 6px;
+}
+
+/* Category buttons */
+.lkp-cat {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    width: 100%;
+    text-align: left;
+    background: none;
+    border: none;
+    color: var(--text-soft);
+    font-size: 13px;
+    padding: 7px 10px;
+    border-radius: var(--r-sm);
+    cursor: pointer;
+    transition: background var(--dur) var(--ease), color var(--dur) var(--ease);
+}
+.lkp-cat > i { color: var(--text-faint); font-size: 12px; }
+.lkp-cat:hover { background: var(--surface-2); color: var(--text-bright); }
+.lkp-cat.active {
+    background: var(--accent-soft);
+    color: var(--accent);
+}
+.lkp-cat.active > i { color: var(--accent); }
+.lkp-cat-count {
+    margin-left: auto;
+    font-size: 11px;
+    color: var(--text-faint);
+}
+
+/* Key rows */
+.lkp-key {
+    display: block;
+    width: 100%;
+    text-align: left;
+    background: none;
+    border: 1px solid transparent;
+    border-radius: var(--r-sm);
+    padding: 8px 10px;
+    cursor: pointer;
+    margin-bottom: 2px;
+    transition: background var(--dur) var(--ease), border-color var(--dur) var(--ease);
+}
+.lkp-key:hover { background: var(--surface-2); }
+.lkp-key.selected {
+    background: var(--accent-soft);
+    border-color: var(--accent);
+}
+.lkp-key-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-bright);
+}
+.lkp-key-text {
+    font-size: 12px;
+    color: var(--text-dim);
+    margin-top: 2px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.lkp-keys-empty,
+.lkp-empty {
+    color: var(--text-faint);
+    font-size: 13px;
+    padding: 24px 12px;
+    text-align: center;
+}
+.lkp-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    margin: auto;
+}
+.lkp-empty > i { font-size: 24px; }

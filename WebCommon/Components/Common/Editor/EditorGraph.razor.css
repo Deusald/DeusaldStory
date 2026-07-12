@@ -113,6 +113,8 @@
 .edg-node-logic     { border-left: 3px solid var(--warning); }
 .edg-node-container { border-left: 3px solid var(--info); }
 .edg-node-portal    { border-left: 3px solid var(--orange); }
+.edg-node-loc       { border-left: 3px solid var(--accent); }
+.edg-node-icon      { border-left: 3px solid var(--orange); }
 
 .edg-node-lock {
     color: var(--text-ghost);

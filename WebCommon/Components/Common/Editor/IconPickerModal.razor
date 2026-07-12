@@ -1,0 +1,98 @@
+@namespace DeusaldStoryWeb.Components.Common
+@inject ProjectStateService _ProjectState
+
+@* ─────────────────────────────────────────────────────────────────────────
+   Picks a single icon from the project's image library (the Icon kind only).
+   Used by both the create and edit flows of an Icon node (see Editor).
+   ───────────────────────────────────────────────────────────────────────── *@
+
+@if (_Visible)
+{
+    <div class="modal-backdrop" @onclick="Cancel"></div>
+
+    <div class="modal-box icp-box" @onclick:stopPropagation="true">
+
+        <div class="modal-header">
+            <span class="modal-title">Pick an icon</span>
+            <button class="modal-close" @onclick="Cancel" title="Close">
+                <i class="bi bi-x-lg"></i>
+            </button>
+        </div>
+
+        <div class="modal-body icp-body">
+            @{
+                List<StoryImage> icons = Icons().ToList();
+            }
+            @if (icons.Count == 0)
+            {
+                <div class="icp-empty">
+                    <i class="bi bi-emoji-smile"></i>
+                    <span>No icons yet — add square, power-of-two PNGs from the Images panel.</span>
+                </div>
+            }
+            else
+            {
+                <div class="icp-grid">
+                    @foreach (StoryImage icon in icons)
+                    {
+                        StoryImage i = icon;
+                        <button class="icp-card @(_SelectedImageId == i.Id ? "selected" : "")"
+                                title="@i.Name"
+                                @onclick="() => _SelectedImageId = i.Id">
+                            <div class="icp-thumb">
+                                <img src="data:image/png;base64,@i.Data" alt="@i.Name"/>
+                            </div>
+                            <div class="icp-name">@i.Name</div>
+                        </button>
+                    }
+                </div>
+            }
+        </div>
+
+        <div class="modal-footer">
+            <button class="modal-btn modal-btn-ghost" @onclick="Cancel">Cancel</button>
+            <button class="modal-btn modal-btn-primary"
+                    @onclick="Confirm"
+                    disabled="@(_SelectedImageId == Guid.Empty)">
+                Select icon
+            </button>
+        </div>
+
+    </div>
+}
+
+@code {
+    [Parameter] public EventCallback<IconPickResult> OnConfirm { get; set; }
+
+    private bool _Visible;
+    private Guid _EditNodeId;   // empty = creating a new node
+    private Guid _SelectedImageId;
+
+    private StoryProject Project => _ProjectState.CurrentProject!;
+
+    private IEnumerable<StoryImage> Icons() =>
+        Project.Images.Values
+               .Where(i => i.Kind == StoryImageKind.Icon)
+               .OrderBy(i => i.Name, StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>Opens the picker. <paramref name="editNodeId"/> is empty to create a node, set to edit one.</summary>
+    public void Show(Guid editNodeId, Guid currentImageId)
+    {
+        _EditNodeId      = editNodeId;
+        _SelectedImageId = currentImageId;
+        _Visible         = true;
+        StateHasChanged();
+    }
+
+    private async Task Confirm()
+    {
+        if (_SelectedImageId == Guid.Empty) return;
+        _Visible = false;
+        await OnConfirm.InvokeAsync(new IconPickResult(_EditNodeId, _SelectedImageId));
+    }
+
+    private void Cancel() => _Visible = false;
+
+    /// <summary>Result passed back to the parent. <see cref="EditNodeId"/> is empty for a create, set for an edit.</summary>
+    public record IconPickResult(Guid EditNodeId, Guid ImageId);
+}

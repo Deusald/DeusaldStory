@@ -148,6 +148,9 @@ public class ProjectStateService(
         };
         node.ExitPoints.AddRange(exitPoints);
 
+        // Seed inner-graph positions so the Entry/Exit nodes don't stack at the origin when first opened.
+        LayoutLogicInnerPoints(node);
+
         CurrentProject!.LogicNodes.Add(node.Id, node);
 
         if (CurrentProject.ContainerNodes.TryGetValue(parentContainerId, out StoryContainerNode? parent))
@@ -256,6 +259,155 @@ public class ProjectStateService(
             p => p.OutPoint.Id == pointId || p.InPoints.Exists(ip => ip.Id == pointId));
 
     private const double _PORTAL_PAIR_GAP = 320;
+
+    // ── Logic node inner content graph (localization / icon nodes + wiring) ────
+
+    /// <summary>Places a logic node's Entry point and each Exit point on its inner canvas so they don't overlap.</summary>
+    private static void LayoutLogicInnerPoints(StoryLogicNode logic)
+    {
+        logic.EntryPoint.X = 60;
+        logic.EntryPoint.Y = 200;
+        for (int x = 0; x < logic.ExitPoints.Count; ++x)
+        {
+            logic.ExitPoints[x].X = 660;
+            logic.ExitPoints[x].Y = 120 + x * 90;
+        }
+    }
+
+    /// <summary>Adds a Localization node (referencing <paramref name="keyId"/>) to a logic node's inner graph.</summary>
+    public StoryLocalizationNode? AddLocalizationNode(Guid logicId, Guid keyId, double x, double y)
+    {
+        if (!CurrentProject!.LogicNodes.TryGetValue(logicId, out StoryLogicNode? logic)) return null;
+
+        StoryLocalizationNode node = new() { SelectedKeyId = keyId, X = x, Y = y };
+        logic.LocalizationNodes.Add(node);
+        MarkKeyDirty(logicId);
+        return node;
+    }
+
+    /// <summary>Adds an Icon node (referencing image <paramref name="imageId"/>) to a logic node's inner graph.</summary>
+    public StoryIconNode? AddIconNode(Guid logicId, Guid imageId, double x, double y)
+    {
+        if (!CurrentProject!.LogicNodes.TryGetValue(logicId, out StoryLogicNode? logic)) return null;
+
+        StoryIconNode node = new() { SelectedImageId = imageId, X = x, Y = y };
+        logic.IconNodes.Add(node);
+        MarkKeyDirty(logicId);
+        return node;
+    }
+
+    /// <summary>Changes the localization key a Localization node points at.</summary>
+    public void UpdateLocalizationNode(Guid logicId, Guid nodeId, Guid keyId)
+    {
+        if (!CurrentProject!.LogicNodes.TryGetValue(logicId, out StoryLogicNode? logic)) return;
+        StoryLocalizationNode? node = logic.LocalizationNodes.Find(n => n.Id == nodeId);
+        if (node is null) return;
+        node.SelectedKeyId = keyId;
+        MarkKeyDirty(logicId);
+    }
+
+    /// <summary>Changes the icon an Icon node points at.</summary>
+    public void UpdateIconNode(Guid logicId, Guid nodeId, Guid imageId)
+    {
+        if (!CurrentProject!.LogicNodes.TryGetValue(logicId, out StoryLogicNode? logic)) return;
+        StoryIconNode? node = logic.IconNodes.Find(n => n.Id == nodeId);
+        if (node is null) return;
+        node.SelectedImageId = imageId;
+        MarkKeyDirty(logicId);
+    }
+
+    /// <summary>Deletes a Localization node and any inner wire that touched its output.</summary>
+    public void DeleteLocalizationNode(Guid logicId, Guid nodeId)
+    {
+        if (!CurrentProject!.LogicNodes.TryGetValue(logicId, out StoryLogicNode? logic)) return;
+        StoryLocalizationNode? node = logic.LocalizationNodes.Find(n => n.Id == nodeId);
+        if (node is null) return;
+
+        logic.LocalizationNodes.Remove(node);
+        logic.ContentConnections.RemoveAll(c => c.FromPoint == node.OutPoint.Id || c.ToPoint == node.OutPoint.Id);
+        MarkKeyDirty(logicId);
+    }
+
+    /// <summary>Deletes an Icon node and any inner wire that touched its output.</summary>
+    public void DeleteIconNode(Guid logicId, Guid nodeId)
+    {
+        if (!CurrentProject!.LogicNodes.TryGetValue(logicId, out StoryLogicNode? logic)) return;
+        StoryIconNode? node = logic.IconNodes.Find(n => n.Id == nodeId);
+        if (node is null) return;
+
+        logic.IconNodes.Remove(node);
+        logic.ContentConnections.RemoveAll(c => c.FromPoint == node.OutPoint.Id || c.ToPoint == node.OutPoint.Id);
+        MarkKeyDirty(logicId);
+    }
+
+    /// <summary>
+    /// Wires an output (<paramref name="fromPoint"/>) to an input (<paramref name="toPoint"/>) inside a logic node's
+    /// content graph. An output leads to one place and a Title/Icon input takes a single source, so any existing wire
+    /// on either endpoint is replaced. A no-op (returns null) if the exact wire already exists.
+    /// </summary>
+    public StoryConnection? ConnectContent(Guid logicId, Guid fromPoint, Guid toPoint)
+    {
+        if (!CurrentProject!.LogicNodes.TryGetValue(logicId, out StoryLogicNode? logic)) return null;
+        if (logic.ContentConnections.Exists(c => c.FromPoint == fromPoint && c.ToPoint == toPoint)) return null;
+
+        logic.ContentConnections.RemoveAll(c => c.FromPoint == fromPoint || c.ToPoint == toPoint);
+
+        StoryConnection connection = new() { FromPoint = fromPoint, ToPoint = toPoint };
+        logic.ContentConnections.Add(connection);
+        MarkKeyDirty(logicId);
+        return connection;
+    }
+
+    /// <summary>Removes an inner content connection from a logic node.</summary>
+    public void DisconnectContent(Guid logicId, Guid connectionId)
+    {
+        if (!CurrentProject!.LogicNodes.TryGetValue(logicId, out StoryLogicNode? logic)) return;
+        if (logic.ContentConnections.RemoveAll(c => c.Id == connectionId) > 0)
+            MarkKeyDirty(logicId);
+    }
+
+    /// <summary>
+    /// Persists a drag inside a logic node's inner graph. <paramref name="movedId"/> is the dragged EdNode id —
+    /// the Entry point, an Exit point, or a Localization/Icon node — resolved to the right stored position.
+    /// </summary>
+    public void MoveLogicNode(Guid logicId, Guid movedId, double x, double y)
+    {
+        if (!CurrentProject!.LogicNodes.TryGetValue(logicId, out StoryLogicNode? logic)) return;
+
+        if (logic.EntryPoint.Id == movedId)
+        {
+            logic.EntryPoint.X = x;
+            logic.EntryPoint.Y = y;
+            MarkKeyDirty(logicId);
+            return;
+        }
+
+        StoryConnectionPoint? exit = logic.ExitPoints.Find(p => p.Id == movedId);
+        if (exit is not null)
+        {
+            exit.X = x;
+            exit.Y = y;
+            MarkKeyDirty(logicId);
+            return;
+        }
+
+        StoryLocalizationNode? loc = logic.LocalizationNodes.Find(n => n.Id == movedId);
+        if (loc is not null)
+        {
+            loc.X = x;
+            loc.Y = y;
+            MarkKeyDirty(logicId);
+            return;
+        }
+
+        StoryIconNode? ico = logic.IconNodes.Find(n => n.Id == movedId);
+        if (ico is not null)
+        {
+            ico.X = x;
+            ico.Y = y;
+            MarkKeyDirty(logicId);
+        }
+    }
 
     // ── Images ───────────────────────────────────────────────────────────────
 
@@ -451,10 +603,25 @@ public class ProjectStateService(
         logic.Description      = description;
         logic.EntryPoint.Name  = entryName;
 
-        ReconcilePoints(logic.ExitPoints, exits, containerId, null);
+        // isEntry:false gives each newly-added exit an inner-graph position (it is drawn as an Exit node inside).
+        ReconcilePoints(logic.ExitPoints, exits, containerId, null, isEntry: false);
+
+        // A removed exit takes its inner Exit node with it — drop any inner wire that pointed at the gone port.
+        PruneContentConnections(logic);
 
         MarkKeyDirty(logicId);
         MarkKeyDirty(containerId);
+    }
+
+    /// <summary>Removes inner content connections whose endpoints no longer exist (e.g. after an exit is deleted).</summary>
+    private static void PruneContentConnections(StoryLogicNode logic)
+    {
+        HashSet<Guid> valid = new() { logic.EntryPoint.Id, logic.TitleIn.Id, logic.IconIn.Id };
+        foreach (StoryConnectionPoint p in logic.ExitPoints) valid.Add(p.Id);
+        foreach (StoryLocalizationNode n in logic.LocalizationNodes) valid.Add(n.OutPoint.Id);
+        foreach (StoryIconNode n in logic.IconNodes) valid.Add(n.OutPoint.Id);
+
+        logic.ContentConnections.RemoveAll(c => !valid.Contains(c.FromPoint) || !valid.Contains(c.ToPoint));
     }
 
     /// <summary>
@@ -569,6 +736,17 @@ public class ProjectStateService(
         {
             return null;
         }
+    }
+
+    /// <summary>
+    /// Re-reads the linked localization project from its store so newly-added keys/categories show up in the
+    /// pickers. Fires <see cref="ProjectDataChanged"/> so open UI (the key picker) refreshes. No-op with no project.
+    /// </summary>
+    public async Task RefreshLocalizationAsync()
+    {
+        if (CurrentProject is null) return;
+        CurrentLocalization = await ResolveLocalizationAsync(CurrentProject);
+        ProjectDataChanged?.Invoke();
     }
 
     /// <summary>

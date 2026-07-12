@@ -1,0 +1,97 @@
+@namespace DeusaldStoryWeb.Components.Common
+@inject ProjectStateService _ProjectState
+
+@* ─────────────────────────────────────────────────────────────────────────
+   Renders a logic node's output as a game-style screen: the localized title
+   as a heading, then a framed row with the connected icon on the left and the
+   localized text beside it. Reads whatever is wired into the Entry node's
+   Title / Icon inputs; shows placeholders when nothing is connected.
+   ───────────────────────────────────────────────────────────────────────── *@
+
+<div class="lpv-root">
+    <div class="lpv-screen">
+
+        @if (string.IsNullOrEmpty(_Title))
+        {
+            <div class="lpv-title lpv-placeholder">No title connected</div>
+        }
+        else
+        {
+            <div class="lpv-title">@_Title</div>
+        }
+
+        <div class="lpv-frame">
+            @if (_IconData is not null)
+            {
+                <div class="lpv-icon">
+                    <img src="data:image/png;base64,@_IconData" alt="icon"/>
+                </div>
+            }
+            else
+            {
+                <div class="lpv-icon lpv-icon-empty">
+                    <i class="bi bi-image"></i>
+                </div>
+            }
+            <div class="lpv-text @(string.IsNullOrEmpty(_Title) ? "lpv-placeholder" : "")">
+                @(string.IsNullOrEmpty(_Title) ? "No text connected" : _Title)
+            </div>
+        </div>
+
+        <div class="lpv-hint">
+            <i class="bi bi-eye"></i>
+            Preview of this logic node's output. Wire a Localization node to <strong>Title</strong> and an
+            Icon node to <strong>Icon</strong> on the Entry node.
+        </div>
+
+    </div>
+</div>
+
+@code {
+    [Parameter] public StoryLogicNode Logic { get; set; } = default!;
+
+    private string  _Title    = "";
+    private string? _IconData; // base64 PNG, or null when no icon connected
+
+    protected override void OnParametersSet()
+    {
+        _Title    = ResolveTitle();
+        _IconData = ResolveIcon();
+    }
+
+    /// <summary>Follows the wire into the Title input to a Localization node → its key → main-language text.</summary>
+    private string ResolveTitle()
+    {
+        Guid from = FromPointInto(Logic.TitleIn.Id);
+        if (from == Guid.Empty) return "";
+
+        StoryLocalizationNode? node = Logic.LocalizationNodes.Find(n => n.OutPoint.Id == from);
+        if (node is null) return "";
+
+        LocProject? loc = _ProjectState.CurrentLocalization;
+        LocLocalizationKey? key = loc?.Keys.Find(k => k.Id == node.SelectedKeyId);
+        if (key is null) return "";
+
+        string? main = loc!.Metadata.MainLanguageId;
+        if (string.IsNullOrEmpty(main)) return "";
+        return key.Translations.Find(t => t.LanguageId == main)?.Text ?? "";
+    }
+
+    /// <summary>Follows the wire into the Icon input to an Icon node → its image → base64 data.</summary>
+    private string? ResolveIcon()
+    {
+        Guid from = FromPointInto(Logic.IconIn.Id);
+        if (from == Guid.Empty) return null;
+
+        StoryIconNode? node = Logic.IconNodes.Find(n => n.OutPoint.Id == from);
+        if (node is null) return null;
+
+        return _ProjectState.CurrentProject!.Images.TryGetValue(node.SelectedImageId, out StoryImage? img)
+            ? img.Data
+            : null;
+    }
+
+    /// <summary>The output point wired into <paramref name="toPoint"/>, or empty when nothing is connected.</summary>
+    private Guid FromPointInto(Guid toPoint) =>
+        Logic.ContentConnections.Find(c => c.ToPoint == toPoint)?.FromPoint ?? Guid.Empty;
+}

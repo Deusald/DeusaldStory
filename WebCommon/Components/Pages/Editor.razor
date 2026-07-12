@@ -14,7 +14,9 @@
     <EditorTopBar Mode="_Mode"
                   ModeChanged="OnModeChanged"
                   Crumbs="_Crumbs"
-                  CrumbClicked="OnCrumbClicked"/>
+                  CrumbClicked="OnCrumbClicked"
+                  InLogicNode="_InLogic"
+                  OnRefreshLocalization="OnRefreshLocalization"/>
 
     <div class="ed-body">
 
@@ -44,6 +46,10 @@
                                  OnNodeDelete="OnNodeDelete"
                                  OnNodeAddPortalIn="OnNodeAddPortalIn"/>
                 }
+                else if (_Mode == EditorMode.Preview && _CurrentLogicNode is StoryLogicNode previewLogic)
+                {
+                    <LogicPreview Logic="previewLogic"/>
+                }
                 else
                 {
                     <div class="ed-play">
@@ -64,24 +70,27 @@
     </div>
 </div>
 
-<NodePaletteModal       @ref="_NodePalette"         OnSelect="OnPaletteSelect"/>
-<NewLogicNodeModal      @ref="_NewLogicNodeModal"   OnConfirm="OnNewLogicNodeConfirmed"/>
-<NewContainerNodeModal  @ref="_NewContainerModal"   OnConfirm="OnNewContainerConfirmed"/>
-<NewPortalNodeModal     @ref="_NewPortalModal"      OnConfirm="OnNewPortalConfirmed"/>
+<NodePaletteModal          @ref="_NodePalette"         OnSelect="OnPaletteSelect"/>
+<NewLogicNodeModal         @ref="_NewLogicNodeModal"   OnConfirm="OnNewLogicNodeConfirmed"/>
+<NewContainerNodeModal     @ref="_NewContainerModal"   OnConfirm="OnNewContainerConfirmed"/>
+<NewPortalNodeModal        @ref="_NewPortalModal"      OnConfirm="OnNewPortalConfirmed"/>
+<LocalizationKeyPickerModal @ref="_LocalizationPicker" OnConfirm="OnLocalizationPicked"/>
+<IconPickerModal           @ref="_IconPicker"          OnConfirm="OnIconPicked"/>
 
 @code {
     private EditorMode        _Mode = EditorMode.Edit;
     private EditorRail.Tool   _ActiveTool = EditorRail.Tool.Graph;
     private Guid              _SelectedId;
-    private Guid              _CurrentContainerId;
     private List<EditorCrumb> _Crumbs = [];
     private List<EdNode>      _Nodes  = [];
     private List<EdEdge>      _Edges  = [];
 
-    private NodePaletteModal?      _NodePalette;
-    private NewLogicNodeModal?     _NewLogicNodeModal;
-    private NewContainerNodeModal? _NewContainerModal;
-    private NewPortalNodeModal?    _NewPortalModal;
+    private NodePaletteModal?          _NodePalette;
+    private NewLogicNodeModal?         _NewLogicNodeModal;
+    private NewContainerNodeModal?     _NewContainerModal;
+    private NewPortalNodeModal?        _NewPortalModal;
+    private LocalizationKeyPickerModal? _LocalizationPicker;
+    private IconPickerModal?           _IconPicker;
 
     // Where the next created node is placed — the right-clicked canvas point (or a staggered default).
     private double _PendingX;
@@ -90,6 +99,15 @@
     private EdNode? _SelectedNode => _Nodes.Find(n => n.Id == _SelectedId);
 
     private StoryProject Project => _ProjectState.CurrentProject!;
+
+    // ── Current location (derived from the last breadcrumb) ─────────────────
+    private EditorScope _Scope     => _Crumbs.Count > 0 ? _Crumbs[^1].Scope : EditorScope.Container;
+    private Guid        _CurrentId => _Crumbs.Count > 0 ? _Crumbs[^1].Id    : Project.Metadata.RootStoryContainerNodeId;
+    private bool        _InLogic   => _Scope == EditorScope.Logic;
+
+    /// <summary>The logic node whose inner graph is currently open, or null when a container is open.</summary>
+    private StoryLogicNode? _CurrentLogicNode =>
+        _InLogic && Project.LogicNodes.TryGetValue(_CurrentId, out StoryLogicNode? logic) ? logic : null;
 
     protected override void OnInitialized()
     {
@@ -100,20 +118,36 @@
             return;
         }
 
-        _CurrentContainerId = Project.Metadata.RootStoryContainerNodeId;
-        _Crumbs             = [new EditorCrumb(_CurrentContainerId, RootName())];
+        Guid root = Project.Metadata.RootStoryContainerNodeId;
+        _Crumbs   = [new EditorCrumb(root, RootName())];
         RebuildNodes();
     }
 
     private string RootName() =>
-        Project.ContainerNodes.TryGetValue(_CurrentContainerId, out StoryContainerNode? root) ? root.Name : "Root";
+        Project.ContainerNodes.TryGetValue(Project.Metadata.RootStoryContainerNodeId, out StoryContainerNode? root)
+            ? root.Name : "Root";
 
-    private bool IsRootContainer => _CurrentContainerId == Project.Metadata.RootStoryContainerNodeId;
+    private bool IsRootContainer => _CurrentId == Project.Metadata.RootStoryContainerNodeId;
 
-    /// <summary>Re-projects the current container's persisted contents into the canvas view models.</summary>
+    /// <summary>Re-projects the current location (a container's graph or a logic node's inner graph) into view models.</summary>
     private void RebuildNodes()
     {
-        if (!Project.ContainerNodes.TryGetValue(_CurrentContainerId, out StoryContainerNode? container))
+        if (_Scope == EditorScope.Logic)
+        {
+            if (Project.LogicNodes.TryGetValue(_CurrentId, out StoryLogicNode? logic))
+            {
+                _Nodes = EditorProjection.BuildLogicNodes(Project, logic, _ProjectState.CurrentLocalization);
+                _Edges = EditorProjection.BuildLogicEdges(logic);
+            }
+            else
+            {
+                _Nodes = [];
+                _Edges = [];
+            }
+            return;
+        }
+
+        if (!Project.ContainerNodes.TryGetValue(_CurrentId, out StoryContainerNode? container))
         {
             _Nodes = [];
             _Edges = [];
@@ -132,40 +166,62 @@
 
     private void OnCrumbClicked(int index)
     {
-        // Drill back up to the clicked container (only the root exists for now).
+        // Drill back up to the clicked step (container or logic node).
         if (index < _Crumbs.Count - 1)
         {
-            _Crumbs             = _Crumbs.GetRange(0, index + 1);
-            _CurrentContainerId = _Crumbs[^1].Id;
+            _Crumbs     = _Crumbs.GetRange(0, index + 1);
+            _SelectedId = Guid.Empty;
+            _Mode       = EditorMode.Edit;
             RebuildNodes();
         }
     }
 
     // ── Drill-down / connections ───────────────────────────────────────────
 
-    /// <summary>Double-click a node: a container opens its inner graph (a logic node has none yet).</summary>
+    /// <summary>Double-click a node: a container opens its inner graph; a logic node opens its content graph.</summary>
     private void OnNodeActivated(EdNode node)
     {
-        if (node.Kind != StoryNodeKind.Container) return;
-        if (!Project.ContainerNodes.TryGetValue(node.Id, out StoryContainerNode? child)) return;
+        switch (node.Kind)
+        {
+            case StoryNodeKind.Container:
+                if (!Project.ContainerNodes.TryGetValue(node.Id, out StoryContainerNode? child)) return;
+                _Crumbs.Add(new EditorCrumb(child.Id, child.Name, EditorScope.Container));
+                break;
 
-        _CurrentContainerId = child.Id;
-        _Crumbs.Add(new EditorCrumb(child.Id, child.Name));
+            case StoryNodeKind.Logic:
+                if (!Project.LogicNodes.TryGetValue(node.Id, out StoryLogicNode? logic)) return;
+                _Crumbs.Add(new EditorCrumb(logic.Id, logic.Name, EditorScope.Logic));
+                break;
+
+            default:
+                return;
+        }
+
         _SelectedId = Guid.Empty;
+        _Mode       = EditorMode.Edit;
         RebuildNodes();
     }
 
-    /// <summary>Wire an output port to an input port in the current container.</summary>
+    /// <summary>Wire an output port to an input port in the current graph (container or logic content).</summary>
     private void OnConnect(EdConnectRequest request)
     {
-        _ProjectState.Connect(_CurrentContainerId, request.FromPoint, request.ToPoint);
+        if (_InLogic) _ProjectState.ConnectContent(_CurrentId, request.FromPoint, request.ToPoint);
+        else          _ProjectState.Connect(_CurrentId, request.FromPoint, request.ToPoint);
         RebuildNodes();
     }
 
-    /// <summary>Remove a connection from the current container.</summary>
+    /// <summary>Remove a connection from the current graph.</summary>
     private void OnDisconnect(Guid connectionId)
     {
-        _ProjectState.Disconnect(_CurrentContainerId, connectionId);
+        if (_InLogic) _ProjectState.DisconnectContent(_CurrentId, connectionId);
+        else          _ProjectState.Disconnect(_CurrentId, connectionId);
+        RebuildNodes();
+    }
+
+    /// <summary>Re-read the linked localization project so new keys appear; refresh node titles.</summary>
+    private async Task OnRefreshLocalization()
+    {
+        await _ProjectState.RefreshLocalizationAsync();
         RebuildNodes();
     }
 
@@ -189,24 +245,61 @@
     }
 
     /// <summary>
-    /// The node kinds that can be added in the current context. Inside a container that means container and
-    /// logic nodes; once editing inside a logic node is supported this will return a different set.
+    /// The node kinds that can be added in the current context. Inside a container that means container, logic
+    /// and portal nodes; inside a logic node's inner graph it means Localization and Icon content nodes.
     /// </summary>
-    private static List<NodePaletteItem> PaletteItems() =>
-    [
-        new NodePaletteItem(StoryNodeKind.Logic,     "bi-diamond-half",       "Logic node",     "A stop point that generates content and runs calculations on variables."),
-        new NodePaletteItem(StoryNodeKind.Container, "bi-collection",         "Container node", "Groups other nodes into a nested sub-graph with its own entries and exits."),
-        new NodePaletteItem(StoryNodeKind.PortalIn,  "bi-box-arrow-in-right", "Portal node",    "A linked in/out pair that teleports flow across the graph to keep it clean.")
-    ];
+    private List<NodePaletteItem> PaletteItems() =>
+        _InLogic
+            ?
+            [
+                new NodePaletteItem(StoryNodeKind.Localization, "bi-translate",    "Localization node", "Picks a localization key that supplies this logic node's title text."),
+                new NodePaletteItem(StoryNodeKind.Icon,         "bi-emoji-smile",  "Icon node",         "Picks a project icon to show alongside this logic node's content.")
+            ]
+            :
+            [
+                new NodePaletteItem(StoryNodeKind.Logic,     "bi-diamond-half",       "Logic node",     "A stop point that generates content and runs calculations on variables."),
+                new NodePaletteItem(StoryNodeKind.Container, "bi-collection",         "Container node", "Groups other nodes into a nested sub-graph with its own entries and exits."),
+                new NodePaletteItem(StoryNodeKind.PortalIn,  "bi-box-arrow-in-right", "Portal node",    "A linked in/out pair that teleports flow across the graph to keep it clean.")
+            ];
 
     private void OnPaletteSelect(NodePaletteItem item)
     {
         switch (item.Kind)
         {
-            case StoryNodeKind.Logic:     _NewLogicNodeModal?.Show(); break;
-            case StoryNodeKind.Container: _NewContainerModal?.Show();  break;
-            case StoryNodeKind.PortalIn:  _NewPortalModal?.Show();     break;
+            case StoryNodeKind.Logic:        _NewLogicNodeModal?.Show();               break;
+            case StoryNodeKind.Container:    _NewContainerModal?.Show();               break;
+            case StoryNodeKind.PortalIn:     _NewPortalModal?.Show();                  break;
+            case StoryNodeKind.Localization: _LocalizationPicker?.Show(Guid.Empty, Guid.Empty); break;
+            case StoryNodeKind.Icon:         _IconPicker?.Show(Guid.Empty, Guid.Empty);         break;
         }
+    }
+
+    // ── Localization / Icon content-node pickers ───────────────────────────
+
+    private void OnLocalizationPicked(LocalizationKeyPickerModal.LocalizationPickResult result)
+    {
+        if (result.EditNodeId != Guid.Empty)
+        {
+            _ProjectState.UpdateLocalizationNode(_CurrentId, result.EditNodeId, result.KeyId);
+        }
+        else if (_ProjectState.AddLocalizationNode(_CurrentId, result.KeyId, _PendingX, _PendingY) is StoryLocalizationNode node)
+        {
+            _SelectedId = node.Id;
+        }
+        RebuildNodes();
+    }
+
+    private void OnIconPicked(IconPickerModal.IconPickResult result)
+    {
+        if (result.EditNodeId != Guid.Empty)
+        {
+            _ProjectState.UpdateIconNode(_CurrentId, result.EditNodeId, result.ImageId);
+        }
+        else if (_ProjectState.AddIconNode(_CurrentId, result.ImageId, _PendingX, _PendingY) is StoryIconNode node)
+        {
+            _SelectedId = node.Id;
+        }
+        RebuildNodes();
     }
 
     private void OnNewLogicNodeConfirmed(NewLogicNodeModal.NewLogicNodeArgs args)
@@ -214,7 +307,7 @@
         if (args.EditId != Guid.Empty)
         {
             _ProjectState.UpdateLogicNode(
-                _CurrentContainerId, args.EditId, args.Name, args.Description, args.EntryName, args.Exits);
+                _CurrentId, args.EditId, args.Name, args.Description, args.EntryName, args.Exits);
             RebuildNodes();
             _SelectedId = args.EditId;
             return;
@@ -226,7 +319,7 @@
                                                .ToList();
 
         StoryLogicNode node = _ProjectState.AddLogicNode(
-            _CurrentContainerId, args.Name, args.Description, entry, exits, _PendingX, _PendingY);
+            _CurrentId, args.Name, args.Description, entry, exits, _PendingX, _PendingY);
 
         RebuildNodes();
         _SelectedId = node.Id;
@@ -237,7 +330,7 @@
         if (args.EditId != Guid.Empty)
         {
             _ProjectState.UpdateContainerNode(
-                _CurrentContainerId, args.EditId, args.Name, args.Description, args.Entries, args.Exits);
+                _CurrentId, args.EditId, args.Name, args.Description, args.Entries, args.Exits);
             RebuildNodes();
             _SelectedId = args.EditId;
             return;
@@ -247,7 +340,7 @@
         List<StoryConnectionPoint> exits   = args.Exits.Select(e => new StoryConnectionPoint { Name = e.Name }).ToList();
 
         StoryContainerNode node = _ProjectState.AddContainerNode(
-            _CurrentContainerId, args.Name, args.Description, entries, exits, _PendingX, _PendingY);
+            _CurrentId, args.Name, args.Description, entries, exits, _PendingX, _PendingY);
 
         RebuildNodes();
         _SelectedId = node.Id;
@@ -262,7 +355,7 @@
             return;
         }
 
-        _ProjectState.AddPortalNode(_CurrentContainerId, args.Name, args.Description, _PendingX, _PendingY);
+        _ProjectState.AddPortalNode(_CurrentId, args.Name, args.Description, _PendingX, _PendingY);
         RebuildNodes();
     }
 
@@ -293,6 +386,16 @@
                 if (_ProjectState.FindPortalByPoint(node.Id) is StoryPortalNode portal)
                     _NewPortalModal?.ShowEdit(portal.Id, portal.Name, portal.Description);
                 break;
+
+            case StoryNodeKind.Localization:
+                if (_CurrentLogicNode?.LocalizationNodes.Find(n => n.Id == node.Id) is StoryLocalizationNode loc)
+                    _LocalizationPicker?.Show(loc.Id, loc.SelectedKeyId);
+                break;
+
+            case StoryNodeKind.Icon:
+                if (_CurrentLogicNode?.IconNodes.Find(n => n.Id == node.Id) is StoryIconNode ico)
+                    _IconPicker?.Show(ico.Id, ico.SelectedImageId);
+                break;
         }
     }
 
@@ -301,13 +404,15 @@
     {
         switch (node.Kind)
         {
-            case StoryNodeKind.Logic:     _ProjectState.DeleteLogicNode(_CurrentContainerId, node.Id);     break;
-            case StoryNodeKind.Container: _ProjectState.DeleteContainerNode(_CurrentContainerId, node.Id); break;
-            case StoryNodeKind.PortalIn:  _ProjectState.DeletePortalIn(_CurrentContainerId, node.Id);      break;
+            case StoryNodeKind.Logic:        _ProjectState.DeleteLogicNode(_CurrentId, node.Id);         break;
+            case StoryNodeKind.Container:    _ProjectState.DeleteContainerNode(_CurrentId, node.Id);     break;
+            case StoryNodeKind.PortalIn:     _ProjectState.DeletePortalIn(_CurrentId, node.Id);          break;
             case StoryNodeKind.PortalOut:
                 if (_ProjectState.FindPortalByPoint(node.Id) is StoryPortalNode portal)
-                    _ProjectState.DeletePortal(_CurrentContainerId, portal.Id);
+                    _ProjectState.DeletePortal(_CurrentId, portal.Id);
                 break;
+            case StoryNodeKind.Localization: _ProjectState.DeleteLocalizationNode(_CurrentId, node.Id);  break;
+            case StoryNodeKind.Icon:         _ProjectState.DeleteIconNode(_CurrentId, node.Id);          break;
             default: return;
         }
 
@@ -327,6 +432,13 @@
 
     private void OnNodeMoved(EdNode moved)
     {
+        // Inside a logic node's inner graph — the Entry/Exit points or a content node moved.
+        if (_InLogic)
+        {
+            _ProjectState.MoveLogicNode(_CurrentId, moved.Id, moved.X, moved.Y);
+            return;
+        }
+
         // A logic node moved.
         if (Project.LogicNodes.TryGetValue(moved.Id, out StoryLogicNode? logic))
         {
@@ -361,7 +473,7 @@
         }
 
         // A connection point (Start/End/Entry/Exit) of the current container moved.
-        if (Project.ContainerNodes.TryGetValue(_CurrentContainerId, out StoryContainerNode? container))
+        if (Project.ContainerNodes.TryGetValue(_CurrentId, out StoryContainerNode? container))
         {
             StoryConnectionPoint? point = container.EntryPoints.Find(p => p.Id == moved.Id)
                                        ?? container.ExitPoints.Find(p => p.Id == moved.Id);

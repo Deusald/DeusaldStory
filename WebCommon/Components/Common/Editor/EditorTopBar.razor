@@ -43,16 +43,27 @@
         </nav>
     </div>
 
-    @* ── Center: Edit / Play ─────────────────────────────────────────── *@
+    @* ── Center: Edit / (Play | Preview) ─────────────────────────────── *@
+    @* Inside a logic node the second tab previews the node's output; elsewhere it plays the story. *@
     <div class="etb-tabs">
         <button class="etb-tab @(Mode == EditorMode.Edit ? "active" : "")"
                 @onclick="() => SetMode(EditorMode.Edit)">
             <i class="bi bi-diagram-2"></i> Edit
         </button>
-        <button class="etb-tab @(Mode == EditorMode.Play ? "active" : "")"
-                @onclick="() => SetMode(EditorMode.Play)">
-            <i class="bi bi-play-fill"></i> Play
-        </button>
+        @if (InLogicNode)
+        {
+            <button class="etb-tab @(Mode == EditorMode.Preview ? "active" : "")"
+                    @onclick="() => SetMode(EditorMode.Preview)">
+                <i class="bi bi-eye-fill"></i> Preview
+            </button>
+        }
+        else
+        {
+            <button class="etb-tab @(Mode == EditorMode.Play ? "active" : "")"
+                    @onclick="() => SetMode(EditorMode.Play)">
+                <i class="bi bi-play-fill"></i> Play
+            </button>
+        }
     </div>
 
     @* ── Right: saved state · export · import ────────────────────────── *@
@@ -97,15 +108,24 @@
         <button class="etb-icon-btn" @onclick="ImportLocalization" title="Import localization from Excel / .loc">
             <i class="bi bi-box-arrow-in-down"></i>
         </button>
+
+        @if (_ProjectState.CurrentLocalization is not null)
+        {
+            <button class="etb-icon-btn" @onclick="RefreshLocalization" title="Refresh localization keys">
+                <i class="bi bi-arrow-clockwise"></i>
+            </button>
+        }
     </div>
 
 </div>
 
 @code {
-    [Parameter] public EditorMode                   Mode         { get; set; }
-    [Parameter] public EventCallback<EditorMode>    ModeChanged  { get; set; }
-    [Parameter] public IReadOnlyList<EditorCrumb>   Crumbs       { get; set; } = [];
-    [Parameter] public EventCallback<int>           CrumbClicked { get; set; }
+    [Parameter] public EditorMode                   Mode                 { get; set; }
+    [Parameter] public EventCallback<EditorMode>    ModeChanged          { get; set; }
+    [Parameter] public IReadOnlyList<EditorCrumb>   Crumbs               { get; set; } = [];
+    [Parameter] public EventCallback<int>           CrumbClicked         { get; set; }
+    [Parameter] public bool                         InLogicNode          { get; set; }
+    [Parameter] public EventCallback                OnRefreshLocalization { get; set; }
 
     private bool _ExportOpen;
 
@@ -125,6 +145,12 @@
     private async Task Save()
     {
         await _ProjectState.SaveAsync();
+        StateHasChanged();
+    }
+
+    private async Task RefreshLocalization()
+    {
+        await OnRefreshLocalization.InvokeAsync();
         StateHasChanged();
     }
 
