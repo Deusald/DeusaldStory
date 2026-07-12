@@ -1,6 +1,6 @@
 using System;
 
-namespace DeusaldStoryRuntime
+namespace DeusaldStoryCommon
 {
     public class StoryProjectMetadata
     {

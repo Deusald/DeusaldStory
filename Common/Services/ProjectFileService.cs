@@ -7,7 +7,7 @@ using JetBrains.Annotations;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Converters;
 
-namespace DeusaldStoryRuntime
+namespace DeusaldStoryCommon
 {
     /// <summary>
     /// Reads and writes a localization project stored as a "folder of files". The concrete backing store

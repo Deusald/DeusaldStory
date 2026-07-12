@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 
-namespace DeusaldStoryRuntime
+namespace DeusaldStoryCommon
 {
     public class StoryContainerNode : IFileWithId
     {

@@ -91,7 +91,7 @@
     </ItemGroup>
 
     <ItemGroup>
-        <ProjectReference Include="..\Runtime\Runtime.csproj"/>
+        <ProjectReference Include="..\Common\Common.csproj"/>
         <ProjectReference Include="..\WebCommon\WebCommon.csproj" />
     </ItemGroup>
 

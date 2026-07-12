@@ -1,5 +1,5 @@
 ﻿using DeusaldLocalizerCommon;
-using DeusaldStoryRuntime;
+using DeusaldStoryCommon;
 using JetBrains.Annotations;
 
 namespace DeusaldStoryWeb;
@@ -124,7 +124,7 @@ public class ProjectStateService(
     public async Task<LocProject?> RelinkAndSaveAsync(StoryProject project, string storyLocation, string newReference)
     {
         project.Metadata.LocalizationProjectPath = newReference;
-        await DeusaldStoryRuntime.ProjectFileService.SaveMetadataOnlyAsync(project, storeFactory.Create(storyLocation));
+        await DeusaldStoryCommon.ProjectFileService.SaveMetadataOnlyAsync(project, storeFactory.Create(storyLocation));
         return await ResolveLocalizationAsync(project);
     }
 
@@ -148,13 +148,13 @@ public class ProjectStateService(
             if (!string.IsNullOrEmpty(saveLocation))
             {
                 CurrentProjectPath = saveLocation;
-                await DeusaldStoryRuntime.ProjectFileService.SaveAsync(CurrentProject!, _CurrentStore);
+                await DeusaldStoryCommon.ProjectFileService.SaveAsync(CurrentProject!, _CurrentStore);
                 MarkClean();
             }
         }
         else
         {
-            await DeusaldStoryRuntime.ProjectFileService.SaveIncrementalAsync(CurrentProject!, _CurrentStore, ChangedFileIds);
+            await DeusaldStoryCommon.ProjectFileService.SaveIncrementalAsync(CurrentProject!, _CurrentStore, ChangedFileIds);
             MarkClean();
         }
 

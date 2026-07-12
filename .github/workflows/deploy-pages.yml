@@ -2,7 +2,7 @@ name: Deploy WebApp to GitHub Pages
 
 # Builds the Blazor WebAssembly client and publishes it to GitHub Pages.
 # The MAUI App is never built here — only WebApp and its dependencies
-# (WebCommon, Runtime), so no MAUI workload is needed.
+# (WebCommon, Common), so no MAUI workload is needed.
 
 on:
   push:

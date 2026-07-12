@@ -278,7 +278,7 @@
 
         try
         {
-            StoryProject project = await DeusaldStoryRuntime.ProjectFileService.OpenAsync(path);
+            StoryProject project = await DeusaldStoryCommon.ProjectFileService.OpenAsync(path);
 
             LocProject? loc = await _ProjectState.ResolveLocalizationAsync(project);
             if (loc is null)
@@ -294,7 +294,7 @@
 
             FinalizeOpen(project, loc, path);
         }
-        catch (DeusaldStoryRuntime.ProjectFolderException ex)
+        catch (DeusaldStoryCommon.ProjectFolderException ex)
         {
             _ErrorMessage = $"Invalid project: {ex.Message}";
             _IsLoading    = false;

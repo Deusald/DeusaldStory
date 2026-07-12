@@ -1,4 +1,4 @@
-﻿using DeusaldStoryRuntime;
+﻿using DeusaldStoryCommon;
 using Newtonsoft.Json;
 
 namespace DeusaldStoryWeb

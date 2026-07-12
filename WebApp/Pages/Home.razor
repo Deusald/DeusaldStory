@@ -214,7 +214,7 @@
                 StoryProject project;
                 try
                 {
-                    project = await DeusaldStoryRuntime.ProjectFileService.OpenAsync(store);
+                    project = await DeusaldStoryCommon.ProjectFileService.OpenAsync(store);
                 }
                 catch
                 {
@@ -271,7 +271,7 @@
         try
         {
             IProjectFileStore store   = _StoreFactory.Create(location);
-            StoryProject      project = await DeusaldStoryRuntime.ProjectFileService.OpenAsync(store);
+            StoryProject      project = await DeusaldStoryCommon.ProjectFileService.OpenAsync(store);
 
             LocProject? loc = await _ProjectState.ResolveLocalizationAsync(project);
             if (loc is null)
