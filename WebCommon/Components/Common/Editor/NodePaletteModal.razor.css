@@ -1,0 +1,94 @@
+/* Reuses the global .modal-* shell (see app.css). Palette-specific bits below. */
+
+.npm-box {
+    width: 440px;
+    height: auto;
+    max-height: calc(100vh - 96px);
+}
+
+.npm-body {
+    gap: 12px;
+    overflow: hidden;
+}
+
+/* ── Search ───────────────────────────────────────────────────────────────── */
+
+.npm-search-wrap { position: relative; flex: none; }
+
+.npm-search-icon {
+    position: absolute;
+    left: 11px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-ghost);
+    font-size: 12px;
+    pointer-events: none;
+}
+
+.npm-search { padding-left: 32px; }
+
+/* ── List ─────────────────────────────────────────────────────────────────── */
+
+.npm-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    overflow-y: auto;
+    min-height: 0;
+    margin: 0 -4px;
+    padding: 0 4px;
+}
+
+.npm-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    text-align: left;
+    padding: 11px 12px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--r-md);
+    cursor: pointer;
+    transition: background var(--dur) var(--ease), border-color var(--dur) var(--ease);
+}
+.npm-item:hover { background: var(--surface-3); border-color: var(--border-hover); }
+
+.npm-item-icon {
+    flex-shrink: 0;
+    width: 30px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--r-sm);
+    background: var(--surface-1);
+    border: 1px solid var(--border-subtle);
+    font-size: 14px;
+}
+
+.npm-item-text {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.npm-item-label {
+    font-size: 13.5px;
+    font-weight: 600;
+    color: var(--text-bright);
+}
+
+.npm-item-desc {
+    font-size: 11.5px;
+    line-height: 1.4;
+    color: var(--text-dim);
+}
+
+.npm-empty {
+    padding: 20px;
+    text-align: center;
+    font-size: 13px;
+    color: var(--text-ghost);
+}

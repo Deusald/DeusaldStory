@@ -525,3 +525,155 @@ select.field {
         padding-left: env(safe-area-inset-left);
     }
 }
+
+/* -------------------------------------------------------------------------
+   12. Modal shell (shared by every modal — must be global, not component-
+   isolated, so any modal component can reuse the .modal-* classes and beat
+   Bootstrap's default black .modal-backdrop)
+   ------------------------------------------------------------------------- */
+
+.modal-backdrop {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, .6);
+    backdrop-filter: blur(2px);
+    z-index: 1050;
+}
+
+.modal-box {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 1060;
+    width: 480px;
+    height: min(620px, calc(100vh - 64px));
+    background: var(--surface-1);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--r-lg);
+    box-shadow: var(--shadow-lg);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 18px 20px 0;
+}
+
+.modal-title {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text-bright);
+    letter-spacing: -.01em;
+}
+
+.modal-close {
+    background: none;
+    border: none;
+    color: var(--text-faint);
+    font-size: 14px;
+    cursor: pointer;
+    padding: 4px;
+    line-height: 1;
+    border-radius: var(--r-xs);
+    transition: color var(--dur) var(--ease), background var(--dur) var(--ease);
+}
+.modal-close:hover { color: var(--text-soft); background: var(--surface-3); }
+
+.modal-body {
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.modal-field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    position: relative;
+    flex: none;
+}
+
+.modal-label {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-muted);
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+}
+
+.modal-label-hint {
+    font-size: 11px;
+    font-weight: 400;
+    color: var(--text-fainter);
+}
+
+.modal-input {
+    background: var(--surface-input);
+    border: 1px solid var(--border);
+    border-radius: var(--r-sm);
+    color: var(--text-bright);
+    font-size: 13.5px;
+    padding: 9px 12px;
+    width: 100%;
+    transition: border-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease);
+}
+.modal-input:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-soft);
+    outline: none;
+}
+.modal-input::placeholder { color: var(--text-ghost); }
+
+.modal-field-error {
+    font-size: 11.5px;
+    color: var(--danger);
+}
+
+.modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    padding: 14px 20px;
+    border-top: 1px solid var(--border-subtle);
+}
+
+.modal-btn {
+    padding: 8px 16px;
+    border-radius: var(--r-sm);
+    font-size: 13.5px;
+    font-weight: 500;
+    cursor: pointer;
+    border: 1px solid transparent;
+    transition: background var(--dur) var(--ease),
+                border-color var(--dur) var(--ease),
+                filter var(--dur) var(--ease),
+                opacity var(--dur) var(--ease);
+}
+.modal-btn:disabled { opacity: .4; cursor: not-allowed; }
+
+.modal-btn-ghost {
+    background: transparent;
+    border-color: var(--border-strong);
+    color: var(--text-muted);
+}
+.modal-btn-ghost:hover:not(:disabled) { background: var(--surface-3); color: var(--text-soft); }
+
+.modal-btn-primary {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--accent-ink);
+    font-weight: 600;
+}
+.modal-btn-primary:hover:not(:disabled) { filter: brightness(1.06); }

@@ -1,0 +1,178 @@
+@namespace DeusaldStoryWeb.Components.Common
+
+@if (_Visible)
+{
+    <div class="modal-backdrop" @onclick="Cancel"></div>
+
+    <div class="modal-box ncm-box" @onclick:stopPropagation="true">
+
+        <div class="modal-header">
+            <span class="modal-title">New container node</span>
+            <button class="modal-close" @onclick="Cancel" title="Close">
+                <i class="bi bi-x-lg"></i>
+            </button>
+        </div>
+
+        <div class="modal-body ncm-body">
+
+            @* ── Name ──────────────────────────────────────────────────── *@
+            <div class="modal-field">
+                <label class="modal-label">Name</label>
+                <input class="modal-input"
+                       type="text"
+                       placeholder="Chapter 1"
+                       @bind="_Name"
+                       @bind:event="oninput"
+                       maxlength="100"/>
+            </div>
+
+            @* ── Description ───────────────────────────────────────────── *@
+            <div class="modal-field">
+                <label class="modal-label">
+                    Description
+                    <span class="modal-label-hint">optional</span>
+                </label>
+                <textarea class="modal-input ncm-textarea"
+                          placeholder="A short description of this part of the story…"
+                          @bind="_Description"
+                          @bind:event="oninput"
+                          rows="2"
+                          maxlength="500"></textarea>
+            </div>
+
+            @* ── Entry points ──────────────────────────────────────────── *@
+            <div class="modal-field">
+                <label class="modal-label">
+                    Entry points
+                    <span class="modal-label-hint">at least one — ways the story can enter this container</span>
+                </label>
+                @for (int i = 0; i < _EntryNames.Count; i++)
+                {
+                    int index = i;
+                    <div class="ncm-point">
+                        <span class="ncm-point-dot" style="background:var(--success)"></span>
+                        <input class="modal-input"
+                               type="text"
+                               placeholder="In"
+                               value="@_EntryNames[index]"
+                               @oninput="e => _EntryNames[index] = e.Value?.ToString() ?? string.Empty"
+                               maxlength="60"/>
+                        <button class="ncm-point-del"
+                                title="Remove entry"
+                                disabled="@(_EntryNames.Count <= 1)"
+                                @onclick="() => RemoveEntry(index)">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </div>
+                }
+                <button class="ncm-add" @onclick="AddEntry">
+                    <i class="bi bi-plus-lg"></i> Add entry
+                </button>
+            </div>
+
+            @* ── Exit points ───────────────────────────────────────────── *@
+            <div class="modal-field">
+                <label class="modal-label">
+                    Exit points
+                    <span class="modal-label-hint">at least one — ways the story can leave this container</span>
+                </label>
+                @for (int i = 0; i < _ExitNames.Count; i++)
+                {
+                    int index = i;
+                    <div class="ncm-point">
+                        <span class="ncm-point-dot" style="background:var(--danger)"></span>
+                        <input class="modal-input"
+                               type="text"
+                               placeholder="Out"
+                               value="@_ExitNames[index]"
+                               @oninput="e => _ExitNames[index] = e.Value?.ToString() ?? string.Empty"
+                               maxlength="60"/>
+                        <button class="ncm-point-del"
+                                title="Remove exit"
+                                disabled="@(_ExitNames.Count <= 1)"
+                                @onclick="() => RemoveExit(index)">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </div>
+                }
+                <button class="ncm-add" @onclick="AddExit">
+                    <i class="bi bi-plus-lg"></i> Add exit
+                </button>
+            </div>
+
+        </div>
+
+        <div class="modal-footer">
+            <button class="modal-btn modal-btn-ghost" @onclick="Cancel">Cancel</button>
+            <button class="modal-btn modal-btn-primary"
+                    @onclick="Confirm"
+                    disabled="@(!_CanConfirm)">
+                Create container
+            </button>
+        </div>
+
+    </div>
+}
+
+@code {
+    [Parameter] public EventCallback<NewContainerNodeArgs> OnConfirm { get; set; }
+
+    private bool         _Visible;
+    private string       _Name        = "";
+    private string       _Description = "";
+    private List<string> _EntryNames  = new() { "In" };
+    private List<string> _ExitNames   = new() { "Out" };
+
+    public void Show()
+    {
+        _Name        = "";
+        _Description = "";
+        _EntryNames  = new List<string> { "In" };
+        _ExitNames   = new List<string> { "Out" };
+        _Visible     = true;
+        StateHasChanged();
+    }
+
+    private bool _CanConfirm =>
+        !string.IsNullOrWhiteSpace(_Name)                   &&
+        _EntryNames.Any(n => !string.IsNullOrWhiteSpace(n)) &&
+        _ExitNames.Any(n => !string.IsNullOrWhiteSpace(n));
+
+    private void AddEntry() => _EntryNames.Add("");
+    private void AddExit()  => _ExitNames.Add("");
+
+    private void RemoveEntry(int index)
+    {
+        if (_EntryNames.Count <= 1) return;
+        _EntryNames.RemoveAt(index);
+    }
+
+    private void RemoveExit(int index)
+    {
+        if (_ExitNames.Count <= 1) return;
+        _ExitNames.RemoveAt(index);
+    }
+
+    private async Task Confirm()
+    {
+        if (!_CanConfirm) return;
+        _Visible = false;
+
+        List<string> entries = Clean(_EntryNames);
+        List<string> exits   = Clean(_ExitNames);
+
+        await OnConfirm.InvokeAsync(new NewContainerNodeArgs(_Name.Trim(), _Description.Trim(), entries, exits));
+    }
+
+    private static List<string> Clean(IEnumerable<string> names) =>
+        names.Select(n => n.Trim()).Where(n => !string.IsNullOrEmpty(n)).ToList();
+
+    private void Cancel() => _Visible = false;
+
+    /// <summary>Result passed back to the parent when the user confirms.</summary>
+    public record NewContainerNodeArgs(
+        string       Name,
+        string       Description,
+        List<string> EntryNames,
+        List<string> ExitNames);
+}

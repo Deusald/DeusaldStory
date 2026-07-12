@@ -5,9 +5,10 @@
     @* ── Floating toolbar ────────────────────────────────────────────── *@
     <div class="edg-toolbar">
         <button class="edg-tool-btn edg-tool-primary" @onclick="() => OnAddNode.InvokeAsync()">
-            <i class="bi bi-plus-lg"></i> Add logic node
+            <i class="bi bi-plus-lg"></i> Add node
         </button>
         <span class="edg-tool-count">@Nodes.Count nodes</span>
+        <span class="edg-tool-hint">right-click the canvas to add</span>
     </div>
 
     @* ── Canvas ──────────────────────────────────────────────────────── *@
@@ -16,6 +17,7 @@
          @onpointermove="CanvasMove"
          @onpointerup="CanvasUp"
          @onpointerleave="CanvasUp"
+         @oncontextmenu="CanvasContextMenu" @oncontextmenu:preventDefault="true"
          @onwheel="OnWheel" @onwheel:preventDefault="true">
 
         <div class="edg-world" style="transform: translate(@F(_PanX)px, @F(_PanY)px) scale(@F(_Scale));">
@@ -43,7 +45,8 @@
                 string color = StoryStyle.NodeColor(n.Kind);
                 <div class="edg-node @NodeClass(n)"
                      style="left:@F(n.X)px; top:@F(n.Y)px;"
-                     @onpointerdown="e => NodeDown(e, n)" @onpointerdown:stopPropagation="true">
+                     @onpointerdown="e => NodeDown(e, n)" @onpointerdown:stopPropagation="true"
+                     @oncontextmenu:stopPropagation="true" @oncontextmenu:preventDefault="true">
 
                     @if (n.Inputs.Count > 0)
                     {
@@ -127,8 +130,9 @@
     [Parameter] public List<EdEdge>         Edges           { get; set; } = [];
     [Parameter] public Guid                 SelectedId      { get; set; }
     [Parameter] public EventCallback<Guid>  SelectedChanged { get; set; }
-    [Parameter] public EventCallback        OnAddNode       { get; set; }
-    [Parameter] public EventCallback<EdNode> OnNodeMoved    { get; set; }
+    [Parameter] public EventCallback             OnAddNode          { get; set; }
+    [Parameter] public EventCallback<EdNode>     OnNodeMoved        { get; set; }
+    [Parameter] public EventCallback<CanvasPoint> OnCanvasContextMenu { get; set; }
 
     private const double NODE_W = 216;  // fixed card width (keep in sync with .edg-node)
     private const double PORT_Y = 46;   // vertical anchor of the ports from the card top
@@ -216,6 +220,16 @@
     {
         double factor = e.DeltaY < 0 ? 1.1 : 1 / 1.1;
         _Scale = Math.Clamp(_Scale * factor, 0.35, 2.2);
+    }
+
+    // ── Context menu ───────────────────────────────────────────────────────
+
+    /// <summary>Right-click on empty canvas — convert the cursor to world coordinates and ask to open the palette.</summary>
+    private async Task CanvasContextMenu(MouseEventArgs e)
+    {
+        double wx = (e.OffsetX - _PanX) / _Scale;
+        double wy = (e.OffsetY - _PanY) / _Scale;
+        await OnCanvasContextMenu.InvokeAsync(new CanvasPoint(wx, wy));
     }
 
     // ── Edge geometry ──────────────────────────────────────────────────────

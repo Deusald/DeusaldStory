@@ -28,7 +28,8 @@
                              SelectedId="_SelectedId"
                              SelectedChanged="OnSelect"
                              OnAddNode="OnAddNode"
-                             OnNodeMoved="OnNodeMoved"/>
+                             OnNodeMoved="OnNodeMoved"
+                             OnCanvasContextMenu="OnCanvasContextMenu"/>
             }
             else
             {
@@ -49,7 +50,9 @@
     </div>
 </div>
 
-<NewLogicNodeModal @ref="_NewLogicNodeModal" OnConfirm="OnNewLogicNodeConfirmed"/>
+<NodePaletteModal       @ref="_NodePalette"         OnSelect="OnPaletteSelect"/>
+<NewLogicNodeModal      @ref="_NewLogicNodeModal"   OnConfirm="OnNewLogicNodeConfirmed"/>
+<NewContainerNodeModal  @ref="_NewContainerModal"   OnConfirm="OnNewContainerConfirmed"/>
 
 @code {
     private EditorMode        _Mode = EditorMode.Edit;
@@ -59,7 +62,13 @@
     private List<EdNode>      _Nodes  = [];
     private List<EdEdge>      _Edges  = [];
 
-    private NewLogicNodeModal? _NewLogicNodeModal;
+    private NodePaletteModal?      _NodePalette;
+    private NewLogicNodeModal?     _NewLogicNodeModal;
+    private NewContainerNodeModal? _NewContainerModal;
+
+    // Where the next created node is placed — the right-clicked canvas point (or a staggered default).
+    private double _PendingX;
+    private double _PendingY;
 
     private EdNode? _SelectedNode => _Nodes.Find(n => n.Id == _SelectedId);
 
@@ -110,9 +119,43 @@
         }
     }
 
-    // ── Add logic node ─────────────────────────────────────────────────────
+    // ── Add node (palette → detail modal) ──────────────────────────────────
 
-    private void OnAddNode() => _NewLogicNodeModal?.Show();
+    /// <summary>Toolbar "Add node" — no cursor position, so stagger a default spot, then open the palette.</summary>
+    private void OnAddNode()
+    {
+        int count = _Nodes.Count;
+        _PendingX = 320 + count % 6 * 30;
+        _PendingY = 140 + count % 6 * 26;
+        _NodePalette?.Show(PaletteItems());
+    }
+
+    /// <summary>Right-click on empty canvas — open the palette and remember where to drop the node.</summary>
+    private void OnCanvasContextMenu(CanvasPoint point)
+    {
+        _PendingX = point.X;
+        _PendingY = point.Y;
+        _NodePalette?.Show(PaletteItems());
+    }
+
+    /// <summary>
+    /// The node kinds that can be added in the current context. Inside a container that means container and
+    /// logic nodes; once editing inside a logic node is supported this will return a different set.
+    /// </summary>
+    private static List<NodePaletteItem> PaletteItems() =>
+    [
+        new NodePaletteItem(StoryNodeKind.Logic,     "bi-diamond-half", "Logic node",     "A stop point that generates content and runs calculations on variables."),
+        new NodePaletteItem(StoryNodeKind.Container, "bi-collection",   "Container node", "Groups other nodes into a nested sub-graph with its own entries and exits.")
+    ];
+
+    private void OnPaletteSelect(NodePaletteItem item)
+    {
+        switch (item.Kind)
+        {
+            case StoryNodeKind.Logic:     _NewLogicNodeModal?.Show(); break;
+            case StoryNodeKind.Container: _NewContainerModal?.Show();  break;
+        }
+    }
 
     private void OnNewLogicNodeConfirmed(NewLogicNodeModal.NewLogicNodeArgs args)
     {
@@ -121,12 +164,20 @@
                                                .Select(n => new StoryConnectionPoint { Name = n })
                                                .ToList();
 
-        // Stagger new nodes so a burst of additions doesn't stack on one spot.
-        int count = Project.LogicNodes.Count;
-        double x  = 320 + count % 5 * 30;
-        double y  = 120 + count % 5 * 26;
+        StoryLogicNode node = _ProjectState.AddLogicNode(
+            _CurrentContainerId, args.Name, args.Description, entry, exits, _PendingX, _PendingY);
 
-        StoryLogicNode node = _ProjectState.AddLogicNode(_CurrentContainerId, args.Name, args.Description, entry, exits, x, y);
+        RebuildNodes();
+        _SelectedId = node.Id;
+    }
+
+    private void OnNewContainerConfirmed(NewContainerNodeModal.NewContainerNodeArgs args)
+    {
+        List<StoryConnectionPoint> entries = args.EntryNames.Select(n => new StoryConnectionPoint { Name = n }).ToList();
+        List<StoryConnectionPoint> exits   = args.ExitNames.Select(n => new StoryConnectionPoint { Name = n }).ToList();
+
+        StoryContainerNode node = _ProjectState.AddContainerNode(
+            _CurrentContainerId, args.Name, args.Description, entries, exits, _PendingX, _PendingY);
 
         RebuildNodes();
         _SelectedId = node.Id;

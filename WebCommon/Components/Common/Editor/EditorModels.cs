@@ -29,6 +29,15 @@ namespace DeusaldStoryWeb
         Container   // a child container node (blue)
     }
 
+    /// <summary>A point on the graph canvas in world (un-panned, un-scaled) coordinates.</summary>
+    public readonly record struct CanvasPoint(double X, double Y);
+
+    /// <summary>
+    /// One selectable entry in the right-click node palette. <see cref="Kind"/> tells the editor which kind of
+    /// node to create; the rest is presentation. The available set is context-dependent (see the palette).
+    /// </summary>
+    public sealed record NodePaletteItem(StoryNodeKind Kind, string Icon, string Label, string Description);
+
     /// <summary>Kind of an inspector content block.</summary>
     public enum StoryBlockKind
     {

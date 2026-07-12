@@ -1,0 +1,101 @@
+@namespace DeusaldStoryWeb.Components.Common
+
+@if (_Visible)
+{
+    <div class="modal-backdrop" @onclick="Cancel"></div>
+
+    <div class="modal-box npm-box" @onclick:stopPropagation="true">
+
+        <div class="modal-header">
+            <span class="modal-title">Add node</span>
+            <button class="modal-close" @onclick="Cancel" title="Close">
+                <i class="bi bi-x-lg"></i>
+            </button>
+        </div>
+
+        <div class="modal-body npm-body">
+
+            @* ── Search ────────────────────────────────────────────────── *@
+            <div class="npm-search-wrap">
+                <i class="bi bi-search npm-search-icon"></i>
+                <input class="modal-input npm-search"
+                       type="text"
+                       placeholder="Search nodes…"
+                       @bind="_Search"
+                       @bind:event="oninput"
+                       @ref="_SearchInput"/>
+            </div>
+
+            @* ── List ──────────────────────────────────────────────────── *@
+            <div class="npm-list">
+                @{ List<NodePaletteItem> filtered = Filtered(); }
+                @if (filtered.Count == 0)
+                {
+                    <div class="npm-empty">No matching nodes.</div>
+                }
+                else
+                {
+                    @foreach (NodePaletteItem item in filtered)
+                    {
+                        NodePaletteItem it = item;
+                        <button class="npm-item" @onclick="() => Pick(it)">
+                            <span class="npm-item-icon" style="color:@StoryStyle.NodeColor(it.Kind)">
+                                <i class="bi @it.Icon"></i>
+                            </span>
+                            <span class="npm-item-text">
+                                <span class="npm-item-label">@it.Label</span>
+                                <span class="npm-item-desc">@it.Description</span>
+                            </span>
+                        </button>
+                    }
+                }
+            </div>
+
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public EventCallback<NodePaletteItem> OnSelect { get; set; }
+
+    private bool                  _Visible;
+    private string                _Search = "";
+    private List<NodePaletteItem> _Items  = new();
+    private ElementReference      _SearchInput;
+
+    /// <summary>Opens the palette with the node kinds available in the current context.</summary>
+    public void Show(IEnumerable<NodePaletteItem> items)
+    {
+        _Items   = items.ToList();
+        _Search  = "";
+        _Visible = true;
+        StateHasChanged();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_Visible)
+        {
+            try { await _SearchInput.FocusAsync(); }
+            catch { /* element may not be ready — harmless */ }
+        }
+    }
+
+    private List<NodePaletteItem> Filtered()
+    {
+        if (string.IsNullOrWhiteSpace(_Search)) return _Items;
+        string q = _Search.Trim();
+        return _Items
+              .Where(i => i.Label.Contains(q, StringComparison.OrdinalIgnoreCase)
+                       || i.Description.Contains(q, StringComparison.OrdinalIgnoreCase))
+              .ToList();
+    }
+
+    private async Task Pick(NodePaletteItem item)
+    {
+        _Visible = false;
+        await OnSelect.InvokeAsync(item);
+    }
+
+    private void Cancel() => _Visible = false;
+}

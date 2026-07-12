@@ -129,6 +129,40 @@ public class ProjectStateService(
         return node;
     }
 
+    /// <summary>
+    /// Adds a new (blue) child container to <paramref name="parentContainerId"/> at
+    /// (<paramref name="x"/>, <paramref name="y"/>), marks it dirty and notifies listeners.
+    /// </summary>
+    public StoryContainerNode AddContainerNode(
+        Guid                              parentContainerId,
+        string                            name,
+        string                            description,
+        IEnumerable<StoryConnectionPoint> entryPoints,
+        IEnumerable<StoryConnectionPoint> exitPoints,
+        double                            x,
+        double                            y)
+    {
+        StoryContainerNode node = new()
+        {
+            Name            = name,
+            Description     = description,
+            ParentContainer = parentContainerId,
+            X               = x,
+            Y               = y
+        };
+        node.EntryPoints.AddRange(entryPoints);
+        node.ExitPoints.AddRange(exitPoints);
+
+        CurrentProject!.ContainerNodes.Add(node.Id, node);
+
+        if (CurrentProject.ContainerNodes.TryGetValue(parentContainerId, out StoryContainerNode? parent))
+            parent.Containers.Add(node.Id);
+
+        MarkKeyDirty(node.Id);
+        MarkKeyDirty(parentContainerId);
+        return node;
+    }
+
     public void LoadProject(StoryProject project, LocProject? localization, string folderPath, Guid userId, Guid accessToken)
     {
         CurrentProject      = project;
