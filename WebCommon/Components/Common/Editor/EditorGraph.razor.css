@@ -112,6 +112,7 @@
 .edg-node-exit      { border-left: 3px solid var(--danger); }
 .edg-node-logic     { border-left: 3px solid var(--warning); }
 .edg-node-container { border-left: 3px solid var(--info); }
+.edg-node-portal    { border-left: 3px solid var(--orange); }
 
 .edg-node-lock {
     color: var(--text-ghost);
@@ -225,6 +226,56 @@
 }
 .edg-port-in  .edg-port-label { left: 12px; }
 .edg-port-out .edg-port-label { right: 12px; text-align: right; }
+
+/* ── Node context menu ───────────────────────────────────────────────────── */
+
+/* Full-viewport catcher so a click / right-click anywhere dismisses the menu. */
+.edg-menu-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 40;
+}
+
+.edg-menu {
+    position: fixed;
+    z-index: 41;
+    min-width: 168px;
+    padding: 5px;
+    background: var(--surface-2);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--r-md);
+    box-shadow: var(--shadow-md);
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+}
+
+.edg-menu-item {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    width: 100%;
+    padding: 8px 10px;
+    border: none;
+    border-radius: var(--r-sm);
+    background: transparent;
+    color: var(--text-soft);
+    font-size: 12.5px;
+    font-weight: 500;
+    text-align: left;
+    cursor: pointer;
+    transition: background var(--dur) var(--ease), color var(--dur) var(--ease);
+}
+.edg-menu-item:hover { background: var(--surface-3); color: var(--text-bright); }
+.edg-menu-item i { font-size: 12px; width: 14px; text-align: center; }
+
+.edg-menu-danger:hover { color: var(--danger); }
+
+.edg-menu-sep {
+    height: 1px;
+    margin: 4px 2px;
+    background: var(--border-subtle);
+}
 
 /* ── Minimap ─────────────────────────────────────────────────────────────── */
 

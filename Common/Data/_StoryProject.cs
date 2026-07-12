@@ -8,10 +8,11 @@ namespace DeusaldStoryCommon
         public StoryProjectMetadata                 Metadata       { get; set; } = new();
         public Dictionary<Guid, StoryContainerNode> ContainerNodes { get; set; } = new();
         public Dictionary<Guid, StoryLogicNode>     LogicNodes     { get; set; } = new();
+        public Dictionary<Guid, StoryPortalNode>    PortalNodes    { get; set; } = new();
 
         public int GetNumberOfNodes()
         {
-            return ContainerNodes.Count + LogicNodes.Count;
+            return ContainerNodes.Count + LogicNodes.Count + PortalNodes.Count;
         }
     }
 }

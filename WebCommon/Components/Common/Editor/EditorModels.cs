@@ -26,7 +26,9 @@ namespace DeusaldStoryWeb
         Entry,      // a non-root container's entry point, rendered as a node inside it (green)
         Exit,       // a non-root container's exit point, rendered as a node inside it (red)
         Logic,      // a logic node — a stop point that generates content and runs calculations (yellow)
-        Container   // a child container node (blue)
+        Container,  // a child container node (blue)
+        PortalIn,   // a portal's entry node — flow arriving here teleports to the paired portal out (orange)
+        PortalOut   // a portal's exit node — flow re-emerges here and continues on (orange)
     }
 
     /// <summary>A point on the graph canvas in world (un-panned, un-scaled) coordinates.</summary>
@@ -152,6 +154,40 @@ namespace DeusaldStoryWeb
                 nodes.Add(node);
             }
 
+            foreach (Guid portalId in container.Portals)
+            {
+                if (!project.PortalNodes.TryGetValue(portalId, out StoryPortalNode? portal)) continue;
+
+                foreach (StoryConnectionPoint ip in portal.InPoints)
+                {
+                    EdNode inNode = new()
+                    {
+                        Id        = ip.Id,
+                        Kind      = StoryNodeKind.PortalIn,
+                        Title     = portal.Name,
+                        Subtitle  = portal.Description,
+                        X         = ip.X,
+                        Y         = ip.Y,
+                        Deletable = true
+                    };
+                    inNode.Inputs.Add(new EdPort { Id = ip.Id, Name = ip.Name });
+                    nodes.Add(inNode);
+                }
+
+                EdNode outNode = new()
+                {
+                    Id        = portal.OutPoint.Id,
+                    Kind      = StoryNodeKind.PortalOut,
+                    Title     = portal.Name,
+                    Subtitle  = portal.Description,
+                    X         = portal.OutPoint.X,
+                    Y         = portal.OutPoint.Y,
+                    Deletable = true
+                };
+                outNode.Outputs.Add(new EdPort { Id = portal.OutPoint.Id, Name = portal.OutPoint.Name });
+                nodes.Add(outNode);
+            }
+
             foreach (Guid childId in container.Containers)
             {
                 if (!project.ContainerNodes.TryGetValue(childId, out StoryContainerNode? child)) continue;
@@ -192,6 +228,8 @@ namespace DeusaldStoryWeb
             StoryNodeKind.Exit      => "EXIT",
             StoryNodeKind.Logic     => "LOGIC",
             StoryNodeKind.Container => "CONTAINER",
+            StoryNodeKind.PortalIn  => "PORTAL IN",
+            StoryNodeKind.PortalOut => "PORTAL OUT",
             _                       => ""
         };
 
@@ -203,6 +241,8 @@ namespace DeusaldStoryWeb
             StoryNodeKind.Exit      => "var(--danger)",
             StoryNodeKind.Logic     => "var(--warning)",
             StoryNodeKind.Container => "var(--info)",
+            StoryNodeKind.PortalIn  => "var(--orange)",
+            StoryNodeKind.PortalOut => "var(--orange)",
             _                       => "var(--text-dim)"
         };
 

@@ -7,7 +7,7 @@
     <div class="modal-box ncm-box" @onclick:stopPropagation="true">
 
         <div class="modal-header">
-            <span class="modal-title">New container node</span>
+            <span class="modal-title">@(_IsEdit ? "Edit container node" : "New container node")</span>
             <button class="modal-close" @onclick="Cancel" title="Close">
                 <i class="bi bi-x-lg"></i>
             </button>
@@ -46,7 +46,7 @@
                     Entry points
                     <span class="modal-label-hint">at least one — ways the story can enter this container</span>
                 </label>
-                @for (int i = 0; i < _EntryNames.Count; i++)
+                @for (int i = 0; i < _Entries.Count; i++)
                 {
                     int index = i;
                     <div class="ncm-point">
@@ -54,12 +54,12 @@
                         <input class="modal-input"
                                type="text"
                                placeholder="In"
-                               value="@_EntryNames[index]"
-                               @oninput="e => _EntryNames[index] = e.Value?.ToString() ?? string.Empty"
+                               value="@_Entries[index].Name"
+                               @oninput="e => _Entries[index].Name = e.Value?.ToString() ?? string.Empty"
                                maxlength="60"/>
                         <button class="ncm-point-del"
                                 title="Remove entry"
-                                disabled="@(_EntryNames.Count <= 1)"
+                                disabled="@(_Entries.Count <= 1)"
                                 @onclick="() => RemoveEntry(index)">
                             <i class="bi bi-trash"></i>
                         </button>
@@ -76,7 +76,7 @@
                     Exit points
                     <span class="modal-label-hint">at least one — ways the story can leave this container</span>
                 </label>
-                @for (int i = 0; i < _ExitNames.Count; i++)
+                @for (int i = 0; i < _Exits.Count; i++)
                 {
                     int index = i;
                     <div class="ncm-point">
@@ -84,12 +84,12 @@
                         <input class="modal-input"
                                type="text"
                                placeholder="Out"
-                               value="@_ExitNames[index]"
-                               @oninput="e => _ExitNames[index] = e.Value?.ToString() ?? string.Empty"
+                               value="@_Exits[index].Name"
+                               @oninput="e => _Exits[index].Name = e.Value?.ToString() ?? string.Empty"
                                maxlength="60"/>
                         <button class="ncm-point-del"
                                 title="Remove exit"
-                                disabled="@(_ExitNames.Count <= 1)"
+                                disabled="@(_Exits.Count <= 1)"
                                 @onclick="() => RemoveExit(index)">
                             <i class="bi bi-trash"></i>
                         </button>
@@ -107,7 +107,7 @@
             <button class="modal-btn modal-btn-primary"
                     @onclick="Confirm"
                     disabled="@(!_CanConfirm)">
-                Create container
+                @(_IsEdit ? "Save changes" : "Create container")
             </button>
         </div>
 
@@ -117,40 +117,65 @@
 @code {
     [Parameter] public EventCallback<NewContainerNodeArgs> OnConfirm { get; set; }
 
-    private bool         _Visible;
-    private string       _Name        = "";
-    private string       _Description = "";
-    private List<string> _EntryNames  = new() { "In" };
-    private List<string> _ExitNames   = new() { "Out" };
+    private bool           _Visible;
+    private bool           _IsEdit;
+    private Guid           _EditId;
+    private string         _Name        = "";
+    private string         _Description = "";
+    private List<PointRow> _Entries     = new() { new PointRow { Name = "In" } };
+    private List<PointRow> _Exits       = new() { new PointRow { Name = "Out" } };
 
+    /// <summary>Opens the modal to create a brand-new container node.</summary>
     public void Show()
     {
+        _IsEdit      = false;
+        _EditId      = Guid.Empty;
         _Name        = "";
         _Description = "";
-        _EntryNames  = new List<string> { "In" };
-        _ExitNames   = new List<string> { "Out" };
+        _Entries     = new List<PointRow> { new PointRow { Name = "In" } };
+        _Exits       = new List<PointRow> { new PointRow { Name = "Out" } };
         _Visible     = true;
         StateHasChanged();
     }
 
-    private bool _CanConfirm =>
-        !string.IsNullOrWhiteSpace(_Name)                   &&
-        _EntryNames.Any(n => !string.IsNullOrWhiteSpace(n)) &&
-        _ExitNames.Any(n => !string.IsNullOrWhiteSpace(n));
+    /// <summary>Opens the modal to edit an existing container, preserving entry/exit-point ids so wires survive.</summary>
+    public void ShowEdit(
+        Guid                                id,
+        string                              name,
+        string                              description,
+        IEnumerable<(Guid Id, string Name)> entries,
+        IEnumerable<(Guid Id, string Name)> exits)
+    {
+        _IsEdit      = true;
+        _EditId      = id;
+        _Name        = name;
+        _Description = description;
+        _Entries     = entries.Select(e => new PointRow { Id = e.Id, Name = e.Name }).ToList();
+        _Exits       = exits.Select(e => new PointRow { Id = e.Id, Name = e.Name }).ToList();
+        if (_Entries.Count == 0) _Entries.Add(new PointRow { Name = "In" });
+        if (_Exits.Count == 0) _Exits.Add(new PointRow { Name = "Out" });
+        _Visible = true;
+        StateHasChanged();
+    }
 
-    private void AddEntry() => _EntryNames.Add("");
-    private void AddExit()  => _ExitNames.Add("");
+    private bool _CanConfirm =>
+        !string.IsNullOrWhiteSpace(_Name)                        &&
+        _Entries.Any(n => !string.IsNullOrWhiteSpace(n.Name)) &&
+        _Exits.Any(n => !string.IsNullOrWhiteSpace(n.Name));
+
+    private void AddEntry() => _Entries.Add(new PointRow { Name = "" });
+    private void AddExit()  => _Exits.Add(new PointRow { Name = "" });
 
     private void RemoveEntry(int index)
     {
-        if (_EntryNames.Count <= 1) return;
-        _EntryNames.RemoveAt(index);
+        if (_Entries.Count <= 1) return;
+        _Entries.RemoveAt(index);
     }
 
     private void RemoveExit(int index)
     {
-        if (_ExitNames.Count <= 1) return;
-        _ExitNames.RemoveAt(index);
+        if (_Exits.Count <= 1) return;
+        _Exits.RemoveAt(index);
     }
 
     private async Task Confirm()
@@ -158,21 +183,32 @@
         if (!_CanConfirm) return;
         _Visible = false;
 
-        List<string> entries = Clean(_EntryNames);
-        List<string> exits   = Clean(_ExitNames);
-
-        await OnConfirm.InvokeAsync(new NewContainerNodeArgs(_Name.Trim(), _Description.Trim(), entries, exits));
+        await OnConfirm.InvokeAsync(new NewContainerNodeArgs(
+            _EditId,
+            _Name.Trim(),
+            _Description.Trim(),
+            Clean(_Entries),
+            Clean(_Exits)));
     }
 
-    private static List<string> Clean(IEnumerable<string> names) =>
-        names.Select(n => n.Trim()).Where(n => !string.IsNullOrEmpty(n)).ToList();
+    private static List<(Guid Id, string Name)> Clean(IEnumerable<PointRow> rows) =>
+        rows.Where(r => !string.IsNullOrWhiteSpace(r.Name))
+            .Select(r => (r.Id, r.Name.Trim()))
+            .ToList();
 
     private void Cancel() => _Visible = false;
 
-    /// <summary>Result passed back to the parent when the user confirms.</summary>
+    private sealed class PointRow
+    {
+        public Guid   Id   { get; set; }
+        public string Name { get; set; } = "";
+    }
+
+    /// <summary>Result passed back to the parent. <see cref="EditId"/> is empty for a create, set for an edit.</summary>
     public record NewContainerNodeArgs(
-        string       Name,
-        string       Description,
-        List<string> EntryNames,
-        List<string> ExitNames);
+        Guid                         EditId,
+        string                       Name,
+        string                       Description,
+        List<(Guid Id, string Name)> Entries,
+        List<(Guid Id, string Name)> Exits);
 }

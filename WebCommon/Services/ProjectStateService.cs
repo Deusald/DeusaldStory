@@ -164,6 +164,71 @@ public class ProjectStateService(
     }
 
     /// <summary>
+    /// Adds a new portal "pair" (orange) to <paramref name="parentContainerId"/>: one <b>portal in</b> placed at
+    /// (<paramref name="x"/>, <paramref name="y"/>) and its paired <b>portal out</b> offset to the right. Flow that
+    /// reaches any portal in teleports to the portal out. Marks it dirty and returns the created portal.
+    /// </summary>
+    public StoryPortalNode AddPortalNode(
+        Guid   parentContainerId,
+        string name,
+        string description,
+        double x,
+        double y)
+    {
+        StoryPortalNode portal = new()
+        {
+            Name            = name,
+            Description     = description,
+            ParentContainer = parentContainerId,
+            OutPoint        = new StoryConnectionPoint { Name = "Out", X = x + _PORTAL_PAIR_GAP, Y = y }
+        };
+        portal.InPoints.Add(new StoryConnectionPoint { Name = "In", X = x, Y = y });
+
+        CurrentProject!.PortalNodes.Add(portal.Id, portal);
+
+        if (CurrentProject.ContainerNodes.TryGetValue(parentContainerId, out StoryContainerNode? parent))
+            parent.Portals.Add(portal.Id);
+
+        MarkKeyDirty(portal.Id);
+        MarkKeyDirty(parentContainerId);
+        return portal;
+    }
+
+    /// <summary>
+    /// Adds another <b>portal in</b> to the pair that <paramref name="pointId"/> belongs to (either an existing in
+    /// point or the out point). The new in is stacked below the lowest existing in point. Returns the portal, or
+    /// null when the point does not belong to any portal.
+    /// </summary>
+    public StoryPortalNode? AddPortalIn(Guid pointId)
+    {
+        StoryPortalNode? portal = FindPortalByPoint(pointId);
+        if (portal is null) return null;
+
+        double x = portal.InPoints.Count > 0 ? portal.InPoints.Min(p => p.X)     : portal.OutPoint.X - _PORTAL_PAIR_GAP;
+        double y = portal.InPoints.Count > 0 ? portal.InPoints.Max(p => p.Y) + 90 : portal.OutPoint.Y;
+
+        portal.InPoints.Add(new StoryConnectionPoint { Name = "In", X = x, Y = y });
+        MarkKeyDirty(portal.Id);
+        return portal;
+    }
+
+    /// <summary>Renames / re-describes a portal pair.</summary>
+    public void UpdatePortalNode(Guid portalId, string name, string description)
+    {
+        if (!CurrentProject!.PortalNodes.TryGetValue(portalId, out StoryPortalNode? portal)) return;
+        portal.Name        = name;
+        portal.Description = description;
+        MarkKeyDirty(portalId);
+    }
+
+    /// <summary>The portal pair that owns <paramref name="pointId"/> (its out point or any in point), or null.</summary>
+    public StoryPortalNode? FindPortalByPoint(Guid pointId) =>
+        CurrentProject?.PortalNodes.Values.FirstOrDefault(
+            p => p.OutPoint.Id == pointId || p.InPoints.Exists(ip => ip.Id == pointId));
+
+    private const double _PORTAL_PAIR_GAP = 320;
+
+    /// <summary>
     /// Wires an output point (<paramref name="fromPoint"/>) to an input point (<paramref name="toPoint"/>) inside
     /// <paramref name="containerId"/>. An exit/output can only lead to one place, so any existing connection leaving
     /// <paramref name="fromPoint"/> is replaced. A no-op (returns null) if the exact wire already exists.
@@ -191,6 +256,212 @@ public class ProjectStateService(
             return;
 
         if (container.Connections.RemoveAll(c => c.Id == connectionId) > 0)
+            MarkKeyDirty(containerId);
+    }
+
+    // ── Delete / edit nodes ────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Deletes a logic node from <paramref name="containerId"/>: drops it from the parent, removes its file and any
+    /// connections in the container that touch its entry/exit ports.
+    /// </summary>
+    public void DeleteLogicNode(Guid containerId, Guid logicId)
+    {
+        if (!CurrentProject!.LogicNodes.TryGetValue(logicId, out StoryLogicNode? logic)) return;
+
+        List<Guid> pointIds = [logic.EntryPoint.Id, .. logic.ExitPoints.Select(p => p.Id)];
+
+        CurrentProject.LogicNodes.Remove(logicId);
+        if (CurrentProject.ContainerNodes.TryGetValue(containerId, out StoryContainerNode? parent))
+            parent.Logic.Remove(logicId);
+
+        RemoveConnectionsFor(containerId, pointIds);
+        MarkKeyDirty(logicId);
+        MarkKeyDirty(containerId);
+    }
+
+    /// <summary>
+    /// Deletes a child container from <paramref name="parentContainerId"/> together with everything nested inside it
+    /// (child containers, logic and portal nodes, recursively), and any connections that touch its boundary ports.
+    /// </summary>
+    public void DeleteContainerNode(Guid parentContainerId, Guid containerId)
+    {
+        if (!CurrentProject!.ContainerNodes.TryGetValue(containerId, out StoryContainerNode? container)) return;
+
+        List<Guid> boundaryPoints = [.. container.EntryPoints.Select(p => p.Id), .. container.ExitPoints.Select(p => p.Id)];
+
+        DeleteContainerRecursive(container);
+
+        if (CurrentProject.ContainerNodes.TryGetValue(parentContainerId, out StoryContainerNode? parent))
+            parent.Containers.Remove(containerId);
+
+        RemoveConnectionsFor(parentContainerId, boundaryPoints);
+        MarkKeyDirty(parentContainerId);
+    }
+
+    /// <summary>Removes a container and all its descendants, marking every deleted file dirty so the save prunes it.</summary>
+    private void DeleteContainerRecursive(StoryContainerNode container)
+    {
+        foreach (Guid childId in container.Containers.ToList())
+        {
+            if (CurrentProject!.ContainerNodes.TryGetValue(childId, out StoryContainerNode? child))
+                DeleteContainerRecursive(child);
+        }
+        foreach (Guid logicId in container.Logic)
+        {
+            CurrentProject!.LogicNodes.Remove(logicId);
+            MarkKeyDirty(logicId);
+        }
+        foreach (Guid portalId in container.Portals)
+        {
+            CurrentProject!.PortalNodes.Remove(portalId);
+            MarkKeyDirty(portalId);
+        }
+        CurrentProject!.ContainerNodes.Remove(container.Id);
+        MarkKeyDirty(container.Id);
+    }
+
+    /// <summary>
+    /// Deletes a single portal <b>in</b> point (identified by <paramref name="inPointId"/>) from its pair. Deleting
+    /// the pair's last in point deletes the whole portal. Cleans up connections that touch the removed point(s).
+    /// </summary>
+    public void DeletePortalIn(Guid containerId, Guid inPointId)
+    {
+        StoryPortalNode? portal = FindPortalByPoint(inPointId);
+        if (portal is null) return;
+
+        if (portal.InPoints.Count <= 1)
+        {
+            DeletePortal(containerId, portal.Id);
+            return;
+        }
+
+        portal.InPoints.RemoveAll(p => p.Id == inPointId);
+        RemoveConnectionsFor(containerId, [inPointId]);
+        MarkKeyDirty(portal.Id);
+    }
+
+    /// <summary>Deletes a whole portal pair (its out point and every in point) from <paramref name="containerId"/>.</summary>
+    public void DeletePortal(Guid containerId, Guid portalId)
+    {
+        if (!CurrentProject!.PortalNodes.TryGetValue(portalId, out StoryPortalNode? portal)) return;
+
+        List<Guid> pointIds = [portal.OutPoint.Id, .. portal.InPoints.Select(p => p.Id)];
+
+        CurrentProject.PortalNodes.Remove(portalId);
+        if (CurrentProject.ContainerNodes.TryGetValue(containerId, out StoryContainerNode? parent))
+            parent.Portals.Remove(portalId);
+
+        RemoveConnectionsFor(containerId, pointIds);
+        MarkKeyDirty(portalId);
+        MarkKeyDirty(containerId);
+    }
+
+    /// <summary>
+    /// Applies an edit to a logic node: new name/description and a reconciled set of exit points. Existing exits
+    /// (matched by id) are renamed and reordered, brand-new rows (empty id) are added, and dropped exits have their
+    /// connections removed. The single entry point keeps its id and is only renamed.
+    /// </summary>
+    public void UpdateLogicNode(
+        Guid                                  containerId,
+        Guid                                  logicId,
+        string                                name,
+        string                                description,
+        string                                entryName,
+        IReadOnlyList<(Guid Id, string Name)> exits)
+    {
+        if (!CurrentProject!.LogicNodes.TryGetValue(logicId, out StoryLogicNode? logic)) return;
+
+        logic.Name             = name;
+        logic.Description      = description;
+        logic.EntryPoint.Name  = entryName;
+
+        ReconcilePoints(logic.ExitPoints, exits, containerId, null);
+
+        MarkKeyDirty(logicId);
+        MarkKeyDirty(containerId);
+    }
+
+    /// <summary>
+    /// Applies an edit to a child container: new name/description and reconciled entry/exit point sets. Dropped
+    /// points have their connections cleaned up both in the parent (<paramref name="parentContainerId"/>, where the
+    /// container's ports are wired) and inside the container itself (where the boundary nodes are wired).
+    /// </summary>
+    public void UpdateContainerNode(
+        Guid                                  parentContainerId,
+        Guid                                  containerId,
+        string                                name,
+        string                                description,
+        IReadOnlyList<(Guid Id, string Name)> entries,
+        IReadOnlyList<(Guid Id, string Name)> exits)
+    {
+        if (!CurrentProject!.ContainerNodes.TryGetValue(containerId, out StoryContainerNode? container)) return;
+
+        container.Name        = name;
+        container.Description = description;
+
+        ReconcilePoints(container.EntryPoints, entries, parentContainerId, containerId, isEntry: true);
+        ReconcilePoints(container.ExitPoints,  exits,   parentContainerId, containerId, isEntry: false);
+
+        MarkKeyDirty(containerId);
+        MarkKeyDirty(parentContainerId);
+    }
+
+    /// <summary>
+    /// Reconciles <paramref name="points"/> in place against the desired <paramref name="desired"/> rows: keeps and
+    /// renames matching ids (in the desired order), appends new rows (empty id), and drops the rest — removing any
+    /// connections that referenced dropped points from <paramref name="connCleanupContainerA"/> and the optional
+    /// <paramref name="connCleanupContainerB"/>. New boundary points get a staggered canvas position when
+    /// <paramref name="isEntry"/> is provided (they are drawn as nodes inside a container).
+    /// </summary>
+    private void ReconcilePoints(
+        List<StoryConnectionPoint>            points,
+        IReadOnlyList<(Guid Id, string Name)> desired,
+        Guid                                  connCleanupContainerA,
+        Guid?                                 connCleanupContainerB,
+        bool?                                 isEntry = null)
+    {
+        List<StoryConnectionPoint> rebuilt = new();
+        int                        newIndex = points.Count;
+
+        foreach ((Guid id, string pname) in desired)
+        {
+            StoryConnectionPoint? existing = id != Guid.Empty ? points.Find(p => p.Id == id) : null;
+            if (existing is not null)
+            {
+                existing.Name = pname;
+                rebuilt.Add(existing);
+            }
+            else
+            {
+                StoryConnectionPoint created = new() { Name = pname };
+                if (isEntry is not null)
+                {
+                    created.X = isEntry.Value ? 40 : 640;
+                    created.Y = 120 + newIndex++ * 90;
+                }
+                rebuilt.Add(created);
+            }
+        }
+
+        List<Guid> removed = points.Where(p => !rebuilt.Contains(p)).Select(p => p.Id).ToList();
+        if (removed.Count > 0)
+        {
+            RemoveConnectionsFor(connCleanupContainerA, removed);
+            if (connCleanupContainerB is Guid b) RemoveConnectionsFor(b, removed);
+        }
+
+        points.Clear();
+        points.AddRange(rebuilt);
+    }
+
+    /// <summary>Removes every connection in <paramref name="containerId"/> that starts or ends at one of <paramref name="pointIds"/>.</summary>
+    private void RemoveConnectionsFor(Guid containerId, IReadOnlyCollection<Guid> pointIds)
+    {
+        if (pointIds.Count == 0) return;
+        if (!CurrentProject!.ContainerNodes.TryGetValue(containerId, out StoryContainerNode? container)) return;
+
+        if (container.Connections.RemoveAll(c => pointIds.Contains(c.FromPoint) || pointIds.Contains(c.ToPoint)) > 0)
             MarkKeyDirty(containerId);
     }
 

@@ -32,7 +32,10 @@
                              OnNodeActivated="OnNodeActivated"
                              OnConnect="OnConnect"
                              OnDisconnect="OnDisconnect"
-                             OnCanvasContextMenu="OnCanvasContextMenu"/>
+                             OnCanvasContextMenu="OnCanvasContextMenu"
+                             OnNodeEdit="OnNodeEdit"
+                             OnNodeDelete="OnNodeDelete"
+                             OnNodeAddPortalIn="OnNodeAddPortalIn"/>
             }
             else
             {
@@ -56,6 +59,7 @@
 <NodePaletteModal       @ref="_NodePalette"         OnSelect="OnPaletteSelect"/>
 <NewLogicNodeModal      @ref="_NewLogicNodeModal"   OnConfirm="OnNewLogicNodeConfirmed"/>
 <NewContainerNodeModal  @ref="_NewContainerModal"   OnConfirm="OnNewContainerConfirmed"/>
+<NewPortalNodeModal     @ref="_NewPortalModal"      OnConfirm="OnNewPortalConfirmed"/>
 
 @code {
     private EditorMode        _Mode = EditorMode.Edit;
@@ -68,6 +72,7 @@
     private NodePaletteModal?      _NodePalette;
     private NewLogicNodeModal?     _NewLogicNodeModal;
     private NewContainerNodeModal? _NewContainerModal;
+    private NewPortalNodeModal?    _NewPortalModal;
 
     // Where the next created node is placed — the right-clicked canvas point (or a staggered default).
     private double _PendingX;
@@ -177,8 +182,9 @@
     /// </summary>
     private static List<NodePaletteItem> PaletteItems() =>
     [
-        new NodePaletteItem(StoryNodeKind.Logic,     "bi-diamond-half", "Logic node",     "A stop point that generates content and runs calculations on variables."),
-        new NodePaletteItem(StoryNodeKind.Container, "bi-collection",   "Container node", "Groups other nodes into a nested sub-graph with its own entries and exits.")
+        new NodePaletteItem(StoryNodeKind.Logic,     "bi-diamond-half",       "Logic node",     "A stop point that generates content and runs calculations on variables."),
+        new NodePaletteItem(StoryNodeKind.Container, "bi-collection",         "Container node", "Groups other nodes into a nested sub-graph with its own entries and exits."),
+        new NodePaletteItem(StoryNodeKind.PortalIn,  "bi-box-arrow-in-right", "Portal node",    "A linked in/out pair that teleports flow across the graph to keep it clean.")
     ];
 
     private void OnPaletteSelect(NodePaletteItem item)
@@ -187,14 +193,24 @@
         {
             case StoryNodeKind.Logic:     _NewLogicNodeModal?.Show(); break;
             case StoryNodeKind.Container: _NewContainerModal?.Show();  break;
+            case StoryNodeKind.PortalIn:  _NewPortalModal?.Show();     break;
         }
     }
 
     private void OnNewLogicNodeConfirmed(NewLogicNodeModal.NewLogicNodeArgs args)
     {
+        if (args.EditId != Guid.Empty)
+        {
+            _ProjectState.UpdateLogicNode(
+                _CurrentContainerId, args.EditId, args.Name, args.Description, args.EntryName, args.Exits);
+            RebuildNodes();
+            _SelectedId = args.EditId;
+            return;
+        }
+
         StoryConnectionPoint entry = new() { Name = args.EntryName };
-        List<StoryConnectionPoint> exits = args.ExitNames
-                                               .Select(n => new StoryConnectionPoint { Name = n })
+        List<StoryConnectionPoint> exits = args.Exits
+                                               .Select(e => new StoryConnectionPoint { Name = e.Name })
                                                .ToList();
 
         StoryLogicNode node = _ProjectState.AddLogicNode(
@@ -206,14 +222,93 @@
 
     private void OnNewContainerConfirmed(NewContainerNodeModal.NewContainerNodeArgs args)
     {
-        List<StoryConnectionPoint> entries = args.EntryNames.Select(n => new StoryConnectionPoint { Name = n }).ToList();
-        List<StoryConnectionPoint> exits   = args.ExitNames.Select(n => new StoryConnectionPoint { Name = n }).ToList();
+        if (args.EditId != Guid.Empty)
+        {
+            _ProjectState.UpdateContainerNode(
+                _CurrentContainerId, args.EditId, args.Name, args.Description, args.Entries, args.Exits);
+            RebuildNodes();
+            _SelectedId = args.EditId;
+            return;
+        }
+
+        List<StoryConnectionPoint> entries = args.Entries.Select(e => new StoryConnectionPoint { Name = e.Name }).ToList();
+        List<StoryConnectionPoint> exits   = args.Exits.Select(e => new StoryConnectionPoint { Name = e.Name }).ToList();
 
         StoryContainerNode node = _ProjectState.AddContainerNode(
             _CurrentContainerId, args.Name, args.Description, entries, exits, _PendingX, _PendingY);
 
         RebuildNodes();
         _SelectedId = node.Id;
+    }
+
+    private void OnNewPortalConfirmed(NewPortalNodeModal.NewPortalNodeArgs args)
+    {
+        if (args.EditId != Guid.Empty)
+        {
+            _ProjectState.UpdatePortalNode(args.EditId, args.Name, args.Description);
+            RebuildNodes();
+            return;
+        }
+
+        _ProjectState.AddPortalNode(_CurrentContainerId, args.Name, args.Description, _PendingX, _PendingY);
+        RebuildNodes();
+    }
+
+    // ── Node context menu (edit / delete / add portal in) ──────────────────
+
+    /// <summary>Edit from a node's context menu — reopen its create modal, pre-filled and in edit mode.</summary>
+    private void OnNodeEdit(EdNode node)
+    {
+        switch (node.Kind)
+        {
+            case StoryNodeKind.Logic:
+                if (Project.LogicNodes.TryGetValue(node.Id, out StoryLogicNode? logic))
+                    _NewLogicNodeModal?.ShowEdit(
+                        logic.Id, logic.Name, logic.Description, logic.EntryPoint.Name,
+                        logic.ExitPoints.Select(p => (p.Id, p.Name)));
+                break;
+
+            case StoryNodeKind.Container:
+                if (Project.ContainerNodes.TryGetValue(node.Id, out StoryContainerNode? child))
+                    _NewContainerModal?.ShowEdit(
+                        child.Id, child.Name, child.Description,
+                        child.EntryPoints.Select(p => (p.Id, p.Name)),
+                        child.ExitPoints.Select(p => (p.Id, p.Name)));
+                break;
+
+            case StoryNodeKind.PortalIn:
+            case StoryNodeKind.PortalOut:
+                if (_ProjectState.FindPortalByPoint(node.Id) is StoryPortalNode portal)
+                    _NewPortalModal?.ShowEdit(portal.Id, portal.Name, portal.Description);
+                break;
+        }
+    }
+
+    /// <summary>Delete from a node's context menu. Deleting a container removes everything nested inside it.</summary>
+    private void OnNodeDelete(EdNode node)
+    {
+        switch (node.Kind)
+        {
+            case StoryNodeKind.Logic:     _ProjectState.DeleteLogicNode(_CurrentContainerId, node.Id);     break;
+            case StoryNodeKind.Container: _ProjectState.DeleteContainerNode(_CurrentContainerId, node.Id); break;
+            case StoryNodeKind.PortalIn:  _ProjectState.DeletePortalIn(_CurrentContainerId, node.Id);      break;
+            case StoryNodeKind.PortalOut:
+                if (_ProjectState.FindPortalByPoint(node.Id) is StoryPortalNode portal)
+                    _ProjectState.DeletePortal(_CurrentContainerId, portal.Id);
+                break;
+            default: return;
+        }
+
+        if (_SelectedId == node.Id) _SelectedId = Guid.Empty;
+        RebuildNodes();
+    }
+
+    /// <summary>Add another portal-in to the pair the right-clicked portal node belongs to.</summary>
+    private void OnNodeAddPortalIn(EdNode node)
+    {
+        if (node.Kind is not (StoryNodeKind.PortalIn or StoryNodeKind.PortalOut)) return;
+        _ProjectState.AddPortalIn(node.Id);
+        RebuildNodes();
     }
 
     // ── Persist a drag ─────────────────────────────────────────────────────
@@ -235,6 +330,21 @@
             child.X = moved.X;
             child.Y = moved.Y;
             _ProjectState.MarkKeyDirty(child.Id);
+            return;
+        }
+
+        // A portal in/out node moved (its position lives on the portal's connection point).
+        if (_ProjectState.FindPortalByPoint(moved.Id) is StoryPortalNode portal)
+        {
+            StoryConnectionPoint? point = portal.OutPoint.Id == moved.Id
+                ? portal.OutPoint
+                : portal.InPoints.Find(p => p.Id == moved.Id);
+            if (point is not null)
+            {
+                point.X = moved.X;
+                point.Y = moved.Y;
+                _ProjectState.MarkKeyDirty(portal.Id);
+            }
             return;
         }
 

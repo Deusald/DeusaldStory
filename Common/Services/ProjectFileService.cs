@@ -30,7 +30,8 @@ namespace DeusaldStoryCommon
         public const string METADATA_FILE_NAME     = "metadata.json";
         public const string CONTAINERS_FOLDER      = "Containers";
         public const string LOGIC_FOLDER           = "Logic";
-        public const int    CURRENT_FORMAT_VERSION = 3;
+        public const string PORTALS_FOLDER         = "Portals";
+        public const int    CURRENT_FORMAT_VERSION = 4;
 
         private static readonly JsonSerializerSettings _JsonSettings = new()
         {
@@ -73,12 +74,14 @@ namespace DeusaldStoryCommon
             // ── Read sub-folders ───────────────────────────────────────────────
             List<StoryContainerNode> containerNodes = await ReadFolderAsync<StoryContainerNode>(store, CONTAINERS_FOLDER);
             List<StoryLogicNode>     logicNodes     = await ReadFolderAsync<StoryLogicNode>(store, LOGIC_FOLDER);
+            List<StoryPortalNode>    portalNodes    = await ReadFolderAsync<StoryPortalNode>(store, PORTALS_FOLDER);
 
             return new StoryProject
             {
                 Metadata       = metadata,
                 ContainerNodes = containerNodes.ToDictionary(k => k.Id),
-                LogicNodes     = logicNodes.ToDictionary(k => k.Id)
+                LogicNodes     = logicNodes.ToDictionary(k => k.Id),
+                PortalNodes    = portalNodes.ToDictionary(k => k.Id)
             };
         }
 
@@ -100,6 +103,7 @@ namespace DeusaldStoryCommon
 
             await SaveFolderAsync(store, CONTAINERS_FOLDER, project.ContainerNodes.Values.ToList(), n => n.Id.ToString());
             await SaveFolderAsync(store, LOGIC_FOLDER,      project.LogicNodes.Values.ToList(),     n => n.Id.ToString());
+            await SaveFolderAsync(store, PORTALS_FOLDER,    project.PortalNodes.Values.ToList(),    n => n.Id.ToString());
         }
 
         // ── Incremental Save ────────────────────
@@ -120,6 +124,7 @@ namespace DeusaldStoryCommon
 
             await UpdateFilesWithIdAsync(project.ContainerNodes.Values.ToList(), CONTAINERS_FOLDER);
             await UpdateFilesWithIdAsync(project.LogicNodes.Values.ToList(),     LOGIC_FOLDER);
+            await UpdateFilesWithIdAsync(project.PortalNodes.Values.ToList(),    PORTALS_FOLDER);
 
             async Task UpdateFilesWithIdAsync<T>(List<T> data, string folder) where T : IFileWithId
             {

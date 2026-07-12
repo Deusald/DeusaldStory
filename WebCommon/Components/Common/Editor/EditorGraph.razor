@@ -82,6 +82,7 @@
                      style="left:@F(n.X)px; top:@F(n.Y)px; height:@F(NodeHeight(n))px;"
                      @onpointerdown="e => NodeDown(e, n)" @onpointerdown:stopPropagation="true"
                      @ondblclick="() => OnNodeActivated.InvokeAsync(n)" @ondblclick:stopPropagation="true"
+                     @oncontextmenu="e => NodeContextMenu(e, n)"
                      @oncontextmenu:stopPropagation="true" @oncontextmenu:preventDefault="true">
 
                     <div class="edg-node-head">
@@ -157,6 +158,30 @@
             </div>
         }
     </div>
+
+    @* ── Node context menu ───────────────────────────────────────────── *@
+    @if (_MenuNode is EdNode menu)
+    {
+        <div class="edg-menu-backdrop"
+             @onpointerdown="CloseMenu" @onpointerdown:stopPropagation="true"
+             @oncontextmenu="CloseMenu" @oncontextmenu:preventDefault="true" @oncontextmenu:stopPropagation="true"></div>
+        <div class="edg-menu" style="left:@F(_MenuX)px; top:@F(_MenuY)px;"
+             @oncontextmenu:preventDefault="true" @oncontextmenu:stopPropagation="true">
+            <button class="edg-menu-item" @onclick="() => MenuInvoke(OnNodeEdit, menu)">
+                <i class="bi bi-pencil"></i> Edit @MenuNoun(menu)
+            </button>
+            @if (menu.Kind is StoryNodeKind.PortalIn or StoryNodeKind.PortalOut)
+            {
+                <button class="edg-menu-item" @onclick="() => MenuInvoke(OnNodeAddPortalIn, menu)">
+                    <i class="bi bi-box-arrow-in-right"></i> Add portal in
+                </button>
+            }
+            <div class="edg-menu-sep"></div>
+            <button class="edg-menu-item edg-menu-danger" @onclick="() => MenuInvoke(OnNodeDelete, menu)">
+                <i class="bi bi-trash"></i> Delete @MenuNoun(menu)
+            </button>
+        </div>
+    }
 </div>
 
 @code {
@@ -170,6 +195,9 @@
     [Parameter] public EventCallback<CanvasPoint> OnCanvasContextMenu { get; set; }
     [Parameter] public EventCallback<EdConnectRequest> OnConnect     { get; set; }
     [Parameter] public EventCallback<Guid>       OnDisconnect        { get; set; }
+    [Parameter] public EventCallback<EdNode>     OnNodeEdit          { get; set; }
+    [Parameter] public EventCallback<EdNode>     OnNodeDelete        { get; set; }
+    [Parameter] public EventCallback<EdNode>     OnNodeAddPortalIn   { get; set; }
 
     // ── Node layout constants (must match the absolute positions in EditorGraph.razor.css) ──
     private const double NODE_W       = 216; // fixed card width
@@ -204,6 +232,10 @@
     private double _ConnY;
 
     private Dictionary<Guid, PortAnchor> _Anchors = new();
+
+    private EdNode? _MenuNode; // node whose right-click context menu is open (null when closed)
+    private double  _MenuX;    // menu position, viewport coordinates (position: fixed)
+    private double  _MenuY;
 
     // ── Node geometry ──────────────────────────────────────────────────────
 
@@ -240,6 +272,7 @@
             StoryNodeKind.Container => "edg-node-container",
             StoryNodeKind.Start or StoryNodeKind.Entry => "edg-node-entry",
             StoryNodeKind.End   or StoryNodeKind.Exit  => "edg-node-exit",
+            StoryNodeKind.PortalIn or StoryNodeKind.PortalOut => "edg-node-portal",
             _                                          => ""
         };
         return $"{kind} {(n.Id == SelectedId ? "edg-node-sel" : "")}";
@@ -366,10 +399,37 @@
     /// <summary>Right-click on empty canvas — convert the cursor to world coordinates and ask to open the palette.</summary>
     private async Task CanvasContextMenu(MouseEventArgs e)
     {
+        _MenuNode = null;
         double wx = (e.OffsetX - _PanX) / _Scale;
         double wy = (e.OffsetY - _PanY) / _Scale;
         await OnCanvasContextMenu.InvokeAsync(new CanvasPoint(wx, wy));
     }
+
+    /// <summary>Right-click on a node — open its edit/delete menu at the cursor. Built-in boundary nodes have none.</summary>
+    private void NodeContextMenu(MouseEventArgs e, EdNode node)
+    {
+        if (!node.Deletable) { _MenuNode = null; return; }
+        _MenuNode = node;
+        _MenuX    = e.ClientX;
+        _MenuY    = e.ClientY;
+    }
+
+    private void CloseMenu() => _MenuNode = null;
+
+    private async Task MenuInvoke(EventCallback<EdNode> callback, EdNode node)
+    {
+        _MenuNode = null;
+        await callback.InvokeAsync(node);
+    }
+
+    private static string MenuNoun(EdNode n) => n.Kind switch
+    {
+        StoryNodeKind.Logic     => "logic node",
+        StoryNodeKind.Container => "container",
+        StoryNodeKind.PortalIn  => "portal in",
+        StoryNodeKind.PortalOut => "portal",
+        _                       => "node"
+    };
 
     // ── Edge geometry ──────────────────────────────────────────────────────
 

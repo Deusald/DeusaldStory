@@ -7,7 +7,7 @@
     <div class="modal-box nlm-box" @onclick:stopPropagation="true">
 
         <div class="modal-header">
-            <span class="modal-title">New logic node</span>
+            <span class="modal-title">@(_IsEdit ? "Edit logic node" : "New logic node")</span>
             <button class="modal-close" @onclick="Cancel" title="Close">
                 <i class="bi bi-x-lg"></i>
             </button>
@@ -63,7 +63,7 @@
                     Exit points
                     <span class="modal-label-hint">at least one — the branches the story can take from here</span>
                 </label>
-                @for (int i = 0; i < _ExitNames.Count; i++)
+                @for (int i = 0; i < _Exits.Count; i++)
                 {
                     int index = i;
                     <div class="nlm-point nlm-point-exit">
@@ -71,12 +71,12 @@
                         <input class="modal-input"
                                type="text"
                                placeholder="Success"
-                               value="@_ExitNames[index]"
-                               @oninput="e => SetExit(index, e)"
+                               value="@_Exits[index].Name"
+                               @oninput="e => _Exits[index].Name = e.Value?.ToString() ?? string.Empty"
                                maxlength="60"/>
                         <button class="nlm-point-del"
                                 title="Remove exit"
-                                disabled="@(_ExitNames.Count <= 1)"
+                                disabled="@(_Exits.Count <= 1)"
                                 @onclick="() => RemoveExit(index)">
                             <i class="bi bi-trash"></i>
                         </button>
@@ -94,7 +94,7 @@
             <button class="modal-btn modal-btn-primary"
                     @onclick="Confirm"
                     disabled="@(!_CanConfirm)">
-                Create node
+                @(_IsEdit ? "Save changes" : "Create node")
             </button>
         </div>
 
@@ -104,35 +104,52 @@
 @code {
     [Parameter] public EventCallback<NewLogicNodeArgs> OnConfirm { get; set; }
 
-    private bool         _Visible;
-    private string       _Name        = "";
-    private string       _Description = "";
-    private string       _EntryName   = "In";
-    private List<string> _ExitNames   = new() { "Out" };
+    private bool          _Visible;
+    private bool          _IsEdit;
+    private Guid          _EditId;
+    private string        _Name        = "";
+    private string        _Description = "";
+    private string        _EntryName   = "In";
+    private List<PointRow> _Exits      = new() { new PointRow { Name = "Out" } };
 
+    /// <summary>Opens the modal to create a brand-new logic node.</summary>
     public void Show()
     {
+        _IsEdit      = false;
+        _EditId      = Guid.Empty;
         _Name        = "";
         _Description = "";
         _EntryName   = "In";
-        _ExitNames   = new List<string> { "Out" };
+        _Exits       = new List<PointRow> { new PointRow { Name = "Out" } };
         _Visible     = true;
+        StateHasChanged();
+    }
+
+    /// <summary>Opens the modal to edit an existing logic node, preserving exit-point ids so wires survive.</summary>
+    public void ShowEdit(Guid id, string name, string description, string entryName, IEnumerable<(Guid Id, string Name)> exits)
+    {
+        _IsEdit      = true;
+        _EditId      = id;
+        _Name        = name;
+        _Description = description;
+        _EntryName   = entryName;
+        _Exits       = exits.Select(e => new PointRow { Id = e.Id, Name = e.Name }).ToList();
+        if (_Exits.Count == 0) _Exits.Add(new PointRow { Name = "Out" });
+        _Visible = true;
         StateHasChanged();
     }
 
     private bool _CanConfirm =>
         !string.IsNullOrWhiteSpace(_Name)      &&
         !string.IsNullOrWhiteSpace(_EntryName) &&
-        _ExitNames.Any(n => !string.IsNullOrWhiteSpace(n));
+        _Exits.Any(n => !string.IsNullOrWhiteSpace(n.Name));
 
-    private void SetExit(int index, ChangeEventArgs e) => _ExitNames[index] = e.Value?.ToString() ?? "";
-
-    private void AddExit() => _ExitNames.Add("");
+    private void AddExit() => _Exits.Add(new PointRow { Name = "" });
 
     private void RemoveExit(int index)
     {
-        if (_ExitNames.Count <= 1) return;
-        _ExitNames.RemoveAt(index);
+        if (_Exits.Count <= 1) return;
+        _Exits.RemoveAt(index);
     }
 
     private async Task Confirm()
@@ -140,12 +157,13 @@
         if (!_CanConfirm) return;
         _Visible = false;
 
-        List<string> exits = _ExitNames
-                            .Select(n => n.Trim())
-                            .Where(n => !string.IsNullOrEmpty(n))
-                            .ToList();
+        List<(Guid Id, string Name)> exits = _Exits
+                                            .Where(e => !string.IsNullOrWhiteSpace(e.Name))
+                                            .Select(e => (e.Id, e.Name.Trim()))
+                                            .ToList();
 
         await OnConfirm.InvokeAsync(new NewLogicNodeArgs(
+            _EditId,
             _Name.Trim(),
             _Description.Trim(),
             _EntryName.Trim(),
@@ -154,10 +172,17 @@
 
     private void Cancel() => _Visible = false;
 
-    /// <summary>Result passed back to the parent when the user confirms.</summary>
+    private sealed class PointRow
+    {
+        public Guid   Id   { get; set; }
+        public string Name { get; set; } = "";
+    }
+
+    /// <summary>Result passed back to the parent. <see cref="EditId"/> is empty for a create, set for an edit.</summary>
     public record NewLogicNodeArgs(
-        string       Name,
-        string       Description,
-        string       EntryName,
-        List<string> ExitNames);
+        Guid                         EditId,
+        string                       Name,
+        string                       Description,
+        string                       EntryName,
+        List<(Guid Id, string Name)> Exits);
 }
