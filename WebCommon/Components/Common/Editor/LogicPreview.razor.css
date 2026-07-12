@@ -2,57 +2,110 @@
     width: 100%;
     height: 100%;
     display: flex;
-    align-items: flex-start;
-    justify-content: center;
+    flex-direction: column;
+    align-items: center;
     overflow-y: auto;
     background:
         radial-gradient(circle at 1px 1px, var(--border) 1px, transparent 0) 0 0 / 22px 22px,
         var(--surface-0);
-    padding: 40px 24px;
+    padding: 20px 24px 40px;
 }
 
-/* A game-style screen: title heading + a framed icon/text row. */
+/* Dark/Light toggle — flips only the inner screen. */
+.lpv-toolbar {
+    width: min(560px, 100%);
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: 16px;
+}
+.lpv-toggle {
+    display: inline-flex;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--r-sm);
+    padding: 2px;
+    gap: 2px;
+}
+.lpv-toggle-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: none;
+    border: none;
+    color: var(--text-dim);
+    font-size: 12px;
+    font-weight: 500;
+    padding: 5px 12px;
+    border-radius: var(--r-xs);
+    cursor: pointer;
+    transition: background var(--dur) var(--ease), color var(--dur) var(--ease);
+}
+.lpv-toggle-btn:hover { color: var(--text-soft); }
+.lpv-toggle-btn.active {
+    background: var(--surface-3);
+    color: var(--text-bright);
+}
+
+/* A screen: title heading + a framed icon/text row. */
 .lpv-screen {
     width: min(560px, 100%);
     background: var(--surface-1);
     border: 1px solid var(--border-strong);
     border-radius: var(--r-lg);
     box-shadow: var(--shadow-md);
-    padding: 28px;
+    padding: 32px;
     display: flex;
     flex-direction: column;
-    gap: 20px;
+    gap: 24px;
+
+    /* Themeable tokens — overridden by .paper. Dark is the default. */
+    --lpv-title:  var(--text-bright);
+    --lpv-text:   var(--text-soft);
+    --lpv-frame-bg:     var(--surface-2);
+    --lpv-frame-border: var(--border);
+    --lpv-icon-bg:      var(--surface-input);
+}
+
+/* Paper/light theme — only the inner window, so it reads like a printed page. */
+.lpv-screen.paper {
+    background: #f4efe4;
+    border-color: #d9cfbb;
+    --lpv-title:  #2a2620;
+    --lpv-text:   #443d31;
+    --lpv-frame-bg:     #fbf8f1;
+    --lpv-frame-border: #e0d7c4;
+    --lpv-icon-bg:      #efe8d8;
 }
 
 .lpv-title {
     font-size: 22px;
     font-weight: 700;
     letter-spacing: -.02em;
-    color: var(--text-bright);
+    color: var(--lpv-title);
     line-height: 1.25;
 }
 
 .lpv-frame {
     display: flex;
-    align-items: flex-start;
-    gap: 16px;
-    padding: 16px;
-    background: var(--surface-2);
-    border: 1px solid var(--border);
+    align-items: center;
+    gap: 24px;
+    padding: 22px;
+    background: var(--lpv-frame-bg);
+    border: 1px solid var(--lpv-frame-border);
     border-radius: var(--r-md);
 }
 
 .lpv-icon {
     flex: none;
-    width: 64px;
-    height: 64px;
+    width: 88px;
+    height: 88px;
+    padding: 12px;
     display: flex;
     align-items: center;
     justify-content: center;
-    background: var(--surface-input);
-    border: 1px solid var(--border);
+    background: var(--lpv-icon-bg);
+    border: 1px solid var(--lpv-frame-border);
     border-radius: var(--r-sm);
-    overflow: hidden;
 }
 .lpv-icon img {
     max-width: 100%;
@@ -61,7 +114,7 @@
 }
 .lpv-icon-empty {
     color: var(--text-fainter);
-    font-size: 22px;
+    font-size: 26px;
     border-style: dashed;
 }
 
@@ -70,8 +123,7 @@
     min-width: 0;
     font-size: 15px;
     line-height: 1.5;
-    color: var(--text-soft);
-    align-self: center;
+    color: var(--lpv-text);
 }
 
 .lpv-placeholder {
@@ -79,15 +131,3 @@
     font-style: italic;
     font-weight: 500;
 }
-
-.lpv-hint {
-    display: flex;
-    align-items: baseline;
-    gap: 8px;
-    font-size: 12px;
-    color: var(--text-faint);
-    line-height: 1.5;
-    border-top: 1px dashed var(--border);
-    padding-top: 14px;
-}
-.lpv-hint strong { color: var(--text-soft); font-weight: 600; }

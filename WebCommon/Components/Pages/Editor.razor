@@ -252,8 +252,9 @@
         _InLogic
             ?
             [
-                new NodePaletteItem(StoryNodeKind.Localization, "bi-translate",    "Localization node", "Picks a localization key that supplies this logic node's title text."),
-                new NodePaletteItem(StoryNodeKind.Icon,         "bi-emoji-smile",  "Icon node",         "Picks a project icon to show alongside this logic node's content.")
+                new NodePaletteItem(StoryNodeKind.Localization,    "bi-translate",       "Localization node",  "Picks a localization key that supplies this logic node's title text."),
+                new NodePaletteItem(StoryNodeKind.Icon,            "bi-emoji-smile",     "Icon node",          "Picks a project icon to show alongside this logic node's content."),
+                new NodePaletteItem(StoryNodeKind.LightDarkSwitch, "bi-circle-half",     "Light/Dark switch",  "Outputs one of two icons depending on the render theme (dark or paper/light).")
             ]
             :
             [
@@ -271,6 +272,12 @@
             case StoryNodeKind.PortalIn:     _NewPortalModal?.Show();                  break;
             case StoryNodeKind.Localization: _LocalizationPicker?.Show(Guid.Empty, Guid.Empty); break;
             case StoryNodeKind.Icon:         _IconPicker?.Show(Guid.Empty, Guid.Empty);         break;
+            case StoryNodeKind.LightDarkSwitch:
+                // No config — create it straight away at the pending position.
+                if (_ProjectState.AddLightDarkSwitchNode(_CurrentId, _PendingX, _PendingY) is StoryLightDarkSwitchNode lds)
+                    _SelectedId = lds.Id;
+                RebuildNodes();
+                break;
         }
     }
 
@@ -413,6 +420,7 @@
                 break;
             case StoryNodeKind.Localization: _ProjectState.DeleteLocalizationNode(_CurrentId, node.Id);  break;
             case StoryNodeKind.Icon:         _ProjectState.DeleteIconNode(_CurrentId, node.Id);          break;
+            case StoryNodeKind.LightDarkSwitch: _ProjectState.DeleteLightDarkSwitchNode(_CurrentId, node.Id); break;
             default: return;
         }
 

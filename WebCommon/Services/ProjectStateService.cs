@@ -340,6 +340,31 @@ public class ProjectStateService(
         MarkKeyDirty(logicId);
     }
 
+    /// <summary>Adds a Light/Dark switch node (picks an icon by theme) to a logic node's inner graph.</summary>
+    public StoryLightDarkSwitchNode? AddLightDarkSwitchNode(Guid logicId, double x, double y)
+    {
+        if (!CurrentProject!.LogicNodes.TryGetValue(logicId, out StoryLogicNode? logic)) return null;
+
+        StoryLightDarkSwitchNode node = new() { X = x, Y = y };
+        logic.LightDarkSwitchNodes.Add(node);
+        MarkKeyDirty(logicId);
+        return node;
+    }
+
+    /// <summary>Deletes a Light/Dark switch node and any inner wire that touched its ports.</summary>
+    public void DeleteLightDarkSwitchNode(Guid logicId, Guid nodeId)
+    {
+        if (!CurrentProject!.LogicNodes.TryGetValue(logicId, out StoryLogicNode? logic)) return;
+        StoryLightDarkSwitchNode? node = logic.LightDarkSwitchNodes.Find(n => n.Id == nodeId);
+        if (node is null) return;
+
+        logic.LightDarkSwitchNodes.Remove(node);
+        logic.ContentConnections.RemoveAll(c =>
+            c.FromPoint == node.OutPoint.Id || c.ToPoint == node.OutPoint.Id ||
+            c.ToPoint   == node.DarkIn.Id   || c.ToPoint == node.LightIn.Id);
+        MarkKeyDirty(logicId);
+    }
+
     /// <summary>
     /// Wires an output (<paramref name="fromPoint"/>) to an input (<paramref name="toPoint"/>) inside a logic node's
     /// content graph. An output leads to one place and a Title/Icon input takes a single source, so any existing wire
@@ -405,6 +430,15 @@ public class ProjectStateService(
         {
             ico.X = x;
             ico.Y = y;
+            MarkKeyDirty(logicId);
+            return;
+        }
+
+        StoryLightDarkSwitchNode? lds = logic.LightDarkSwitchNodes.Find(n => n.Id == movedId);
+        if (lds is not null)
+        {
+            lds.X = x;
+            lds.Y = y;
             MarkKeyDirty(logicId);
         }
     }
@@ -620,6 +654,12 @@ public class ProjectStateService(
         foreach (StoryConnectionPoint p in logic.ExitPoints) valid.Add(p.Id);
         foreach (StoryLocalizationNode n in logic.LocalizationNodes) valid.Add(n.OutPoint.Id);
         foreach (StoryIconNode n in logic.IconNodes) valid.Add(n.OutPoint.Id);
+        foreach (StoryLightDarkSwitchNode n in logic.LightDarkSwitchNodes)
+        {
+            valid.Add(n.DarkIn.Id);
+            valid.Add(n.LightIn.Id);
+            valid.Add(n.OutPoint.Id);
+        }
 
         logic.ContentConnections.RemoveAll(c => !valid.Contains(c.FromPoint) || !valid.Contains(c.ToPoint));
     }

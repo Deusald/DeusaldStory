@@ -39,6 +39,9 @@ namespace DeusaldStoryCommon
         /// <summary>Icon nodes placed in the inner graph (each feeds an Icon input).</summary>
         public List<StoryIconNode> IconNodes { get; } = new();
 
+        /// <summary>Light/Dark switch nodes placed in the inner graph (each picks between two icons by theme).</summary>
+        public List<StoryLightDarkSwitchNode> LightDarkSwitchNodes { get; } = new();
+
         /// <summary>Wires between the inner graph's connection points (Entry/Exit ports and content-node ports).</summary>
         public List<StoryConnection> ContentConnections { get; } = new();
     }

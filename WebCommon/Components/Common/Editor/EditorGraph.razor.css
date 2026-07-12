@@ -115,6 +115,26 @@
 .edg-node-portal    { border-left: 3px solid var(--orange); }
 .edg-node-loc       { border-left: 3px solid var(--accent); }
 .edg-node-icon      { border-left: 3px solid var(--orange); }
+.edg-node-lds       { border-left: 3px solid var(--info); }
+
+/* Inline thumbnail (Icon node preview). Fixed top/height match THUMB_* in EditorGraph.razor:
+   title top 36 + title height 20 + THUMB_GAP 8 = 64; height = THUMB_H. Assumes no subtitle. */
+.edg-node-thumb {
+    position: absolute;
+    top: 64px;
+    left: 14px;
+    right: 14px;
+    height: 46px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.edg-node-thumb img {
+    max-width: 46px;
+    max-height: 46px;
+    image-rendering: pixelated;
+    border-radius: 4px;
+}
 
 .edg-node-lock {
     color: var(--text-ghost);

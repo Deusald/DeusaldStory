@@ -2,14 +2,27 @@
 @inject ProjectStateService _ProjectState
 
 @* ─────────────────────────────────────────────────────────────────────────
-   Renders a logic node's output as a game-style screen: the localized title
-   as a heading, then a framed row with the connected icon on the left and the
-   localized text beside it. Reads whatever is wired into the Entry node's
-   Title / Icon inputs; shows placeholders when nothing is connected.
+   Renders a logic node's output as a screen: the localized title as a heading,
+   then a framed row with the connected icon on the left and the localized text
+   beside it. A Dark/Light toggle flips only the inner window between the dark
+   theme and a paper-like light theme (the story is printed on paper later);
+   the toggle also decides which side of a Light/Dark switch node is shown.
    ───────────────────────────────────────────────────────────────────────── *@
 
 <div class="lpv-root">
-    <div class="lpv-screen">
+
+    <div class="lpv-toolbar">
+        <div class="lpv-toggle">
+            <button class="lpv-toggle-btn @(_Paper ? "" : "active")" @onclick="() => SetPaper(false)">
+                <i class="bi bi-moon-stars-fill"></i> Dark
+            </button>
+            <button class="lpv-toggle-btn @(_Paper ? "active" : "")" @onclick="() => SetPaper(true)">
+                <i class="bi bi-sun-fill"></i> Light
+            </button>
+        </div>
+    </div>
+
+    <div class="lpv-screen @(_Paper ? "paper" : "")">
 
         @if (string.IsNullOrEmpty(_Title))
         {
@@ -38,25 +51,26 @@
             </div>
         </div>
 
-        <div class="lpv-hint">
-            <i class="bi bi-eye"></i>
-            Preview of this logic node's output. Wire a Localization node to <strong>Title</strong> and an
-            Icon node to <strong>Icon</strong> on the Entry node.
-        </div>
-
     </div>
 </div>
 
 @code {
     [Parameter] public StoryLogicNode Logic { get; set; } = default!;
 
-    private string  _Title    = "";
+    private bool    _Paper;    // false = dark (default), true = paper/light
+    private string  _Title = "";
     private string? _IconData; // base64 PNG, or null when no icon connected
 
     protected override void OnParametersSet()
     {
         _Title    = ResolveTitle();
         _IconData = ResolveIcon();
+    }
+
+    private void SetPaper(bool paper)
+    {
+        _Paper    = paper;
+        _IconData = ResolveIcon(); // a Light/Dark switch may resolve to a different icon
     }
 
     /// <summary>Follows the wire into the Title input to a Localization node → its key → main-language text.</summary>
@@ -68,7 +82,7 @@
         StoryLocalizationNode? node = Logic.LocalizationNodes.Find(n => n.OutPoint.Id == from);
         if (node is null) return "";
 
-        LocProject? loc = _ProjectState.CurrentLocalization;
+        LocProject?         loc = _ProjectState.CurrentLocalization;
         LocLocalizationKey? key = loc?.Keys.Find(k => k.Id == node.SelectedKeyId);
         if (key is null) return "";
 
@@ -77,18 +91,28 @@
         return key.Translations.Find(t => t.LanguageId == main)?.Text ?? "";
     }
 
-    /// <summary>Follows the wire into the Icon input to an Icon node → its image → base64 data.</summary>
-    private string? ResolveIcon()
+    /// <summary>Follows the wire into the Icon input, resolving through a Light/Dark switch when present.</summary>
+    private string? ResolveIcon() => ResolveIconImage(FromPointInto(Logic.IconIn.Id), 0);
+
+    /// <summary>
+    /// Resolves the icon emitted by <paramref name="fromPoint"/>: an Icon node yields its image; a Light/Dark
+    /// switch follows its Dark or Light input (by the current mode) one step further. Depth-guarded against loops.
+    /// </summary>
+    private string? ResolveIconImage(Guid fromPoint, int depth)
     {
-        Guid from = FromPointInto(Logic.IconIn.Id);
-        if (from == Guid.Empty) return null;
+        if (fromPoint == Guid.Empty || depth > 8) return null;
 
-        StoryIconNode? node = Logic.IconNodes.Find(n => n.OutPoint.Id == from);
-        if (node is null) return null;
+        if (Logic.IconNodes.Find(n => n.OutPoint.Id == fromPoint) is StoryIconNode icon)
+            return _ProjectState.CurrentProject!.Images.TryGetValue(icon.SelectedImageId, out StoryImage? img)
+                ? img.Data : null;
 
-        return _ProjectState.CurrentProject!.Images.TryGetValue(node.SelectedImageId, out StoryImage? img)
-            ? img.Data
-            : null;
+        if (Logic.LightDarkSwitchNodes.Find(n => n.OutPoint.Id == fromPoint) is StoryLightDarkSwitchNode sw)
+        {
+            Guid input = _Paper ? sw.LightIn.Id : sw.DarkIn.Id;
+            return ResolveIconImage(FromPointInto(input), depth + 1);
+        }
+
+        return null;
     }
 
     /// <summary>The output point wired into <paramref name="toPoint"/>, or empty when nothing is connected.</summary>

@@ -102,6 +102,12 @@
                     {
                         <div class="edg-node-preview">@n.Subtitle</div>
                     }
+                    @if (HasThumb(n))
+                    {
+                        <div class="edg-node-thumb">
+                            <img src="data:image/png;base64,@n.Thumb" alt="@n.Title"/>
+                        </div>
+                    }
 
                     @* Input ports — dots hang on the left border, connections drop onto them. *@
                     @for (int i = 0; i < n.Inputs.Count; ++i)
@@ -167,16 +173,22 @@
              @oncontextmenu="CloseMenu" @oncontextmenu:preventDefault="true" @oncontextmenu:stopPropagation="true"></div>
         <div class="edg-menu" style="left:@F(_MenuX)px; top:@F(_MenuY)px;"
              @oncontextmenu:preventDefault="true" @oncontextmenu:stopPropagation="true">
-            <button class="edg-menu-item" @onclick="() => MenuInvoke(OnNodeEdit, menu)">
-                <i class="bi bi-pencil"></i> Edit @MenuNoun(menu)
-            </button>
+            @if (menu.Editable)
+            {
+                <button class="edg-menu-item" @onclick="() => MenuInvoke(OnNodeEdit, menu)">
+                    <i class="bi bi-pencil"></i> Edit @MenuNoun(menu)
+                </button>
+            }
             @if (menu.Kind is StoryNodeKind.PortalIn or StoryNodeKind.PortalOut)
             {
                 <button class="edg-menu-item" @onclick="() => MenuInvoke(OnNodeAddPortalIn, menu)">
                     <i class="bi bi-box-arrow-in-right"></i> Add portal in
                 </button>
             }
-            <div class="edg-menu-sep"></div>
+            @if (menu.Editable || menu.Kind is StoryNodeKind.PortalIn or StoryNodeKind.PortalOut)
+            {
+                <div class="edg-menu-sep"></div>
+            }
             <button class="edg-menu-item edg-menu-danger" @onclick="() => MenuInvoke(OnNodeDelete, menu)">
                 <i class="bi bi-trash"></i> Delete @MenuNoun(menu)
             </button>
@@ -207,6 +219,8 @@
     private const double TITLE_H      = 20;
     private const double SUB_GAP      = 6;
     private const double SUB_H        = 16;
+    private const double THUMB_GAP    = 8;   // space above an inline thumbnail (Icon node preview)
+    private const double THUMB_H      = 46;  // inline thumbnail height
     private const double PORTS_GAP    = 14;  // space between the header block and the first port
     private const double PORT_SLOT    = 24;  // vertical pitch of a port row
     private const double PORTS_BOTTOM = 14;  // padding below the last port
@@ -240,9 +254,13 @@
     // ── Node geometry ──────────────────────────────────────────────────────
 
     private static bool HasSub(EdNode n) => !string.IsNullOrEmpty(n.Subtitle);
+    private static bool HasThumb(EdNode n) => !string.IsNullOrEmpty(n.Thumb);
 
     private static double PortsTop(EdNode n) =>
-        HEAD_TOP + HEAD_H + TITLE_GAP + TITLE_H + (HasSub(n) ? SUB_GAP + SUB_H : 0) + PORTS_GAP;
+        HEAD_TOP + HEAD_H + TITLE_GAP + TITLE_H
+        + (HasSub(n)   ? SUB_GAP + SUB_H     : 0)
+        + (HasThumb(n) ? THUMB_GAP + THUMB_H : 0)
+        + PORTS_GAP;
 
     private static double PortCenterY(EdNode n, int slot) => PortsTop(n) + slot * PORT_SLOT + PORT_SLOT / 2;
 
@@ -273,8 +291,9 @@
             StoryNodeKind.Start or StoryNodeKind.Entry or StoryNodeKind.LogicEntry => "edg-node-entry",
             StoryNodeKind.End   or StoryNodeKind.Exit  or StoryNodeKind.LogicExit  => "edg-node-exit",
             StoryNodeKind.PortalIn or StoryNodeKind.PortalOut => "edg-node-portal",
-            StoryNodeKind.Localization => "edg-node-loc",
-            StoryNodeKind.Icon         => "edg-node-icon",
+            StoryNodeKind.Localization    => "edg-node-loc",
+            StoryNodeKind.Icon            => "edg-node-icon",
+            StoryNodeKind.LightDarkSwitch => "edg-node-lds",
             _                                          => ""
         };
         return $"{kind} {(n.Id == SelectedId ? "edg-node-sel" : "")}";
@@ -282,7 +301,8 @@
 
     private static bool ShowPortLabels(EdNode n) =>
         n.Kind is StoryNodeKind.Logic or StoryNodeKind.Container
-               or StoryNodeKind.LogicEntry or StoryNodeKind.LogicExit;
+               or StoryNodeKind.LogicEntry or StoryNodeKind.LogicExit
+               or StoryNodeKind.LightDarkSwitch;
 
     /// <summary>True when a wire is being dragged and this input port carries the same signal type as its source.</summary>
     private bool IsCompatibleTarget(EdPort input) =>
@@ -439,8 +459,9 @@
         StoryNodeKind.Container    => "container",
         StoryNodeKind.PortalIn     => "portal in",
         StoryNodeKind.PortalOut    => "portal",
-        StoryNodeKind.Localization => "localization node",
-        StoryNodeKind.Icon         => "icon node",
+        StoryNodeKind.Localization    => "localization node",
+        StoryNodeKind.Icon            => "icon node",
+        StoryNodeKind.LightDarkSwitch => "light/dark switch",
         _                       => "node"
     };
 

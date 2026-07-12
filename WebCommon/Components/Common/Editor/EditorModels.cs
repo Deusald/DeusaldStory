@@ -57,7 +57,8 @@ namespace DeusaldStoryWeb
         LogicEntry, // inside a logic node: the single Entry node (Title/Icon inputs + flow output) (green)
         LogicExit,  // inside a logic node: one Exit node per exit branch (flow input) (red)
         Localization, // inside a logic node: picks a localization key, feeds a Title input (accent)
-        Icon        // inside a logic node: picks a project icon, feeds an Icon input (orange)
+        Icon,       // inside a logic node: picks a project icon, feeds an Icon input (orange)
+        LightDarkSwitch // inside a logic node: picks between two icons by render theme (info)
     }
 
     /// <summary>A point on the graph canvas in world (un-panned, un-scaled) coordinates.</summary>
@@ -95,6 +96,10 @@ namespace DeusaldStoryWeb
         public double        X         { get; set; }
         public double        Y         { get; set; }
         public bool          Deletable { get; init; }
+        public bool          Editable  { get; init; } = true;
+
+        /// <summary>Optional inline thumbnail (base64 PNG) drawn in the card body — e.g. an Icon node's picked icon.</summary>
+        public string? Thumb { get; set; }
 
         public List<EdPort> Inputs  { get; } = new();
         public List<EdPort> Outputs { get; } = new();
@@ -300,7 +305,7 @@ namespace DeusaldStoryWeb
                 nodes.Add(exit);
             }
 
-            // ── Localization nodes (accent) — resolve the picked key's name + preview text. ──
+            // ── Localization nodes (accent) — show the full category/key path + preview text. ──
             foreach (StoryLocalizationNode loc in logic.LocalizationNodes)
             {
                 LocLocalizationKey? key = localization?.Keys.Find(k => k.Id == loc.SelectedKeyId);
@@ -308,7 +313,7 @@ namespace DeusaldStoryWeb
                 {
                     Id        = loc.Id,
                     Kind      = StoryNodeKind.Localization,
-                    Title     = key is not null ? key.KeyName : "(no key)",
+                    Title     = key is not null ? FullKeyName(key, localization!) : "(no key)",
                     Subtitle  = key is not null ? PreviewText(key, localization) : "",
                     X         = loc.X,
                     Y         = loc.Y,
@@ -318,7 +323,7 @@ namespace DeusaldStoryWeb
                 nodes.Add(node);
             }
 
-            // ── Icon nodes (orange) — resolve the picked icon's name. ──
+            // ── Icon nodes (orange) — show the picked icon as a thumbnail. ──
             foreach (StoryIconNode ico in logic.IconNodes)
             {
                 bool found = project.Images.TryGetValue(ico.SelectedImageId, out StoryImage? image);
@@ -327,11 +332,31 @@ namespace DeusaldStoryWeb
                     Id        = ico.Id,
                     Kind      = StoryNodeKind.Icon,
                     Title     = found ? image!.Name : "(no icon)",
+                    Thumb     = found ? image!.Data : null,
                     X         = ico.X,
                     Y         = ico.Y,
                     Deletable = true
                 };
                 node.Outputs.Add(new EdPort { Id = ico.OutPoint.Id, Name = "Icon", Type = PortType.Icon });
+                nodes.Add(node);
+            }
+
+            // ── Light/Dark switch nodes (info) — two icon inputs, one icon output; no config to edit. ──
+            foreach (StoryLightDarkSwitchNode lds in logic.LightDarkSwitchNodes)
+            {
+                EdNode node = new()
+                {
+                    Id        = lds.Id,
+                    Kind      = StoryNodeKind.LightDarkSwitch,
+                    Title     = "Light / Dark",
+                    X         = lds.X,
+                    Y         = lds.Y,
+                    Deletable = true,
+                    Editable  = false
+                };
+                node.Inputs.Add(new EdPort { Id = lds.DarkIn.Id,  Name = "Dark",  Type = PortType.Icon });
+                node.Inputs.Add(new EdPort { Id = lds.LightIn.Id, Name = "Light", Type = PortType.Icon });
+                node.Outputs.Add(new EdPort { Id = lds.OutPoint.Id, Name = "Icon", Type = PortType.Icon });
                 nodes.Add(node);
             }
 
@@ -347,6 +372,20 @@ namespace DeusaldStoryWeb
         /// <summary>A connection point's stored position, falling back to (<paramref name="defX"/>, <paramref name="defY"/>) when unplaced.</summary>
         private static (double X, double Y) PointPos(StoryConnectionPoint p, double defX, double defY) =>
             p.X == 0 && p.Y == 0 ? (defX, defY) : (p.X, p.Y);
+
+        /// <summary>The key's full path — its category chain (root → leaf) joined with '/' then the key name.</summary>
+        private static string FullKeyName(LocLocalizationKey key, LocProject localization)
+        {
+            List<string> parts = new() { key.KeyName };
+            Guid?        cur    = key.CategoryId == Guid.Empty ? null : key.CategoryId;
+            int          guard  = 0;
+            while (cur is Guid id && localization.Categories.Find(c => c.Id == id) is LocCategory cat && guard++ < 32)
+            {
+                parts.Insert(0, cat.Name);
+                cur = cat.ParentCategoryId;
+            }
+            return string.Join("/", parts);
+        }
 
         /// <summary>The main-language text of <paramref name="key"/> (empty when there is no source translation).</summary>
         private static string PreviewText(LocLocalizationKey key, LocProject? localization)
@@ -374,6 +413,7 @@ namespace DeusaldStoryWeb
             StoryNodeKind.LogicExit    => "EXIT",
             StoryNodeKind.Localization => "LOCALIZATION",
             StoryNodeKind.Icon         => "ICON",
+            StoryNodeKind.LightDarkSwitch => "LIGHT / DARK",
             _                       => ""
         };
 
@@ -391,6 +431,7 @@ namespace DeusaldStoryWeb
             StoryNodeKind.LogicExit    => "var(--danger)",
             StoryNodeKind.Localization => "var(--accent)",
             StoryNodeKind.Icon         => "var(--orange)",
+            StoryNodeKind.LightDarkSwitch => "var(--info)",
             _                       => "var(--text-dim)"
         };
 
