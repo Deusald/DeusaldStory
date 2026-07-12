@@ -95,6 +95,35 @@ public class ProjectStateService(
         DirtyStateChanged?.Invoke();
     }
 
+#if DEBUG
+    /// <summary>
+    /// DEBUG ONLY. Spins up a throwaway in-memory test project (no localization link) with a logic node and a
+    /// nested container in the root, pre-wired Start → logic → container → End, so the editor can be exercised
+    /// without the localization-picker flow. Shared by every host's Home debug button so there's a single place
+    /// the test project is defined. Callers navigate to the editor afterwards.
+    /// </summary>
+    public async Task CreateDebugProjectAsync()
+    {
+        await CreateNewProjectAsync("Debug Test", "debug-test", "Throwaway test project", "");
+
+        StoryProject project = CurrentProject!;
+        Guid         root    = project.Metadata.RootStoryContainerNodeId;
+
+        StoryLogicNode logic = AddLogicNode(root, "Say hello", "A test logic node",
+            new StoryConnectionPoint { Name = "In" },
+            new[] { new StoryConnectionPoint { Name = "Out" } }, 340, 120);
+        StoryContainerNode container = AddContainerNode(root, "Test Container", "A nested container",
+            new[] { new StoryConnectionPoint { Name = "In" } },
+            new[] { new StoryConnectionPoint { Name = "Out" } }, 340, 340);
+
+        // Pre-wire Start → logic → container → End so edges are visible immediately.
+        StoryContainerNode rootNode = project.ContainerNodes[root];
+        Connect(root, rootNode.EntryPoints[0].Id, logic.EntryPoint.Id);
+        Connect(root, logic.ExitPoints[0].Id, container.EntryPoints[0].Id);
+        Connect(root, container.ExitPoints[0].Id, rootNode.ExitPoints[0].Id);
+    }
+#endif
+
     /// <summary>
     /// Adds a new logic node to <paramref name="parentContainerId"/>, marks it dirty and notifies listeners.
     /// The node is placed at (<paramref name="x"/>, <paramref name="y"/>) on the container's canvas.

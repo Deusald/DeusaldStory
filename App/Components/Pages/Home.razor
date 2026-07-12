@@ -94,6 +94,9 @@
                         <span>Open project…</span>
                     }
                 </button>
+
+                @* TEMP DEBUG button — rendered only in Debug builds (see DebugButton in @code). *@
+                @DebugButton
             </div>
 
             <div class="home-version">
@@ -347,6 +350,29 @@
         await _ProjectState.CreateNewProjectAsync(args.Name, args.Slug, args.Description, args.LocalizationReference);
         _Nav.NavigateTo("/editor");
     }
+
+    // TEMP DEBUG — spins up a throwaway test project so the editor can be exercised without the
+    // localization-picker flow. The property is null (and the handler below is excluded) in Release
+    // builds, so nothing debug-related ships. The markup #if is unreliable, so we gate here.
+    private RenderFragment? DebugButton =>
+    #if DEBUG
+        @<button class="home-btn home-btn-secondary" style="border-style:dashed;" @onclick="CreateDebugProject" disabled="@_IsLoading">
+            <span class="home-btn-icon"><i class="bi bi-bug"></i></span>
+            <span>Debug: test project</span>
+        </button>;
+    #else
+        null;
+    #endif
+
+    #if DEBUG
+    // Spins up the shared throwaway test project (defined once in ProjectStateService) and jumps
+    // straight into the editor to try wiring/drill-down.
+    private async Task CreateDebugProject()
+    {
+        await _ProjectState.CreateDebugProjectAsync();
+        _Nav.NavigateTo("/editor");
+    }
+    #endif
 
     // ── Recents ───────────────────────────────────────────────────────────
 
