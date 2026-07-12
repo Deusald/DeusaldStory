@@ -257,6 +257,52 @@ public class ProjectStateService(
 
     private const double _PORTAL_PAIR_GAP = 320;
 
+    // ── Images ───────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Adds a PNG asset to the project's image library. <paramref name="name"/> must be unique across all images
+    /// (both kinds) — it is how story text references the asset. <paramref name="base64"/> is the raw PNG bytes,
+    /// base64-encoded. Marks the new image dirty and returns it.
+    /// </summary>
+    public StoryImage AddImage(string name, StoryImageKind kind, int width, int height, string base64)
+    {
+        StoryImage image = new()
+        {
+            Name   = name,
+            Kind   = kind,
+            Width  = width,
+            Height = height,
+            Data   = base64
+        };
+
+        CurrentProject!.Images.Add(image.Id, image);
+        MarkKeyDirty(image.Id);
+        return image;
+    }
+
+    /// <summary>Renames an image. No-op when the id is unknown.</summary>
+    public void RenameImage(Guid imageId, string name)
+    {
+        if (!CurrentProject!.Images.TryGetValue(imageId, out StoryImage? image)) return;
+        image.Name = name;
+        MarkKeyDirty(imageId);
+    }
+
+    /// <summary>Deletes an image from the library. No-op when the id is unknown.</summary>
+    public void DeleteImage(Guid imageId)
+    {
+        if (!CurrentProject!.Images.Remove(imageId)) return;
+        MarkKeyDirty(imageId);
+    }
+
+    /// <summary>
+    /// True when <paramref name="name"/> is already used by an image (case-insensitive). Pass the id being edited as
+    /// <paramref name="ignoreId"/> so a rename to the same name doesn't collide with itself.
+    /// </summary>
+    public bool IsImageNameTaken(string name, Guid ignoreId = default) =>
+        CurrentProject!.Images.Values.Any(
+            i => i.Id != ignoreId && string.Equals(i.Name, name, StringComparison.OrdinalIgnoreCase));
+
     /// <summary>
     /// Wires an output point (<paramref name="fromPoint"/>) to an input point (<paramref name="toPoint"/>) inside
     /// <paramref name="containerId"/>. An exit/output can only lead to one place, so any existing connection leaving

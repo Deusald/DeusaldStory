@@ -18,40 +18,48 @@
 
     <div class="ed-body">
 
-        <EditorRail/>
+        <EditorRail OnToolSelected="OnToolSelected"/>
 
-        <div class="ed-stage">
-            @if (_Mode == EditorMode.Edit)
-            {
-                <EditorGraph Nodes="_Nodes"
-                             Edges="_Edges"
-                             SelectedId="_SelectedId"
-                             SelectedChanged="OnSelect"
-                             OnAddNode="OnAddNode"
-                             OnNodeMoved="OnNodeMoved"
-                             OnNodeActivated="OnNodeActivated"
-                             OnConnect="OnConnect"
-                             OnDisconnect="OnDisconnect"
-                             OnCanvasContextMenu="OnCanvasContextMenu"
-                             OnNodeEdit="OnNodeEdit"
-                             OnNodeDelete="OnNodeDelete"
-                             OnNodeAddPortalIn="OnNodeAddPortalIn"/>
-            }
-            else
-            {
-                <div class="ed-play">
-                    <div class="ed-play-inner">
-                        <i class="bi bi-play-circle"></i>
-                        <div class="ed-play-title">Play mode</div>
-                        <div class="ed-play-sub">Step through the story from the start node. Runtime playback is coming next.</div>
+        @if (_ActiveTool == EditorRail.Tool.Media)
+        {
+            @* The images library spans the whole centre (graph + inspector); only the rail stays. *@
+            <ImagesPanel/>
+        }
+        else
+        {
+            <div class="ed-stage">
+                @if (_Mode == EditorMode.Edit)
+                {
+                    <EditorGraph Nodes="_Nodes"
+                                 Edges="_Edges"
+                                 SelectedId="_SelectedId"
+                                 SelectedChanged="OnSelect"
+                                 OnAddNode="OnAddNode"
+                                 OnNodeMoved="OnNodeMoved"
+                                 OnNodeActivated="OnNodeActivated"
+                                 OnConnect="OnConnect"
+                                 OnDisconnect="OnDisconnect"
+                                 OnCanvasContextMenu="OnCanvasContextMenu"
+                                 OnNodeEdit="OnNodeEdit"
+                                 OnNodeDelete="OnNodeDelete"
+                                 OnNodeAddPortalIn="OnNodeAddPortalIn"/>
+                }
+                else
+                {
+                    <div class="ed-play">
+                        <div class="ed-play-inner">
+                            <i class="bi bi-play-circle"></i>
+                            <div class="ed-play-title">Play mode</div>
+                            <div class="ed-play-sub">Step through the story from the start node. Runtime playback is coming next.</div>
+                        </div>
                     </div>
-                </div>
-            }
-        </div>
+                }
+            </div>
 
-        <div class="ed-inspector">
-            <EditorInspector Node="_SelectedNode"/>
-        </div>
+            <div class="ed-inspector">
+                <EditorInspector Node="_SelectedNode"/>
+            </div>
+        }
 
     </div>
 </div>
@@ -63,6 +71,7 @@
 
 @code {
     private EditorMode        _Mode = EditorMode.Edit;
+    private EditorRail.Tool   _ActiveTool = EditorRail.Tool.Graph;
     private Guid              _SelectedId;
     private Guid              _CurrentContainerId;
     private List<EditorCrumb> _Crumbs = [];
@@ -115,6 +124,9 @@
     }
 
     private void OnModeChanged(EditorMode mode) => _Mode = mode;
+
+    /// <summary>Rail tool picked — swap the centre panel. Only Media has its own panel; the rest keep the graph.</summary>
+    private void OnToolSelected(EditorRail.Tool tool) => _ActiveTool = tool;
 
     private void OnSelect(Guid id) => _SelectedId = id;
 

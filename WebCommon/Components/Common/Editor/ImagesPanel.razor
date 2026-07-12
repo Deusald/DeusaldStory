@@ -1,0 +1,278 @@
+@namespace DeusaldStoryWeb.Components.Common
+@inject ProjectStateService _ProjectState
+
+@* ─────────────────────────────────────────────────────────────────────────
+   The project's image library. Two lists: inline ICONS (square power-of-two
+   PNGs) and free-size IMAGES (any-size PNG). Each asset is referenced from
+   story text by its unique name; upload, rename and delete happen here.
+   ───────────────────────────────────────────────────────────────────────── *@
+
+<div class="imp-root">
+
+    <div class="imp-head">
+        <div class="imp-head-title">
+            <i class="bi bi-image"></i>
+            <span>Images</span>
+        </div>
+        <div class="imp-head-sub">Referenced from story text by name. PNG only.</div>
+    </div>
+
+    @if (_Error is not null)
+    {
+        <div class="imp-error">
+            <i class="bi bi-exclamation-triangle"></i>
+            <span>@_Error</span>
+            <button class="imp-error-close" @onclick="() => _Error = null" title="Dismiss"><i class="bi bi-x-lg"></i></button>
+        </div>
+    }
+
+    <div class="imp-body">
+        @Section(StoryImageKind.Icon,  "Icons",  "bi-emoji-smile", "Square, power-of-two sizes (32×32, 64×64, …). Shown inline with text.")
+        @Section(StoryImageKind.Image, "Images", "bi-card-image",  "Any size. Shown as a picture in the story.")
+    </div>
+
+</div>
+
+@* ── Rename modal ─────────────────────────────────────────────────────────── *@
+@if (_Renaming is not null)
+{
+    <div class="modal-backdrop" @onclick="CancelRename"></div>
+    <div class="modal-box imp-rename-box" @onclick:stopPropagation="true">
+        <div class="modal-header">
+            <span class="modal-title">Rename image</span>
+            <button class="modal-close" @onclick="CancelRename" title="Close"><i class="bi bi-x-lg"></i></button>
+        </div>
+        <div class="modal-body">
+            <div class="modal-field">
+                <label class="modal-label">Name</label>
+                <input class="modal-input" type="text" @bind="_RenameValue" @bind:event="oninput"
+                       maxlength="100" @onkeydown="OnRenameKeyDown" @ref="_RenameInput"/>
+                @if (_RenameError is not null)
+                {
+                    <div class="modal-field-error">@_RenameError</div>
+                }
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="modal-btn modal-btn-ghost" @onclick="CancelRename">Cancel</button>
+            <button class="modal-btn modal-btn-primary" @onclick="ConfirmRename" disabled="@(!CanRename)">Save</button>
+        </div>
+    </div>
+}
+
+@* ── Delete confirm modal ─────────────────────────────────────────────────── *@
+@if (_Deleting is not null)
+{
+    <div class="modal-backdrop" @onclick="CancelDelete"></div>
+    <div class="modal-box imp-delete-box" @onclick:stopPropagation="true">
+        <div class="modal-header">
+            <span class="modal-title">Delete image</span>
+            <button class="modal-close" @onclick="CancelDelete" title="Close"><i class="bi bi-x-lg"></i></button>
+        </div>
+        <div class="modal-body">
+            <p class="imp-delete-text">
+                Delete <strong>@_Deleting.Name</strong>? Any story text that references it by name will no longer
+                resolve. This cannot be undone.
+            </p>
+        </div>
+        <div class="modal-footer">
+            <button class="modal-btn modal-btn-ghost" @onclick="CancelDelete">Cancel</button>
+            <button class="modal-btn modal-btn-danger" @onclick="ConfirmDelete">Delete</button>
+        </div>
+    </div>
+}
+
+@code {
+    // Cap uploads at 10 MB — well beyond any icon and generous for a story picture.
+    private const long _MAX_BYTES = 10L * 1024 * 1024;
+
+    private string? _Error;
+
+    private StoryImage?           _Renaming;
+    private string                _RenameValue = "";
+    private string?               _RenameError;
+    private ElementReference      _RenameInput;
+    private bool                  _RenameFocusPending;
+
+    private StoryImage? _Deleting;
+
+    private StoryProject Project => _ProjectState.CurrentProject!;
+
+    private IEnumerable<StoryImage> ImagesOf(StoryImageKind kind) =>
+        Project.Images.Values.Where(i => i.Kind == kind).OrderBy(i => i.Name, StringComparer.OrdinalIgnoreCase);
+
+    // ── One library section (icons / images) ───────────────────────────────
+
+    private RenderFragment Section(StoryImageKind kind, string title, string icon, string hint) => __builder =>
+    {
+        List<StoryImage> items = ImagesOf(kind).ToList();
+
+        <section class="imp-section">
+            <div class="imp-section-head">
+                <div class="imp-section-title">
+                    <i class="bi @icon"></i>
+                    <span>@title</span>
+                    <span class="imp-count">@items.Count</span>
+                </div>
+                <label class="imp-upload">
+                    <i class="bi bi-upload"></i>
+                    <span>Upload PNG</span>
+                    <InputFile class="imp-file" accept="image/png" multiple
+                               OnChange="e => OnFilesSelected(e, kind)"/>
+                </label>
+            </div>
+            <div class="imp-section-hint">@hint</div>
+
+            @if (items.Count == 0)
+            {
+                <div class="imp-empty">
+                    <i class="bi bi-images"></i>
+                    <span>No @title.ToLowerInvariant() yet — upload a PNG to get started.</span>
+                </div>
+            }
+            else
+            {
+                <div class="imp-grid">
+                    @foreach (StoryImage img in items)
+                    {
+                        <div class="imp-card" @key="img.Id">
+                            <div class="imp-thumb">
+                                <img src="data:image/png;base64,@img.Data" alt="@img.Name"/>
+                            </div>
+                            <div class="imp-card-meta">
+                                <div class="imp-card-name" title="@img.Name">@img.Name</div>
+                                <div class="imp-card-dim">@img.Width×@img.Height</div>
+                            </div>
+                            <div class="imp-card-actions">
+                                <button class="imp-act" title="Rename" @onclick="() => BeginRename(img)">
+                                    <i class="bi bi-pencil"></i>
+                                </button>
+                                <button class="imp-act imp-act-danger" title="Delete" @onclick="() => _Deleting = img">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+        </section>
+    };
+
+    // ── Upload ──────────────────────────────────────────────────────────────
+
+    private async Task OnFilesSelected(InputFileChangeEventArgs e, StoryImageKind kind)
+    {
+        _Error = null;
+        List<string> problems = new();
+
+        foreach (IBrowserFile file in e.GetMultipleFiles(20))
+        {
+            byte[] bytes;
+            try
+            {
+                using MemoryStream ms = new();
+                await file.OpenReadStream(_MAX_BYTES).CopyToAsync(ms);
+                bytes = ms.ToArray();
+            }
+            catch (Exception)
+            {
+                problems.Add($"“{file.Name}” is larger than {_MAX_BYTES / (1024 * 1024)} MB.");
+                continue;
+            }
+
+            if (!PngInfo.TryReadSize(bytes, out int width, out int height))
+            {
+                problems.Add($"“{file.Name}” is not a valid PNG.");
+                continue;
+            }
+
+            if (kind == StoryImageKind.Icon && (width != height || !PngInfo.IsPowerOfTwo(width)))
+            {
+                problems.Add($"“{file.Name}” ({width}×{height}) is not a square power-of-two icon.");
+                continue;
+            }
+
+            string name = UniqueName(Path.GetFileNameWithoutExtension(file.Name));
+            _ProjectState.AddImage(name, kind, width, height, Convert.ToBase64String(bytes));
+        }
+
+        if (problems.Count > 0) _Error = string.Join(" ", problems);
+    }
+
+    /// <summary>Derives a project-unique name from an uploaded file's base name.</summary>
+    private string UniqueName(string baseName)
+    {
+        string cleaned = string.IsNullOrWhiteSpace(baseName) ? "image" : baseName.Trim();
+        if (!_ProjectState.IsImageNameTaken(cleaned)) return cleaned;
+
+        int suffix = 2;
+        while (_ProjectState.IsImageNameTaken($"{cleaned} {suffix}")) ++suffix;
+        return $"{cleaned} {suffix}";
+    }
+
+    // ── Rename ────────────────────────────────────────────────────────────────
+
+    private void BeginRename(StoryImage img)
+    {
+        _Renaming           = img;
+        _RenameValue        = img.Name;
+        _RenameError        = null;
+        _RenameFocusPending = true;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_RenameFocusPending && _Renaming is not null)
+        {
+            _RenameFocusPending = false;
+            await _RenameInput.FocusAsync();
+        }
+    }
+
+    private bool CanRename
+    {
+        get
+        {
+            string value = _RenameValue.Trim();
+            if (value.Length == 0) return false;
+            if (string.Equals(value, _Renaming?.Name, StringComparison.Ordinal)) return true;
+            return !_ProjectState.IsImageNameTaken(value, _Renaming!.Id);
+        }
+    }
+
+    private void ConfirmRename()
+    {
+        if (_Renaming is null) return;
+
+        string value = _RenameValue.Trim();
+        if (value.Length == 0) { _RenameError = "Name can't be empty."; return; }
+        if (!string.Equals(value, _Renaming.Name, StringComparison.Ordinal)
+            && _ProjectState.IsImageNameTaken(value, _Renaming.Id))
+        {
+            _RenameError = "Another image already uses that name.";
+            return;
+        }
+
+        _ProjectState.RenameImage(_Renaming.Id, value);
+        _Renaming = null;
+    }
+
+    private void OnRenameKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter" && CanRename) ConfirmRename();
+        else if (e.Key == "Escape") CancelRename();
+    }
+
+    private void CancelRename() => _Renaming = null;
+
+    // ── Delete ────────────────────────────────────────────────────────────────
+
+    private void ConfirmDelete()
+    {
+        if (_Deleting is null) return;
+        _ProjectState.DeleteImage(_Deleting.Id);
+        _Deleting = null;
+    }
+
+    private void CancelDelete() => _Deleting = null;
+}

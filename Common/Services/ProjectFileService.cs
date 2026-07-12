@@ -18,6 +18,8 @@ namespace DeusaldStoryCommon
     ///   metadata.json
     ///   Containers/           {guid}.json  per StoryContainerNode
     ///   Logic/                {guid}.json  per StoryLogicNode
+    ///   Portals/              {guid}.json  per StoryPortalNode
+    ///   Images/               {guid}.json  per StoryImage (base64 PNG + metadata)
     ///
     /// Every method has a <c>string folderPath</c> overload that operates on a <see cref="DeusaldLocalizerCommon.DiscProjectFileStore"/>,
     /// so existing disc callers (App, Backend) are unchanged.
@@ -31,7 +33,8 @@ namespace DeusaldStoryCommon
         public const string CONTAINERS_FOLDER      = "Containers";
         public const string LOGIC_FOLDER           = "Logic";
         public const string PORTALS_FOLDER         = "Portals";
-        public const int    CURRENT_FORMAT_VERSION = 4;
+        public const string IMAGES_FOLDER          = "Images";
+        public const int    CURRENT_FORMAT_VERSION = 5;
 
         private static readonly JsonSerializerSettings _JsonSettings = new()
         {
@@ -75,13 +78,15 @@ namespace DeusaldStoryCommon
             List<StoryContainerNode> containerNodes = await ReadFolderAsync<StoryContainerNode>(store, CONTAINERS_FOLDER);
             List<StoryLogicNode>     logicNodes     = await ReadFolderAsync<StoryLogicNode>(store, LOGIC_FOLDER);
             List<StoryPortalNode>    portalNodes    = await ReadFolderAsync<StoryPortalNode>(store, PORTALS_FOLDER);
+            List<StoryImage>         images         = await ReadFolderAsync<StoryImage>(store, IMAGES_FOLDER);
 
             return new StoryProject
             {
                 Metadata       = metadata,
                 ContainerNodes = containerNodes.ToDictionary(k => k.Id),
                 LogicNodes     = logicNodes.ToDictionary(k => k.Id),
-                PortalNodes    = portalNodes.ToDictionary(k => k.Id)
+                PortalNodes    = portalNodes.ToDictionary(k => k.Id),
+                Images         = images.ToDictionary(k => k.Id)
             };
         }
 
@@ -104,6 +109,7 @@ namespace DeusaldStoryCommon
             await SaveFolderAsync(store, CONTAINERS_FOLDER, project.ContainerNodes.Values.ToList(), n => n.Id.ToString());
             await SaveFolderAsync(store, LOGIC_FOLDER,      project.LogicNodes.Values.ToList(),     n => n.Id.ToString());
             await SaveFolderAsync(store, PORTALS_FOLDER,    project.PortalNodes.Values.ToList(),    n => n.Id.ToString());
+            await SaveFolderAsync(store, IMAGES_FOLDER,     project.Images.Values.ToList(),         n => n.Id.ToString());
         }
 
         // ── Incremental Save ────────────────────
@@ -125,6 +131,7 @@ namespace DeusaldStoryCommon
             await UpdateFilesWithIdAsync(project.ContainerNodes.Values.ToList(), CONTAINERS_FOLDER);
             await UpdateFilesWithIdAsync(project.LogicNodes.Values.ToList(),     LOGIC_FOLDER);
             await UpdateFilesWithIdAsync(project.PortalNodes.Values.ToList(),    PORTALS_FOLDER);
+            await UpdateFilesWithIdAsync(project.Images.Values.ToList(),         IMAGES_FOLDER);
 
             async Task UpdateFilesWithIdAsync<T>(List<T> data, string folder) where T : IFileWithId
             {

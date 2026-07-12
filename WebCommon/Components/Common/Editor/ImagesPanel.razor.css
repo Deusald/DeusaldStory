@@ -1,0 +1,246 @@
+/* Fills the centre of the editor (graph + inspector area); only the rail sits to its left. */
+.imp-root {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    background: var(--bg);
+}
+
+/* ── Header ───────────────────────────────────────────────────────────────── */
+
+.imp-head {
+    flex: none;
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--border-subtle);
+    background: var(--surface-1);
+}
+.imp-head-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text-bright);
+}
+.imp-head-title i { color: var(--accent); }
+.imp-head-sub {
+    margin-top: 3px;
+    font-size: 12px;
+    color: var(--text-dim);
+}
+
+/* ── Error banner ─────────────────────────────────────────────────────────── */
+
+.imp-error {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 12px 20px 0;
+    padding: 9px 12px;
+    font-size: 13px;
+    color: var(--danger);
+    background: rgba(255, 143, 163, .10);
+    border: 1px solid rgba(255, 143, 163, .28);
+    border-radius: var(--r-sm);
+}
+.imp-error > span { flex: 1; }
+.imp-error-close {
+    background: transparent;
+    border: none;
+    color: var(--danger);
+    cursor: pointer;
+    opacity: .8;
+    padding: 2px;
+}
+.imp-error-close:hover { opacity: 1; }
+
+/* ── Body / sections ──────────────────────────────────────────────────────── */
+
+.imp-body {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 28px;
+}
+
+.imp-section-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+.imp-section-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+    color: var(--text-soft);
+}
+.imp-section-title i { color: var(--text-muted); }
+.imp-count {
+    min-width: 20px;
+    padding: 1px 7px;
+    font-size: 11px;
+    text-align: center;
+    color: var(--text-muted);
+    background: var(--surface-3);
+    border-radius: var(--r-pill);
+}
+.imp-section-hint {
+    margin: 4px 0 12px;
+    font-size: 12px;
+    color: var(--text-dim);
+}
+
+/* ── Upload button (a styled label wrapping a hidden InputFile) ────────────── */
+
+.imp-upload {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    font-size: 13px;
+    color: var(--accent);
+    background: var(--accent-soft);
+    border: 1px solid transparent;
+    border-radius: var(--r-sm);
+    cursor: pointer;
+    transition: filter var(--dur) var(--ease);
+}
+.imp-upload:hover { filter: brightness(1.15); }
+.imp-file {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+    pointer-events: none;
+}
+
+/* ── Grid of image cards ──────────────────────────────────────────────────── */
+
+.imp-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
+    gap: 14px;
+}
+
+.imp-card {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    background: var(--surface-2);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--r-md);
+    overflow: hidden;
+    transition: border-color var(--dur) var(--ease);
+}
+.imp-card:hover { border-color: var(--border-strong); }
+
+.imp-thumb {
+    aspect-ratio: 1 / 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 10px;
+    /* Checkerboard so transparent PNGs read clearly. */
+    background-color: var(--surface-input);
+    background-image:
+        linear-gradient(45deg, var(--surface-3) 25%, transparent 25%),
+        linear-gradient(-45deg, var(--surface-3) 25%, transparent 25%),
+        linear-gradient(45deg, transparent 75%, var(--surface-3) 75%),
+        linear-gradient(-45deg, transparent 75%, var(--surface-3) 75%);
+    background-size: 16px 16px;
+    background-position: 0 0, 0 8px, 8px -8px, -8px 0;
+}
+.imp-thumb img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+    image-rendering: pixelated;
+}
+
+.imp-card-meta {
+    padding: 7px 9px;
+    border-top: 1px solid var(--border-subtle);
+}
+.imp-card-name {
+    font-size: 12.5px;
+    color: var(--text-soft);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.imp-card-dim {
+    margin-top: 2px;
+    font-size: 11px;
+    color: var(--text-faint);
+}
+
+.imp-card-actions {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    display: flex;
+    gap: 4px;
+    opacity: 0;
+    transition: opacity var(--dur) var(--ease);
+}
+.imp-card:hover .imp-card-actions { opacity: 1; }
+.imp-act {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    font-size: 12px;
+    color: var(--text-soft);
+    background: rgba(12, 13, 16, .78);
+    border: 1px solid var(--border);
+    border-radius: var(--r-sm);
+    cursor: pointer;
+    transition: background var(--dur) var(--ease), color var(--dur) var(--ease);
+}
+.imp-act:hover { background: var(--surface-3); color: var(--text-bright); }
+.imp-act-danger:hover { color: var(--danger); border-color: var(--danger); }
+
+/* ── Empty state ──────────────────────────────────────────────────────────── */
+
+.imp-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    padding: 28px;
+    text-align: center;
+    font-size: 13px;
+    color: var(--text-dim);
+    border: 1px dashed var(--border-dashed);
+    border-radius: var(--r-md);
+}
+.imp-empty i { font-size: 24px; color: var(--text-fainter); }
+
+/* ── Modal bits (danger button variant + widths) ──────────────────────────── */
+
+.imp-rename-box,
+.imp-delete-box { width: 420px; max-width: calc(100vw - 40px); }
+
+.imp-delete-text {
+    margin: 0;
+    font-size: 13px;
+    line-height: 1.55;
+    color: var(--text-soft);
+}
+.imp-delete-text strong { color: var(--text-bright); }
+
+.modal-btn-danger {
+    background: var(--danger);
+    color: #2a0d13;
+}
+.modal-btn-danger:hover:not(:disabled) { filter: brightness(1.06); }

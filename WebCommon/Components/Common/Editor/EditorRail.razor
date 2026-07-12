@@ -41,7 +41,12 @@
 </div>
 
 @code {
-    private enum Tool { Graph, Connections, Outline, Flow, Localization, Variables, Blocks, Media, Preview, Problems, History }
+    /// <summary>The panels the rail switches between. Only <see cref="Graph"/> and <see cref="Media"/> have a real
+    /// panel today; the rest highlight but keep the graph visible until their panels land.</summary>
+    public enum Tool { Graph, Connections, Outline, Flow, Localization, Variables, Blocks, Media, Preview, Problems, History }
+
+    /// <summary>Raised when the user picks a tool, so the editor can swap the centre panel.</summary>
+    [Parameter] public EventCallback<Tool> OnToolSelected { get; set; }
 
     private Tool _Active = Tool.Graph;
 
@@ -58,5 +63,9 @@
         (Tool.Preview,      "bi-play-circle", "Preview")
     ];
 
-    private void Select(Tool tool) => _Active = tool;
+    private async Task Select(Tool tool)
+    {
+        _Active = tool;
+        await OnToolSelected.InvokeAsync(tool);
+    }
 }
