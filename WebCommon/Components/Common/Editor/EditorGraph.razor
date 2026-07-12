@@ -48,37 +48,6 @@
                      @onpointerdown="e => NodeDown(e, n)" @onpointerdown:stopPropagation="true"
                      @oncontextmenu:stopPropagation="true" @oncontextmenu:preventDefault="true">
 
-                    @if (n.Inputs.Count > 0)
-                    {
-                        <div class="edg-ports edg-ports-in">
-                            @foreach (EdPort port in n.Inputs)
-                            {
-                                <span class="edg-port-row">
-                                    <span class="edg-port" style="background:@color"></span>
-                                    @if (ShowPortLabels(n) && !string.IsNullOrEmpty(port.Name))
-                                    {
-                                        <span class="edg-port-label">@port.Name</span>
-                                    }
-                                </span>
-                            }
-                        </div>
-                    }
-                    @if (n.Outputs.Count > 0)
-                    {
-                        <div class="edg-ports edg-ports-out">
-                            @foreach (EdPort port in n.Outputs)
-                            {
-                                <span class="edg-port-row">
-                                    @if (ShowPortLabels(n) && !string.IsNullOrEmpty(port.Name))
-                                    {
-                                        <span class="edg-port-label">@port.Name</span>
-                                    }
-                                    <span class="edg-port" style="background:@color"></span>
-                                </span>
-                            }
-                        </div>
-                    }
-
                     <div class="edg-node-head">
                         <span class="edg-node-kind" style="color:@color">
                             <span class="edg-node-kind-dot" style="background:@color"></span>
@@ -96,6 +65,34 @@
                     {
                         <div class="edg-node-preview">@n.Subtitle</div>
                     }
+
+                    @* Ports live in their own row so their dots/labels never overlap the title. *@
+                    <div class="edg-node-ports">
+                        <div class="edg-ports-col edg-ports-in">
+                            @foreach (EdPort port in n.Inputs)
+                            {
+                                <span class="edg-port-row">
+                                    <span class="edg-port" style="background:@color"></span>
+                                    @if (ShowPortLabels(n) && !string.IsNullOrEmpty(port.Name))
+                                    {
+                                        <span class="edg-port-label">@port.Name</span>
+                                    }
+                                </span>
+                            }
+                        </div>
+                        <div class="edg-ports-col edg-ports-out">
+                            @foreach (EdPort port in n.Outputs)
+                            {
+                                <span class="edg-port-row">
+                                    @if (ShowPortLabels(n) && !string.IsNullOrEmpty(port.Name))
+                                    {
+                                        <span class="edg-port-label">@port.Name</span>
+                                    }
+                                    <span class="edg-port" style="background:@color"></span>
+                                </span>
+                            }
+                        </div>
+                    </div>
                 </div>
             }
         </div>
