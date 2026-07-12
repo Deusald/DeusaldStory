@@ -62,13 +62,8 @@
                     }
                 </button>
 
-                @* TEMP DEBUG — spins up a throwaway test project (Start/End + a logic node + a container)
-                   so the editor can be exercised in the browser without the localization-picker flow.
-                   Remove before shipping. *@
-                <button class="home-btn home-btn-secondary" style="border-style:dashed;" @onclick="CreateDebugProject" disabled="@_IsBusy">
-                    <span class="home-btn-icon"><i class="bi bi-bug"></i></span>
-                    <span>Debug: test project</span>
-                </button>
+                @* TEMP DEBUG button — rendered only in Debug builds (see DebugButton in @code). *@
+                @DebugButton
             </div>
 
             <div class="home-version">
@@ -337,8 +332,22 @@
         _Nav.NavigateTo("/editor");
     }
 
-    // TEMP DEBUG — remove before shipping. Creates an in-memory test project (no localization link) with a
-    // logic node and a container in the root, then jumps straight into the editor to try wiring/drill-down.
+    // TEMP DEBUG — spins up a throwaway test project so the editor can be exercised in the browser
+    // without the localization-picker flow. The property is null (and the handler below is excluded)
+    // in Release builds, so nothing debug-related ships. The markup #if is unreliable, so we gate here.
+    private RenderFragment? DebugButton =>
+    #if DEBUG
+        @<button class="home-btn home-btn-secondary" style="border-style:dashed;" @onclick="CreateDebugProject" disabled="@_IsBusy">
+            <span class="home-btn-icon"><i class="bi bi-bug"></i></span>
+            <span>Debug: test project</span>
+        </button>;
+    #else
+        null;
+    #endif
+
+    #if DEBUG
+    // Creates an in-memory test project (no localization link) with a logic node and a container in the
+    // root, then jumps straight into the editor to try wiring/drill-down.
     private async Task CreateDebugProject()
     {
         await _ProjectState.CreateNewProjectAsync("Debug Test", "debug-test", "Throwaway test project", "");
@@ -361,6 +370,7 @@
 
         _Nav.NavigateTo("/editor");
     }
+    #endif
 
     private async Task ImportZip()
     {
