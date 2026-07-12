@@ -27,8 +27,10 @@
                 _Anchors = anchors;
             }
 
-            @* Edge layer *@
-            <svg class="edg-edges" xmlns="http://www.w3.org/2000/svg">
+            @* Edge layer. Styling is inline (not scoped CSS): Blazor CSS isolation does not tag SVG
+               child elements, so a scoped `.edg-edge` stroke would never apply and the wires vanish. *@
+            <svg class="edg-edges" xmlns="http://www.w3.org/2000/svg"
+                 style="position:absolute; top:0; left:0; width:10px; height:10px; overflow:visible; pointer-events:none;">
                 @foreach (EdEdge edge in Edges)
                 {
                     if (!anchors.TryGetValue(edge.FromPoint, out PortAnchor from) ||
@@ -37,24 +39,23 @@
 
                     EdEdge e      = edge;
                     bool   active = edge.Id == _SelectedEdgeId;
+                    string stroke = active ? "var(--accent)" : "var(--text-dim)";
                     <path d="@EdgePath(from.X, from.Y, to.X, to.Y)"
-                          class="edg-edge-hit"
-                          fill="none"
+                          style="stroke:transparent; stroke-width:14px; fill:none; pointer-events:stroke; cursor:pointer;"
                           @onpointerdown="() => SelectEdge(e.Id)" @onpointerdown:stopPropagation="true"
                           @oncontextmenu="() => OnDisconnect.InvokeAsync(e.Id)"
                           @oncontextmenu:stopPropagation="true" @oncontextmenu:preventDefault="true"/>
                     <path d="@EdgePath(from.X, from.Y, to.X, to.Y)"
-                          class="edg-edge @(active ? "edg-edge-active" : "")"
-                          fill="none"/>
+                          style="stroke:@stroke; stroke-width:@(active ? "2.5" : "2")px; fill:none; pointer-events:none;"/>
 
                     @if (active)
                     {
                         double mx = (from.X + to.X) / 2, my = (from.Y + to.Y) / 2;
-                        <g class="edg-edge-del" transform="translate(@F(mx) @F(my))"
+                        <g transform="translate(@F(mx) @F(my))" style="cursor:pointer;"
                            @onpointerdown="() => OnDisconnect.InvokeAsync(e.Id)" @onpointerdown:stopPropagation="true">
-                            <circle r="9"/>
-                            <line x1="-3.5" y1="-3.5" x2="3.5" y2="3.5"/>
-                            <line x1="3.5" y1="-3.5" x2="-3.5" y2="3.5"/>
+                            <circle r="9" style="fill:var(--danger);"/>
+                            <line x1="-3.5" y1="-3.5" x2="3.5" y2="3.5" style="stroke:#fff; stroke-width:1.6px; stroke-linecap:round;"/>
+                            <line x1="3.5" y1="-3.5" x2="-3.5" y2="3.5" style="stroke:#fff; stroke-width:1.6px; stroke-linecap:round;"/>
                         </g>
                     }
                 }
@@ -62,7 +63,8 @@
                 @* Temp edge while dragging a new connection *@
                 @if (_ConnFrom is Guid connFrom && anchors.TryGetValue(connFrom, out PortAnchor src))
                 {
-                    <path d="@EdgePath(src.X, src.Y, _ConnX, _ConnY)" class="edg-edge edg-edge-temp" fill="none"/>
+                    <path d="@EdgePath(src.X, src.Y, _ConnX, _ConnY)"
+                          style="stroke:var(--accent); stroke-width:2.5px; stroke-dasharray:5 4; fill:none; pointer-events:none;"/>
                 }
             </svg>
 

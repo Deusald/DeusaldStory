@@ -77,43 +77,9 @@
 
 /* ── Edges ───────────────────────────────────────────────────────────────── */
 
-.edg-edges {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 10px;
-    height: 10px;
-    overflow: visible;
-    pointer-events: none;
-}
-
-.edg-edge {
-    stroke: var(--border-hover);
-    stroke-width: 2;
-    transition: stroke var(--dur) var(--ease);
-}
-.edg-edge-active {
-    stroke: var(--accent);
-    stroke-width: 2.5;
-}
-.edg-edge-temp {
-    stroke: var(--accent);
-    stroke-width: 2.5;
-    stroke-dasharray: 5 4;
-}
-
-/* Wide invisible path so thin edges are still easy to click / right-click. */
-.edg-edge-hit {
-    stroke: transparent;
-    stroke-width: 14;
-    pointer-events: stroke;
-    cursor: pointer;
-}
-
-/* Delete affordance at the midpoint of the selected edge. */
-.edg-edge-del { cursor: pointer; pointer-events: auto; }
-.edg-edge-del circle { fill: var(--danger); }
-.edg-edge-del line   { stroke: #fff; stroke-width: 1.6; stroke-linecap: round; }
+/* NOTE: the edge <svg> and its <path>/<g> children are styled INLINE in EditorGraph.razor.
+   Blazor CSS isolation does not tag SVG child elements with the scope attribute, so scoped
+   rules here would silently fail to apply (the wires would render with no stroke). */
 
 /* ── Node card ───────────────────────────────────────────────────────────── */
 
