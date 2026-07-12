@@ -1,0 +1,62 @@
+@namespace DeusaldStoryWeb.Components.Common
+
+@* ─────────────────────────────────────────────────────────────────────────
+   Left tool rail. Placeholder navigation matching the design mock — the
+   panels these switch between do not exist yet, so clicking only sets the
+   active tool. Wire each to real editor panels as they land.
+   ───────────────────────────────────────────────────────────────────────── *@
+
+<div class="edr-root">
+
+    @* ── Primary: story graph ────────────────────────────────────────── *@
+    <button class="edr-btn edr-primary @(_Active == Tool.Graph ? "active" : "")"
+            title="Story graph" @onclick="() => Select(Tool.Graph)">
+        <i class="bi bi-bezier2"></i>
+    </button>
+
+    <div class="edr-sep"></div>
+
+    @* ── Tools ───────────────────────────────────────────────────────── *@
+    @foreach ((Tool tool, string icon, string label) in _Tools)
+    {
+        Tool t = tool;
+        <button class="edr-btn @(_Active == t ? "active" : "")"
+                title="@label" @onclick="() => Select(t)">
+            <i class="bi @icon"></i>
+        </button>
+    }
+
+    <div class="edr-spacer"></div>
+
+    @* ── Bottom: diagnostics + history ───────────────────────────────── *@
+    <button class="edr-btn @(_Active == Tool.Problems ? "active" : "")"
+            title="Problems" @onclick="() => Select(Tool.Problems)">
+        <i class="bi bi-exclamation-triangle"></i>
+    </button>
+    <button class="edr-btn @(_Active == Tool.History ? "active" : "")"
+            title="History" @onclick="() => Select(Tool.History)">
+        <i class="bi bi-clock-history"></i>
+    </button>
+
+</div>
+
+@code {
+    private enum Tool { Graph, Connections, Outline, Flow, Localization, Variables, Blocks, Media, Preview, Problems, History }
+
+    private Tool _Active = Tool.Graph;
+
+    // Middle tool stack (order mirrors the mock).
+    private static readonly (Tool Tool, string Icon, string Label)[] _Tools =
+    [
+        (Tool.Connections,  "bi-share",       "Connections"),
+        (Tool.Outline,      "bi-list-ul",     "Outline"),
+        (Tool.Flow,         "bi-play",        "Flow"),
+        (Tool.Localization, "bi-globe",       "Localization"),
+        (Tool.Variables,    "bi-braces",      "Variables"),
+        (Tool.Blocks,       "bi-grid",        "Blocks"),
+        (Tool.Media,        "bi-image",       "Media"),
+        (Tool.Preview,      "bi-play-circle", "Preview")
+    ];
+
+    private void Select(Tool tool) => _Active = tool;
+}

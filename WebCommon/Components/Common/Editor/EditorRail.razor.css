@@ -1,0 +1,55 @@
+.edr-root {
+    flex: none;
+    width: 52px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 0;
+    background: var(--surface-0);
+    border-right: 1px solid var(--border-subtle);
+}
+
+.edr-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    flex-shrink: 0;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: var(--r-sm);
+    color: var(--text-dim);
+    font-size: 16px;
+    cursor: pointer;
+    transition: background var(--dur) var(--ease), color var(--dur) var(--ease), border-color var(--dur) var(--ease);
+}
+.edr-btn:hover {
+    background: var(--surface-3);
+    border-color: var(--border-strong);
+    color: var(--text-soft);
+}
+.edr-btn.active {
+    background: var(--accent-soft);
+    border-color: transparent;
+    color: var(--accent);
+}
+
+/* Primary graph tool — solid accent when active. */
+.edr-primary.active {
+    background: var(--accent);
+    color: var(--accent-ink);
+    box-shadow: var(--shadow-accent);
+}
+
+.edr-sep {
+    width: 24px;
+    height: 1px;
+    margin: 4px 0;
+    background: var(--border-subtle);
+}
+
+.edr-spacer {
+    flex: 1;
+}
