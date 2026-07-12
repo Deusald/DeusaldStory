@@ -71,6 +71,11 @@
     position: absolute;
     top: 0;
     left: 0;
+    /* Explicit size (not 0×0): an absolutely-positioned <svg> child clamps its rendered width to the
+       parent's width, so a zero-width world collapses the edge layer and no wires paint. Must be >= the
+       edge <svg> size (8000, see EditorGraph.razor). Overflow stays visible so nodes/edges outside it show. */
+    width: 8000px;
+    height: 8000px;
     transform-origin: 0 0;
     will-change: transform;
 }

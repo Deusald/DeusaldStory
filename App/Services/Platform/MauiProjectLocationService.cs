@@ -11,9 +11,18 @@ namespace App;
 [UsedImplicitly]
 public sealed class MauiProjectLocationService : IProjectLocationService
 {
-    public async Task<string?> PickSaveLocationAsync()
+    public async Task<string?> PickSaveLocationAsync(string projectSlug)
     {
         FolderPickerResult result = await FolderPicker.Default.PickAsync();
-        return result.IsSuccessful ? result.Folder.Path : null;
+        if (!result.IsSuccessful) return null;
+
+        // Save the project into its own sub-folder named after the slug, created inside the picked folder.
+        string slug = string.IsNullOrWhiteSpace(projectSlug) ? "project" : projectSlug.Trim();
+        foreach (char invalid in Path.GetInvalidFileNameChars())
+            slug = slug.Replace(invalid, '-');
+
+        string target = Path.Combine(result.Folder.Path, slug);
+        Directory.CreateDirectory(target);
+        return target;
     }
 }

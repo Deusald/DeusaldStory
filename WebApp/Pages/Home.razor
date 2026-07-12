@@ -61,6 +61,14 @@
                         <span>Import .zip…</span>
                     }
                 </button>
+
+                @* TEMP DEBUG — spins up a throwaway test project (Start/End + a logic node + a container)
+                   so the editor can be exercised in the browser without the localization-picker flow.
+                   Remove before shipping. *@
+                <button class="home-btn home-btn-secondary" style="border-style:dashed;" @onclick="CreateDebugProject" disabled="@_IsBusy">
+                    <span class="home-btn-icon"><i class="bi bi-bug"></i></span>
+                    <span>Debug: test project</span>
+                </button>
             </div>
 
             <div class="home-version">
@@ -326,6 +334,31 @@
     private async Task OnNewProjectConfirmed(NewProjectModal.NewProjectArgs args)
     {
         await _ProjectState.CreateNewProjectAsync(args.Name, args.Slug, args.Description, args.LocalizationReference);
+        _Nav.NavigateTo("/editor");
+    }
+
+    // TEMP DEBUG — remove before shipping. Creates an in-memory test project (no localization link) with a
+    // logic node and a container in the root, then jumps straight into the editor to try wiring/drill-down.
+    private async Task CreateDebugProject()
+    {
+        await _ProjectState.CreateNewProjectAsync("Debug Test", "debug-test", "Throwaway test project", "");
+
+        StoryProject project = _ProjectState.CurrentProject!;
+        Guid root = project.Metadata.RootStoryContainerNodeId;
+
+        StoryLogicNode logic = _ProjectState.AddLogicNode(root, "Say hello", "A test logic node",
+            new StoryConnectionPoint { Name = "In" },
+            new[] { new StoryConnectionPoint { Name = "Out" } }, 340, 120);
+        StoryContainerNode container = _ProjectState.AddContainerNode(root, "Test Container", "A nested container",
+            new[] { new StoryConnectionPoint { Name = "In" } },
+            new[] { new StoryConnectionPoint { Name = "Out" } }, 340, 340);
+
+        // Pre-wire Start → logic → container → End so edges are visible immediately.
+        StoryContainerNode rootNode = project.ContainerNodes[root];
+        _ProjectState.Connect(root, rootNode.EntryPoints[0].Id, logic.EntryPoint.Id);
+        _ProjectState.Connect(root, logic.ExitPoints[0].Id, container.EntryPoints[0].Id);
+        _ProjectState.Connect(root, container.ExitPoints[0].Id, rootNode.ExitPoints[0].Id);
+
         _Nav.NavigateTo("/editor");
     }
 

@@ -15,6 +15,7 @@ public sealed class WebProjectLocationService : IProjectLocationService
     /// </summary>
     public const string LocationPrefix = "story:";
 
-    public Task<string?> PickSaveLocationAsync() =>
+    // The slug is unused on the web: each project gets a unique IndexedDB namespace, not a folder path.
+    public Task<string?> PickSaveLocationAsync(string projectSlug) =>
         Task.FromResult<string?>(LocationPrefix + Guid.NewGuid().ToString("N"));
 }
