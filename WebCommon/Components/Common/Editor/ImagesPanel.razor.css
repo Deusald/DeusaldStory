@@ -115,12 +115,17 @@
     transition: filter var(--dur) var(--ease);
 }
 .imp-upload:hover { filter: brightness(1.15); }
-.imp-file {
+/* InputFile is a child component, so its native <input> escapes CSS isolation —
+   reach it with ::deep and hide it; the label is the visible, styled trigger. */
+.imp-upload ::deep .imp-file {
     position: absolute;
     width: 1px;
     height: 1px;
-    opacity: 0;
-    pointer-events: none;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    border: 0;
 }
 
 /* ── Grid of image cards ──────────────────────────────────────────────────── */
