@@ -234,6 +234,12 @@
 }
 .edg-port:hover { transform: translate(-50%, -50%) scale(1.25); }
 
+/* While a wire is being dragged, input ports advertise themselves as drop targets. */
+.edg-port-target {
+    box-shadow: 0 0 0 3px var(--accent-soft);
+    transform: translate(-50%, -50%) scale(1.15);
+}
+
 .edg-port-label {
     position: absolute;
     top: -7px;

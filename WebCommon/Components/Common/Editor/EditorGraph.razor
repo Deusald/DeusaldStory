@@ -101,9 +101,9 @@
                     {
                         EdPort port = n.Inputs[i];
                         <div class="edg-port-anchor edg-port-in" style="top:@F(PortCenterY(n, i))px;">
-                            <span class="edg-port" style="background:@color"
-                                  @onpointerdown:stopPropagation="true"
-                                  @onpointerup="() => CompleteConnect(port.Id)" @onpointerup:stopPropagation="true"></span>
+                            <span class="edg-port @(_ConnFrom is not null ? "edg-port-target" : "")"
+                                  style="background:@color"
+                                  @onpointerdown:stopPropagation="true"></span>
                             @if (ShowPortLabels(n) && !string.IsNullOrEmpty(port.Name))
                             {
                                 <span class="edg-port-label">@port.Name</span>
@@ -176,9 +176,10 @@
     private const double PORTS_GAP    = 14;  // space between the header block and the first port
     private const double PORT_SLOT    = 24;  // vertical pitch of a port row
     private const double PORTS_BOTTOM = 14;  // padding below the last port
+    private const double SNAP_RADIUS  = 60;  // how close a drop must land to an input port to wire it
 
     /// <summary>A resolved connection-point position in world coordinates, keyed by point id.</summary>
-    private readonly record struct PortAnchor(double X, double Y, bool IsOutput);
+    private readonly record struct PortAnchor(Guid NodeId, double X, double Y, bool IsOutput);
 
     private double _Scale = 1;
     private double _PanX  = 24;
@@ -191,8 +192,9 @@
     private double  _LastClientY;
 
     private Guid?  _SelectedEdgeId;
-    private Guid?  _ConnFrom; // output point currently being dragged from
-    private double _ConnX;    // temp-edge end, world coordinates
+    private Guid?  _ConnFrom;  // output point currently being dragged from
+    private bool   _ConnMoved; // the drag actually moved (guards against a bare click auto-wiring)
+    private double _ConnX;     // temp-edge end, world coordinates
     private double _ConnY;
 
     private Dictionary<Guid, PortAnchor> _Anchors = new();
@@ -215,9 +217,9 @@
         foreach (EdNode n in Nodes)
         {
             for (int i = 0; i < n.Inputs.Count; ++i)
-                anchors[n.Inputs[i].Id] = new PortAnchor(n.X, n.Y + PortCenterY(n, i), false);
+                anchors[n.Inputs[i].Id] = new PortAnchor(n.Id, n.X, n.Y + PortCenterY(n, i), false);
             for (int i = 0; i < n.Outputs.Count; ++i)
-                anchors[n.Outputs[i].Id] = new PortAnchor(n.X + NODE_W, n.Y + PortCenterY(n, i), true);
+                anchors[n.Outputs[i].Id] = new PortAnchor(n.Id, n.X + NODE_W, n.Y + PortCenterY(n, i), true);
         }
         return anchors;
     }
@@ -265,8 +267,9 @@
     {
         if (_ConnFrom is not null)
         {
-            _ConnX += (e.ClientX - _LastClientX) / _Scale;
-            _ConnY += (e.ClientY - _LastClientY) / _Scale;
+            _ConnX     += (e.ClientX - _LastClientX) / _Scale;
+            _ConnY     += (e.ClientY - _LastClientY) / _Scale;
+            _ConnMoved  = true;
         }
         else if (_DragNode is not null)
         {
@@ -293,10 +296,15 @@
         if (_DragNode is not null && _DragMoved)
             await OnNodeMoved.InvokeAsync(_DragNode);
 
-        _Panning   = false;
-        _DragNode  = null;
-        _DragMoved = false;
-        _ConnFrom  = null; // released away from an input port — cancel the pending wire
+        // Drop a pending wire onto the nearest input port under the cursor (forgiving — no pixel-perfect hit needed).
+        if (_ConnFrom is Guid from && _ConnMoved && NearestInputPoint(from) is Guid to)
+            await OnConnect.InvokeAsync(new EdConnectRequest(from, to));
+
+        _Panning    = false;
+        _DragNode   = null;
+        _DragMoved  = false;
+        _ConnFrom   = null;
+        _ConnMoved  = false;
     }
 
     private void OnWheel(WheelEventArgs e)
@@ -310,6 +318,7 @@
     private void StartConnect(PointerEventArgs e, Guid fromPoint)
     {
         _ConnFrom       = fromPoint;
+        _ConnMoved      = false;
         _SelectedEdgeId = null;
         if (_Anchors.TryGetValue(fromPoint, out PortAnchor a))
         {
@@ -320,11 +329,28 @@
         _LastClientY = e.ClientY;
     }
 
-    private async Task CompleteConnect(Guid toPoint)
+    /// <summary>
+    /// The input port nearest the current drag point (<see cref="_ConnX"/>/<see cref="_ConnY"/>), within
+    /// <see cref="SNAP_RADIUS"/> and not on the source node. Null when the drop lands away from any input.
+    /// </summary>
+    private Guid? NearestInputPoint(Guid fromPoint)
     {
-        if (_ConnFrom is Guid from && from != toPoint)
-            await OnConnect.InvokeAsync(new EdConnectRequest(from, toPoint));
-        _ConnFrom = null;
+        Guid    sourceNode = _Anchors.TryGetValue(fromPoint, out PortAnchor src) ? src.NodeId : Guid.Empty;
+        Guid?   best       = null;
+        double  bestDist   = SNAP_RADIUS * SNAP_RADIUS;
+
+        foreach ((Guid pointId, PortAnchor a) in _Anchors)
+        {
+            if (a.IsOutput || a.NodeId == sourceNode) continue;
+            double dx = a.X - _ConnX, dy = a.Y - _ConnY;
+            double d2 = dx * dx + dy * dy;
+            if (d2 <= bestDist)
+            {
+                bestDist = d2;
+                best     = pointId;
+            }
+        }
+        return best;
     }
 
     private void SelectEdge(Guid edgeId) => _SelectedEdgeId = edgeId;
