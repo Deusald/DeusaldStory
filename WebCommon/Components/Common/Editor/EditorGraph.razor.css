@@ -143,6 +143,10 @@
     max-height: 46px;
     image-rendering: pixelated;
     border-radius: 4px;
+    /* Let the pointerdown fall through to the node card so the icon is a drag handle too. */
+    pointer-events: none;
+    -webkit-user-drag: none;
+    user-select: none;
 }
 
 .edg-node-lock {
