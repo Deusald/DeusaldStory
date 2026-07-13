@@ -15,6 +15,9 @@ namespace DeusaldStoryCommon
     [PublicAPI]
     public static class StoryLogicRenderer
     {
+        /// <summary>Shared empty value map for flow-only walks (e.g. <see cref="ReachedExits"/>) that don't render text.</summary>
+        private static readonly Dictionary<Guid, string> _EmptyValues = new();
+
         /// <summary>A logic node resolved to display text/icon for one combination of variable values.</summary>
         public sealed class RenderedLogic
         {
@@ -49,7 +52,7 @@ namespace DeusaldStoryCommon
             StoryProject project, LocProject? localization, StoryLogicNode logic,
             IReadOnlyDictionary<Guid, string> values, bool paper, StoryRenderTarget target = StoryRenderTarget.App)
         {
-            WalkSpine(project, localization, logic, values, target, out List<string> blocks, out List<RenderedChoice> choices);
+            WalkSpine(project, localization, logic, values, target, out List<string> blocks, out List<RenderedChoice> choices, out _);
             return new RenderedLogic
             {
                 Title        = ResolveText(project, localization, logic, values, FromPointInto(logic, logic.TitleIn.Id),    target, 0),
@@ -66,8 +69,22 @@ namespace DeusaldStoryCommon
             StoryProject project, LocProject? localization, StoryLogicNode logic,
             IReadOnlyDictionary<Guid, string> values, StoryRenderTarget target = StoryRenderTarget.App)
         {
-            WalkSpine(project, localization, logic, values, target, out _, out List<RenderedChoice> choices);
+            WalkSpine(project, localization, logic, values, target, out _, out List<RenderedChoice> choices, out _);
             return choices;
+        }
+
+        /// <summary>
+        /// The exit point(s) the flow spine flows into for <paramref name="target"/>: a linear spine reaches exactly
+        /// one exit, and an App/Gamebook flow splitter routes each medium to its own — so the App preview and the
+        /// Gamebook only offer the continuations their medium actually flows into. Empty when the spine ends in a
+        /// Choice (whose options carry their own exits), at an unconnected flow-splitter branch, or a dead end.
+        /// Meaningful only for <see cref="StoryLogicExitMode.SeparatePaths"/> nodes; in SingleSelection mode the exits
+        /// are Selection labels the spine never flows into (flow leaves through the single Selection flow-out instead).
+        /// </summary>
+        public static List<Guid> ReachedExits(StoryProject project, StoryLogicNode logic, StoryRenderTarget target = StoryRenderTarget.App)
+        {
+            WalkSpine(project, null, logic, _EmptyValues, target, out _, out _, out List<Guid> reached);
+            return reached;
         }
 
         // ── Flow-spine walk ──────────────────────────────────────────────────────
@@ -80,10 +97,12 @@ namespace DeusaldStoryCommon
         /// </summary>
         private static void WalkSpine(
             StoryProject project, LocProject? localization, StoryLogicNode logic, IReadOnlyDictionary<Guid, string> values,
-            StoryRenderTarget renderTarget, out List<string> blocks, out List<RenderedChoice> choices)
+            StoryRenderTarget renderTarget, out List<string> blocks, out List<RenderedChoice> choices, out List<Guid> reachedExits)
         {
-            blocks  = new();
-            choices = new();
+            blocks       = new();
+            choices      = new();
+            reachedExits = new();
+            HashSet<Guid> exitIds = new(logic.ExitPoints.Select(e => e.Id));
             Guid target = FlowTargetOf(logic, logic.EntryPoint.Id);
 
             for (int guard = 0; guard < 256; ++guard)
@@ -114,7 +133,10 @@ namespace DeusaldStoryCommon
                 else if (logic.UnregisterVariableNodes.Find(n => n.FlowIn.Id == target) is StoryUnregisterVariableNode unreg)
                     target = FlowTargetOf(logic, unreg.FlowOut.Id);
                 else
+                {
+                    if (exitIds.Contains(target)) reachedExits.Add(target); // the spine flowed into one of the node's exits
                     break; // reached an Exit or a leaf input
+                }
             }
         }
 

@@ -117,8 +117,14 @@ namespace DeusaldStoryCommon
 
             List<ContinueLine> lines = new();
 
+            // Only the exits the Gamebook flow actually reaches — a node whose App/Gamebook flow splitter routes the
+            // two mediums to different exits must not print the App-only exit's continuation here.
+            List<Guid> reached = StoryLogicRenderer.ReachedExits(project, logic, StoryRenderTarget.Gamebook);
+
             foreach (StoryConnectionPoint exit in logic.ExitPoints)
             {
+                if (!reached.Contains(exit.Id)) continue;
+
                 StoryFlowNavigator.NextLogicResult next = StoryFlowNavigator.ResolveNextLogic(project, exit.Id);
 
                 switch (next.Kind)
