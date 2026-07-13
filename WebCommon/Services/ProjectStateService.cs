@@ -196,6 +196,49 @@ public class ProjectStateService(
     }
 
     /// <summary>
+    /// Moves a logic or container node out of <paramref name="fromContainerId"/> and into
+    /// <paramref name="toContainerId"/>: drops it from the old parent's child list (and any connections in the old
+    /// container that touched its boundary ports), adds it to the new parent, repoints its <c>ParentContainer</c>,
+    /// and places it at (<paramref name="x"/>, <paramref name="y"/>) on the new container's canvas. No-op when the
+    /// two containers are the same, either container is unknown, or the node is neither a logic nor a container node.
+    /// </summary>
+    public void ReparentNode(Guid fromContainerId, Guid nodeId, Guid toContainerId, double x, double y)
+    {
+        if (fromContainerId == toContainerId) return;
+        if (!CurrentProject!.ContainerNodes.TryGetValue(fromContainerId, out StoryContainerNode? from)) return;
+        if (!CurrentProject.ContainerNodes.TryGetValue(toContainerId, out StoryContainerNode? to)) return;
+
+        if (CurrentProject.LogicNodes.TryGetValue(nodeId, out StoryLogicNode? logic))
+        {
+            List<Guid> boundaryPoints = [logic.EntryPoint.Id, .. logic.ExitPoints.Select(p => p.Id)];
+            from.Logic.Remove(nodeId);
+            to.Logic.Add(nodeId);
+            logic.ParentContainer = toContainerId;
+            logic.X               = x;
+            logic.Y               = y;
+            RemoveConnectionsFor(fromContainerId, boundaryPoints);
+        }
+        else if (CurrentProject.ContainerNodes.TryGetValue(nodeId, out StoryContainerNode? child))
+        {
+            List<Guid> boundaryPoints = [.. child.EntryPoints.Select(p => p.Id), .. child.ExitPoints.Select(p => p.Id)];
+            from.Containers.Remove(nodeId);
+            to.Containers.Add(nodeId);
+            child.ParentContainer = toContainerId;
+            child.X               = x;
+            child.Y               = y;
+            RemoveConnectionsFor(fromContainerId, boundaryPoints);
+        }
+        else
+        {
+            return;
+        }
+
+        MarkKeyDirty(nodeId);
+        MarkKeyDirty(fromContainerId);
+        MarkKeyDirty(toContainerId);
+    }
+
+    /// <summary>
     /// Adds a new portal "pair" (orange) to <paramref name="parentContainerId"/>: one <b>portal in</b> placed at
     /// (<paramref name="x"/>, <paramref name="y"/>) and its paired <b>portal out</b> offset to the right. Flow that
     /// reaches any portal in teleports to the portal out. Marks it dirty and returns the created portal.

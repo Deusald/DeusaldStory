@@ -107,6 +107,12 @@
     box-shadow: 0 0 0 1px var(--accent), var(--shadow-accent);
 }
 
+/* Container currently under a dragged node — signals it will receive the node on drop. */
+.edg-node-drop {
+    border-color: var(--info);
+    box-shadow: 0 0 0 2px var(--info);
+}
+
 /* Kind-tinted left accent so node types are readable at a glance. */
 .edg-node-entry     { border-left: 3px solid var(--success); }
 .edg-node-exit      { border-left: 3px solid var(--danger); }

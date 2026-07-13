@@ -185,6 +185,12 @@
                     <i class="bi bi-box-arrow-in-right"></i> Add portal in
                 </button>
             }
+            @if (CanMoveToParent && menu.Kind is StoryNodeKind.Logic or StoryNodeKind.Container)
+            {
+                <button class="edg-menu-item" @onclick="() => MenuInvoke(OnNodeMoveToParent, menu)">
+                    <i class="bi bi-box-arrow-up-left"></i> Move to parent
+                </button>
+            }
             @if (menu.Editable || menu.Kind is StoryNodeKind.PortalIn or StoryNodeKind.PortalOut)
             {
                 <div class="edg-menu-sep"></div>
@@ -210,6 +216,11 @@
     [Parameter] public EventCallback<EdNode>     OnNodeEdit          { get; set; }
     [Parameter] public EventCallback<EdNode>     OnNodeDelete        { get; set; }
     [Parameter] public EventCallback<EdNode>     OnNodeAddPortalIn   { get; set; }
+    [Parameter] public EventCallback<EdNodeReparent> OnNodeReparent  { get; set; }
+    [Parameter] public EventCallback<EdNode>     OnNodeMoveToParent  { get; set; }
+
+    /// <summary>Whether the current graph's nodes can be pushed up a level (false in the Root container).</summary>
+    [Parameter] public bool CanMoveToParent { get; set; }
 
     // ── Node layout constants (must match the absolute positions in EditorGraph.razor.css) ──
     private const double NODE_W       = 216; // fixed card width
@@ -236,6 +247,7 @@
     private bool    _Panning;
     private EdNode? _DragNode;
     private bool    _DragMoved;
+    private Guid?   _DropTargetId; // container the dragged (logic/container) node currently hovers over
     private double  _LastClientX;
     private double  _LastClientY;
 
@@ -299,7 +311,27 @@
             StoryNodeKind.FlowText         => "edg-node-flowtext",
             _                                          => ""
         };
-        return $"{kind} {(n.Id == SelectedId ? "edg-node-sel" : "")}";
+        string sel  = n.Id == SelectedId     ? "edg-node-sel"  : "";
+        string drop = n.Id == _DropTargetId  ? "edg-node-drop" : "";
+        return $"{kind} {sel} {drop}";
+    }
+
+    // ── Reparent (drop a logic/container node onto a container) ───────────────
+
+    private static bool IsReparentable(EdNode n) => n.Kind is StoryNodeKind.Logic or StoryNodeKind.Container;
+
+    /// <summary>The container node whose card the dragged node's centre overlaps (never itself), or null.</summary>
+    private Guid? ContainerUnder(EdNode dragged)
+    {
+        double cx = dragged.X + NODE_W / 2;
+        double cy = dragged.Y + NodeHeight(dragged) / 2;
+        foreach (EdNode n in Nodes)
+        {
+            if (n.Kind != StoryNodeKind.Container || n.Id == dragged.Id) continue;
+            if (cx >= n.X && cx <= n.X + NODE_W && cy >= n.Y && cy <= n.Y + NodeHeight(n))
+                return n.Id;
+        }
+        return null;
     }
 
     private static bool ShowPortLabels(EdNode n) =>
@@ -350,6 +382,8 @@
             _DragNode.X += (e.ClientX - _LastClientX) / _Scale;
             _DragNode.Y += (e.ClientY - _LastClientY) / _Scale;
             _DragMoved   = true;
+            // Highlight the container the node would drop into, so reparenting is discoverable mid-drag.
+            _DropTargetId = IsReparentable(_DragNode) ? ContainerUnder(_DragNode) : null;
         }
         else if (_Panning)
         {
@@ -368,17 +402,24 @@
     private async Task CanvasUp(PointerEventArgs e)
     {
         if (_DragNode is not null && _DragMoved)
-            await OnNodeMoved.InvokeAsync(_DragNode);
+        {
+            // Dropping a logic/container node onto another container reparents it; otherwise it's a plain move.
+            if (IsReparentable(_DragNode) && ContainerUnder(_DragNode) is Guid target)
+                await OnNodeReparent.InvokeAsync(new EdNodeReparent(_DragNode.Id, target));
+            else
+                await OnNodeMoved.InvokeAsync(_DragNode);
+        }
 
         // Drop a pending wire onto the nearest input port under the cursor (forgiving — no pixel-perfect hit needed).
         if (_ConnFrom is Guid from && _ConnMoved && NearestInputPoint(from) is Guid to)
             await OnConnect.InvokeAsync(new EdConnectRequest(from, to));
 
-        _Panning    = false;
-        _DragNode   = null;
-        _DragMoved  = false;
-        _ConnFrom   = null;
-        _ConnMoved  = false;
+        _Panning      = false;
+        _DragNode     = null;
+        _DragMoved    = false;
+        _DropTargetId = null;
+        _ConnFrom     = null;
+        _ConnMoved    = false;
     }
 
     private void OnWheel(WheelEventArgs e)

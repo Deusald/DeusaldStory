@@ -117,6 +117,12 @@ namespace DeusaldStoryWeb
     /// <summary>A user request to wire an output port to an input port, raised by the graph on drop.</summary>
     public readonly record struct EdConnectRequest(Guid FromPoint, Guid ToPoint);
 
+    /// <summary>
+    /// A user request to move a node (a logic or container node) into a container, raised by the graph when the
+    /// node is dropped onto that container's card. <see cref="TargetContainerId"/> is the drop-target container.
+    /// </summary>
+    public readonly record struct EdNodeReparent(Guid NodeId, Guid TargetContainerId);
+
     /// <summary>Projects a persisted story container into the editor's canvas view models.</summary>
     public static class EditorProjection
     {

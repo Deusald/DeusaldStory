@@ -54,7 +54,10 @@
                                  OnCanvasContextMenu="OnCanvasContextMenu"
                                  OnNodeEdit="OnNodeEdit"
                                  OnNodeDelete="OnNodeDelete"
-                                 OnNodeAddPortalIn="OnNodeAddPortalIn"/>
+                                 OnNodeAddPortalIn="OnNodeAddPortalIn"
+                                 OnNodeReparent="OnNodeReparent"
+                                 OnNodeMoveToParent="OnNodeMoveToParent"
+                                 CanMoveToParent="@(!_InLogic && !IsRootContainer)"/>
                 }
                 else if (_Mode == EditorMode.Preview && _CurrentLogicNode is StoryLogicNode previewLogic)
                 {
@@ -500,6 +503,41 @@
         if (node.Kind is not (StoryNodeKind.PortalIn or StoryNodeKind.PortalOut)) return;
         _ProjectState.AddPortalIn(node.Id);
         RebuildNodes();
+    }
+
+    // ── Reparent (drag onto a container / push up to parent) ────────────────
+
+    /// <summary>A logic/container node was dropped onto a container — move it inside that container.</summary>
+    private void OnNodeReparent(EdNodeReparent request)
+    {
+        if (!Project.ContainerNodes.TryGetValue(request.TargetContainerId, out StoryContainerNode? target)) return;
+        (double x, double y) = DropSpot(target);
+        _ProjectState.ReparentNode(_CurrentId, request.NodeId, request.TargetContainerId, x, y);
+
+        // The node has left this graph — drop the selection so the inspector doesn't dangle.
+        if (_SelectedId == request.NodeId) _SelectedId = Guid.Empty;
+        RebuildNodes();
+    }
+
+    /// <summary>"Move to parent" — push a logic/container node up one level (never above the Root).</summary>
+    private void OnNodeMoveToParent(EdNode node)
+    {
+        if (IsRootContainer) return;
+        if (!Project.ContainerNodes.TryGetValue(_CurrentId, out StoryContainerNode? current)) return;
+        if (!Project.ContainerNodes.TryGetValue(current.ParentContainer, out StoryContainerNode? parent)) return;
+
+        (double x, double y) = DropSpot(parent);
+        _ProjectState.ReparentNode(_CurrentId, node.Id, parent.Id, x, y);
+
+        if (_SelectedId == node.Id) _SelectedId = Guid.Empty;
+        RebuildNodes();
+    }
+
+    /// <summary>A staggered canvas position for a node arriving in <paramref name="container"/>, so drops don't stack.</summary>
+    private static (double X, double Y) DropSpot(StoryContainerNode container)
+    {
+        int count = container.Containers.Count + container.Logic.Count;
+        return (320 + count % 6 * 30, 140 + count % 6 * 26);
     }
 
     // ── Persist a drag ─────────────────────────────────────────────────────
