@@ -812,6 +812,45 @@ public class ProjectStateService(
         MarkKeyDirty(logicId);
     }
 
+    /// <summary>Adds a Condition node (branches the flow spine True/False by testing a variable) to a logic node's inner graph.</summary>
+    public StoryConditionNode? AddConditionNode(Guid logicId, double x, double y)
+    {
+        if (!CurrentProject!.LogicNodes.TryGetValue(logicId, out StoryLogicNode? logic)) return null;
+
+        StoryConditionNode node = new() { X = x, Y = y };
+        logic.ConditionNodes.Add(node);
+        MarkKeyDirty(logicId);
+        return node;
+    }
+
+    /// <summary>Updates a Condition node's operator and compare value.</summary>
+    public void UpdateConditionNode(Guid logicId, Guid nodeId, StoryConditionOperator op, string compareValue)
+    {
+        if (!CurrentProject!.LogicNodes.TryGetValue(logicId, out StoryLogicNode? logic)) return;
+        StoryConditionNode? node = logic.ConditionNodes.Find(n => n.Id == nodeId);
+        if (node is null) return;
+
+        node.Operator     = op;
+        node.CompareValue = compareValue;
+        MarkKeyDirty(logicId);
+    }
+
+    /// <summary>Deletes a Condition node and any inner wire that touched its flow / variable ports.</summary>
+    public void DeleteConditionNode(Guid logicId, Guid nodeId)
+    {
+        if (!CurrentProject!.LogicNodes.TryGetValue(logicId, out StoryLogicNode? logic)) return;
+        StoryConditionNode? node = logic.ConditionNodes.Find(n => n.Id == nodeId);
+        if (node is null) return;
+
+        logic.ConditionNodes.Remove(node);
+        logic.ContentConnections.RemoveAll(c =>
+            c.FromPoint == node.FlowIn.Id     || c.ToPoint == node.FlowIn.Id     ||
+            c.ToPoint   == node.VariableIn.Id ||
+            c.FromPoint == node.FlowTrue.Id   || c.ToPoint == node.FlowTrue.Id   ||
+            c.FromPoint == node.FlowFalse.Id  || c.ToPoint == node.FlowFalse.Id);
+        MarkKeyDirty(logicId);
+    }
+
     /// <summary>Sets which registered storage variables are released when the story reaches The End (edited on the End node).</summary>
     public void SetEndUnregister(IEnumerable<Guid> registeredVariableIds)
     {
@@ -1002,6 +1041,15 @@ public class ProjectStateService(
         {
             flowSplit.X = x;
             flowSplit.Y = y;
+            MarkKeyDirty(logicId);
+            return;
+        }
+
+        StoryConditionNode? condition = logic.ConditionNodes.Find(n => n.Id == movedId);
+        if (condition is not null)
+        {
+            condition.X = x;
+            condition.Y = y;
             MarkKeyDirty(logicId);
         }
     }

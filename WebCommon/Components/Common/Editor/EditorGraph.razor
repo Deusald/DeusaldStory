@@ -343,7 +343,10 @@
                or StoryNodeKind.LogicEntry or StoryNodeKind.LogicExit
                or StoryNodeKind.LightDarkSwitch or StoryNodeKind.SmartFormat
                or StoryNodeKind.FlowText or StoryNodeKind.Choice
-               or StoryNodeKind.AppGamebookTextSplitter or StoryNodeKind.AppGamebookFlowSplitter;
+               or StoryNodeKind.AppGamebookTextSplitter or StoryNodeKind.AppGamebookFlowSplitter
+               or StoryNodeKind.RegisterVariable or StoryNodeKind.SetVariable
+               or StoryNodeKind.UnregisterVariable or StoryNodeKind.SetExternalVariable
+               or StoryNodeKind.Condition;
 
     /// <summary>
     /// True when a wire is being dragged and this input port is a valid drop target for its source: same signal type,
@@ -530,6 +533,7 @@
         StoryNodeKind.AppGamebookTextSplitter => "App/Gamebook text splitter",
         StoryNodeKind.AppGamebookFlowSplitter => "App/Gamebook flow splitter",
         StoryNodeKind.PrevExitVariable        => "selection variable",
+        StoryNodeKind.Condition               => "condition node",
         _                       => "node"
     };
 

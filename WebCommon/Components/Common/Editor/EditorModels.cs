@@ -71,7 +71,8 @@ namespace DeusaldStoryWeb
         Choice,             // inside a logic node: on the flow spine, offers the player a set of branches (one exit each) (accent)
         AppGamebookTextSplitter, // inside a logic node: emits one of two texts depending on the render target (App/Gamebook) (purple)
         AppGamebookFlowSplitter, // inside a logic node: on the flow spine, routes flow by the render target (App/Gamebook) (amber)
-        PrevExitVariable         // inside a logic node: exposes the upstream node's Selection variable, optionally remapped (teal)
+        PrevExitVariable,        // inside a logic node: exposes the upstream node's Selection variable, optionally remapped (teal)
+        Condition                // inside a logic node: on the flow spine, branches flow True/False by testing a variable (info)
     }
 
     /// <summary>A point on the graph canvas in world (un-panned, un-scaled) coordinates.</summary>
@@ -601,8 +602,40 @@ namespace DeusaldStoryWeb
                 nodes.Add(node);
             }
 
+            // ── Condition nodes (info) — flow + variable inputs, two flow outputs (True/False) routed by the test. ──
+            foreach (StoryConditionNode cond in logic.ConditionNodes)
+            {
+                EdNode node = new()
+                {
+                    Id        = cond.Id,
+                    Kind      = StoryNodeKind.Condition,
+                    Title     = "Condition",
+                    Subtitle  = $"{ConditionSymbol(cond.Operator)} {(string.IsNullOrEmpty(cond.CompareValue) ? "?" : cond.CompareValue)}",
+                    X         = cond.X,
+                    Y         = cond.Y,
+                    Deletable = true
+                };
+                node.Inputs.Add(new EdPort  { Id = cond.FlowIn.Id,     Name = "Flow",     Type = PortType.Flow });
+                node.Inputs.Add(new EdPort  { Id = cond.VariableIn.Id, Name = "Variable", Type = PortType.Variable });
+                node.Outputs.Add(new EdPort { Id = cond.FlowTrue.Id,   Name = "True",     Type = PortType.Flow });
+                node.Outputs.Add(new EdPort { Id = cond.FlowFalse.Id,  Name = "False",    Type = PortType.Flow });
+                nodes.Add(node);
+            }
+
             return nodes;
         }
+
+        /// <summary>A compact symbol for a condition operator, used in a Condition node's subtitle.</summary>
+        public static string ConditionSymbol(StoryConditionOperator op) => op switch
+        {
+            StoryConditionOperator.Equal          => "=",
+            StoryConditionOperator.NotEqual       => "≠",
+            StoryConditionOperator.LessThan       => "<",
+            StoryConditionOperator.GreaterThan    => ">",
+            StoryConditionOperator.LessOrEqual    => "≤",
+            StoryConditionOperator.GreaterOrEqual => "≥",
+            _                                     => "?"
+        };
 
         /// <summary>
         /// Resolves the upstream exit points feeding <paramref name="logic"/>'s Exit Variable input: follows the
@@ -691,6 +724,7 @@ namespace DeusaldStoryWeb
             StoryNodeKind.AppGamebookTextSplitter => "APP / GAMEBOOK TEXT",
             StoryNodeKind.AppGamebookFlowSplitter => "APP / GAMEBOOK FLOW",
             StoryNodeKind.PrevExitVariable        => "PREV EXIT VARIABLE",
+            StoryNodeKind.Condition               => "CONDITION",
             _                       => ""
         };
 
@@ -720,6 +754,7 @@ namespace DeusaldStoryWeb
             StoryNodeKind.AppGamebookTextSplitter => "var(--purple)",
             StoryNodeKind.AppGamebookFlowSplitter => "var(--warning)",
             StoryNodeKind.PrevExitVariable        => "var(--code-func)",
+            StoryNodeKind.Condition               => "var(--info)",
             _                       => "var(--text-dim)"
         };
     }

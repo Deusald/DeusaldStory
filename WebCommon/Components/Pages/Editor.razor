@@ -141,6 +141,7 @@
 <UnregisterVariablePickerModal @ref="_UnregisterPicker"  OnConfirm="OnUnregisterPicked"/>
 <SetExternalVariableModal  @ref="_SetExternalVariableModal" OnConfirm="OnSetExternalVariableConfirmed"/>
 <NewChoiceNodeModal        @ref="_NewChoiceNodeModal"       OnConfirm="OnChoiceConfirmed"/>
+<NewConditionNodeModal     @ref="_NewConditionNodeModal"    OnConfirm="OnConditionConfirmed"/>
 <PrevExitVariableModal     @ref="_PrevExitVariableModal"    OnConfirm="OnPrevExitVariableConfirmed"/>
 
 @code {
@@ -163,6 +164,7 @@
     private UnregisterVariablePickerModal? _UnregisterPicker;
     private SetExternalVariableModal?  _SetExternalVariableModal;
     private NewChoiceNodeModal?        _NewChoiceNodeModal;
+    private NewConditionNodeModal?     _NewConditionNodeModal;
     private PrevExitVariableModal?     _PrevExitVariableModal;
 
     // Where the next created node is placed — the right-clicked canvas point (or a staggered default).
@@ -398,7 +400,8 @@
                 new NodePaletteItem(StoryNodeKind.SetExternalVariable, "bi-sliders",        "Set external variable", "On the flow spine — assigns a value to a story-wide external variable (App only; no Gamebook instruction)."),
                 new NodePaletteItem(StoryNodeKind.Choice,             "bi-signpost-split",  "Choice node",           "On the flow spine — offers the player a set of choices, each branching out to an exit."),
                 new NodePaletteItem(StoryNodeKind.AppGamebookTextSplitter, "bi-fonts",       "App/Gamebook text splitter", "Emits its App text when rendering the app and its Gamebook text when rendering the printed gamebook (either may be empty)."),
-                new NodePaletteItem(StoryNodeKind.AppGamebookFlowSplitter, "bi-signpost-2",  "App/Gamebook flow splitter", "On the flow spine — routes flow down its App branch for the app and its Gamebook branch for the printed gamebook.")
+                new NodePaletteItem(StoryNodeKind.AppGamebookFlowSplitter, "bi-signpost-2",  "App/Gamebook flow splitter", "On the flow spine — routes flow down its App branch for the app and its Gamebook branch for the printed gamebook."),
+                new NodePaletteItem(StoryNodeKind.Condition,              "bi-diamond",     "Condition node",             "On the flow spine — tests a connected variable and branches flow down its True or False output.")
             ]
             :
             [
@@ -452,6 +455,7 @@
                     _SelectedId = agf.Id;
                 RebuildNodes();
                 break;
+            case StoryNodeKind.Condition: _NewConditionNodeModal?.Show(); break;
         }
     }
 
@@ -612,6 +616,19 @@
         RebuildNodes();
     }
 
+    private void OnConditionConfirmed(NewConditionNodeModal.ConditionArgs args)
+    {
+        Guid nodeId = args.EditNodeId;
+        if (nodeId == Guid.Empty)
+        {
+            if (_ProjectState.AddConditionNode(_CurrentId, _PendingX, _PendingY) is not StoryConditionNode created) return;
+            nodeId      = created.Id;
+            _SelectedId = created.Id;
+        }
+        _ProjectState.UpdateConditionNode(_CurrentId, nodeId, args.Operator, args.CompareValue);
+        RebuildNodes();
+    }
+
     private void OnUnregisterPicked(UnregisterVariablePickerModal.UnregisterPickResult result)
     {
         if (result.EditNodeId != Guid.Empty)
@@ -754,6 +771,11 @@
                     _NewChoiceNodeModal?.ShowEdit(choice);
                 break;
 
+            case StoryNodeKind.Condition:
+                if (_CurrentLogicNode?.ConditionNodes.Find(n => n.Id == node.Id) is StoryConditionNode cond)
+                    _NewConditionNodeModal?.ShowEdit(cond);
+                break;
+
             case StoryNodeKind.PrevExitVariable:
                 if (_CurrentLogicNode is StoryLogicNode owner)
                 {
@@ -799,6 +821,7 @@
             case StoryNodeKind.Choice:              _ProjectState.DeleteChoiceNode(_CurrentId, node.Id);             break;
             case StoryNodeKind.AppGamebookTextSplitter: _ProjectState.DeleteAppGamebookTextSplitterNode(_CurrentId, node.Id); break;
             case StoryNodeKind.AppGamebookFlowSplitter: _ProjectState.DeleteAppGamebookFlowSplitterNode(_CurrentId, node.Id); break;
+            case StoryNodeKind.Condition:               _ProjectState.DeleteConditionNode(_CurrentId, node.Id);             break;
             default: return;
         }
 

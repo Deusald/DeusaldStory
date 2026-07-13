@@ -60,7 +60,7 @@ namespace DeusaldStoryCommon
                 IconData     = ResolveIconImage(project, logic, FromPointInto(logic, logic.IconIn.Id), paper, 0),
                 Blocks       = blocks,
                 Choices      = choices,
-                Instructions = StoryStorageInstructions.For(project, localization, logic, target)
+                Instructions = StoryStorageInstructions.For(project, localization, logic, target, values)
             };
         }
 
@@ -134,6 +134,8 @@ namespace DeusaldStoryCommon
                 }
                 else if (logic.AppGamebookFlowSplitterNodes.Find(n => n.FlowIn.Id == target) is StoryAppGamebookFlowSplitterNode fs)
                     target = FlowTargetOf(logic, renderTarget == StoryRenderTarget.App ? fs.AppFlowOut.Id : fs.GamebookFlowOut.Id);
+                else if (logic.ConditionNodes.Find(n => n.FlowIn.Id == target) is StoryConditionNode cond)
+                    target = FlowTargetOf(logic, StoryLogicFlow.ConditionBranch(project, logic, cond, values, renderTarget));
                 else if (logic.SetExternalVariableNodes.Find(n => n.FlowIn.Id == target) is StorySetExternalVariableNode se)
                     target = FlowTargetOf(logic, se.FlowOut.Id);
                 else if (logic.RegisterVariableNodes.Find(n => n.FlowIn.Id == target) is StoryRegisterVariableNode reg)

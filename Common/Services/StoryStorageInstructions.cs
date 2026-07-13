@@ -43,10 +43,10 @@ namespace DeusaldStoryCommon
         /// <summary>The ordered storage instructions for <paramref name="logic"/>'s operations (empty when none).</summary>
         public static List<StorageInstruction> For(
             StoryProject project, LocProject? localization, StoryLogicNode logic,
-            StoryRenderTarget target = StoryRenderTarget.App)
+            StoryRenderTarget target = StoryRenderTarget.App, IReadOnlyDictionary<Guid, string>? values = null)
         {
             List<StorageInstruction> list = new();
-            foreach (StorageOp op in StoryLogicFlow.StorageOps(logic, target))
+            foreach (StorageOp op in StoryLogicFlow.StorageOps(project, logic, target, values))
             {
                 StorageInstruction? entry = op.Kind switch
                 {

@@ -181,7 +181,7 @@ namespace DeusaldStoryCommon
                 ea[logic.Id] = new HashSet<Guid>(incoming);
                 CheckTextReferences(logic, incoming, regById, localization, problems);
                 HashSet<Guid> active = new(incoming);
-                ApplyOps(logic, active, regById, problems);
+                ApplyOps(project, logic, active, regById, problems);
 
                 // SingleSelection collapses every internal exit into one continuation (SelectionFlowOut);
                 // otherwise each exit continues independently. Both carry the same active-variable set.
@@ -211,10 +211,10 @@ namespace DeusaldStoryCommon
 
         /// <summary>Applies a logic node's inner Register/Set/Unregister operations, in flow order, to <paramref name="active"/>.</summary>
         private static void ApplyOps(
-            StoryLogicNode logic, HashSet<Guid> active, Dictionary<Guid, StoryRegisterVariableNode> regById,
+            StoryProject project, StoryLogicNode logic, HashSet<Guid> active, Dictionary<Guid, StoryRegisterVariableNode> regById,
             List<StoryProblem> problems)
         {
-            foreach (StorageOp op in StoryLogicFlow.StorageOps(logic))
+            foreach (StorageOp op in StoryLogicFlow.StorageOps(project, logic))
             {
                 switch (op.Kind)
                 {
