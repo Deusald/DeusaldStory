@@ -1,0 +1,289 @@
+/* Fills the centre of the editor (graph + inspector area); only the rail sits to its left. */
+.lop-root {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    background: var(--bg);
+}
+
+/* ── Header ───────────────────────────────────────────────────────────────── */
+
+.lop-head {
+    flex: none;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--border-subtle);
+    background: var(--surface-1);
+}
+.lop-head-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text-bright);
+}
+.lop-head-title i { color: var(--accent); }
+.lop-head-sub {
+    margin-top: 3px;
+    font-size: 12px;
+    color: var(--text-dim);
+}
+
+.lop-refresh {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    font-size: 13px;
+    color: var(--accent);
+    background: var(--accent-soft);
+    border: 1px solid transparent;
+    border-radius: var(--r-sm);
+    cursor: pointer;
+    transition: filter var(--dur) var(--ease);
+}
+.lop-refresh:hover:not(:disabled) { filter: brightness(1.15); }
+.lop-refresh:disabled { opacity: .6; cursor: default; }
+
+.lop-spin { animation: lop-spin 0.7s linear infinite; }
+@keyframes lop-spin { to { transform: rotate(360deg); } }
+
+/* ── Search row ───────────────────────────────────────────────────────────── */
+
+.lop-search {
+    position: relative;
+    flex: none;
+    margin: 16px 20px 0;
+}
+.lop-search > i {
+    position: absolute;
+    left: 11px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-faint);
+    font-size: 13px;
+    pointer-events: none;
+}
+.lop-search .modal-input { padding-left: 32px; }
+
+/* ── Three columns ────────────────────────────────────────────────────────── */
+
+.lop-cols {
+    display: grid;
+    grid-template-columns: 220px 300px 1fr;
+    gap: 14px;
+    flex: 1;
+    min-height: 0;
+    padding: 16px 20px 20px;
+}
+
+.lop-cats,
+.lop-keys,
+.lop-trans {
+    background: var(--surface-input);
+    border: 1px solid var(--border);
+    border-radius: var(--r-md);
+    overflow-y: auto;
+    padding: 6px;
+}
+.lop-trans { padding: 0; }
+
+/* Category buttons */
+.lop-cat {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    width: 100%;
+    text-align: left;
+    background: none;
+    border: none;
+    color: var(--text-soft);
+    font-size: 13px;
+    padding: 7px 10px;
+    border-radius: var(--r-sm);
+    cursor: pointer;
+    transition: background var(--dur) var(--ease), color var(--dur) var(--ease);
+}
+.lop-cat > i { color: var(--text-faint); font-size: 12px; }
+.lop-cat:hover { background: var(--surface-2); color: var(--text-bright); }
+.lop-cat.active {
+    background: var(--accent-soft);
+    color: var(--accent);
+}
+.lop-cat.active > i { color: var(--accent); }
+.lop-cat-count {
+    margin-left: auto;
+    font-size: 11px;
+    color: var(--text-faint);
+}
+
+/* Key rows */
+.lop-key {
+    display: block;
+    width: 100%;
+    text-align: left;
+    background: none;
+    border: 1px solid transparent;
+    border-radius: var(--r-sm);
+    padding: 8px 10px;
+    cursor: pointer;
+    margin-bottom: 2px;
+    transition: background var(--dur) var(--ease), border-color var(--dur) var(--ease);
+}
+.lop-key:hover { background: var(--surface-2); }
+.lop-key.selected {
+    background: var(--accent-soft);
+    border-color: var(--accent);
+}
+.lop-key-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-bright);
+}
+.lop-key-text {
+    font-size: 12px;
+    color: var(--text-dim);
+    margin-top: 2px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.lop-keys-empty {
+    color: var(--text-faint);
+    font-size: 13px;
+    padding: 24px 12px;
+    text-align: center;
+}
+
+/* ── Translations column ──────────────────────────────────────────────────── */
+
+.lop-trans-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    height: 100%;
+    color: var(--text-faint);
+    font-size: 13px;
+    text-align: center;
+    padding: 24px;
+}
+.lop-trans-empty > i { font-size: 24px; }
+
+.lop-trans-head {
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--border-subtle);
+}
+.lop-trans-key {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-bright);
+    word-break: break-word;
+}
+.lop-trans-desc {
+    margin-top: 4px;
+    font-size: 12px;
+    color: var(--text-dim);
+    line-height: 1.5;
+}
+.lop-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    margin-top: 8px;
+}
+.lop-tag {
+    font-size: 11px;
+    color: var(--text-muted);
+    background: var(--surface-3);
+    border-radius: var(--r-pill);
+    padding: 1px 8px;
+}
+
+.lop-trans-list {
+    padding: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+.lop-trans-row {
+    background: var(--surface-2);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--r-sm);
+    padding: 9px 11px;
+}
+.lop-trans-lang {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    margin-bottom: 5px;
+}
+.lop-lang-code {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-soft);
+    letter-spacing: .02em;
+}
+.lop-lang-main {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    color: var(--accent);
+    background: var(--accent-soft);
+    border-radius: var(--r-pill);
+    padding: 1px 6px;
+}
+.lop-status {
+    margin-left: auto;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    border-radius: var(--r-pill);
+    padding: 1px 7px;
+}
+.lop-status-approved {
+    color: var(--success);
+    background: rgba(126, 231, 165, .12);
+}
+.lop-status-suggested {
+    color: var(--warning, #e7c77e);
+    background: rgba(231, 199, 126, .12);
+}
+.lop-status-untranslated {
+    color: var(--text-faint);
+    background: var(--surface-3);
+}
+.lop-trans-text {
+    font-size: 13px;
+    color: var(--text-soft);
+    line-height: 1.5;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+.lop-trans-text-empty {
+    color: var(--text-faint);
+    font-style: italic;
+}
+
+/* ── Empty state (no linked project) ──────────────────────────────────────── */
+
+.lop-empty {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    color: var(--text-faint);
+    font-size: 14px;
+    text-align: center;
+    padding: 24px;
+}
+.lop-empty > i { font-size: 30px; }

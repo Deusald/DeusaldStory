@@ -27,6 +27,11 @@
             @* The images library spans the whole centre (graph + inspector); only the rail stays. *@
             <ImagesPanel/>
         }
+        else if (_ActiveTool == EditorRail.Tool.Localization)
+        {
+            @* The localization browser spans the whole centre; refresh re-projects the graph behind it. *@
+            <LocalizationPanel OnRefresh="OnRefreshLocalization"/>
+        }
         else
         {
             <div class="ed-stage">
