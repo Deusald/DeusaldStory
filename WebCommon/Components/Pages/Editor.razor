@@ -114,6 +114,11 @@
                     @* The story End node: choose which whole-story storage variables are released here. *@
                     <EndUnregisterEditor/>
                 }
+                else if (_InLogic && _SelectedNode?.Kind is StoryNodeKind.RegisterVariable or StoryNodeKind.SetVariable or StoryNodeKind.UnregisterVariable)
+                {
+                    @* A storage-variable node: show its full configuration. *@
+                    <VariableNodeInspector Logic="_CurrentLogicNode" NodeId="_SelectedId"/>
+                }
                 else
                 {
                     <EditorInspector Node="_SelectedNode"/>
@@ -476,13 +481,16 @@
     /// logic node if it's an inner-graph issue, and select the offending node).</summary>
     private void OnProblemNavigate(StoryProblem problem)
     {
-        List<EditorCrumb>        crumbs = new();
+        // Rebuild the full breadcrumb path: Root / …containers… / (logic node). The Root crumb must always be
+        // present so the user can walk back up, matching how normal drill-down keeps Root as the first crumb.
+        Guid                     rootId = Project.Metadata.RootStoryContainerNodeId;
+        List<EditorCrumb>        crumbs = [new EditorCrumb(rootId, RootName())];
         List<StoryContainerNode> chain  = new();
         Guid                     cur    = problem.ContainerId;
         int                      guard  = 0;
         while (cur != Guid.Empty
+               && cur != rootId
                && Project.ContainerNodes.TryGetValue(cur, out StoryContainerNode? c)
-               && c.Id != Project.Metadata.RootStoryContainerNodeId
                && guard++ < 64)
         {
             chain.Add(c);

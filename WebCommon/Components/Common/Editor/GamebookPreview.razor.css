@@ -199,9 +199,9 @@
     gap: 0.3rem;
     margin: 0.6rem 0;
     padding: 0.55rem 0.7rem;
-    border: 1px dashed var(--border);
+    border: 1px dashed #b7a97f;
     border-radius: 0.4rem;
-    background: color-mix(in srgb, var(--success) 8%, transparent);
+    background: rgba(122, 143, 90, 0.12);
 }
 
 .gbp-storage-line {
@@ -210,11 +210,12 @@
     gap: 0.45rem;
     font-size: 0.88rem;
     line-height: 1.35;
+    color: var(--gbp-text);
 }
 
 .gbp-storage-line i {
     flex: 0 0 auto;
-    color: var(--success);
+    color: #5e7a3a;
     font-size: 0.85em;
 }
 

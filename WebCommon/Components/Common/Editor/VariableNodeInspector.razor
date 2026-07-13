@@ -1,0 +1,135 @@
+@namespace DeusaldStoryWeb.Components.Common
+@inject ProjectStateService _ProjectState
+
+@* ─────────────────────────────────────────────────────────────────────────
+   Read-only inspector for a selected Register / Set / Unregister variable node,
+   showing all of its stored configuration. Editing is done from the node's
+   right-click "Edit" (which reopens the modal).
+   ───────────────────────────────────────────────────────────────────────── *@
+
+<div class="vni-root">
+
+    @if (Register is StoryRegisterVariableNode reg)
+    {
+        <div class="vni-head">
+            <span class="vni-kind" style="color:@StoryStyle.NodeColor(StoryNodeKind.RegisterVariable)">
+                <span class="vni-dot" style="background:@StoryStyle.NodeColor(StoryNodeKind.RegisterVariable)"></span>
+                REGISTER VARIABLE
+            </span>
+            <div class="vni-title">@Name(reg.Name)</div>
+            @if (!string.IsNullOrWhiteSpace(reg.Description))
+            {
+                <div class="vni-desc">@reg.Description</div>
+            }
+        </div>
+
+        <div class="vni-body">
+            @Row("Slot", $"{StorageSlots.Label(reg.Type, reg.SlotIndex)}")
+            @Row("Storage", TypeLabel(reg.Type))
+
+            @if (reg.Type == StorageVariableType.Number)
+            {
+                @Row("Stored with", reg.Mode == NumberStorageMode.Dice ? "D6 die" : "Number token")
+                @Row("Values", ValueCountLabel(reg.ValueCount))
+            }
+
+            @if (reg.Type is StorageVariableType.Number or StorageVariableType.Dial)
+            {
+                @Row("Initial value", AssignmentLabel(reg.Assignment, reg.SpecificValue))
+                @if (ShowsSecret(reg.Type, reg.Mode))
+                {
+                    @Row("Secret", reg.Secret ? "Yes" : "No")
+                }
+            }
+        </div>
+    }
+    else if (SetNode is StorySetVariableNode set)
+    {
+        StoryRegisterVariableNode? target = EditorProjection.FindRegister(_ProjectState.CurrentProject!, set.RegisteredVariableId);
+        <div class="vni-head">
+            <span class="vni-kind" style="color:@StoryStyle.NodeColor(StoryNodeKind.SetVariable)">
+                <span class="vni-dot" style="background:@StoryStyle.NodeColor(StoryNodeKind.SetVariable)"></span>
+                SET VARIABLE
+            </span>
+            <div class="vni-title">@(target is not null ? Name(target.Name) : "(no variable)")</div>
+        </div>
+        <div class="vni-body">
+            @if (target is not null)
+            {
+                @Row("Slot", StorageSlots.Label(target.Type, target.SlotIndex))
+                @Row("Storage", TypeLabel(target.Type))
+            }
+            @Row("New value", AssignmentLabel(set.Assignment, set.SpecificValue))
+            @if (target is not null && ShowsSecret(target.Type, target.Mode))
+            {
+                @Row("Secret", set.Secret ? "Yes" : "No")
+            }
+        </div>
+    }
+    else if (Unregister is StoryUnregisterVariableNode unreg)
+    {
+        StoryRegisterVariableNode? target = EditorProjection.FindRegister(_ProjectState.CurrentProject!, unreg.RegisteredVariableId);
+        <div class="vni-head">
+            <span class="vni-kind" style="color:@StoryStyle.NodeColor(StoryNodeKind.UnregisterVariable)">
+                <span class="vni-dot" style="background:@StoryStyle.NodeColor(StoryNodeKind.UnregisterVariable)"></span>
+                UNREGISTER VARIABLE
+            </span>
+            <div class="vni-title">@(target is not null ? Name(target.Name) : "(no variable)")</div>
+        </div>
+        <div class="vni-body">
+            @if (target is not null)
+            {
+                @Row("Slot", StorageSlots.Label(target.Type, target.SlotIndex))
+                @Row("Storage", TypeLabel(target.Type))
+            }
+            <div class="vni-note">Frees the slot and instructs players to clear it.</div>
+        </div>
+    }
+
+</div>
+
+@code {
+    [Parameter] public StoryLogicNode? Logic  { get; set; }
+    [Parameter] public Guid            NodeId { get; set; }
+
+    private StoryRegisterVariableNode?   Register   => Logic?.RegisterVariableNodes.Find(n => n.Id == NodeId);
+    private StorySetVariableNode?        SetNode    => Logic?.SetVariableNodes.Find(n => n.Id == NodeId);
+    private StoryUnregisterVariableNode? Unregister => Logic?.UnregisterVariableNodes.Find(n => n.Id == NodeId);
+
+    private RenderFragment Row(string label, string value) =>@<div class="vni-row">
+        <span class="vni-row-label">@label</span>
+        <span class="vni-row-value">@value</span>
+    </div>;
+
+    private static string Name(string name) => string.IsNullOrWhiteSpace(name) ? "(unnamed variable)" : name;
+
+    private static string TypeLabel(StorageVariableType type) => type switch
+    {
+        StorageVariableType.Number => "Number (NA, NB…)",
+        StorageVariableType.Dial   => "Dial (−7…7)",
+        StorageVariableType.String => "String (written)",
+        _                          => type.ToString()
+    };
+
+    private static string ValueCountLabel(NumberValueCount count) => count switch
+    {
+        NumberValueCount.One   => "1 — presence flag",
+        NumberValueCount.Two   => "2 — even / odd",
+        NumberValueCount.Three => "3 — 1&2 / 3&4 / 5&6",
+        NumberValueCount.Four  => "4 — 1 / 2 / 3 / 4",
+        NumberValueCount.Five  => "5 — 1 … 5",
+        NumberValueCount.Six   => "6 — 1 … 6",
+        _                      => count.ToString()
+    };
+
+    private static string AssignmentLabel(NumberAssignment assignment, int specificValue) => assignment switch
+    {
+        NumberAssignment.Unset       => "Unset (no value)",
+        NumberAssignment.SetSpecific => $"Set to {specificValue}",
+        NumberAssignment.Randomize   => "Randomize (roll / draw)",
+        _                            => assignment.ToString()
+    };
+
+    private static bool ShowsSecret(StorageVariableType type, NumberStorageMode mode) =>
+        type == StorageVariableType.Dial || (type == StorageVariableType.Number && mode == NumberStorageMode.Token);
+}

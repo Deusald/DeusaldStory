@@ -276,7 +276,7 @@
             IProjectFileStore store   = _StoreFactory.Create(location);
             StoryProject      project = await DeusaldStoryCommon.ProjectFileService.OpenAsync(store);
 
-            LocProject? loc = await _ProjectState.ResolveLocalizationAsync(project);
+            LocProject? loc = await _ProjectState.ResolveLocalizationAsync(project, location);
             if (loc is null)
             {
                 // The linked localization project couldn't be opened — block and make the user re-link.

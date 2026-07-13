@@ -72,15 +72,7 @@
             }
         }
 
-        @if (_Rendered.Instructions.Count > 0)
-        {
-            <div class="lpv-storage">
-                @foreach (string line in _Rendered.Instructions)
-                {
-                    <div class="lpv-storage-line"><i class="bi bi-box-seam"></i> <span>@SafeHtml(line)</span></div>
-                }
-            </div>
-        }
+        @* The app stores variables invisibly, so player-facing storage instructions are only shown in the Gamebook preview. *@
 
         @* Continue button per exit — the app's dummy "next" that jumps the preview to the next logic node. *@
         <div class="lpv-continue">

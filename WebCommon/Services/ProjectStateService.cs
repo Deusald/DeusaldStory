@@ -1,4 +1,5 @@
-﻿using DeusaldLocalizerCommon;
+﻿using System.IO;
+using DeusaldLocalizerCommon;
 using DeusaldStoryCommon;
 using JetBrains.Annotations;
 
@@ -1138,10 +1139,12 @@ public class ProjectStateService(
     /// library and the platform store factory. Returns null when the reference is empty or unresolvable
     /// (moved folder, deleted, or a handle minted on the other platform) — the caller re-links in that case.
     /// </summary>
-    public async Task<LocProject?> ResolveLocalizationAsync(StoryProject project)
+    public async Task<LocProject?> ResolveLocalizationAsync(StoryProject project, string? storyLocation = null)
     {
-        string locRef = project.Metadata.LocalizationProjectPath;
-        if (string.IsNullOrEmpty(locRef)) return null;
+        string stored = project.Metadata.LocalizationProjectPath;
+        if (string.IsNullOrEmpty(stored)) return null;
+
+        string locRef = ResolveLocReference(storyLocation ?? CurrentProjectPath, stored);
 
         try
         {
@@ -1150,6 +1153,52 @@ public class ProjectStateService(
         catch
         {
             return null;
+        }
+    }
+
+    // ── Localization reference paths (stored relative to the story folder when possible) ──
+
+    private static bool IsHandleReference(string reference) =>
+        reference.StartsWith("loc:",   System.StringComparison.OrdinalIgnoreCase) ||
+        reference.StartsWith("story:", System.StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Converts a filesystem localization reference to a path relative to the story folder when possible (same
+    /// root), so moving the whole project keeps the link. Web handles (<c>loc:</c>/<c>story:</c>), already-relative
+    /// paths and cross-root paths are returned unchanged.
+    /// </summary>
+    private static string ToStoredLocReference(string? storyLocation, string reference)
+    {
+        if (string.IsNullOrEmpty(reference) || string.IsNullOrEmpty(storyLocation)) return reference;
+        if (IsHandleReference(reference) || IsHandleReference(storyLocation!))       return reference;
+        if (!Path.IsPathRooted(reference) || !Path.IsPathRooted(storyLocation!))     return reference;
+
+        try
+        {
+            string rel = Path.GetRelativePath(storyLocation!, reference);
+            return string.IsNullOrEmpty(rel) || Path.IsPathRooted(rel) ? reference : rel;
+        }
+        catch
+        {
+            return reference;
+        }
+    }
+
+    /// <summary>Inverse of <see cref="ToStoredLocReference"/>: resolves a stored relative localization path back to
+    /// an absolute one against the story folder. Absolute paths and web handles are returned unchanged.</summary>
+    private static string ResolveLocReference(string? storyLocation, string reference)
+    {
+        if (string.IsNullOrEmpty(reference) || IsHandleReference(reference))            return reference;
+        if (Path.IsPathRooted(reference) || string.IsNullOrEmpty(storyLocation))        return reference;
+        if (IsHandleReference(storyLocation!))                                          return reference;
+
+        try
+        {
+            return Path.GetFullPath(Path.Combine(storyLocation!, reference));
+        }
+        catch
+        {
+            return reference;
         }
     }
 
@@ -1170,9 +1219,9 @@ public class ProjectStateService(
     /// </summary>
     public async Task<LocProject?> RelinkAndSaveAsync(StoryProject project, string storyLocation, string newReference)
     {
-        project.Metadata.LocalizationProjectPath = newReference;
+        project.Metadata.LocalizationProjectPath = ToStoredLocReference(storyLocation, newReference);
         await DeusaldStoryCommon.ProjectFileService.SaveMetadataOnlyAsync(project, storeFactory.Create(storyLocation));
-        return await ResolveLocalizationAsync(project);
+        return await ResolveLocalizationAsync(project, storyLocation);
     }
 
     public void CloseProject()
@@ -1195,18 +1244,29 @@ public class ProjectStateService(
             if (!string.IsNullOrEmpty(saveLocation))
             {
                 CurrentProjectPath = saveLocation;
+                NormalizeLocReference();
                 await DeusaldStoryCommon.ProjectFileService.SaveAsync(CurrentProject!, _CurrentStore);
                 MarkClean();
             }
         }
         else
         {
+            NormalizeLocReference();
             await DeusaldStoryCommon.ProjectFileService.SaveIncrementalAsync(CurrentProject!, _CurrentStore, ChangedFileIds);
             MarkClean();
         }
 
         if (!string.IsNullOrEmpty(CurrentProjectPath))
             recents.UpdateRecentProjects(CurrentProject!, CurrentProjectPath!, CurrentLocalization?.Keys.Count ?? 0);
+    }
+
+    /// <summary>Rewrites the metadata's localization reference relative to the story folder before a save, so a
+    /// newly-saved or moved project keeps a portable link (no-op for web handles or cross-root paths).</summary>
+    private void NormalizeLocReference()
+    {
+        if (CurrentProject is null || string.IsNullOrEmpty(CurrentProjectPath)) return;
+        CurrentProject.Metadata.LocalizationProjectPath =
+            ToStoredLocReference(CurrentProjectPath, CurrentProject.Metadata.LocalizationProjectPath);
     }
 
     /// <summary>Marks a key as edited.</summary>
