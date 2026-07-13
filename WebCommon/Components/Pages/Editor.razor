@@ -106,8 +106,8 @@
             <div class="ed-inspector">
                 @if (_Mode == EditorMode.Preview && _CurrentLogicNode is StoryLogicNode inspectLogic)
                 {
-                    @* In preview, the inspector column becomes the External Variables tweak panel that re-renders the preview. *@
-                    <PreviewVariablesPanel Logic="inspectLogic" Values="_PreviewVars" ValuesChanged="StateHasChanged"/>
+                    @* In App preview the inspector becomes the variables tweak panel; in Gamebook it shows a read-only note. *@
+                    <PreviewVariablesPanel Logic="inspectLogic" Values="_PreviewVars" ValuesChanged="StateHasChanged" Gamebook="_PreviewGamebook"/>
                 }
                 else if (_SelectedNode?.Kind == StoryNodeKind.End)
                 {

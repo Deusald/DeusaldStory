@@ -13,21 +13,32 @@
     <div class="pvp-header">
         <span class="pvp-kind">
             <span class="pvp-kind-dot"></span>
-            EXTERNAL VARIABLES
+            @(Gamebook ? "GAMEBOOK" : "VARIABLES")
         </span>
-        <div class="pvp-title">Preview values</div>
-        <div class="pvp-subtitle">Tweak the connected variables to see how the text renders.</div>
+        <div class="pvp-title">@(Gamebook ? "Generated sections" : "Preview values")</div>
+        <div class="pvp-subtitle">
+            @(Gamebook
+                ? "Every section is generated for all variable combinations — nothing to set here."
+                : "Tweak this node's variables to see how the text renders.")
+        </div>
     </div>
 
+    @{
+        List<StoryVariable> vars = Gamebook ? new List<StoryVariable>() : ReferencedVariables();
+    }
     <div class="pvp-body">
-        @{
-            List<StoryVariable> vars = ReferencedVariables();
+        @if (Gamebook)
+        {
+            <div class="pvp-empty">
+                <i class="bi bi-book"></i>
+                <span>All Gamebook sections are pre-generated for every value combination, so there are no live inputs to change.</span>
+            </div>
         }
-        @if (vars.Count == 0)
+        else if (vars.Count == 0)
         {
             <div class="pvp-empty">
                 <i class="bi bi-braces"></i>
-                <span>No External Variable nodes are connected in this logic node.</span>
+                <span>This logic node has no variables to preview.</span>
             </div>
         }
         else
@@ -70,16 +81,31 @@
     [Parameter] public Dictionary<Guid, string>  Values        { get; set; } = new();
     [Parameter] public EventCallback             ValuesChanged { get; set; }
 
-    protected override void OnParametersSet() => SeedValues();
+    /// <summary>Gamebook preview: sections are pre-generated, so the panel shows a note instead of editable values.</summary>
+    [Parameter] public bool Gamebook { get; set; }
 
-    /// <summary>The distinct story variables referenced by this logic node's External Variable nodes.</summary>
+    protected override void OnParametersSet()
+    {
+        if (!Gamebook) SeedValues();
+    }
+
+    /// <summary>
+    /// The variables this logic node previews: those its External Variable nodes reference, plus — when it accepts a
+    /// wired-in exit variable — the Selection variable, so the reader can pick a value and it never renders as null.
+    /// </summary>
     private List<StoryVariable> ReferencedVariables()
     {
         Dictionary<Guid, StoryVariable> map = new();
         foreach (StoryExternalVariableNode n in Logic.ExternalVariableNodes)
             if (Variable(n.SelectedVariableId) is StoryVariable v)
                 map[v.Id] = v;
-        return map.Values.OrderBy(v => v.Name, StringComparer.OrdinalIgnoreCase).ToList();
+
+        List<StoryVariable> ordered = map.Values.OrderBy(v => v.Name, StringComparer.OrdinalIgnoreCase).ToList();
+
+        if (StorySelectionResolver.SelectionVariable(_ProjectState.CurrentProject!, Logic) is StoryVariable selection)
+            ordered.Add(selection);
+
+        return ordered;
     }
 
     /// <summary>Ensures every referenced variable has a value (defaulting to its first possible value).</summary>
