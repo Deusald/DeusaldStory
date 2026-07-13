@@ -1,0 +1,133 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using DeusaldLocalizerCommon;
+using JetBrains.Annotations;
+
+namespace DeusaldStoryCommon
+{
+    /// <summary>
+    /// Resolves a logic node's inner content graph into plain rendered data — the title, optional subtitle, an
+    /// optional icon (base64 PNG) and the ordered text blocks produced by walking the flow spine — for a given set
+    /// of External Variable values. Host-agnostic so both the App preview, the Gamebook preview and (later) PDF
+    /// export share one resolution; HTML sanitization is left to the caller (see <see cref="PreviewHtmlSanitizer"/>).
+    /// </summary>
+    [PublicAPI]
+    public static class StoryLogicRenderer
+    {
+        /// <summary>A logic node resolved to display text/icon for one combination of variable values.</summary>
+        public sealed class RenderedLogic
+        {
+            public string       Title    { get; set; } = "";
+            public string       Subtitle { get; set; } = "";
+            public string?      IconData { get; set; }
+            public List<string> Blocks   { get; set; } = new();
+        }
+
+        /// <summary>
+        /// Resolves <paramref name="logic"/> against <paramref name="values"/> (story-variable id → value). When a
+        /// referenced variable has no entry it falls back to the variable's first possible value.
+        /// <paramref name="paper"/> selects the light side of any Light/Dark switch on the icon path.
+        /// </summary>
+        public static RenderedLogic Render(
+            StoryProject project, LocProject? localization, StoryLogicNode logic,
+            IReadOnlyDictionary<Guid, string> values, bool paper)
+        {
+            return new RenderedLogic
+            {
+                Title    = ResolveText(project, localization, logic, values, FromPointInto(logic, logic.TitleIn.Id),    0),
+                Subtitle = ResolveText(project, localization, logic, values, FromPointInto(logic, logic.SubtitleIn.Id), 0),
+                IconData = ResolveIconImage(project, logic, FromPointInto(logic, logic.IconIn.Id), paper, 0),
+                Blocks   = RenderBlocks(project, localization, logic, values)
+            };
+        }
+
+        // ── Flow-block rendering ─────────────────────────────────────────────────
+
+        private static List<string> RenderBlocks(
+            StoryProject project, LocProject? localization, StoryLogicNode logic, IReadOnlyDictionary<Guid, string> values)
+        {
+            List<string> blocks = new();
+            Guid         target = FlowTargetOf(logic, logic.EntryPoint.Id);
+            int          guard  = 0;
+
+            while (guard++ < 128 && logic.FlowTextNodes.Find(n => n.FlowIn.Id == target) is StoryFlowTextNode ft)
+            {
+                blocks.Add(ResolveText(project, localization, logic, values, FromPointInto(logic, ft.TextIn.Id), 0));
+                target = FlowTargetOf(logic, ft.FlowOut.Id);
+            }
+            return blocks;
+        }
+
+        private static Guid FlowTargetOf(StoryLogicNode logic, Guid fromPoint) =>
+            logic.ContentConnections.Find(c => c.FromPoint == fromPoint)?.ToPoint ?? Guid.Empty;
+
+        // ── Text resolution ──────────────────────────────────────────────────────
+
+        private static string ResolveText(
+            StoryProject project, LocProject? localization, StoryLogicNode logic,
+            IReadOnlyDictionary<Guid, string> values, Guid fromPoint, int depth)
+        {
+            if (fromPoint == Guid.Empty || depth > 8) return "";
+
+            if (logic.LocalizationNodes.Find(n => n.OutPoint.Id == fromPoint) is StoryLocalizationNode locNode)
+                return LocalizedText(localization, locNode.SelectedKeyId);
+
+            if (logic.SmartFormatNodes.Find(n => n.OutPoint.Id == fromPoint) is StorySmartFormatNode sf)
+            {
+                string format = ResolveText(project, localization, logic, values, FromPointInto(logic, sf.LocalizationIn.Id), depth + 1);
+
+                Dictionary<string, object> vals = new(StringComparer.OrdinalIgnoreCase);
+                foreach (StoryConnection c in logic.ContentConnections.Where(c => c.ToPoint == sf.VariablesIn.Id))
+                {
+                    if (logic.ExternalVariableNodes.Find(n => n.OutPoint.Id == c.FromPoint) is StoryExternalVariableNode ev
+                        && Variable(project, ev.SelectedVariableId) is StoryVariable v && !string.IsNullOrWhiteSpace(v.Name))
+                        vals[v.Name] = PreviewValue(v, values);
+                }
+
+                return StoryConditionPreview.Render(format, vals, out _);
+            }
+
+            return "";
+        }
+
+        /// <summary>The main-language text of the localization key <paramref name="keyId"/> (empty when unavailable).</summary>
+        public static string LocalizedText(LocProject? localization, Guid keyId)
+        {
+            LocLocalizationKey? key = localization?.Keys.Find(k => k.Id == keyId);
+            if (key is null) return "";
+
+            string? main = localization!.Metadata.MainLanguageId;
+            if (string.IsNullOrEmpty(main)) return "";
+            return key.Translations.Find(t => t.LanguageId == main)?.Text ?? "";
+        }
+
+        private static string PreviewValue(StoryVariable v, IReadOnlyDictionary<Guid, string> values) =>
+            values.TryGetValue(v.Id, out string? val) ? val : v.PossibleValues.FirstOrDefault() ?? "";
+
+        private static StoryVariable? Variable(StoryProject project, Guid id) =>
+            id != Guid.Empty && project.Variables.TryGetValue(id, out StoryVariable? v) ? v : null;
+
+        // ── Icon resolution ──────────────────────────────────────────────────────
+
+        private static string? ResolveIconImage(StoryProject project, StoryLogicNode logic, Guid fromPoint, bool paper, int depth)
+        {
+            if (fromPoint == Guid.Empty || depth > 8) return null;
+
+            if (logic.IconNodes.Find(n => n.OutPoint.Id == fromPoint) is StoryIconNode icon)
+                return project.Images.TryGetValue(icon.SelectedImageId, out StoryImage? img) ? img.Data : null;
+
+            if (logic.LightDarkSwitchNodes.Find(n => n.OutPoint.Id == fromPoint) is StoryLightDarkSwitchNode sw)
+            {
+                Guid input = paper ? sw.LightIn.Id : sw.DarkIn.Id;
+                return ResolveIconImage(project, logic, FromPointInto(logic, input), paper, depth + 1);
+            }
+
+            return null;
+        }
+
+        /// <summary>The output point wired into <paramref name="toPoint"/>, or empty when nothing is connected.</summary>
+        private static Guid FromPointInto(StoryLogicNode logic, Guid toPoint) =>
+            logic.ContentConnections.Find(c => c.ToPoint == toPoint)?.FromPoint ?? Guid.Empty;
+    }
+}

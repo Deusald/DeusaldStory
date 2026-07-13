@@ -17,6 +17,15 @@ namespace DeusaldStoryCommon
         public double X               { get; set; }
         public double Y               { get; set; }
 
+        /// <summary>
+        /// When set, this node holds only variable calculations / randomizations — no story-facing screen. In the
+        /// app it runs automatically and the player never stops here; in the printed Gamebook it becomes a section
+        /// whose body is <b>generated instructions</b> telling players to perform those operations by hand
+        /// (roll a die, note a value, jump to a section). Today the only operation source is the node's External
+        /// Variables and their Gamebook condition keys; future interaction blocks contribute their own baked keys.
+        /// </summary>
+        public bool GamebookInstructions { get; set; }
+
         public StoryConnectionPoint       EntryPoint { get; set; } = new() { Name = "In" };
         public List<StoryConnectionPoint> ExitPoints { get; }      = new();
 

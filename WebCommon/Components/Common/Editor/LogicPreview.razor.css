@@ -148,6 +148,38 @@
     font-weight: 500;
 }
 
+/* Continue buttons — the app's dummy "next" (one per exit branch). */
+.lpv-continue {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 4px;
+}
+.lpv-continue-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    width: 100%;
+    padding: 13px 18px;
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: var(--r-md);
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: filter var(--dur) var(--ease);
+}
+.lpv-continue-btn:hover { filter: brightness(1.08); }
+.lpv-continue-branch {
+    font-weight: 500;
+    opacity: .82;
+    padding-left: 8px;
+    margin-left: 2px;
+    border-left: 1px solid rgba(255, 255, 255, .4);
+}
+
 /* Inline <icon=Name> — sits in the text flow, sized to the surrounding line.
    ::deep reaches the <img> injected via MarkupString (it carries no scope attribute). */
 .lpv-screen ::deep .lpv-inline-icon {

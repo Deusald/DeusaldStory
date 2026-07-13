@@ -87,6 +87,19 @@
                 </button>
             </div>
 
+            @* ── Gamebook instructions ─────────────────────────────────── *@
+            <div class="modal-field">
+                <label class="nlm-check">
+                    <input type="checkbox"
+                           checked="@_GamebookInstructions"
+                           @onchange="e => _GamebookInstructions = (bool)(e.Value ?? false)"/>
+                    <span>
+                        Gamebook instructions
+                        <span class="modal-label-hint">runs automatically in the app; prints a generated instruction section in the Gamebook</span>
+                    </span>
+                </label>
+            </div>
+
         </div>
 
         <div class="modal-footer">
@@ -111,31 +124,34 @@
     private string        _Description = "";
     private string        _EntryName   = "In";
     private List<PointRow> _Exits      = new() { new PointRow { Name = "Out" } };
+    private bool          _GamebookInstructions;
 
     /// <summary>Opens the modal to create a brand-new logic node.</summary>
     public void Show()
     {
-        _IsEdit      = false;
-        _EditId      = Guid.Empty;
-        _Name        = "";
-        _Description = "";
-        _EntryName   = "In";
-        _Exits       = new List<PointRow> { new PointRow { Name = "Out" } };
-        _Visible     = true;
+        _IsEdit               = false;
+        _EditId               = Guid.Empty;
+        _Name                 = "";
+        _Description          = "";
+        _EntryName            = "In";
+        _Exits                = new List<PointRow> { new PointRow { Name = "Out" } };
+        _GamebookInstructions = false;
+        _Visible              = true;
         StateHasChanged();
     }
 
     /// <summary>Opens the modal to edit an existing logic node, preserving exit-point ids so wires survive.</summary>
-    public void ShowEdit(Guid id, string name, string description, string entryName, IEnumerable<(Guid Id, string Name)> exits)
+    public void ShowEdit(Guid id, string name, string description, string entryName, IEnumerable<(Guid Id, string Name)> exits, bool gamebookInstructions)
     {
-        _IsEdit      = true;
-        _EditId      = id;
-        _Name        = name;
-        _Description = description;
-        _EntryName   = entryName;
-        _Exits       = exits.Select(e => new PointRow { Id = e.Id, Name = e.Name }).ToList();
+        _IsEdit               = true;
+        _EditId               = id;
+        _Name                 = name;
+        _Description          = description;
+        _EntryName            = entryName;
+        _Exits                = exits.Select(e => new PointRow { Id = e.Id, Name = e.Name }).ToList();
         if (_Exits.Count == 0) _Exits.Add(new PointRow { Name = "Out" });
-        _Visible = true;
+        _GamebookInstructions = gamebookInstructions;
+        _Visible              = true;
         StateHasChanged();
     }
 
@@ -167,7 +183,8 @@
             _Name.Trim(),
             _Description.Trim(),
             _EntryName.Trim(),
-            exits));
+            exits,
+            _GamebookInstructions));
     }
 
     private void Cancel() => _Visible = false;
@@ -184,5 +201,6 @@
         string                       Name,
         string                       Description,
         string                       EntryName,
-        List<(Guid Id, string Name)> Exits);
+        List<(Guid Id, string Name)> Exits,
+        bool                         GamebookInstructions);
 }

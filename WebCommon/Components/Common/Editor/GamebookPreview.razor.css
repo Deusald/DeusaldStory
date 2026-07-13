@@ -1,0 +1,193 @@
+.gbp-root {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    overflow-y: auto;
+    background:
+        radial-gradient(circle at 1px 1px, var(--border) 1px, transparent 0) 0 0 / 22px 22px,
+        var(--surface-0);
+    padding: 20px 24px 40px;
+    gap: 20px;
+}
+
+/* Count / truncation summary above the sections. */
+.gbp-summary {
+    width: 60%;
+    min-width: 380px;
+    max-width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--text-dim);
+    font-size: 13px;
+    font-weight: 500;
+}
+.gbp-warn { color: var(--danger); }
+
+/* One printed section — always the paper look, since the book is printed. */
+.gbp-section {
+    width: 60%;
+    min-width: 380px;
+    max-width: 100%;
+    background: #f4efe4;
+    border: 1px solid #d9cfbb;
+    border-radius: var(--r-lg);
+    box-shadow: var(--shadow-md);
+    padding: 28px 32px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+
+    --gbp-title:  #2a2620;
+    --gbp-text:   #443d31;
+    --gbp-frame-bg:     #fbf8f1;
+    --gbp-frame-border: #e0d7c4;
+    --gbp-icon-bg:      #efe8d8;
+}
+
+/* Section header — the placeholder token, combo values and an optional Instructions badge. */
+.gbp-section-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    border-bottom: 1px dashed #d0c6b1;
+    padding-bottom: 12px;
+}
+.gbp-section-tag {
+    font-family: var(--font-mono, monospace);
+    font-size: 13px;
+    font-weight: 700;
+    color: #8a7b5c;
+    background: #ece3d0;
+    border: 1px solid #ddd2ba;
+    border-radius: var(--r-xs);
+    padding: 2px 8px;
+}
+.gbp-section-combo {
+    font-size: 12px;
+    font-weight: 600;
+    color: #6b6250;
+}
+.gbp-section-badge {
+    margin-left: auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    color: #7a5a2a;
+    background: #f0e2c8;
+    border: 1px solid #e0cfa8;
+    border-radius: var(--r-pill);
+    padding: 3px 10px;
+}
+
+/* Header — icon beside the title heading. */
+.gbp-head {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+}
+.gbp-titles {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+.gbp-title {
+    font-size: 21px;
+    font-weight: 700;
+    letter-spacing: -.02em;
+    color: var(--gbp-title);
+    line-height: 1.25;
+}
+.gbp-subtitle {
+    font-size: 15px;
+    font-weight: 500;
+    color: var(--gbp-text);
+    line-height: 1.3;
+}
+.gbp-icon {
+    flex: none;
+    width: 80px;
+    height: 80px;
+    padding: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--gbp-icon-bg);
+    border: 1px solid var(--gbp-frame-border);
+    border-radius: var(--r-sm);
+}
+.gbp-icon img {
+    max-width: 100%;
+    max-height: 100%;
+    image-rendering: pixelated;
+}
+
+/* A rendered text block (or instruction line). */
+.gbp-block {
+    font-size: 15px;
+    line-height: 1.6;
+    color: var(--gbp-text);
+    padding: 16px 20px;
+    background: var(--gbp-frame-bg);
+    border: 1px solid var(--gbp-frame-border);
+    border-radius: var(--r-md);
+    white-space: pre-wrap;
+}
+.gbp-instructions {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+.gbp-placeholder {
+    color: #9a8f77;
+    font-style: italic;
+    font-weight: 500;
+}
+
+/* Continue-instructions printed at the bottom of the section. */
+.gbp-continue {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    border-top: 1px dashed #d0c6b1;
+    padding-top: 16px;
+}
+.gbp-continue-line {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    color: #55442a;
+    line-height: 1.45;
+}
+.gbp-continue-line i { margin-top: 3px; color: #8a7b5c; }
+.gbp-continue-line.error { color: var(--danger); }
+.gbp-continue-line.error i { color: var(--danger); }
+
+/* Inline / standalone project images inside blocks (see LogicPreview for the tags). */
+.gbp-section ::deep .lpv-inline-icon {
+    display: inline-block;
+    height: 1.15em;
+    width: auto;
+    vertical-align: -0.2em;
+    margin: 0 1px;
+    image-rendering: pixelated;
+}
+.gbp-section ::deep .lpv-sprite {
+    display: block;
+    width: auto;
+    max-width: 20%;
+    height: auto;
+    margin: 14px auto;
+    border-radius: var(--r-sm);
+}

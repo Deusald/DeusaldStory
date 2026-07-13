@@ -135,16 +135,18 @@ public class ProjectStateService(
         StoryConnectionPoint              entryPoint,
         IEnumerable<StoryConnectionPoint> exitPoints,
         double                            x,
-        double                            y)
+        double                            y,
+        bool                              gamebookInstructions = false)
     {
         StoryLogicNode node = new()
         {
-            Name            = name,
-            Description     = description,
-            ParentContainer = parentContainerId,
-            EntryPoint      = entryPoint,
-            X               = x,
-            Y               = y
+            Name                 = name,
+            Description          = description,
+            ParentContainer      = parentContainerId,
+            EntryPoint           = entryPoint,
+            X                    = x,
+            Y                    = y,
+            GamebookInstructions = gamebookInstructions
         };
         node.ExitPoints.AddRange(exitPoints);
 
@@ -828,13 +830,15 @@ public class ProjectStateService(
         string                                name,
         string                                description,
         string                                entryName,
-        IReadOnlyList<(Guid Id, string Name)> exits)
+        IReadOnlyList<(Guid Id, string Name)> exits,
+        bool                                  gamebookInstructions)
     {
         if (!CurrentProject!.LogicNodes.TryGetValue(logicId, out StoryLogicNode? logic)) return;
 
-        logic.Name             = name;
-        logic.Description      = description;
-        logic.EntryPoint.Name  = entryName;
+        logic.Name                 = name;
+        logic.Description          = description;
+        logic.EntryPoint.Name      = entryName;
+        logic.GamebookInstructions = gamebookInstructions;
 
         // isEntry:false gives each newly-added exit an inner-graph position (it is drawn as an Exit node inside).
         ReconcilePoints(logic.ExitPoints, exits, containerId, null, isEntry: false);

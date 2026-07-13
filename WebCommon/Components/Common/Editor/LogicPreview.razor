@@ -2,17 +2,17 @@
 @inject ProjectStateService _ProjectState
 
 @* ─────────────────────────────────────────────────────────────────────────
-   Renders a logic node's output as a screen: the localized title (Entry's Title
-   input) as a heading with the connected icon and, when connected, a smaller
-   subtitle beneath it, then the ordered sequence of text
-   blocks produced by walking the flow spine — Entry's flow output through each
-   FlowText node until an Exit. A FlowText block whose text comes from a
-   SmartFormat node renders against the External Variable values the author tweaks
-   in the inspector (passed in via Values).
+   The App preview: renders a logic node's output as a screen — the localized
+   title (Entry's Title input) as a heading with the connected icon and, when
+   connected, a smaller subtitle beneath it, then the ordered sequence of text
+   blocks produced by walking the flow spine. Content is resolved for the
+   External Variable values the author tweaks in the inspector (passed in via
+   Values), shared with the Gamebook preview through StoryLogicRenderer.
 
    A Dark/Light toggle flips only the inner window between the dark theme and a
    paper-like light theme; it also decides which side of a Light/Dark switch node
-   is shown.
+   is shown. A "Click here to continue…" button per exit jumps the preview on to
+   the next logic node (OnContinue).
    ───────────────────────────────────────────────────────────────────────── *@
 
 <div class="lpv-root">
@@ -31,38 +31,35 @@
     <div class="lpv-screen @(_Paper ? "paper" : "")">
 
         <div class="lpv-head">
-            @if (_IconData is not null)
+            @if (_Rendered.IconData is not null)
             {
                 <div class="lpv-icon">
-                    <img src="data:image/png;base64,@_IconData" alt="icon"/>
+                    <img src="data:image/png;base64,@_Rendered.IconData" alt="icon"/>
                 </div>
             }
             <div class="lpv-titles">
-                @if (string.IsNullOrEmpty(_Title))
+                @if (string.IsNullOrEmpty(_Rendered.Title))
                 {
                     <div class="lpv-title lpv-placeholder">No title connected</div>
                 }
                 else
                 {
-                    <div class="lpv-title">@SafeHtml(_Title)</div>
+                    <div class="lpv-title">@SafeHtml(_Rendered.Title)</div>
                 }
-                @if (!string.IsNullOrEmpty(_Subtitle))
+                @if (!string.IsNullOrEmpty(_Rendered.Subtitle))
                 {
-                    <div class="lpv-subtitle">@SafeHtml(_Subtitle)</div>
+                    <div class="lpv-subtitle">@SafeHtml(_Rendered.Subtitle)</div>
                 }
             </div>
         </div>
 
-        @{
-            List<string> blocks = RenderBlocks();
-        }
-        @if (blocks.Count == 0)
+        @if (_Rendered.Blocks.Count == 0)
         {
             <div class="lpv-block lpv-placeholder">No text blocks connected — wire the Entry flow into a FlowText node.</div>
         }
         else
         {
-            @foreach (string block in blocks)
+            @foreach (string block in _Rendered.Blocks)
             {
                 @if (string.IsNullOrEmpty(block))
                 {
@@ -75,32 +72,53 @@
             }
         }
 
+        @* Continue button per exit — the app's dummy "next" that jumps the preview to the next logic node. *@
+        <div class="lpv-continue">
+            @foreach (StoryConnectionPoint exit in Logic.ExitPoints)
+            {
+                StoryConnectionPoint branch = exit;
+                <button class="lpv-continue-btn" @onclick="() => OnContinue.InvokeAsync(branch.Id)">
+                    <span>@_ContinueLabel</span>
+                    @if (Logic.ExitPoints.Count > 1 && !string.IsNullOrWhiteSpace(branch.Name))
+                    {
+                        <span class="lpv-continue-branch">@branch.Name</span>
+                    }
+                    <i class="bi bi-arrow-right"></i>
+                </button>
+            }
+        </div>
+
     </div>
 </div>
 
 @code {
-    [Parameter] public StoryLogicNode           Logic  { get; set; } = default!;
+    [Parameter] public StoryLogicNode Logic { get; set; } = default!;
 
     /// <summary>External Variable values driving SmartFormat blocks (variable id → value); owned by the parent.</summary>
     [Parameter] public Dictionary<Guid, string> Values { get; set; } = new();
 
-    private bool    _Paper;    // false = dark (default), true = paper/light
-    private string  _Title    = "";
-    private string  _Subtitle = "";
-    private string? _IconData; // base64 PNG, or null when no icon connected
+    /// <summary>Raised when a continue button is clicked; carries the exit point id to follow to the next node.</summary>
+    [Parameter] public EventCallback<Guid> OnContinue { get; set; }
+
+    private bool _Paper; // false = dark (default), true = paper/light
+
+    private StoryLogicRenderer.RenderedLogic _Rendered = new();
+    private string                           _ContinueLabel = "";
 
     protected override void OnParametersSet()
     {
-        _Title    = ResolveText(FromPointInto(Logic.TitleIn.Id),    0);
-        _Subtitle = ResolveText(FromPointInto(Logic.SubtitleIn.Id), 0);
-        _IconData = ResolveIcon();
+        _Rendered      = Render();
+        _ContinueLabel = StoryCommonLocalizationKeys.Resolve(_ProjectState.CurrentLocalization, StoryCommonLocalizationKeys.AppContinueButton);
     }
 
     private void SetPaper(bool paper)
     {
         _Paper    = paper;
-        _IconData = ResolveIcon(); // a Light/Dark switch may resolve to a different icon
+        _Rendered = Render(); // a Light/Dark switch may resolve to a different icon
     }
+
+    private StoryLogicRenderer.RenderedLogic Render() =>
+        StoryLogicRenderer.Render(_ProjectState.CurrentProject!, _ProjectState.CurrentLocalization, Logic, Values, _Paper);
 
     /// <summary>
     /// Renders preview text with a whitelist of basic formatting tags (b/i/br/…) plus the project-image tags
@@ -123,109 +141,4 @@
         }
         return null;
     }
-
-    // ── Flow-block rendering ─────────────────────────────────────────────────
-
-    /// <summary>
-    /// Walks the flow spine from the Entry's flow output through each FlowText node, resolving each block's text,
-    /// until the flow reaches a non-FlowText target (an Exit) or a dead end. Loop-guarded.
-    /// </summary>
-    private List<string> RenderBlocks()
-    {
-        List<string> blocks = new();
-        Guid         target = FlowTargetOf(Logic.EntryPoint.Id);
-        int          guard  = 0;
-
-        while (guard++ < 128 && Logic.FlowTextNodes.Find(n => n.FlowIn.Id == target) is StoryFlowTextNode ft)
-        {
-            blocks.Add(ResolveText(FromPointInto(ft.TextIn.Id), 0));
-            target = FlowTargetOf(ft.FlowOut.Id);
-        }
-        return blocks;
-    }
-
-    /// <summary>The input point wired from output <paramref name="fromPoint"/>, or empty when nothing is connected.</summary>
-    private Guid FlowTargetOf(Guid fromPoint) =>
-        Logic.ContentConnections.Find(c => c.FromPoint == fromPoint)?.ToPoint ?? Guid.Empty;
-
-    // ── Text resolution ──────────────────────────────────────────────────────
-
-    /// <summary>
-    /// Resolves the text emitted by <paramref name="fromPoint"/>: a Localization node yields its key's main-language
-    /// text; a SmartFormat node formats its text input against the values of its connected External Variables.
-    /// Depth-guarded against loops.
-    /// </summary>
-    private string ResolveText(Guid fromPoint, int depth)
-    {
-        if (fromPoint == Guid.Empty || depth > 8) return "";
-
-        if (Logic.LocalizationNodes.Find(n => n.OutPoint.Id == fromPoint) is StoryLocalizationNode locNode)
-            return LocalizedText(locNode.SelectedKeyId);
-
-        if (Logic.SmartFormatNodes.Find(n => n.OutPoint.Id == fromPoint) is StorySmartFormatNode sf)
-        {
-            string format = ResolveText(FromPointInto(sf.LocalizationIn.Id), depth + 1);
-
-            Dictionary<string, object> values = new(StringComparer.OrdinalIgnoreCase);
-            foreach (StoryConnection c in Logic.ContentConnections.Where(c => c.ToPoint == sf.VariablesIn.Id))
-            {
-                if (Logic.ExternalVariableNodes.Find(n => n.OutPoint.Id == c.FromPoint) is StoryExternalVariableNode ev
-                    && Variable(ev.SelectedVariableId) is StoryVariable v && !string.IsNullOrWhiteSpace(v.Name))
-                    values[v.Name] = PreviewValue(v);
-            }
-
-            return StoryConditionPreview.Render(format, values, out _);
-        }
-
-        return "";
-    }
-
-    /// <summary>The main-language text of the localization key <paramref name="keyId"/> (empty when unavailable).</summary>
-    private string LocalizedText(Guid keyId)
-    {
-        LocProject?         loc = _ProjectState.CurrentLocalization;
-        LocLocalizationKey? key = loc?.Keys.Find(k => k.Id == keyId);
-        if (key is null) return "";
-
-        string? main = loc!.Metadata.MainLanguageId;
-        if (string.IsNullOrEmpty(main)) return "";
-        return key.Translations.Find(t => t.LanguageId == main)?.Text ?? "";
-    }
-
-    /// <summary>The preview value in use for <paramref name="v"/> — the tweaked one, else its first possible value.</summary>
-    private string PreviewValue(StoryVariable v) =>
-        Values.TryGetValue(v.Id, out string? val) ? val : v.PossibleValues.FirstOrDefault() ?? "";
-
-    private StoryVariable? Variable(Guid id) =>
-        id != Guid.Empty && _ProjectState.CurrentProject!.Variables.TryGetValue(id, out StoryVariable? v) ? v : null;
-
-    // ── Icon resolution ──────────────────────────────────────────────────────
-
-    /// <summary>Follows the wire into the Icon input, resolving through a Light/Dark switch when present.</summary>
-    private string? ResolveIcon() => ResolveIconImage(FromPointInto(Logic.IconIn.Id), 0);
-
-    /// <summary>
-    /// Resolves the icon emitted by <paramref name="fromPoint"/>: an Icon node yields its image; a Light/Dark
-    /// switch follows its Dark or Light input (by the current mode) one step further. Depth-guarded against loops.
-    /// </summary>
-    private string? ResolveIconImage(Guid fromPoint, int depth)
-    {
-        if (fromPoint == Guid.Empty || depth > 8) return null;
-
-        if (Logic.IconNodes.Find(n => n.OutPoint.Id == fromPoint) is StoryIconNode icon)
-            return _ProjectState.CurrentProject!.Images.TryGetValue(icon.SelectedImageId, out StoryImage? img)
-                ? img.Data : null;
-
-        if (Logic.LightDarkSwitchNodes.Find(n => n.OutPoint.Id == fromPoint) is StoryLightDarkSwitchNode sw)
-        {
-            Guid input = _Paper ? sw.LightIn.Id : sw.DarkIn.Id;
-            return ResolveIconImage(FromPointInto(input), depth + 1);
-        }
-
-        return null;
-    }
-
-    /// <summary>The output point wired into <paramref name="toPoint"/>, or empty when nothing is connected.</summary>
-    private Guid FromPointInto(Guid toPoint) =>
-        Logic.ContentConnections.Find(c => c.ToPoint == toPoint)?.FromPoint ?? Guid.Empty;
 }

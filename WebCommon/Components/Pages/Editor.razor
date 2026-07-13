@@ -61,7 +61,30 @@
                 }
                 else if (_Mode == EditorMode.Preview && _CurrentLogicNode is StoryLogicNode previewLogic)
                 {
-                    <LogicPreview Logic="previewLogic" Values="_PreviewVars"/>
+                    <div class="ed-preview">
+                        <div class="ed-preview-switch">
+                            <button class="ed-preview-tab @(_PreviewGamebook ? "" : "active")" @onclick="() => SetPreviewKind(false)">
+                                <i class="bi bi-phone"></i> App
+                            </button>
+                            <button class="ed-preview-tab @(_PreviewGamebook ? "active" : "")" @onclick="() => SetPreviewKind(true)">
+                                <i class="bi bi-book"></i> Gamebook
+                            </button>
+                        </div>
+                        @if (_PreviewNotice is not null)
+                        {
+                            <div class="ed-preview-notice">@_PreviewNotice</div>
+                        }
+                        <div class="ed-preview-body">
+                            @if (_PreviewGamebook)
+                            {
+                                <GamebookPreview Logic="previewLogic"/>
+                            }
+                            else
+                            {
+                                <LogicPreview Logic="previewLogic" Values="_PreviewVars" OnContinue="OnPreviewContinue"/>
+                            }
+                        </div>
+                    </div>
                 }
                 else
                 {
@@ -122,6 +145,11 @@
     // Transient External Variable values driving the logic-node preview (variable id → value). Reset on each
     // entry into Preview so a fresh render starts from the variables' defaults; shared with the inspector panel.
     private Dictionary<Guid, string> _PreviewVars = new();
+
+    // Which preview is showing (false = App, true = Gamebook), and a transient notice for App continue clicks
+    // that don't navigate (reaches End / an unwired exit).
+    private bool    _PreviewGamebook;
+    private string? _PreviewNotice;
 
     private EdNode? _SelectedNode => _Nodes.Find(n => n.Id == _SelectedId);
 
@@ -187,8 +215,46 @@
     private void OnModeChanged(EditorMode mode)
     {
         // Entering preview starts the External Variable tweaks fresh (panel re-seeds them to the defaults).
-        if (mode == EditorMode.Preview) _PreviewVars = new Dictionary<Guid, string>();
+        if (mode == EditorMode.Preview)
+        {
+            _PreviewVars     = new Dictionary<Guid, string>();
+            _PreviewGamebook = false;
+            _PreviewNotice   = null;
+        }
         _Mode = mode;
+    }
+
+    /// <summary>Switch the preview between the App screen and the printed Gamebook sections.</summary>
+    private void SetPreviewKind(bool gamebook)
+    {
+        _PreviewGamebook = gamebook;
+        _PreviewNotice   = null;
+    }
+
+    /// <summary>
+    /// App-preview "continue" — follow the clicked exit to the next logic node and preview it. Reaching the story
+    /// End or an unwired exit shows a transient notice instead of navigating.
+    /// </summary>
+    private void OnPreviewContinue(Guid exitPointId)
+    {
+        StoryFlowNavigator.NextLogicResult result = StoryFlowNavigator.ResolveNextLogic(Project, exitPointId);
+        switch (result.Kind)
+        {
+            case StoryFlowNavigator.NextKind.Logic when result.Logic is not null:
+                _Crumbs[^1]    = new EditorCrumb(result.Logic.Id, result.Logic.Name, EditorScope.Logic);
+                _PreviewVars   = new Dictionary<Guid, string>();
+                _PreviewNotice = null;
+                RebuildNodes();
+                break;
+
+            case StoryFlowNavigator.NextKind.End:
+                _PreviewNotice = "This branch reaches The End.";
+                break;
+
+            default:
+                _PreviewNotice = "This exit isn't connected — wire it to the next node.";
+                break;
+        }
     }
 
     /// <summary>Rail tool picked — swap the centre panel. Only Media has its own panel; the rest keep the graph.</summary>
@@ -375,7 +441,7 @@
         if (args.EditId != Guid.Empty)
         {
             _ProjectState.UpdateLogicNode(
-                _CurrentId, args.EditId, args.Name, args.Description, args.EntryName, args.Exits);
+                _CurrentId, args.EditId, args.Name, args.Description, args.EntryName, args.Exits, args.GamebookInstructions);
             RebuildNodes();
             _SelectedId = args.EditId;
             return;
@@ -387,7 +453,7 @@
                                                .ToList();
 
         StoryLogicNode node = _ProjectState.AddLogicNode(
-            _CurrentId, args.Name, args.Description, entry, exits, _PendingX, _PendingY);
+            _CurrentId, args.Name, args.Description, entry, exits, _PendingX, _PendingY, args.GamebookInstructions);
 
         RebuildNodes();
         _SelectedId = node.Id;
@@ -438,7 +504,7 @@
                 if (Project.LogicNodes.TryGetValue(node.Id, out StoryLogicNode? logic))
                     _NewLogicNodeModal?.ShowEdit(
                         logic.Id, logic.Name, logic.Description, logic.EntryPoint.Name,
-                        logic.ExitPoints.Select(p => (p.Id, p.Name)));
+                        logic.ExitPoints.Select(p => (p.Id, p.Name)), logic.GamebookInstructions);
                 break;
 
             case StoryNodeKind.Container:
