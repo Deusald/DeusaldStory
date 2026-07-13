@@ -1044,6 +1044,7 @@ public class ProjectStateService(
     /// edited as <paramref name="ignoreId"/> so a rename to the same name doesn't collide with itself.
     /// </summary>
     public bool IsVariableNameTaken(string name, Guid ignoreId = default) =>
+        StoryBuiltInVariables.IsReservedName(name) ||
         CurrentProject!.Variables.Values.Any(
             v => v.Id != ignoreId && string.Equals(v.Name, name, StringComparison.OrdinalIgnoreCase));
 

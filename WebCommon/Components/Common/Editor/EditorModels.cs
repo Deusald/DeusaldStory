@@ -384,7 +384,9 @@ namespace DeusaldStoryWeb
             // ── External Variable nodes (teal) — reference a story variable, feed a SmartFormat variables input. ──
             foreach (StoryExternalVariableNode ev in logic.ExternalVariableNodes)
             {
-                bool found = project.Variables.TryGetValue(ev.SelectedVariableId, out StoryVariable? variable);
+                StoryVariable? variable = StoryBuiltInVariables.Find(ev.SelectedVariableId)
+                    ?? (project.Variables.TryGetValue(ev.SelectedVariableId, out StoryVariable? stored) ? stored : null);
+                bool found = variable is not null;
                 EdNode node = new()
                 {
                     Id        = ev.Id,

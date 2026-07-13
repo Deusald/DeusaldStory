@@ -148,7 +148,9 @@ namespace DeusaldStoryCommon
                 {
                     if (logic.ExternalVariableNodes.Find(n => n.OutPoint.Id == c.FromPoint) is StoryExternalVariableNode ev
                         && Variable(project, ev.SelectedVariableId) is StoryVariable v && !string.IsNullOrWhiteSpace(v.Name))
-                        vals[v.Name] = PreviewValue(v, values);
+                        vals[v.Name] = StoryBuiltInVariables.IsBuiltIn(v.Id)
+                            ? StoryBuiltInVariables.ValueFor(target) // the medium variable follows the render target, not the preview values
+                            : PreviewValue(v, values);
                 }
 
                 return StoryConditionPreview.Render(format, vals, out _);
@@ -172,7 +174,8 @@ namespace DeusaldStoryCommon
             values.TryGetValue(v.Id, out string? val) ? val : v.PossibleValues.FirstOrDefault() ?? "";
 
         private static StoryVariable? Variable(StoryProject project, Guid id) =>
-            id != Guid.Empty && project.Variables.TryGetValue(id, out StoryVariable? v) ? v : null;
+            StoryBuiltInVariables.Find(id)
+            ?? (id != Guid.Empty && project.Variables.TryGetValue(id, out StoryVariable? v) ? v : null);
 
         // ── Icon resolution ──────────────────────────────────────────────────────
 

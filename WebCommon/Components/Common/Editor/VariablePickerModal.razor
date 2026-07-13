@@ -34,14 +34,7 @@
             @{
                 List<StoryVariable> vars = Filtered().ToList();
             }
-            @if (Project.Variables.Count == 0)
-            {
-                <div class="vpk-empty">
-                    <i class="bi bi-braces"></i>
-                    <span>No variables yet — add some in the Variables panel first.</span>
-                </div>
-            }
-            else if (vars.Count == 0)
+            @if (vars.Count == 0)
             {
                 <div class="vpk-empty">
                     <i class="bi bi-braces"></i>
@@ -116,7 +109,8 @@
 
     private IEnumerable<StoryVariable> Filtered()
     {
-        IEnumerable<StoryVariable> vars = Project.Variables.Values;
+        // Built-in variables (e.g. the medium's App/Gamebook value) are always selectable, alongside authored ones.
+        IEnumerable<StoryVariable> vars = Project.Variables.Values.Concat(StoryBuiltInVariables.All);
 
         string term = _Search.Trim();
         if (term.Length > 0)

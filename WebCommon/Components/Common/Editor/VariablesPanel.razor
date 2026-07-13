@@ -42,11 +42,7 @@
                 @{
                     List<StoryVariable> list = FilteredVariables().ToList();
                 }
-                @if (Project.Variables.Count == 0)
-                {
-                    <div class="var-list-empty">No variables yet — add one to get started.</div>
-                }
-                else if (list.Count == 0)
+                @if (list.Count == 0)
                 {
                     <div class="var-list-empty">No variables match.</div>
                 }
@@ -59,6 +55,10 @@
                                 @onclick="() => Select(variable.Id)">
                             <div class="var-item-name">
                                 @(string.IsNullOrWhiteSpace(variable.Name) ? "(unnamed)" : variable.Name)
+                                @if (StoryBuiltInVariables.IsBuiltIn(variable.Id))
+                                {
+                                    <i class="bi bi-lock-fill var-item-lock" title="Built-in, read-only"></i>
+                                }
                             </div>
                             <div class="var-item-sub">
                                 @variable.PossibleValues.Count value@(variable.PossibleValues.Count == 1 ? "" : "s")
@@ -76,6 +76,46 @@
                 <div class="var-edit-empty">
                     <i class="bi bi-braces"></i>
                     <span>Select a variable to edit it, or add a new one.</span>
+                </div>
+            }
+            else if (StoryBuiltInVariables.IsBuiltIn(sel.Id))
+            {
+                <div class="var-edit-scroll">
+
+                    <div class="var-edit-toolbar">
+                        <span class="var-edit-heading">Built-in variable</span>
+                        <span class="var-builtin-badge"><i class="bi bi-lock-fill"></i> Read-only</span>
+                    </div>
+
+                    <div class="var-builtin-note">
+                        This variable is always available and can't be edited or deleted. Its value follows the preview
+                        mode — <b>@StoryBuiltInVariables.AppValue</b> in the app and <b>@StoryBuiltInVariables.GamebookValue</b>
+                        in the printed gamebook. Connect it through an External Variable node into a SmartFormat node's
+                        Variables input to branch text on the current medium (e.g. <code>{@sel.Name}</code>).
+                    </div>
+
+                    <div class="modal-field">
+                        <label class="modal-label">Name</label>
+                        <input class="modal-input" type="text" value="@sel.Name" readonly disabled/>
+                    </div>
+
+                    <div class="modal-field">
+                        <label class="modal-label">Description</label>
+                        <textarea class="modal-input var-textarea" rows="2" value="@sel.Description" readonly disabled></textarea>
+                    </div>
+
+                    <div class="modal-field">
+                        <label class="modal-label">Possible values</label>
+                        <div class="var-values">
+                            @foreach (string val in sel.PossibleValues)
+                            {
+                                <div class="var-value-row">
+                                    <input class="modal-input" type="text" value="@val" readonly disabled/>
+                                </div>
+                            }
+                        </div>
+                    </div>
+
                 </div>
             }
             else
@@ -243,7 +283,9 @@
 
     private StoryProject   Project  => _ProjectState.CurrentProject!;
     private LocProject?    Loc      => _ProjectState.CurrentLocalization;
-    private StoryVariable? Selected => Project.Variables.TryGetValue(_SelectedId, out StoryVariable? v) ? v : null;
+    private StoryVariable? Selected =>
+        StoryBuiltInVariables.Find(_SelectedId)
+        ?? (Project.Variables.TryGetValue(_SelectedId, out StoryVariable? v) ? v : null);
 
     protected override void OnInitialized() =>
         _ProjectState.ProjectDataChanged += OnDataChanged;
@@ -252,7 +294,8 @@
 
     private IEnumerable<StoryVariable> FilteredVariables()
     {
-        IEnumerable<StoryVariable> vars = Project.Variables.Values;
+        // Built-in variables (e.g. the read-only App/Gamebook medium value) are always listed alongside authored ones.
+        IEnumerable<StoryVariable> vars = Project.Variables.Values.Concat(StoryBuiltInVariables.All);
 
         string term = _Search.Trim();
         if (term.Length > 0)
