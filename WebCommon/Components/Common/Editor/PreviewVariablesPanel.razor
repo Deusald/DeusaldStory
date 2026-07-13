@@ -86,7 +86,10 @@
 
     protected override void OnParametersSet()
     {
-        if (!Gamebook) SeedValues();
+        // Seeding fills the shared values dictionary; the sibling LogicPreview has already rendered against the
+        // pre-seed (empty) values, so notify the parent to re-render it with the freshly seeded defaults.
+        if (!Gamebook && SeedValues())
+            ValuesChanged.InvokeAsync();
     }
 
     /// <summary>
@@ -108,12 +111,17 @@
         return ordered;
     }
 
-    /// <summary>Ensures every referenced variable has a value (defaulting to its first possible value).</summary>
-    private void SeedValues()
+    /// <summary>Ensures every referenced variable has a value (defaulting to its first possible value); returns whether any were added.</summary>
+    private bool SeedValues()
     {
+        bool added = false;
         foreach (StoryVariable v in ReferencedVariables())
             if (!Values.ContainsKey(v.Id))
+            {
                 Values[v.Id] = v.PossibleValues.FirstOrDefault() ?? "";
+                added        = true;
+            }
+        return added;
     }
 
     private string PreviewValue(StoryVariable v) =>
