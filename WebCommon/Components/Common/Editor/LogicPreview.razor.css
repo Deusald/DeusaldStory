@@ -133,3 +133,23 @@
     font-style: italic;
     font-weight: 500;
 }
+
+/* Inline <icon=Name> — sits in the text flow, sized to the surrounding line.
+   ::deep reaches the <img> injected via MarkupString (it carries no scope attribute). */
+.lpv-screen ::deep .lpv-inline-icon {
+    display: inline-block;
+    height: 1.15em;
+    width: auto;
+    vertical-align: -0.2em;
+    margin: 0 1px;
+    image-rendering: pixelated; /* icons are square power-of-two pixel art */
+}
+
+/* Standalone <sprite=Name> — a centred picture, as an <img> would render. */
+.lpv-screen ::deep .lpv-sprite {
+    display: block;
+    max-width: 100%;
+    height: auto;
+    margin: 14px auto;
+    border-radius: var(--r-sm);
+}

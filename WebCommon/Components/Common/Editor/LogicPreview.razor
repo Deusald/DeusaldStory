@@ -93,8 +93,27 @@
         _IconData = ResolveIcon(); // a Light/Dark switch may resolve to a different icon
     }
 
-    /// <summary>Renders preview text with a whitelist of basic formatting tags (b/i/br/…), everything else escaped.</summary>
-    private static MarkupString SafeHtml(string text) => (MarkupString)PreviewHtmlSanitizer.ToSafeHtml(text);
+    /// <summary>
+    /// Renders preview text with a whitelist of basic formatting tags (b/i/br/…) plus the project-image tags
+    /// <c>&lt;icon=Name&gt;</c> (inline) and <c>&lt;sprite=Name&gt;</c> (standalone picture); everything else escaped.
+    /// </summary>
+    private MarkupString SafeHtml(string text) => (MarkupString)PreviewHtmlSanitizer.ToSafeHtml(text, ResolveImageTag);
+
+    /// <summary>
+    /// Resolves an <c>&lt;icon=Name&gt;</c> / <c>&lt;sprite=Name&gt;</c> tag to a project image (name match is
+    /// case-insensitive, matching the library's uniqueness rule). <c>icon</c> only accepts the inline Icon library;
+    /// <c>sprite</c> accepts either library. Returns null when nothing matches so the tag stays visible.
+    /// </summary>
+    private StoryImage? ResolveImageTag(string tag, string name)
+    {
+        foreach (StoryImage image in _ProjectState.CurrentProject!.Images.Values)
+        {
+            if (!string.Equals(image.Name, name, StringComparison.OrdinalIgnoreCase)) continue;
+            if (tag == "icon" && image.Kind != StoryImageKind.Icon)                   continue;
+            return image;
+        }
+        return null;
+    }
 
     // ── Flow-block rendering ─────────────────────────────────────────────────
 
