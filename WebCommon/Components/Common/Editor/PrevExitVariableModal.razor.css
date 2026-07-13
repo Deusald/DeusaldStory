@@ -1,0 +1,54 @@
+/* Reuses the shared .modal-* classes and .nlm-check (see NewLogicNodeModal.razor.css).
+   Only the selection-variable-specific bits live here. */
+
+.pev-box {
+    height: auto;
+    max-height: calc(100vh - 64px);
+}
+
+.pev-body { overflow-y: auto; }
+
+.pev-hint {
+    font-size: 12.5px;
+    color: var(--text-faint);
+    line-height: 1.5;
+}
+
+/* ── Remap table ──────────────────────────────────────────────────────────── */
+
+.pev-map {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+.pev-map-row {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+}
+.pev-map-from {
+    flex: 0 0 40%;
+    font-size: 13px;
+    color: var(--text-soft);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.pev-map-arrow { color: var(--text-faint); font-size: 12px; flex: none; }
+.pev-map-to { flex: 1 1 auto; }
+
+/* ── Possible values (remap off) ──────────────────────────────────────────── */
+
+.pev-values {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+.pev-value {
+    font-size: 12.5px;
+    color: var(--text-soft);
+    background: var(--surface-3);
+    border: 1px solid var(--border);
+    border-radius: var(--r-sm);
+    padding: 4px 9px;
+}

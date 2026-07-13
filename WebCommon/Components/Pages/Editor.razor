@@ -141,6 +141,7 @@
 <UnregisterVariablePickerModal @ref="_UnregisterPicker"  OnConfirm="OnUnregisterPicked"/>
 <SetExternalVariableModal  @ref="_SetExternalVariableModal" OnConfirm="OnSetExternalVariableConfirmed"/>
 <NewChoiceNodeModal        @ref="_NewChoiceNodeModal"       OnConfirm="OnChoiceConfirmed"/>
+<PrevExitVariableModal     @ref="_PrevExitVariableModal"    OnConfirm="OnPrevExitVariableConfirmed"/>
 
 @code {
     private EditorMode        _Mode = EditorMode.Edit;
@@ -162,6 +163,7 @@
     private UnregisterVariablePickerModal? _UnregisterPicker;
     private SetExternalVariableModal?  _SetExternalVariableModal;
     private NewChoiceNodeModal?        _NewChoiceNodeModal;
+    private PrevExitVariableModal?     _PrevExitVariableModal;
 
     // Where the next created node is placed — the right-clicked canvas point (or a staggered default).
     private double _PendingX;
@@ -262,12 +264,21 @@
     /// </summary>
     private void OnPreviewContinue(Guid exitPointId)
     {
-        StoryFlowNavigator.NextLogicResult result = StoryFlowNavigator.ResolveNextLogic(Project, exitPointId);
+        // A single-selection node funnels every branch through its one Selection flow-out; follow that instead of the
+        // internal exit, and carry the chosen exit's (remapped) value so the receiver reads it as its Selection.
+        StoryLogicNode? owner = Project.LogicNodes.Values.FirstOrDefault(l => l.ExitPoints.Any(e => e.Id == exitPointId));
+        bool singleSelect     = owner is { ExitMode: StoryLogicExitMode.SingleSelection };
+        Guid followId         = singleSelect ? owner!.SelectionFlowOut.Id : exitPointId;
+
+        StoryFlowNavigator.NextLogicResult result = StoryFlowNavigator.ResolveNextLogic(Project, followId);
         switch (result.Kind)
         {
             case StoryFlowNavigator.NextKind.Logic when result.Logic is not null:
                 _Crumbs[^1]    = new EditorCrumb(result.Logic.Id, result.Logic.Name, EditorScope.Logic);
                 _PreviewVars   = new Dictionary<Guid, string>();
+                if (singleSelect && result.Logic.AcceptExitVariable
+                    && owner!.ExitPoints.Find(e => e.Id == exitPointId) is StoryConnectionPoint chosenExit)
+                    _PreviewVars[result.Logic.PrevExitVariable.Id] = StorySelectionResolver.ValueFor(result.Logic.PrevExitVariable, chosenExit);
                 _PreviewNotice = null;
                 RebuildNodes();
                 break;
@@ -618,7 +629,8 @@
         if (args.EditId != Guid.Empty)
         {
             _ProjectState.UpdateLogicNode(
-                _CurrentId, args.EditId, args.Name, args.Description, args.EntryName, args.Exits, args.GamebookInstructions);
+                _CurrentId, args.EditId, args.Name, args.Description, args.EntryName, args.Exits,
+                args.GamebookInstructions, args.ExitMode, args.AcceptExitVariable);
             RebuildNodes();
             _SelectedId = args.EditId;
             return;
@@ -630,7 +642,8 @@
                                                .ToList();
 
         StoryLogicNode node = _ProjectState.AddLogicNode(
-            _CurrentId, args.Name, args.Description, entry, exits, _PendingX, _PendingY, args.GamebookInstructions);
+            _CurrentId, args.Name, args.Description, entry, exits, _PendingX, _PendingY,
+            args.GamebookInstructions, args.ExitMode, args.AcceptExitVariable);
 
         RebuildNodes();
         _SelectedId = node.Id;
@@ -681,7 +694,8 @@
                 if (Project.LogicNodes.TryGetValue(node.Id, out StoryLogicNode? logic))
                     _NewLogicNodeModal?.ShowEdit(
                         logic.Id, logic.Name, logic.Description, logic.EntryPoint.Name,
-                        logic.ExitPoints.Select(p => (p.Id, p.Name)), logic.GamebookInstructions);
+                        logic.ExitPoints.Select(p => (p.Id, p.Name)), logic.GamebookInstructions,
+                        logic.ExitMode, logic.AcceptExitVariable);
                 break;
 
             case StoryNodeKind.Container:
@@ -737,7 +751,25 @@
                 if (_CurrentLogicNode?.ChoiceNodes.Find(n => n.Id == node.Id) is StoryChoiceNode choice)
                     _NewChoiceNodeModal?.ShowEdit(choice);
                 break;
+
+            case StoryNodeKind.PrevExitVariable:
+                if (_CurrentLogicNode is StoryLogicNode owner)
+                {
+                    List<StoryConnectionPoint>? sourceExits = EditorProjection.ResolveExitVariableSource(Project, owner);
+                    _PrevExitVariableModal?.ShowEdit(
+                        owner.PrevExitVariable,
+                        (sourceExits ?? new List<StoryConnectionPoint>()).Select(p => (p.Id, p.Name)));
+                }
+                break;
         }
+    }
+
+    private void OnPrevExitVariableConfirmed(PrevExitVariableModal.PrevExitVariableArgs args)
+    {
+        if (_CurrentLogicNode is not StoryLogicNode owner) return;
+        _ProjectState.UpdatePrevExitVariableNode(owner.Id, args.VariableName, args.RemapEnabled, args.Remaps);
+        RebuildNodes();
+        _SelectedId = owner.PrevExitVariable.Id;
     }
 
     /// <summary>Delete from a node's context menu. Deleting a container removes everything nested inside it.</summary>

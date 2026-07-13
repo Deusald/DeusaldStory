@@ -102,6 +102,11 @@ namespace DeusaldStoryCommon
 
         private static List<ContinueLine> BuildContinueLines(StoryProject project, LocProject? localization, StoryLogicNode logic)
         {
+            // A single-selection node funnels every branch into one flow-out; each branch instead pins the receiver's
+            // Selection value and points to that specific section.
+            if (logic.ExitMode == StoryLogicExitMode.SingleSelection)
+                return BuildSelectionContinueLines(project, localization, logic);
+
             // When the node ends in a Choice, the choices *are* the continue instructions — each is a labelled
             // "go to section" line. Choice text is resolved once with empty values (the preview uses each variable's
             // first possible value); node-driven variable branching is still enumerated per next-node combo below.
@@ -197,6 +202,77 @@ namespace DeusaldStoryCommon
             }
         }
 
+        // ── Single-selection continue instructions ───────────────────────────────
+
+        /// <summary>
+        /// Builds the continue instructions for a <see cref="StoryLogicExitMode.SingleSelection"/> node: every branch
+        /// (its choices, or its bare exits) funnels through the one Selection flow-out to the same receiver, so each
+        /// line points to the receiver section whose Selection is pinned to that branch's (remapped) exit value.
+        /// </summary>
+        private static List<ContinueLine> BuildSelectionContinueLines(StoryProject project, LocProject? localization, StoryLogicNode logic)
+        {
+            StoryFlowNavigator.NextLogicResult next = StoryFlowNavigator.ResolveNextLogic(project, logic.SelectionFlowOut.Id);
+
+            if (next.Kind == StoryFlowNavigator.NextKind.Dangling)
+                return new List<ContinueLine> { new() { Text = "The Selection flow-out is not connected — wire it to the node that reads the selection.", IsError = true } };
+
+            // The player-facing branches: a spine-ending Choice's options, else the node's bare exits.
+            List<StoryLogicRenderer.RenderedChoice> choices =
+                StoryLogicRenderer.Choices(project, localization, logic, new Dictionary<Guid, string>(), StoryRenderTarget.Gamebook);
+            List<(string Label, Guid ExitId)> branches = choices.Count > 0
+                ? choices.Select(c => (c.Text, c.ExitPointId)).ToList()
+                : logic.ExitPoints.Select(e => (e.Name, e.Id)).ToList();
+
+            StoryLogicNode? receiver = next.Kind == StoryFlowNavigator.NextKind.Logic ? next.Logic : null;
+            List<ContinueLine> lines = new();
+
+            foreach ((string label, Guid exitId) in branches)
+            {
+                StoryConnectionPoint? exit = logic.ExitPoints.Find(e => e.Id == exitId);
+                string exitName  = exit is null || string.IsNullOrWhiteSpace(exit.Name) ? "?" : exit.Name;
+                string labelText = string.IsNullOrWhiteSpace(label) ? exitName : label;
+
+                if (next.Kind == StoryFlowNavigator.NextKind.End)
+                {
+                    lines.Add(new ContinueLine { Text = $"{labelText} — {StoryCommonLocalizationKeys.Resolve(localization, StoryCommonLocalizationKeys.GamebookTheEnd)}" });
+                    continue;
+                }
+
+                // The value the receiver's Selection takes for this exit (remapped when the receiver remaps).
+                string selValue = receiver is { AcceptExitVariable: true } && exit is not null
+                    ? StorySelectionResolver.ValueFor(receiver.PrevExitVariable, exit)
+                    : "";
+
+                lines.AddRange(SelectionToNode(project, localization, labelText, receiver!, selValue));
+            }
+
+            return lines;
+        }
+
+        /// <summary>
+        /// Enumerates the receiver's <em>other</em> variable combinations (Selection pinned to <paramref name="selValue"/>)
+        /// into one "<i>{label}</i> go to section {section}" line each, so the section tokens match the receiver's own.
+        /// </summary>
+        private static IEnumerable<ContinueLine> SelectionToNode(
+            StoryProject project, LocProject? localization, string label, StoryLogicNode receiver, string selValue)
+        {
+            List<StoryVariable> fullVars  = OrderedVariables(project, receiver);           // includes the Selection variable
+            Guid                selVarId  = receiver.PrevExitVariable.Id;
+            List<StoryVariable> otherVars = fullVars.Where(v => v.Id != selVarId).ToList();
+            List<Dictionary<Guid, string>> combos = Combinations(otherVars, out _, out _);
+
+            foreach (Dictionary<Guid, string> combo in combos)
+            {
+                Dictionary<Guid, string> pinned = new(combo) { [selVarId] = selValue };
+                string section = SectionToken(receiver, fullVars, pinned);
+                yield return new ContinueLine
+                {
+                    Text = StoryCommonLocalizationKeys.Resolve(localization, StoryCommonLocalizationKeys.GamebookChoiceToSection,
+                        new Dictionary<string, object> { ["choice"] = label, ["section"] = section })
+                };
+            }
+        }
+
         /// <summary>Enumerates the next node's variable combinations into one continue line each (a placeholder section per combo).</summary>
         private static IEnumerable<ContinueLine> ContinueToNode(StoryProject project, LocProject? localization, StoryLogicNode next)
         {
@@ -246,14 +322,25 @@ namespace DeusaldStoryCommon
 
         // ── Variables & combinations ─────────────────────────────────────────────
 
-        /// <summary>The distinct story variables referenced by <paramref name="logic"/>'s External Variable nodes, ordered by name.</summary>
+        /// <summary>
+        /// The distinct story variables that dimension <paramref name="logic"/>'s Gamebook sections, ordered by name:
+        /// the variables its External Variable nodes reference, plus — when the node accepts a wired-in exit variable —
+        /// the synthetic Selection variable, so the node expands into one section per upstream exit value.
+        /// </summary>
         private static List<StoryVariable> OrderedVariables(StoryProject project, StoryLogicNode logic)
         {
             Dictionary<Guid, StoryVariable> map = new();
             foreach (StoryExternalVariableNode n in logic.ExternalVariableNodes)
                 if (n.SelectedVariableId != Guid.Empty && project.Variables.TryGetValue(n.SelectedVariableId, out StoryVariable? v))
                     map[v.Id] = v;
-            return map.Values.OrderBy(v => v.Name, StringComparer.OrdinalIgnoreCase).ToList();
+
+            List<StoryVariable> ordered = map.Values.OrderBy(v => v.Name, StringComparer.OrdinalIgnoreCase).ToList();
+
+            // The Selection dimension goes last so its sections read "…, Selection=Win" after the story variables.
+            if (StorySelectionResolver.SelectionVariable(project, logic) is StoryVariable selection)
+                ordered.Add(selection);
+
+            return ordered;
         }
 
         /// <summary>

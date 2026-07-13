@@ -117,6 +117,8 @@ namespace DeusaldStoryCommon
                     lk.LogicByEntry[logic.EntryPoint.Id] = logic;
                     foreach (StoryConnectionPoint exit in logic.ExitPoints)
                         lk.LogicByExit[exit.Id] = logic;
+                    // A single-selection node leaves through its one Selection flow-out, not the per-exit points.
+                    lk.LogicByExit[logic.SelectionFlowOut.Id] = logic;
                 }
 
                 foreach (StoryContainerNode container in project.ContainerNodes.Values)

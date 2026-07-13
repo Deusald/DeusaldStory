@@ -137,7 +137,9 @@ public class ProjectStateService(
         IEnumerable<StoryConnectionPoint> exitPoints,
         double                            x,
         double                            y,
-        bool                              gamebookInstructions = false)
+        bool                              gamebookInstructions = false,
+        StoryLogicExitMode                exitMode             = StoryLogicExitMode.SeparatePaths,
+        bool                              acceptExitVariable   = false)
     {
         StoryLogicNode node = new()
         {
@@ -147,7 +149,9 @@ public class ProjectStateService(
             EntryPoint           = entryPoint,
             X                    = x,
             Y                    = y,
-            GamebookInstructions = gamebookInstructions
+            GamebookInstructions = gamebookInstructions,
+            ExitMode             = exitMode,
+            AcceptExitVariable   = acceptExitVariable
         };
         node.ExitPoints.AddRange(exitPoints);
 
@@ -318,6 +322,8 @@ public class ProjectStateService(
             logic.ExitPoints[x].X = 660;
             logic.ExitPoints[x].Y = 120 + x * 90;
         }
+        logic.PrevExitVariable.X = 60;
+        logic.PrevExitVariable.Y = 360;
     }
 
     /// <summary>Adds a Localization node (referencing <paramref name="keyId"/>) to a logic node's inner graph.</summary>
@@ -842,6 +848,14 @@ public class ProjectStateService(
             return;
         }
 
+        if (logic.PrevExitVariable.Id == movedId)
+        {
+            logic.PrevExitVariable.X = x;
+            logic.PrevExitVariable.Y = y;
+            MarkKeyDirty(logicId);
+            return;
+        }
+
         StoryLocalizationNode? loc = logic.LocalizationNodes.Find(n => n.Id == movedId);
         if (loc is not null)
         {
@@ -1189,7 +1203,9 @@ public class ProjectStateService(
         string                                description,
         string                                entryName,
         IReadOnlyList<(Guid Id, string Name)> exits,
-        bool                                  gamebookInstructions)
+        bool                                  gamebookInstructions,
+        StoryLogicExitMode                    exitMode,
+        bool                                  acceptExitVariable)
     {
         if (!CurrentProject!.LogicNodes.TryGetValue(logicId, out StoryLogicNode? logic)) return;
 
@@ -1197,6 +1213,8 @@ public class ProjectStateService(
         logic.Description          = description;
         logic.EntryPoint.Name      = entryName;
         logic.GamebookInstructions = gamebookInstructions;
+        logic.ExitMode             = exitMode;
+        logic.AcceptExitVariable   = acceptExitVariable;
 
         // isEntry:false gives each newly-added exit an inner-graph position (it is drawn as an Exit node inside).
         ReconcilePoints(logic.ExitPoints, exits, containerId, null, isEntry: false);
@@ -1204,14 +1222,46 @@ public class ProjectStateService(
         // A removed exit takes its inner Exit node with it — drop any inner wire that pointed at the gone port.
         PruneContentConnections(logic);
 
+        // Drop container wires that reference outer ports this node no longer exposes after a mode/flag change.
+        List<Guid> goneOuterPorts = new();
+        if (exitMode == StoryLogicExitMode.SingleSelection)
+            goneOuterPorts.AddRange(logic.ExitPoints.Select(p => p.Id)); // per-exit output ports are gone
+        else
+        {
+            goneOuterPorts.Add(logic.SelectionFlowOut.Id);              // Selection flow/var outputs are gone
+            goneOuterPorts.Add(logic.SelectionVarOut.Id);
+        }
+        if (!acceptExitVariable)
+            goneOuterPorts.Add(logic.ExitVariableIn.Id);                // the second input is gone
+        RemoveConnectionsFor(containerId, goneOuterPorts);
+
         MarkKeyDirty(logicId);
         MarkKeyDirty(containerId);
+    }
+
+    /// <summary>
+    /// Updates a logic node's Prev Exit Variable node: its local <paramref name="variableName"/>, whether values are
+    /// <paramref name="remapEnabled">remapped</paramref>, and the per-exit <paramref name="remaps"/>.
+    /// </summary>
+    public void UpdatePrevExitVariableNode(Guid logicId, string variableName, bool remapEnabled, List<StoryPrevExitRemap> remaps)
+    {
+        if (!CurrentProject!.LogicNodes.TryGetValue(logicId, out StoryLogicNode? logic)) return;
+
+        logic.PrevExitVariable.VariableName = variableName;
+        logic.PrevExitVariable.RemapEnabled = remapEnabled;
+        logic.PrevExitVariable.Remaps       = remaps;
+
+        MarkKeyDirty(logicId);
     }
 
     /// <summary>Removes inner content connections whose endpoints no longer exist (e.g. after an exit is deleted).</summary>
     private static void PruneContentConnections(StoryLogicNode logic)
     {
-        HashSet<Guid> valid = new() { logic.EntryPoint.Id, logic.TitleIn.Id, logic.SubtitleIn.Id, logic.IconIn.Id };
+        HashSet<Guid> valid = new()
+        {
+            logic.EntryPoint.Id, logic.TitleIn.Id, logic.SubtitleIn.Id, logic.IconIn.Id,
+            logic.PrevExitVariable.OutPoint.Id
+        };
         foreach (StoryConnectionPoint p in logic.ExitPoints) valid.Add(p.Id);
         foreach (StoryLocalizationNode n in logic.LocalizationNodes) valid.Add(n.OutPoint.Id);
         foreach (StoryIconNode n in logic.IconNodes) valid.Add(n.OutPoint.Id);

@@ -70,7 +70,8 @@ namespace DeusaldStoryWeb
         SetExternalVariable, // inside a logic node: on the flow spine, assigns a value to a story-wide external variable (blue)
         Choice,             // inside a logic node: on the flow spine, offers the player a set of branches (one exit each) (accent)
         AppGamebookTextSplitter, // inside a logic node: emits one of two texts depending on the render target (App/Gamebook) (purple)
-        AppGamebookFlowSplitter  // inside a logic node: on the flow spine, routes flow by the render target (App/Gamebook) (amber)
+        AppGamebookFlowSplitter, // inside a logic node: on the flow spine, routes flow by the render target (App/Gamebook) (amber)
+        PrevExitVariable         // inside a logic node: exposes the upstream node's Selection variable, optionally remapped (teal)
     }
 
     /// <summary>A point on the graph canvas in world (un-panned, un-scaled) coordinates.</summary>
@@ -150,7 +151,8 @@ namespace DeusaldStoryWeb
                     Title     = ep.Name,
                     X         = ep.X,
                     Y         = ep.Y,
-                    Deletable = false
+                    Deletable = false,
+                    Editable  = false
                 };
                 node.Outputs.Add(new EdPort { Id = ep.Id, Name = ep.Name });
                 nodes.Add(node);
@@ -165,7 +167,8 @@ namespace DeusaldStoryWeb
                     Title     = xp.Name,
                     X         = xp.X,
                     Y         = xp.Y,
-                    Deletable = false
+                    Deletable = false,
+                    Editable  = false
                 };
                 node.Inputs.Add(new EdPort { Id = xp.Id, Name = xp.Name });
                 nodes.Add(node);
@@ -186,7 +189,18 @@ namespace DeusaldStoryWeb
                     Deletable = true
                 };
                 node.Inputs.Add(new EdPort { Id = logic.EntryPoint.Id, Name = logic.EntryPoint.Name });
-                node.Outputs.AddRange(logic.ExitPoints.Select(p => new EdPort { Id = p.Id, Name = p.Name }));
+                if (logic.AcceptExitVariable)
+                    node.Inputs.Add(new EdPort { Id = logic.ExitVariableIn.Id, Name = logic.ExitVariableIn.Name, Type = PortType.Variable });
+
+                if (logic.ExitMode == StoryLogicExitMode.SingleSelection)
+                {
+                    node.Outputs.Add(new EdPort { Id = logic.SelectionFlowOut.Id, Name = logic.SelectionFlowOut.Name, Type = PortType.Flow });
+                    node.Outputs.Add(new EdPort { Id = logic.SelectionVarOut.Id,  Name = logic.SelectionVarOut.Name,  Type = PortType.Variable });
+                }
+                else
+                {
+                    node.Outputs.AddRange(logic.ExitPoints.Select(p => new EdPort { Id = p.Id, Name = p.Name }));
+                }
                 nodes.Add(node);
             }
 
@@ -261,6 +275,7 @@ namespace DeusaldStoryWeb
         private const double _LOGIC_EXIT_X  = 660;
         private const double _LOGIC_EXIT_Y0 = 120;
         private const double _LOGIC_EXIT_DY = 90;
+        private const double _PREV_EXIT_Y   = 360;
 
         /// <summary>
         /// Builds the graph nodes for a logic node's inner content graph: its single Entry node (the reused
@@ -281,7 +296,8 @@ namespace DeusaldStoryWeb
                 Title     = "Entry",
                 X         = ex,
                 Y         = ey,
-                Deletable = false
+                Deletable = false,
+                Editable  = false
             };
             entry.Inputs.Add(new EdPort { Id = logic.TitleIn.Id,    Name = "Title",    Type = PortType.Text });
             entry.Inputs.Add(new EdPort { Id = logic.SubtitleIn.Id, Name = "Subtitle", Type = PortType.Text });
@@ -301,7 +317,8 @@ namespace DeusaldStoryWeb
                     Title     = xp.Name,
                     X         = xx,
                     Y         = xy,
-                    Deletable = false
+                    Deletable = false,
+                    Editable  = false
                 };
                 exit.Inputs.Add(new EdPort { Id = xp.Id, Type = PortType.Flow });
                 nodes.Add(exit);
@@ -555,8 +572,40 @@ namespace DeusaldStoryWeb
                 nodes.Add(node);
             }
 
+            // ── Prev Exit Variable node (teal, non-deletable) — appears when this node accepts an exit variable
+            //    and its second input is wired to an upstream node's Selection output. ──
+            List<StoryConnectionPoint>? sourceExits = ResolveExitVariableSource(project, logic);
+            if (logic.AcceptExitVariable && sourceExits is not null)
+            {
+                StoryPrevExitVariableNode prev = logic.PrevExitVariable;
+                double px = prev.X == 0 && prev.Y == 0 ? _LOGIC_ENTRY_X : prev.X;
+                double py = prev.X == 0 && prev.Y == 0 ? _PREV_EXIT_Y   : prev.Y;
+                EdNode node = new()
+                {
+                    Id        = prev.Id,
+                    Kind      = StoryNodeKind.PrevExitVariable,
+                    Title     = string.IsNullOrWhiteSpace(prev.VariableName) ? "Selection" : prev.VariableName,
+                    Subtitle  = string.Join(", ", sourceExits.Select(e => e.Name)),
+                    X         = px,
+                    Y         = py,
+                    Deletable = false,
+                    Editable  = true
+                };
+                node.Outputs.Add(new EdPort { Id = prev.OutPoint.Id, Name = "Value", Type = PortType.Variable });
+                nodes.Add(node);
+            }
+
             return nodes;
         }
+
+        /// <summary>
+        /// Resolves the upstream exit points feeding <paramref name="logic"/>'s Exit Variable input: follows the
+        /// container wire arriving at <see cref="StoryLogicNode.ExitVariableIn"/> back to the upstream logic node's
+        /// <see cref="StoryLogicNode.SelectionVarOut"/> and returns that node's <see cref="StoryLogicNode.ExitPoints"/>
+        /// (the possible Selection values). Returns null when nothing is wired in.
+        /// </summary>
+        public static List<StoryConnectionPoint>? ResolveExitVariableSource(StoryProject project, StoryLogicNode logic) =>
+            StorySelectionResolver.SourceExits(project, logic);
 
         /// <summary>Finds the Register-variable node with <paramref name="id"/> anywhere in the project's logic nodes.</summary>
         public static StoryRegisterVariableNode? FindRegister(StoryProject project, Guid id)
@@ -635,6 +684,7 @@ namespace DeusaldStoryWeb
             StoryNodeKind.Choice              => "CHOICE",
             StoryNodeKind.AppGamebookTextSplitter => "APP / GAMEBOOK TEXT",
             StoryNodeKind.AppGamebookFlowSplitter => "APP / GAMEBOOK FLOW",
+            StoryNodeKind.PrevExitVariable        => "PREV EXIT VARIABLE",
             _                       => ""
         };
 
@@ -663,6 +713,7 @@ namespace DeusaldStoryWeb
             StoryNodeKind.Choice              => "var(--accent)",
             StoryNodeKind.AppGamebookTextSplitter => "var(--purple)",
             StoryNodeKind.AppGamebookFlowSplitter => "var(--warning)",
+            StoryNodeKind.PrevExitVariable        => "var(--code-func)",
             _                       => "var(--text-dim)"
         };
     }

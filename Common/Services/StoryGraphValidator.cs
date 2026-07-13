@@ -68,6 +68,23 @@ namespace DeusaldStoryCommon
                 foreach (Guid logicId in container.Logic)
                 {
                     if (!project.LogicNodes.TryGetValue(logicId, out StoryLogicNode? logic)) continue;
+
+                    // In SingleSelection mode the per-exit points are internal (the Selection values); flow leaves
+                    // through the single SelectionFlowOut, so that — not each exit — is the output to check.
+                    if (logic.ExitMode == StoryLogicExitMode.SingleSelection)
+                    {
+                        if (!container.Connections.Exists(c => c.FromPoint == logic.SelectionFlowOut.Id))
+                            problems.Add(new StoryProblem
+                            {
+                                Severity    = StoryProblemSeverity.Error,
+                                Message     = $"Exit '{PointName(logic.SelectionFlowOut, "Out")}' of logic node '{NodeName(logic.Name)}' is not connected.",
+                                ContainerId = container.Id,
+                                LogicNodeId = logic.Id,
+                                PointId     = logic.SelectionFlowOut.Id
+                            });
+                        continue;
+                    }
+
                     foreach (StoryConnectionPoint exit in logic.ExitPoints)
                         if (!container.Connections.Exists(c => c.FromPoint == exit.Id))
                             problems.Add(new StoryProblem
@@ -166,9 +183,15 @@ namespace DeusaldStoryCommon
                 HashSet<Guid> active = new(incoming);
                 ApplyOps(logic, active, regById, problems);
 
-                foreach (StoryConnectionPoint exit in logic.ExitPoints)
+                // SingleSelection collapses every internal exit into one continuation (SelectionFlowOut);
+                // otherwise each exit continues independently. Both carry the same active-variable set.
+                IEnumerable<Guid> continuations = logic.ExitMode == StoryLogicExitMode.SingleSelection
+                    ? new[] { logic.SelectionFlowOut.Id }
+                    : logic.ExitPoints.Select(e => e.Id);
+
+                foreach (Guid outPointId in continuations)
                 {
-                    Step step = Follow(project, lk, logic.ParentContainer, exit.Id, 0);
+                    Step step = Follow(project, lk, logic.ParentContainer, outPointId, 0);
                     switch (step.Kind)
                     {
                         case StepKind.Logic: VisitLogic(step.Logic!, active, guard + 1); break;

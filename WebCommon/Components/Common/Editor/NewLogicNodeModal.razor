@@ -40,6 +40,28 @@
                           maxlength="500"></textarea>
             </div>
 
+            @* ── Exit mode ─────────────────────────────────────────────── *@
+            <div class="modal-field">
+                <label class="modal-label">
+                    Exit mode
+                    <span class="modal-label-hint">how this node's branches leave the card</span>
+                </label>
+                <div class="nlm-mode">
+                    <button type="button"
+                            class="nlm-mode-opt @(_ExitMode == StoryLogicExitMode.SeparatePaths ? "active" : "")"
+                            @onclick="() => _ExitMode = StoryLogicExitMode.SeparatePaths">
+                        <span class="nlm-mode-title">Separate paths</span>
+                        <span class="nlm-mode-desc">one output per exit</span>
+                    </button>
+                    <button type="button"
+                            class="nlm-mode-opt @(_ExitMode == StoryLogicExitMode.SingleSelection ? "active" : "")"
+                            @onclick="() => _ExitMode = StoryLogicExitMode.SingleSelection">
+                        <span class="nlm-mode-title">Single path + Selection</span>
+                        <span class="nlm-mode-desc">one flow + a "Selection" variable</span>
+                    </button>
+                </div>
+            </div>
+
             @* ── Entry point ───────────────────────────────────────────── *@
             <div class="modal-field">
                 <label class="modal-label">
@@ -100,6 +122,19 @@
                 </label>
             </div>
 
+            @* ── Accept exit variable ──────────────────────────────────── *@
+            <div class="modal-field">
+                <label class="nlm-check">
+                    <input type="checkbox"
+                           checked="@_AcceptExitVariable"
+                           @onchange="e => _AcceptExitVariable = (bool)(e.Value ?? false)"/>
+                    <span>
+                        Accept exit variable
+                        <span class="modal-label-hint">adds a second input for an upstream node's Selection variable</span>
+                    </span>
+                </label>
+            </div>
+
         </div>
 
         <div class="modal-footer">
@@ -125,6 +160,8 @@
     private string        _EntryName   = "In";
     private List<PointRow> _Exits      = new() { new PointRow { Name = "Out" } };
     private bool          _GamebookInstructions;
+    private StoryLogicExitMode _ExitMode;
+    private bool          _AcceptExitVariable;
 
     /// <summary>Opens the modal to create a brand-new logic node.</summary>
     public void Show()
@@ -136,12 +173,15 @@
         _EntryName            = "In";
         _Exits                = new List<PointRow> { new PointRow { Name = "Out" } };
         _GamebookInstructions = false;
+        _ExitMode             = StoryLogicExitMode.SeparatePaths;
+        _AcceptExitVariable   = false;
         _Visible              = true;
         StateHasChanged();
     }
 
     /// <summary>Opens the modal to edit an existing logic node, preserving exit-point ids so wires survive.</summary>
-    public void ShowEdit(Guid id, string name, string description, string entryName, IEnumerable<(Guid Id, string Name)> exits, bool gamebookInstructions)
+    public void ShowEdit(Guid id, string name, string description, string entryName, IEnumerable<(Guid Id, string Name)> exits,
+                         bool gamebookInstructions, StoryLogicExitMode exitMode, bool acceptExitVariable)
     {
         _IsEdit               = true;
         _EditId               = id;
@@ -151,6 +191,8 @@
         _Exits                = exits.Select(e => new PointRow { Id = e.Id, Name = e.Name }).ToList();
         if (_Exits.Count == 0) _Exits.Add(new PointRow { Name = "Out" });
         _GamebookInstructions = gamebookInstructions;
+        _ExitMode             = exitMode;
+        _AcceptExitVariable   = acceptExitVariable;
         _Visible              = true;
         StateHasChanged();
     }
@@ -184,7 +226,9 @@
             _Description.Trim(),
             _EntryName.Trim(),
             exits,
-            _GamebookInstructions));
+            _GamebookInstructions,
+            _ExitMode,
+            _AcceptExitVariable));
     }
 
     private void Cancel() => _Visible = false;
@@ -202,5 +246,7 @@
         string                       Description,
         string                       EntryName,
         List<(Guid Id, string Name)> Exits,
-        bool                         GamebookInstructions);
+        bool                         GamebookInstructions,
+        StoryLogicExitMode           ExitMode,
+        bool                         AcceptExitVariable);
 }

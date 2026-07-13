@@ -62,6 +62,35 @@
 .nlm-add-exit:hover { color: var(--text-soft); border-color: var(--border-hover); background: var(--surface-3); }
 .nlm-add-exit i { font-size: 11px; }
 
+/* ── Exit mode selector ───────────────────────────────────────────────────── */
+
+.nlm-mode {
+    display: flex;
+    gap: 8px;
+}
+.nlm-mode-opt {
+    flex: 1 1 0;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    text-align: left;
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: var(--r-sm);
+    color: var(--text-muted);
+    padding: 9px 11px;
+    cursor: pointer;
+    transition: color var(--dur) var(--ease), border-color var(--dur) var(--ease), background var(--dur) var(--ease);
+}
+.nlm-mode-opt:hover { border-color: var(--border-hover); background: var(--surface-3); }
+.nlm-mode-opt.active {
+    border-color: var(--accent);
+    background: var(--surface-3);
+    color: var(--text-soft);
+}
+.nlm-mode-title { font-size: 13px; font-weight: 600; }
+.nlm-mode-desc  { font-size: 11.5px; color: var(--text-faint); }
+
 /* ── Gamebook instructions checkbox ───────────────────────────────────────── */
 
 .nlm-check {

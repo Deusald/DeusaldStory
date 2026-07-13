@@ -151,6 +151,12 @@ namespace DeusaldStoryCommon
                         vals[v.Name] = StoryBuiltInVariables.IsBuiltIn(v.Id)
                             ? StoryBuiltInVariables.ValueFor(target) // the medium variable follows the render target, not the preview values
                             : PreviewValue(v, values);
+                    else if (c.FromPoint == logic.PrevExitVariable.OutPoint.Id && logic.AcceptExitVariable)
+                    {
+                        // The upstream Selection value for this section (keyed by the Prev Exit Variable node's id).
+                        string name = string.IsNullOrWhiteSpace(logic.PrevExitVariable.VariableName) ? "Selection" : logic.PrevExitVariable.VariableName;
+                        vals[name] = values.TryGetValue(logic.PrevExitVariable.Id, out string? sel) ? sel : "";
+                    }
                 }
 
                 return StoryConditionPreview.Render(format, vals, out _);

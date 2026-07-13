@@ -26,6 +26,36 @@ namespace DeusaldStoryCommon
         /// </summary>
         public bool GamebookInstructions { get; set; }
 
+        /// <summary>
+        /// How this node exposes its exits on its card. <see cref="StoryLogicExitMode.SeparatePaths"/> (the default)
+        /// draws one output port per <see cref="ExitPoints"/> entry; <see cref="StoryLogicExitMode.SingleSelection"/>
+        /// draws one <see cref="SelectionFlowOut"/> flow port plus one <see cref="SelectionVarOut"/> variable port.
+        /// Either way the named exit points are kept — in SingleSelection mode they are the possible Selection values.
+        /// </summary>
+        public StoryLogicExitMode ExitMode { get; set; }
+
+        /// <summary>SingleSelection only — the single flow output all exits collapse into. Kept stable across mode toggles.</summary>
+        public StoryConnectionPoint SelectionFlowOut { get; set; } = new() { Name = "Out" };
+
+        /// <summary>SingleSelection only — the variable output carrying the name of whichever exit the flow reached.</summary>
+        public StoryConnectionPoint SelectionVarOut { get; set; } = new() { Name = "Selection" };
+
+        /// <summary>
+        /// When set, this node gains a second (variable) input port, <see cref="ExitVariableIn"/>, that accepts an
+        /// upstream node's Selection variable. Wiring it in surfaces the <see cref="PrevExitVariable"/> node inside
+        /// this node's inner graph.
+        /// </summary>
+        public bool AcceptExitVariable { get; set; }
+
+        /// <summary>The second (variable) input port — accepts an upstream Selection variable. Shown when <see cref="AcceptExitVariable"/>.</summary>
+        public StoryConnectionPoint ExitVariableIn { get; set; } = new() { Name = "Selection" };
+
+        /// <summary>
+        /// The always-present "Prev Exit Variable" node, drawn inside the inner graph only when
+        /// <see cref="AcceptExitVariable"/> is set and <see cref="ExitVariableIn"/> is wired to an upstream Selection.
+        /// </summary>
+        public StoryPrevExitVariableNode PrevExitVariable { get; set; } = new();
+
         public StoryConnectionPoint       EntryPoint { get; set; } = new() { Name = "In" };
         public List<StoryConnectionPoint> ExitPoints { get; }      = new();
 
