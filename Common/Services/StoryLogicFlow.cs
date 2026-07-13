@@ -51,7 +51,7 @@ namespace DeusaldStoryCommon
     {
         private const int _GUARD = 4096;
 
-        public static List<StorageOp> StorageOps(StoryLogicNode logic)
+        public static List<StorageOp> StorageOps(StoryLogicNode logic, StoryRenderTarget target = StoryRenderTarget.App)
         {
             List<StorageOp> ops     = new();
             HashSet<Guid>   visited = new(); // node ids already emitted (so we don't duplicate them below)
@@ -91,6 +91,10 @@ namespace DeusaldStoryCommon
                 else if (logic.SetExternalVariableNodes.Find(n => n.FlowIn.Id == to) is StorySetExternalVariableNode se)
                 {
                     from = se.FlowOut.Id; // external-variable set — not a storage op, pass through
+                }
+                else if (logic.AppGamebookFlowSplitterNodes.Find(n => n.FlowIn.Id == to) is StoryAppGamebookFlowSplitterNode fs)
+                {
+                    from = target == StoryRenderTarget.App ? fs.AppFlowOut.Id : fs.GamebookFlowOut.Id; // follow the rendered medium's branch
                 }
                 else
                 {

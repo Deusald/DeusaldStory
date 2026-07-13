@@ -78,6 +78,12 @@ namespace DeusaldStoryCommon
         /// <summary>Choice nodes on the flow spine — each presents the player with a set of branches (one exit per choice).</summary>
         public List<StoryChoiceNode> ChoiceNodes { get; } = new();
 
+        /// <summary>App/Gamebook text-splitter nodes — each emits one of two texts depending on the render target.</summary>
+        public List<StoryAppGamebookTextSplitterNode> AppGamebookTextSplitterNodes { get; } = new();
+
+        /// <summary>App/Gamebook flow-splitter nodes on the flow spine — each routes the spine by the render target.</summary>
+        public List<StoryAppGamebookFlowSplitterNode> AppGamebookFlowSplitterNodes { get; } = new();
+
         /// <summary>Wires between the inner graph's connection points (Entry/Exit ports and content-node ports).</summary>
         public List<StoryConnection> ContentConnections { get; } = new();
     }

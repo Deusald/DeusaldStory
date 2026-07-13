@@ -139,7 +139,7 @@
     }
 
     private StoryLogicRenderer.RenderedLogic Render() =>
-        StoryLogicRenderer.Render(_ProjectState.CurrentProject!, _ProjectState.CurrentLocalization, Logic, Values, _Paper);
+        StoryLogicRenderer.Render(_ProjectState.CurrentProject!, _ProjectState.CurrentLocalization, Logic, Values, _Paper, StoryRenderTarget.App);
 
     /// <summary>
     /// Renders preview text with a whitelist of basic formatting tags (b/i/br/…) plus the project-image tags

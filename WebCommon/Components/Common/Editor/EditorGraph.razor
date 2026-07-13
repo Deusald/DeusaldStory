@@ -338,7 +338,8 @@
         n.Kind is StoryNodeKind.Logic or StoryNodeKind.Container
                or StoryNodeKind.LogicEntry or StoryNodeKind.LogicExit
                or StoryNodeKind.LightDarkSwitch or StoryNodeKind.SmartFormat
-               or StoryNodeKind.FlowText or StoryNodeKind.Choice;
+               or StoryNodeKind.FlowText or StoryNodeKind.Choice
+               or StoryNodeKind.AppGamebookTextSplitter or StoryNodeKind.AppGamebookFlowSplitter;
 
     /// <summary>
     /// True when a wire is being dragged and this input port is a valid drop target for its source: same signal type,
@@ -522,6 +523,8 @@
         StoryNodeKind.FlowText         => "flow text node",
         StoryNodeKind.SetExternalVariable => "set external variable node",
         StoryNodeKind.Choice              => "choice node",
+        StoryNodeKind.AppGamebookTextSplitter => "App/Gamebook text splitter",
+        StoryNodeKind.AppGamebookFlowSplitter => "App/Gamebook flow splitter",
         _                       => "node"
     };
 

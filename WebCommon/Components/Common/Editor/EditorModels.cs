@@ -68,7 +68,9 @@ namespace DeusaldStoryWeb
         SetVariable,        // inside a logic node: on the flow spine, sets an already-registered variable's value (blue)
         UnregisterVariable, // inside a logic node: on the flow spine, releases a registered variable and frees its slot (red)
         SetExternalVariable, // inside a logic node: on the flow spine, assigns a value to a story-wide external variable (blue)
-        Choice              // inside a logic node: on the flow spine, offers the player a set of branches (one exit each) (accent)
+        Choice,             // inside a logic node: on the flow spine, offers the player a set of branches (one exit each) (accent)
+        AppGamebookTextSplitter, // inside a logic node: emits one of two texts depending on the render target (App/Gamebook) (purple)
+        AppGamebookFlowSplitter  // inside a logic node: on the flow spine, routes flow by the render target (App/Gamebook) (amber)
     }
 
     /// <summary>A point on the graph canvas in world (un-panned, un-scaled) coordinates.</summary>
@@ -513,6 +515,44 @@ namespace DeusaldStoryWeb
                 nodes.Add(node);
             }
 
+            // ── App/Gamebook text-splitter nodes (purple) — two text inputs, one text output selected by render target. ──
+            foreach (StoryAppGamebookTextSplitterNode ts in logic.AppGamebookTextSplitterNodes)
+            {
+                EdNode node = new()
+                {
+                    Id        = ts.Id,
+                    Kind      = StoryNodeKind.AppGamebookTextSplitter,
+                    Title     = "App / Gamebook Text",
+                    X         = ts.X,
+                    Y         = ts.Y,
+                    Deletable = true,
+                    Editable  = false
+                };
+                node.Inputs.Add(new EdPort  { Id = ts.AppTextIn.Id,      Name = "App",      Type = PortType.Text });
+                node.Inputs.Add(new EdPort  { Id = ts.GamebookTextIn.Id, Name = "Gamebook", Type = PortType.Text });
+                node.Outputs.Add(new EdPort { Id = ts.OutPoint.Id,       Name = "Text",     Type = PortType.Text });
+                nodes.Add(node);
+            }
+
+            // ── App/Gamebook flow-splitter nodes (amber) — one flow input, two flow outputs routed by render target. ──
+            foreach (StoryAppGamebookFlowSplitterNode fs in logic.AppGamebookFlowSplitterNodes)
+            {
+                EdNode node = new()
+                {
+                    Id        = fs.Id,
+                    Kind      = StoryNodeKind.AppGamebookFlowSplitter,
+                    Title     = "App / Gamebook Flow",
+                    X         = fs.X,
+                    Y         = fs.Y,
+                    Deletable = true,
+                    Editable  = false
+                };
+                node.Inputs.Add(new EdPort  { Id = fs.FlowIn.Id,          Name = "Flow",     Type = PortType.Flow });
+                node.Outputs.Add(new EdPort { Id = fs.AppFlowOut.Id,      Name = "App",      Type = PortType.Flow });
+                node.Outputs.Add(new EdPort { Id = fs.GamebookFlowOut.Id, Name = "Gamebook", Type = PortType.Flow });
+                nodes.Add(node);
+            }
+
             return nodes;
         }
 
@@ -591,6 +631,8 @@ namespace DeusaldStoryWeb
             StoryNodeKind.UnregisterVariable => "UNREGISTER VARIABLE",
             StoryNodeKind.SetExternalVariable => "SET EXTERNAL VARIABLE",
             StoryNodeKind.Choice              => "CHOICE",
+            StoryNodeKind.AppGamebookTextSplitter => "APP / GAMEBOOK TEXT",
+            StoryNodeKind.AppGamebookFlowSplitter => "APP / GAMEBOOK FLOW",
             _                       => ""
         };
 
@@ -617,6 +659,8 @@ namespace DeusaldStoryWeb
             StoryNodeKind.UnregisterVariable => "var(--danger)",
             StoryNodeKind.SetExternalVariable => "var(--info)",
             StoryNodeKind.Choice              => "var(--accent)",
+            StoryNodeKind.AppGamebookTextSplitter => "var(--purple)",
+            StoryNodeKind.AppGamebookFlowSplitter => "var(--warning)",
             _                       => "var(--text-dim)"
         };
     }

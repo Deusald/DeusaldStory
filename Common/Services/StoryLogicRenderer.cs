@@ -43,28 +43,30 @@ namespace DeusaldStoryCommon
         /// Resolves <paramref name="logic"/> against <paramref name="values"/> (story-variable id → value). When a
         /// referenced variable has no entry it falls back to the variable's first possible value.
         /// <paramref name="paper"/> selects the light side of any Light/Dark switch on the icon path.
+        /// <paramref name="target"/> selects which branch App/Gamebook splitter nodes take (App preview vs Gamebook).
         /// </summary>
         public static RenderedLogic Render(
             StoryProject project, LocProject? localization, StoryLogicNode logic,
-            IReadOnlyDictionary<Guid, string> values, bool paper)
+            IReadOnlyDictionary<Guid, string> values, bool paper, StoryRenderTarget target = StoryRenderTarget.App)
         {
-            WalkSpine(project, localization, logic, values, out List<string> blocks, out List<RenderedChoice> choices);
+            WalkSpine(project, localization, logic, values, target, out List<string> blocks, out List<RenderedChoice> choices);
             return new RenderedLogic
             {
-                Title        = ResolveText(project, localization, logic, values, FromPointInto(logic, logic.TitleIn.Id),    0),
-                Subtitle     = ResolveText(project, localization, logic, values, FromPointInto(logic, logic.SubtitleIn.Id), 0),
+                Title        = ResolveText(project, localization, logic, values, FromPointInto(logic, logic.TitleIn.Id),    target, 0),
+                Subtitle     = ResolveText(project, localization, logic, values, FromPointInto(logic, logic.SubtitleIn.Id), target, 0),
                 IconData     = ResolveIconImage(project, logic, FromPointInto(logic, logic.IconIn.Id), paper, 0),
                 Blocks       = blocks,
                 Choices      = choices,
-                Instructions = StoryStorageInstructions.For(project, localization, logic)
+                Instructions = StoryStorageInstructions.For(project, localization, logic, target)
             };
         }
 
         /// <summary>The choices offered at the end of <paramref name="logic"/>'s flow spine (empty when it has no Choice node).</summary>
         public static List<RenderedChoice> Choices(
-            StoryProject project, LocProject? localization, StoryLogicNode logic, IReadOnlyDictionary<Guid, string> values)
+            StoryProject project, LocProject? localization, StoryLogicNode logic,
+            IReadOnlyDictionary<Guid, string> values, StoryRenderTarget target = StoryRenderTarget.App)
         {
-            WalkSpine(project, localization, logic, values, out _, out List<RenderedChoice> choices);
+            WalkSpine(project, localization, logic, values, target, out _, out List<RenderedChoice> choices);
             return choices;
         }
 
@@ -78,7 +80,7 @@ namespace DeusaldStoryCommon
         /// </summary>
         private static void WalkSpine(
             StoryProject project, LocProject? localization, StoryLogicNode logic, IReadOnlyDictionary<Guid, string> values,
-            out List<string> blocks, out List<RenderedChoice> choices)
+            StoryRenderTarget renderTarget, out List<string> blocks, out List<RenderedChoice> choices)
         {
             blocks  = new();
             choices = new();
@@ -88,7 +90,7 @@ namespace DeusaldStoryCommon
             {
                 if (logic.FlowTextNodes.Find(n => n.FlowIn.Id == target) is StoryFlowTextNode ft)
                 {
-                    blocks.Add(ResolveText(project, localization, logic, values, FromPointInto(logic, ft.TextIn.Id), 0));
+                    blocks.Add(ResolveText(project, localization, logic, values, FromPointInto(logic, ft.TextIn.Id), renderTarget, 0));
                     target = FlowTargetOf(logic, ft.FlowOut.Id);
                 }
                 else if (logic.ChoiceNodes.Find(n => n.FlowIn.Id == target) is StoryChoiceNode choice)
@@ -96,11 +98,13 @@ namespace DeusaldStoryCommon
                     foreach (StoryChoiceOption option in choice.Options)
                         choices.Add(new RenderedChoice
                         {
-                            Text        = ResolveText(project, localization, logic, values, FromPointInto(logic, option.TextIn.Id), 0),
+                            Text        = ResolveText(project, localization, logic, values, FromPointInto(logic, option.TextIn.Id), renderTarget, 0),
                             ExitPointId = FlowTargetOf(logic, option.FlowOut.Id)
                         });
                     break; // a choice branches out to exits — the spine ends here
                 }
+                else if (logic.AppGamebookFlowSplitterNodes.Find(n => n.FlowIn.Id == target) is StoryAppGamebookFlowSplitterNode fs)
+                    target = FlowTargetOf(logic, renderTarget == StoryRenderTarget.App ? fs.AppFlowOut.Id : fs.GamebookFlowOut.Id);
                 else if (logic.SetExternalVariableNodes.Find(n => n.FlowIn.Id == target) is StorySetExternalVariableNode se)
                     target = FlowTargetOf(logic, se.FlowOut.Id);
                 else if (logic.RegisterVariableNodes.Find(n => n.FlowIn.Id == target) is StoryRegisterVariableNode reg)
@@ -121,16 +125,23 @@ namespace DeusaldStoryCommon
 
         private static string ResolveText(
             StoryProject project, LocProject? localization, StoryLogicNode logic,
-            IReadOnlyDictionary<Guid, string> values, Guid fromPoint, int depth)
+            IReadOnlyDictionary<Guid, string> values, Guid fromPoint, StoryRenderTarget target, int depth)
         {
             if (fromPoint == Guid.Empty || depth > 8) return "";
 
             if (logic.LocalizationNodes.Find(n => n.OutPoint.Id == fromPoint) is StoryLocalizationNode locNode)
                 return LocalizedText(localization, locNode.SelectedKeyId);
 
+            if (logic.AppGamebookTextSplitterNodes.Find(n => n.OutPoint.Id == fromPoint) is StoryAppGamebookTextSplitterNode ts)
+            {
+                // Emit the branch for the medium being rendered; an unconnected branch resolves to empty text.
+                Guid input = target == StoryRenderTarget.App ? ts.AppTextIn.Id : ts.GamebookTextIn.Id;
+                return ResolveText(project, localization, logic, values, FromPointInto(logic, input), target, depth + 1);
+            }
+
             if (logic.SmartFormatNodes.Find(n => n.OutPoint.Id == fromPoint) is StorySmartFormatNode sf)
             {
-                string format = ResolveText(project, localization, logic, values, FromPointInto(logic, sf.LocalizationIn.Id), depth + 1);
+                string format = ResolveText(project, localization, logic, values, FromPointInto(logic, sf.LocalizationIn.Id), target, depth + 1);
 
                 Dictionary<string, object> vals = new(StringComparer.OrdinalIgnoreCase);
                 foreach (StoryConnection c in logic.ContentConnections.Where(c => c.ToPoint == sf.VariablesIn.Id))

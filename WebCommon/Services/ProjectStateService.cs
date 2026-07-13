@@ -725,6 +725,57 @@ public class ProjectStateService(
         MarkKeyDirty(logicId);
     }
 
+    /// <summary>Adds an App/Gamebook text-splitter node (emits one of two texts by render target) to a logic node's inner graph.</summary>
+    public StoryAppGamebookTextSplitterNode? AddAppGamebookTextSplitterNode(Guid logicId, double x, double y)
+    {
+        if (!CurrentProject!.LogicNodes.TryGetValue(logicId, out StoryLogicNode? logic)) return null;
+
+        StoryAppGamebookTextSplitterNode node = new() { X = x, Y = y };
+        logic.AppGamebookTextSplitterNodes.Add(node);
+        MarkKeyDirty(logicId);
+        return node;
+    }
+
+    /// <summary>Deletes an App/Gamebook text-splitter node and any inner wire that touched its text ports.</summary>
+    public void DeleteAppGamebookTextSplitterNode(Guid logicId, Guid nodeId)
+    {
+        if (!CurrentProject!.LogicNodes.TryGetValue(logicId, out StoryLogicNode? logic)) return;
+        StoryAppGamebookTextSplitterNode? node = logic.AppGamebookTextSplitterNodes.Find(n => n.Id == nodeId);
+        if (node is null) return;
+
+        logic.AppGamebookTextSplitterNodes.Remove(node);
+        logic.ContentConnections.RemoveAll(c =>
+            c.FromPoint == node.OutPoint.Id     || c.ToPoint == node.OutPoint.Id ||
+            c.ToPoint   == node.AppTextIn.Id    || c.ToPoint == node.GamebookTextIn.Id);
+        MarkKeyDirty(logicId);
+    }
+
+    /// <summary>Adds an App/Gamebook flow-splitter node (routes the flow spine by render target) to a logic node's inner graph.</summary>
+    public StoryAppGamebookFlowSplitterNode? AddAppGamebookFlowSplitterNode(Guid logicId, double x, double y)
+    {
+        if (!CurrentProject!.LogicNodes.TryGetValue(logicId, out StoryLogicNode? logic)) return null;
+
+        StoryAppGamebookFlowSplitterNode node = new() { X = x, Y = y };
+        logic.AppGamebookFlowSplitterNodes.Add(node);
+        MarkKeyDirty(logicId);
+        return node;
+    }
+
+    /// <summary>Deletes an App/Gamebook flow-splitter node and any inner wire that touched its flow ports.</summary>
+    public void DeleteAppGamebookFlowSplitterNode(Guid logicId, Guid nodeId)
+    {
+        if (!CurrentProject!.LogicNodes.TryGetValue(logicId, out StoryLogicNode? logic)) return;
+        StoryAppGamebookFlowSplitterNode? node = logic.AppGamebookFlowSplitterNodes.Find(n => n.Id == nodeId);
+        if (node is null) return;
+
+        logic.AppGamebookFlowSplitterNodes.Remove(node);
+        logic.ContentConnections.RemoveAll(c =>
+            c.FromPoint == node.FlowIn.Id          || c.ToPoint == node.FlowIn.Id          ||
+            c.FromPoint == node.AppFlowOut.Id      || c.ToPoint == node.AppFlowOut.Id      ||
+            c.FromPoint == node.GamebookFlowOut.Id || c.ToPoint == node.GamebookFlowOut.Id);
+        MarkKeyDirty(logicId);
+    }
+
     /// <summary>Sets which registered storage variables are released when the story reaches The End (edited on the End node).</summary>
     public void SetEndUnregister(IEnumerable<Guid> registeredVariableIds)
     {
@@ -886,6 +937,24 @@ public class ProjectStateService(
         {
             choice.X = x;
             choice.Y = y;
+            MarkKeyDirty(logicId);
+            return;
+        }
+
+        StoryAppGamebookTextSplitterNode? textSplit = logic.AppGamebookTextSplitterNodes.Find(n => n.Id == movedId);
+        if (textSplit is not null)
+        {
+            textSplit.X = x;
+            textSplit.Y = y;
+            MarkKeyDirty(logicId);
+            return;
+        }
+
+        StoryAppGamebookFlowSplitterNode? flowSplit = logic.AppGamebookFlowSplitterNodes.Find(n => n.Id == movedId);
+        if (flowSplit is not null)
+        {
+            flowSplit.X = x;
+            flowSplit.Y = y;
             MarkKeyDirty(logicId);
         }
     }

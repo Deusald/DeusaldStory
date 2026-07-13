@@ -67,7 +67,7 @@ namespace DeusaldStoryCommon
             StoryProject project, LocProject? localization, StoryLogicNode logic,
             List<StoryVariable> vars, Dictionary<Guid, string> values)
         {
-            StoryLogicRenderer.RenderedLogic rendered = StoryLogicRenderer.Render(project, localization, logic, values, paper: true);
+            StoryLogicRenderer.RenderedLogic rendered = StoryLogicRenderer.Render(project, localization, logic, values, paper: true, StoryRenderTarget.Gamebook);
             string                           label    = ComboLabel(vars, values);
 
             if (!logic.GamebookInstructions)
@@ -106,7 +106,7 @@ namespace DeusaldStoryCommon
             // "go to section" line. Choice text is resolved once with empty values (the preview uses each variable's
             // first possible value); node-driven variable branching is still enumerated per next-node combo below.
             List<StoryLogicRenderer.RenderedChoice> choices =
-                StoryLogicRenderer.Choices(project, localization, logic, new Dictionary<Guid, string>());
+                StoryLogicRenderer.Choices(project, localization, logic, new Dictionary<Guid, string>(), StoryRenderTarget.Gamebook);
             if (choices.Count > 0)
                 return BuildChoiceLines(project, localization, choices);
 

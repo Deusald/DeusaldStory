@@ -385,7 +385,9 @@
                 new NodePaletteItem(StoryNodeKind.SetVariable,        "bi-pencil-square",   "Set variable",          "On the flow spine — assigns a value to an already-registered variable."),
                 new NodePaletteItem(StoryNodeKind.UnregisterVariable, "bi-box-arrow-up",    "Unregister variable",   "On the flow spine — releases a registered variable and frees its slot."),
                 new NodePaletteItem(StoryNodeKind.SetExternalVariable, "bi-sliders",        "Set external variable", "On the flow spine — assigns a value to a story-wide external variable (App only; no Gamebook instruction)."),
-                new NodePaletteItem(StoryNodeKind.Choice,             "bi-signpost-split",  "Choice node",           "On the flow spine — offers the player a set of choices, each branching out to an exit.")
+                new NodePaletteItem(StoryNodeKind.Choice,             "bi-signpost-split",  "Choice node",           "On the flow spine — offers the player a set of choices, each branching out to an exit."),
+                new NodePaletteItem(StoryNodeKind.AppGamebookTextSplitter, "bi-fonts",       "App/Gamebook text splitter", "Emits its App text when rendering the app and its Gamebook text when rendering the printed gamebook (either may be empty)."),
+                new NodePaletteItem(StoryNodeKind.AppGamebookFlowSplitter, "bi-signpost-2",  "App/Gamebook flow splitter", "On the flow spine — routes flow down its App branch for the app and its Gamebook branch for the printed gamebook.")
             ]
             :
             [
@@ -427,6 +429,18 @@
             case StoryNodeKind.UnregisterVariable: _UnregisterPicker?.Show(Guid.Empty, Guid.Empty); break;
             case StoryNodeKind.SetExternalVariable: _SetExternalVariableModal?.Show();        break;
             case StoryNodeKind.Choice:              _NewChoiceNodeModal?.Show();              break;
+            case StoryNodeKind.AppGamebookTextSplitter:
+                // No config — the branch is chosen by the render target, so create it straight away.
+                if (_ProjectState.AddAppGamebookTextSplitterNode(_CurrentId, _PendingX, _PendingY) is StoryAppGamebookTextSplitterNode ags)
+                    _SelectedId = ags.Id;
+                RebuildNodes();
+                break;
+            case StoryNodeKind.AppGamebookFlowSplitter:
+                // No config — the branch is chosen by the render target, so create it straight away.
+                if (_ProjectState.AddAppGamebookFlowSplitterNode(_CurrentId, _PendingX, _PendingY) is StoryAppGamebookFlowSplitterNode agf)
+                    _SelectedId = agf.Id;
+                RebuildNodes();
+                break;
         }
     }
 
@@ -749,6 +763,8 @@
             case StoryNodeKind.UnregisterVariable: _ProjectState.DeleteUnregisterVariableNode(_CurrentId, node.Id); break;
             case StoryNodeKind.SetExternalVariable: _ProjectState.DeleteSetExternalVariableNode(_CurrentId, node.Id); break;
             case StoryNodeKind.Choice:              _ProjectState.DeleteChoiceNode(_CurrentId, node.Id);             break;
+            case StoryNodeKind.AppGamebookTextSplitter: _ProjectState.DeleteAppGamebookTextSplitterNode(_CurrentId, node.Id); break;
+            case StoryNodeKind.AppGamebookFlowSplitter: _ProjectState.DeleteAppGamebookFlowSplitterNode(_CurrentId, node.Id); break;
             default: return;
         }
 

@@ -16,10 +16,12 @@ namespace DeusaldStoryCommon
     public static class StoryStorageInstructions
     {
         /// <summary>The ordered instruction lines for <paramref name="logic"/>'s storage operations (empty when none).</summary>
-        public static List<string> For(StoryProject project, LocProject? localization, StoryLogicNode logic)
+        public static List<string> For(
+            StoryProject project, LocProject? localization, StoryLogicNode logic,
+            StoryRenderTarget target = StoryRenderTarget.App)
         {
             List<string> lines = new();
-            foreach (StorageOp op in StoryLogicFlow.StorageOps(logic))
+            foreach (StorageOp op in StoryLogicFlow.StorageOps(logic, target))
             {
                 string? line = op.Kind switch
                 {
