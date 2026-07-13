@@ -41,8 +41,9 @@
 </div>
 
 @code {
-    /// <summary>The panels the rail switches between. Only <see cref="Graph"/> and <see cref="Media"/> have a real
-    /// panel today; the rest highlight but keep the graph visible until their panels land.</summary>
+    /// <summary>The panels the rail switches between. <see cref="Graph"/>, <see cref="Media"/>,
+    /// <see cref="Localization"/> and <see cref="Variables"/> have a real panel today; the rest highlight but keep the
+    /// graph visible until their panels land.</summary>
     public enum Tool { Graph, Connections, Outline, Flow, Localization, Variables, Blocks, Media, Preview, Problems, History }
 
     /// <summary>Raised when the user picks a tool, so the editor can swap the centre panel.</summary>

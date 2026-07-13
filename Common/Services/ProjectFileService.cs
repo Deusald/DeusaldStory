@@ -34,7 +34,8 @@ namespace DeusaldStoryCommon
         public const string LOGIC_FOLDER           = "Logic";
         public const string PORTALS_FOLDER         = "Portals";
         public const string IMAGES_FOLDER          = "Images";
-        public const int    CURRENT_FORMAT_VERSION = 6;
+        public const string VARIABLES_FOLDER       = "Variables";
+        public const int    CURRENT_FORMAT_VERSION = 7;
 
         private static readonly JsonSerializerSettings _JsonSettings = new()
         {
@@ -79,6 +80,7 @@ namespace DeusaldStoryCommon
             List<StoryLogicNode>     logicNodes     = await ReadFolderAsync<StoryLogicNode>(store, LOGIC_FOLDER);
             List<StoryPortalNode>    portalNodes    = await ReadFolderAsync<StoryPortalNode>(store, PORTALS_FOLDER);
             List<StoryImage>         images         = await ReadFolderAsync<StoryImage>(store, IMAGES_FOLDER);
+            List<StoryVariable>      variables      = await ReadFolderAsync<StoryVariable>(store, VARIABLES_FOLDER);
 
             return new StoryProject
             {
@@ -86,7 +88,8 @@ namespace DeusaldStoryCommon
                 ContainerNodes = containerNodes.ToDictionary(k => k.Id),
                 LogicNodes     = logicNodes.ToDictionary(k => k.Id),
                 PortalNodes    = portalNodes.ToDictionary(k => k.Id),
-                Images         = images.ToDictionary(k => k.Id)
+                Images         = images.ToDictionary(k => k.Id),
+                Variables      = variables.ToDictionary(k => k.Id)
             };
         }
 
@@ -110,6 +113,7 @@ namespace DeusaldStoryCommon
             await SaveFolderAsync(store, LOGIC_FOLDER,      project.LogicNodes.Values.ToList(),     n => n.Id.ToString());
             await SaveFolderAsync(store, PORTALS_FOLDER,    project.PortalNodes.Values.ToList(),    n => n.Id.ToString());
             await SaveFolderAsync(store, IMAGES_FOLDER,     project.Images.Values.ToList(),         n => n.Id.ToString());
+            await SaveFolderAsync(store, VARIABLES_FOLDER,  project.Variables.Values.ToList(),      n => n.Id.ToString());
         }
 
         // ── Incremental Save ────────────────────
@@ -132,6 +136,7 @@ namespace DeusaldStoryCommon
             await UpdateFilesWithIdAsync(project.LogicNodes.Values.ToList(),     LOGIC_FOLDER);
             await UpdateFilesWithIdAsync(project.PortalNodes.Values.ToList(),    PORTALS_FOLDER);
             await UpdateFilesWithIdAsync(project.Images.Values.ToList(),         IMAGES_FOLDER);
+            await UpdateFilesWithIdAsync(project.Variables.Values.ToList(),      VARIABLES_FOLDER);
 
             async Task UpdateFilesWithIdAsync<T>(List<T> data, string folder) where T : IFileWithId
             {

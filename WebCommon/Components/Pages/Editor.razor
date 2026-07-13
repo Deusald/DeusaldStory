@@ -32,6 +32,11 @@
             @* The localization browser spans the whole centre; refresh re-projects the graph behind it. *@
             <LocalizationPanel OnRefresh="OnRefreshLocalization"/>
         }
+        else if (_ActiveTool == EditorRail.Tool.Variables)
+        {
+            @* The variables editor spans the whole centre (list + edit); only the rail stays. *@
+            <VariablesPanel/>
+        }
         else
         {
             <div class="ed-stage">

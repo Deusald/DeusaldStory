@@ -489,6 +489,48 @@ public class ProjectStateService(
         CurrentProject!.Images.Values.Any(
             i => i.Id != ignoreId && string.Equals(i.Name, name, StringComparison.OrdinalIgnoreCase));
 
+    // ── Variables ──────────────────────────────────────────────────────────────
+
+    /// <summary>Adds a new story-wide variable with <paramref name="name"/> (and no values yet). Marks it dirty.</summary>
+    public StoryVariable AddVariable(string name)
+    {
+        StoryVariable variable = new() { Name = name };
+        CurrentProject!.Variables.Add(variable.Id, variable);
+        MarkKeyDirty(variable.Id);
+        return variable;
+    }
+
+    /// <summary>Applies an edit to a variable: name, description, possible values and the linked condition key.</summary>
+    public void UpdateVariable(
+        Guid                id,
+        string              name,
+        string              description,
+        IEnumerable<string> possibleValues,
+        Guid                conditionKeyId)
+    {
+        if (!CurrentProject!.Variables.TryGetValue(id, out StoryVariable? variable)) return;
+        variable.Name           = name;
+        variable.Description    = description;
+        variable.PossibleValues = possibleValues.ToList();
+        variable.ConditionKeyId = conditionKeyId;
+        MarkKeyDirty(id);
+    }
+
+    /// <summary>Deletes a variable from the project. No-op when the id is unknown.</summary>
+    public void DeleteVariable(Guid id)
+    {
+        if (!CurrentProject!.Variables.Remove(id)) return;
+        MarkKeyDirty(id);
+    }
+
+    /// <summary>
+    /// True when <paramref name="name"/> is already used by another variable (case-insensitive). Pass the id being
+    /// edited as <paramref name="ignoreId"/> so a rename to the same name doesn't collide with itself.
+    /// </summary>
+    public bool IsVariableNameTaken(string name, Guid ignoreId = default) =>
+        CurrentProject!.Variables.Values.Any(
+            v => v.Id != ignoreId && string.Equals(v.Name, name, StringComparison.OrdinalIgnoreCase));
+
     /// <summary>
     /// Wires an output point (<paramref name="fromPoint"/>) to an input point (<paramref name="toPoint"/>) inside
     /// <paramref name="containerId"/>. An exit/output can only lead to one place, so any existing connection leaving

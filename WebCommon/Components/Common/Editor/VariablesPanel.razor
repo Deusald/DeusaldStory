@@ -1,0 +1,393 @@
+@namespace DeusaldStoryWeb.Components.Common
+@inject ProjectStateService _ProjectState
+@implements IDisposable
+
+@* ─────────────────────────────────────────────────────────────────────────
+   Story-wide variables editor, shown from the rail's Variables tool. Two
+   columns: the list of variables on the left (searchable, with Add), and the
+   editor for the selected variable on the right — its name, description and
+   possible values, plus a linked "gamebook condition" localization key with a
+   live SmartFormat preview the author can render against any chosen value.
+   ───────────────────────────────────────────────────────────────────────── *@
+
+<div class="var-root">
+
+    <div class="var-head">
+        <div class="var-head-text">
+            <div class="var-head-title">
+                <i class="bi bi-braces"></i>
+                <span>Variables</span>
+            </div>
+            <div class="var-head-sub">Story-wide values the gamebook reads and branches on.</div>
+        </div>
+    </div>
+
+    <div class="var-cols">
+
+        @* ── List column ─────────────────────────────────────────────────── *@
+        <div class="var-list-col">
+            <div class="var-search">
+                <i class="bi bi-search"></i>
+                <input class="modal-input" type="text"
+                       placeholder="Search variables…"
+                       @bind="_Search" @bind:event="oninput"/>
+            </div>
+
+            <button class="var-add" @onclick="AddVariable">
+                <i class="bi bi-plus-lg"></i>
+                <span>Add variable</span>
+            </button>
+
+            <div class="var-list">
+                @{
+                    List<StoryVariable> list = FilteredVariables().ToList();
+                }
+                @if (Project.Variables.Count == 0)
+                {
+                    <div class="var-list-empty">No variables yet — add one to get started.</div>
+                }
+                else if (list.Count == 0)
+                {
+                    <div class="var-list-empty">No variables match.</div>
+                }
+                else
+                {
+                    @foreach (StoryVariable v in list)
+                    {
+                        StoryVariable variable = v;
+                        <button class="var-item @(_SelectedId == variable.Id ? "selected" : "")"
+                                @onclick="() => Select(variable.Id)">
+                            <div class="var-item-name">
+                                @(string.IsNullOrWhiteSpace(variable.Name) ? "(unnamed)" : variable.Name)
+                            </div>
+                            <div class="var-item-sub">
+                                @variable.PossibleValues.Count value@(variable.PossibleValues.Count == 1 ? "" : "s")
+                            </div>
+                        </button>
+                    }
+                }
+            </div>
+        </div>
+
+        @* ── Edit column ─────────────────────────────────────────────────── *@
+        <div class="var-edit-col">
+            @if (Selected is not StoryVariable sel)
+            {
+                <div class="var-edit-empty">
+                    <i class="bi bi-braces"></i>
+                    <span>Select a variable to edit it, or add a new one.</span>
+                </div>
+            }
+            else
+            {
+                <div class="var-edit-scroll">
+
+                    <div class="var-edit-toolbar">
+                        <span class="var-edit-heading">Edit variable</span>
+                        <button class="var-delete" @onclick="() => DeleteVariable(sel)" title="Delete variable">
+                            <i class="bi bi-trash"></i>
+                            <span>Delete</span>
+                        </button>
+                    </div>
+
+                    @* Name *@
+                    <div class="modal-field">
+                        <label class="modal-label">Name</label>
+                        <input class="modal-input" type="text" maxlength="100"
+                               value="@sel.Name"
+                               @oninput="e => OnNameInput(sel, e)"/>
+                        @if (_NameError is not null)
+                        {
+                            <div class="modal-field-error">@_NameError</div>
+                        }
+                    </div>
+
+                    @* Description *@
+                    <div class="modal-field">
+                        <label class="modal-label">Description</label>
+                        <textarea class="modal-input var-textarea" rows="2" maxlength="500"
+                                  value="@sel.Description"
+                                  @oninput="e => OnDescriptionInput(sel, e)"></textarea>
+                    </div>
+
+                    @* Possible values *@
+                    <div class="modal-field">
+                        <label class="modal-label">Possible values</label>
+                        @if (sel.PossibleValues.Count == 0)
+                        {
+                            <div class="var-values-empty">No values yet.</div>
+                        }
+                        else
+                        {
+                            <div class="var-values">
+                                @for (int i = 0; i < sel.PossibleValues.Count; ++i)
+                                {
+                                    int index = i;
+                                    <div class="var-value-row">
+                                        <input class="modal-input" type="text" maxlength="200"
+                                               value="@sel.PossibleValues[index]"
+                                               @oninput="e => OnValueInput(sel, index, e)"/>
+                                        <button class="var-value-del" title="Remove value"
+                                                @onclick="() => RemoveValue(sel, index)">
+                                            <i class="bi bi-x-lg"></i>
+                                        </button>
+                                    </div>
+                                }
+                            </div>
+                        }
+                        <button class="var-value-add" @onclick="() => AddValue(sel)">
+                            <i class="bi bi-plus-lg"></i>
+                            <span>Add value</span>
+                        </button>
+                    </div>
+
+                    @* Condition localization key *@
+                    <div class="modal-field">
+                        <label class="modal-label">Gamebook condition key</label>
+                        <div class="var-cond">
+                            @{
+                                LocLocalizationKey? condKey = ConditionKey(sel);
+                            }
+                            @if (condKey is not null)
+                            {
+                                <div class="var-cond-name">
+                                    <i class="bi bi-translate"></i>
+                                    <span>@condKey.KeyName</span>
+                                </div>
+                            }
+                            else if (sel.ConditionKeyId != Guid.Empty)
+                            {
+                                <div class="var-cond-name var-cond-missing">
+                                    <i class="bi bi-exclamation-triangle"></i>
+                                    <span>Linked key not found</span>
+                                </div>
+                            }
+                            else
+                            {
+                                <div class="var-cond-name var-cond-none">No key linked.</div>
+                            }
+                            <div class="var-cond-actions">
+                                <button class="var-cond-btn" @onclick="() => PickKey(sel)">
+                                    <i class="bi bi-search"></i>
+                                    <span>@(sel.ConditionKeyId == Guid.Empty ? "Choose" : "Change")</span>
+                                </button>
+                                @if (sel.ConditionKeyId != Guid.Empty)
+                                {
+                                    <button class="var-cond-btn var-cond-btn-ghost" @onclick="() => ClearKey(sel)">
+                                        <i class="bi bi-x-lg"></i>
+                                        <span>Clear</span>
+                                    </button>
+                                }
+                            </div>
+                        </div>
+                    </div>
+
+                    @* SmartFormat preview *@
+                    @if (condKey is not null)
+                    {
+                        <div class="modal-field">
+                            <label class="modal-label">Preview</label>
+
+                            @if (sel.PossibleValues.Count > 0)
+                            {
+                                <div class="var-preview-pick">
+                                    <span class="var-preview-pick-label">@ValueLabel(sel) =</span>
+                                    <select class="modal-input var-preview-select"
+                                            value="@EffectivePreviewValue(sel)"
+                                            @onchange="OnPreviewSelect">
+                                        @foreach (string val in sel.PossibleValues)
+                                        {
+                                            <option value="@val">@(string.IsNullOrEmpty(val) ? "(empty)" : val)</option>
+                                        }
+                                    </select>
+                                </div>
+                            }
+                            else
+                            {
+                                <div class="var-preview-hint">Add a value above to preview against it.</div>
+                            }
+
+                            @{
+                                string template = MainText(condKey);
+                                string rendered = RenderPreview(sel, template, out string? previewError);
+                            }
+                            <div class="var-preview-template" title="Condition template (main language)">@template</div>
+                            <div class="var-preview-result">@rendered</div>
+                            @if (previewError is not null)
+                            {
+                                <div class="var-preview-error">
+                                    <i class="bi bi-exclamation-triangle"></i>
+                                    <span>@previewError</span>
+                                </div>
+                            }
+                        </div>
+                    }
+
+                </div>
+            }
+        </div>
+
+    </div>
+
+</div>
+
+<LocalizationKeyPickerModal @ref="_KeyPicker" OnConfirm="OnKeyPicked"/>
+
+@code {
+    private string _Search = "";
+    private Guid   _SelectedId;
+    private string _PreviewValue = "";
+    private string? _NameError;
+
+    private LocalizationKeyPickerModal? _KeyPicker;
+
+    private StoryProject   Project  => _ProjectState.CurrentProject!;
+    private LocProject?    Loc      => _ProjectState.CurrentLocalization;
+    private StoryVariable? Selected => Project.Variables.TryGetValue(_SelectedId, out StoryVariable? v) ? v : null;
+
+    protected override void OnInitialized() =>
+        _ProjectState.ProjectDataChanged += OnDataChanged;
+
+    // ── List ────────────────────────────────────────────────────────────────
+
+    private IEnumerable<StoryVariable> FilteredVariables()
+    {
+        IEnumerable<StoryVariable> vars = Project.Variables.Values;
+
+        string term = _Search.Trim();
+        if (term.Length > 0)
+            vars = vars.Where(v =>
+                v.Name.Contains(term, StringComparison.OrdinalIgnoreCase)        ||
+                v.Description.Contains(term, StringComparison.OrdinalIgnoreCase));
+
+        return vars.OrderBy(v => v.Name, StringComparer.OrdinalIgnoreCase);
+    }
+
+    private void Select(Guid id)
+    {
+        _SelectedId   = id;
+        _NameError    = null;
+        _PreviewValue = Selected?.PossibleValues.FirstOrDefault() ?? "";
+    }
+
+    private void AddVariable()
+    {
+        StoryVariable created = _ProjectState.AddVariable(UniqueName("Variable"));
+        Select(created.Id);
+    }
+
+    private void DeleteVariable(StoryVariable v)
+    {
+        _ProjectState.DeleteVariable(v.Id);
+        if (_SelectedId == v.Id) _SelectedId = Guid.Empty;
+    }
+
+    /// <summary>Derives a project-unique variable name from <paramref name="baseName"/>.</summary>
+    private string UniqueName(string baseName)
+    {
+        if (!_ProjectState.IsVariableNameTaken(baseName)) return baseName;
+        int suffix = 2;
+        while (_ProjectState.IsVariableNameTaken($"{baseName} {suffix}")) ++suffix;
+        return $"{baseName} {suffix}";
+    }
+
+    // ── Field edits (mutate the live variable, then mark dirty) ──────────────
+
+    private void OnNameInput(StoryVariable v, ChangeEventArgs e)
+    {
+        string value = e.Value?.ToString() ?? "";
+        v.Name = value;
+
+        if (string.IsNullOrWhiteSpace(value))               _NameError = "Name can't be empty.";
+        else if (_ProjectState.IsVariableNameTaken(value, v.Id)) _NameError = "Another variable uses that name.";
+        else                                                _NameError = null;
+
+        _ProjectState.MarkKeyDirty(v.Id);
+    }
+
+    private void OnDescriptionInput(StoryVariable v, ChangeEventArgs e)
+    {
+        v.Description = e.Value?.ToString() ?? "";
+        _ProjectState.MarkKeyDirty(v.Id);
+    }
+
+    private void OnValueInput(StoryVariable v, int index, ChangeEventArgs e)
+    {
+        if (index < 0 || index >= v.PossibleValues.Count) return;
+        v.PossibleValues[index] = e.Value?.ToString() ?? "";
+        _ProjectState.MarkKeyDirty(v.Id);
+    }
+
+    private void AddValue(StoryVariable v)
+    {
+        v.PossibleValues.Add("");
+        _ProjectState.MarkKeyDirty(v.Id);
+    }
+
+    private void RemoveValue(StoryVariable v, int index)
+    {
+        if (index < 0 || index >= v.PossibleValues.Count) return;
+        v.PossibleValues.RemoveAt(index);
+        _ProjectState.MarkKeyDirty(v.Id);
+    }
+
+    // ── Condition key ────────────────────────────────────────────────────────
+
+    private LocLocalizationKey? ConditionKey(StoryVariable v) =>
+        v.ConditionKeyId == Guid.Empty ? null : Loc?.Keys.Find(k => k.Id == v.ConditionKeyId);
+
+    private void PickKey(StoryVariable v) => _KeyPicker?.Show(v.Id, v.ConditionKeyId);
+
+    private void ClearKey(StoryVariable v)
+    {
+        v.ConditionKeyId = Guid.Empty;
+        _ProjectState.MarkKeyDirty(v.Id);
+    }
+
+    private void OnKeyPicked(LocalizationKeyPickerModal.LocalizationPickResult result)
+    {
+        if (!Project.Variables.TryGetValue(result.EditNodeId, out StoryVariable? v)) return;
+        v.ConditionKeyId = result.KeyId;
+        _ProjectState.MarkKeyDirty(v.Id);
+    }
+
+    // ── Preview ──────────────────────────────────────────────────────────────
+
+    private void OnPreviewSelect(ChangeEventArgs e) => _PreviewValue = e.Value?.ToString() ?? "";
+
+    private string ValueLabel(StoryVariable v) => string.IsNullOrWhiteSpace(v.Name) ? "value" : v.Name;
+
+    /// <summary>The preview value actually used — the picked one if it's still a valid value, else the first.</summary>
+    private string EffectivePreviewValue(StoryVariable v) =>
+        v.PossibleValues.Contains(_PreviewValue) ? _PreviewValue : v.PossibleValues.FirstOrDefault() ?? "";
+
+    /// <summary>
+    /// Renders <paramref name="template"/> with every variable resolved: this variable to the chosen preview value,
+    /// the rest to their first possible value (so a condition that references several still renders).
+    /// </summary>
+    private string RenderPreview(StoryVariable v, string template, out string? error)
+    {
+        Dictionary<string, object> values = new(StringComparer.OrdinalIgnoreCase);
+        foreach (StoryVariable other in Project.Variables.Values)
+        {
+            if (string.IsNullOrWhiteSpace(other.Name)) continue;
+            values[other.Name] = other.PossibleValues.FirstOrDefault() ?? "";
+        }
+        if (!string.IsNullOrWhiteSpace(v.Name))
+            values[v.Name] = EffectivePreviewValue(v);
+
+        return StoryConditionPreview.Render(template, values, out error);
+    }
+
+    /// <summary>The key's main-language text (empty when it has no source translation).</summary>
+    private string MainText(LocLocalizationKey key)
+    {
+        string? main = Loc?.Metadata.MainLanguageId;
+        if (string.IsNullOrEmpty(main)) return "";
+        return key.Translations.Find(t => t.LanguageId == main)?.Text ?? "";
+    }
+
+    private void OnDataChanged() => InvokeAsync(StateHasChanged);
+
+    public void Dispose() => _ProjectState.ProjectDataChanged -= OnDataChanged;
+}
