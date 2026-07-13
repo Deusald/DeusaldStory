@@ -1,0 +1,90 @@
+@namespace DeusaldStoryWeb.Components.Common
+@inject ProjectStateService _ProjectState
+@implements IDisposable
+
+@* ─────────────────────────────────────────────────────────────────────────
+   Diagnostics list, shown from the rail's Problems tool. Runs the graph
+   validator over the whole story and lists every issue — unconnected flow
+   connectors and storage-variable register/unregister mistakes. Clicking a row
+   navigates the graph to the offending node. Re-runs whenever the project data
+   changes.
+   ───────────────────────────────────────────────────────────────────────── *@
+
+<div class="prb-root">
+
+    <div class="prb-head">
+        <div class="prb-head-text">
+            <div class="prb-head-title">
+                <i class="bi bi-exclamation-triangle"></i>
+                <span>Problems</span>
+            </div>
+            <div class="prb-head-sub">Flow and variable issues found across the whole story.</div>
+        </div>
+        <button class="prb-recheck" @onclick="Revalidate" title="Re-check the story">
+            <i class="bi bi-arrow-clockwise"></i>
+            <span>Re-check</span>
+        </button>
+    </div>
+
+    <div class="prb-body">
+        @{
+            List<StoryProblem> problems = _Result?.Problems ?? new List<StoryProblem>();
+        }
+        @if (problems.Count == 0)
+        {
+            <div class="prb-empty">
+                <i class="bi bi-check-circle"></i>
+                <div class="prb-empty-title">No problems found</div>
+                <div class="prb-empty-sub">Every flow connector is wired and all storage variables balance.</div>
+            </div>
+        }
+        else
+        {
+            <div class="prb-count">@problems.Count issue@(problems.Count == 1 ? "" : "s")</div>
+            <div class="prb-list">
+                @foreach (StoryProblem p in problems)
+                {
+                    StoryProblem problem = p;
+                    <button class="prb-item prb-@(problem.Severity.ToString().ToLowerInvariant())"
+                            @onclick="() => Navigate(problem)">
+                        <span class="prb-item-icon">
+                            <i class="bi @(problem.Severity == StoryProblemSeverity.Error ? "bi-x-octagon-fill" : "bi-exclamation-triangle-fill")"></i>
+                        </span>
+                        <span class="prb-item-msg">@problem.Message</span>
+                        <span class="prb-item-go"><i class="bi bi-arrow-right-short"></i></span>
+                    </button>
+                }
+            </div>
+        }
+    </div>
+
+</div>
+
+@code {
+    /// <summary>Raised when the user clicks a problem, so the editor can navigate to it.</summary>
+    [Parameter] public EventCallback<StoryProblem> OnNavigate { get; set; }
+
+    private StoryValidationResult? _Result;
+
+    protected override void OnInitialized()
+    {
+        _ProjectState.ProjectDataChanged += OnDataChanged;
+        Revalidate();
+    }
+
+    private void Revalidate()
+    {
+        if (_ProjectState.CurrentProject is StoryProject project)
+            _Result = StoryGraphValidator.Validate(project, _ProjectState.CurrentLocalization);
+    }
+
+    private void OnDataChanged() => InvokeAsync(() =>
+    {
+        Revalidate();
+        StateHasChanged();
+    });
+
+    private async Task Navigate(StoryProblem problem) => await OnNavigate.InvokeAsync(problem);
+
+    public void Dispose() => _ProjectState.ProjectDataChanged -= OnDataChanged;
+}

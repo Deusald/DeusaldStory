@@ -191,3 +191,57 @@
     margin: 14px auto;
     border-radius: var(--r-sm);
 }
+
+/* ── Storage-variable player instructions (register/set/unregister ops) ── */
+.gbp-storage {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    margin: 0.6rem 0;
+    padding: 0.55rem 0.7rem;
+    border: 1px dashed var(--border);
+    border-radius: 0.4rem;
+    background: color-mix(in srgb, var(--success) 8%, transparent);
+}
+
+.gbp-storage-line {
+    display: flex;
+    align-items: baseline;
+    gap: 0.45rem;
+    font-size: 0.88rem;
+    line-height: 1.35;
+}
+
+.gbp-storage-line i {
+    flex: 0 0 auto;
+    color: var(--success);
+    font-size: 0.85em;
+}
+
+/* ── Inline storage-variable references (<var=Name> → slot label). ::deep reaches
+   the span injected via MarkupString (it carries no scope attribute). */
+.gbp-section ::deep .lpv-var {
+    display: inline-block;
+    padding: 0 0.32em;
+    border-radius: 0.3em;
+    font-family: var(--font-mono, monospace);
+    font-size: 0.92em;
+    font-weight: 600;
+    background: color-mix(in srgb, var(--accent) 18%, transparent);
+    color: var(--accent);
+}
+
+.gbp-section ::deep .lpv-var-number {
+    background: color-mix(in srgb, var(--info) 18%, transparent);
+    color: var(--info);
+}
+
+.gbp-section ::deep .lpv-var-dial {
+    background: color-mix(in srgb, var(--orange) 20%, transparent);
+    color: var(--orange);
+}
+
+.gbp-section ::deep .lpv-var-string {
+    background: color-mix(in srgb, var(--success) 18%, transparent);
+    color: var(--success);
+}

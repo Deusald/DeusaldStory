@@ -1,0 +1,178 @@
+@namespace DeusaldStoryWeb.Components.Common
+@inject ProjectStateService _ProjectState
+
+@* ─────────────────────────────────────────────────────────────────────────
+   Creates / edits a Set-variable node: picks an already-registered variable and
+   assigns it a new value (the "register unset, set it later" flow).
+   ───────────────────────────────────────────────────────────────────────── *@
+
+@if (_Visible)
+{
+    <div class="modal-backdrop" @onclick="Cancel"></div>
+
+    <div class="modal-box svm-box" @onclick:stopPropagation="true">
+
+        <div class="modal-header">
+            <span class="modal-title">@(_IsEdit ? "Edit set value" : "Set variable")</span>
+            <button class="modal-close" @onclick="Cancel" title="Close">
+                <i class="bi bi-x-lg"></i>
+            </button>
+        </div>
+
+        <div class="modal-body svm-body">
+
+            @{
+                List<StoryRegisterVariableNode> vars = RegisteredVariables();
+            }
+            @if (vars.Count == 0)
+            {
+                <div class="svm-empty">
+                    <i class="bi bi-box-seam"></i>
+                    <span>No variables registered yet — add a Register-variable node first.</span>
+                </div>
+            }
+            else
+            {
+                <div class="modal-field">
+                    <label class="modal-label">Variable</label>
+                    <div class="svm-list">
+                        @foreach (StoryRegisterVariableNode v in vars)
+                        {
+                            StoryRegisterVariableNode variable = v;
+                            <button class="svm-item @(_RegisteredVariableId == variable.Id ? "selected" : "")"
+                                    @onclick="() => _RegisteredVariableId = variable.Id">
+                                <span class="svm-item-name">@(string.IsNullOrWhiteSpace(variable.Name) ? "(unnamed)" : variable.Name)</span>
+                                <span class="svm-item-slot">@StorageSlots.Label(variable.Type, variable.SlotIndex)</span>
+                            </button>
+                        }
+                    </div>
+                </div>
+
+                @if (Selected is StoryRegisterVariableNode sel && sel.Type is StorageVariableType.Number or StorageVariableType.Dial)
+                {
+                    <div class="modal-field">
+                        <label class="modal-label">New value</label>
+                        <select class="modal-input" @bind="_Assignment">
+                            <option value="@NumberAssignment.Unset">Unset (clear it)</option>
+                            <option value="@NumberAssignment.SetSpecific">Set to a specific value</option>
+                            <option value="@NumberAssignment.Randomize">Randomize (roll / draw)</option>
+                        </select>
+                    </div>
+
+                    @if (_Assignment == NumberAssignment.SetSpecific)
+                    {
+                        <div class="modal-field">
+                            <label class="modal-label">Value</label>
+                            <input class="modal-input"
+                                   type="number"
+                                   min="@ValueMin(sel)"
+                                   max="@ValueMax(sel)"
+                                   @bind="_SpecificValue"
+                                   @bind:event="oninput"/>
+                        </div>
+                    }
+
+                    @if (sel.Type == StorageVariableType.Dial ||
+                        (sel.Type == StorageVariableType.Number && sel.Mode == NumberStorageMode.Token))
+                    {
+                        <div class="modal-field">
+                            <label class="svm-check">
+                                <input type="checkbox"
+                                       checked="@_Secret"
+                                       @onchange="e => _Secret = (bool)(e.Value ?? false)"/>
+                                <span>Secret</span>
+                            </label>
+                        </div>
+                    }
+                }
+            }
+
+        </div>
+
+        <div class="modal-footer">
+            <button class="modal-btn modal-btn-ghost" @onclick="Cancel">Cancel</button>
+            <button class="modal-btn modal-btn-primary"
+                    @onclick="Confirm"
+                    disabled="@(_RegisteredVariableId == Guid.Empty)">
+                @(_IsEdit ? "Save changes" : "Add set node")
+            </button>
+        </div>
+
+    </div>
+}
+
+@code {
+    [Parameter] public EventCallback<SetVariableArgs> OnConfirm { get; set; }
+
+    private bool _Visible;
+    private bool _IsEdit;
+    private Guid _EditNodeId;
+
+    private Guid             _RegisteredVariableId;
+    private NumberAssignment _Assignment = NumberAssignment.SetSpecific;
+    private bool             _Secret;
+    private int              _SpecificValue = 1;
+
+    /// <summary>Opens the modal to create a new Set-variable node.</summary>
+    public void Show()
+    {
+        _IsEdit               = false;
+        _EditNodeId           = Guid.Empty;
+        _RegisteredVariableId = Guid.Empty;
+        _Assignment           = NumberAssignment.SetSpecific;
+        _Secret               = false;
+        _SpecificValue        = 1;
+        _Visible              = true;
+        StateHasChanged();
+    }
+
+    /// <summary>Opens the modal to edit an existing Set-variable node.</summary>
+    public void ShowEdit(StorySetVariableNode node)
+    {
+        _IsEdit               = true;
+        _EditNodeId           = node.Id;
+        _RegisteredVariableId = node.RegisteredVariableId;
+        _Assignment           = node.Assignment;
+        _Secret               = node.Secret;
+        _SpecificValue        = node.SpecificValue;
+        _Visible              = true;
+        StateHasChanged();
+    }
+
+    private StoryRegisterVariableNode? Selected =>
+        _RegisteredVariableId == Guid.Empty ? null : EditorProjection.FindRegister(_ProjectState.CurrentProject!, _RegisteredVariableId);
+
+    private List<StoryRegisterVariableNode> RegisteredVariables()
+    {
+        List<StoryRegisterVariableNode> list = new();
+        foreach (StoryLogicNode logic in _ProjectState.CurrentProject!.LogicNodes.Values)
+            list.AddRange(logic.RegisterVariableNodes);
+        return list.OrderBy(v => v.Name, StringComparer.OrdinalIgnoreCase).ToList();
+    }
+
+    private static int ValueMin(StoryRegisterVariableNode v) => v.Type == StorageVariableType.Dial ? -7 : 1;
+    private static int ValueMax(StoryRegisterVariableNode v) => v.Type == StorageVariableType.Dial ? 7  : StorageSlots.ToNumber(v.ValueCount);
+
+    private async Task Confirm()
+    {
+        if (_RegisteredVariableId == Guid.Empty) return;
+        _Visible = false;
+
+        int specific = Selected is StoryRegisterVariableNode sel
+            ? Math.Clamp(_SpecificValue, ValueMin(sel), ValueMax(sel))
+            : _SpecificValue;
+
+        await OnConfirm.InvokeAsync(new SetVariableArgs(
+            _EditNodeId, _RegisteredVariableId, _Assignment, _Secret, specific));
+    }
+
+    private void Cancel() => _Visible = false;
+
+    /// <summary>Result passed back to the parent. <see cref="EditNodeId"/> is empty for a create, set for an edit.</summary>
+    public record SetVariableArgs(
+        Guid             EditNodeId,
+        Guid             RegisteredVariableId,
+        NumberAssignment Assignment,
+        bool             Secret,
+        int              SpecificValue);
+}

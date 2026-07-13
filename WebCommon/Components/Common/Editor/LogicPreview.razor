@@ -72,6 +72,16 @@
             }
         }
 
+        @if (_Rendered.Instructions.Count > 0)
+        {
+            <div class="lpv-storage">
+                @foreach (string line in _Rendered.Instructions)
+                {
+                    <div class="lpv-storage-line"><i class="bi bi-box-seam"></i> <span>@SafeHtml(line)</span></div>
+                }
+            </div>
+        }
+
         @* Continue button per exit — the app's dummy "next" that jumps the preview to the next logic node. *@
         <div class="lpv-continue">
             @foreach (StoryConnectionPoint exit in Logic.ExitPoints)
@@ -124,7 +134,17 @@
     /// Renders preview text with a whitelist of basic formatting tags (b/i/br/…) plus the project-image tags
     /// <c>&lt;icon=Name&gt;</c> (inline) and <c>&lt;sprite=Name&gt;</c> (standalone picture); everything else escaped.
     /// </summary>
-    private MarkupString SafeHtml(string text) => (MarkupString)PreviewHtmlSanitizer.ToSafeHtml(text, ResolveImageTag);
+    private MarkupString SafeHtml(string text) => (MarkupString)PreviewHtmlSanitizer.ToSafeHtml(text, ResolveImageTag, ResolveVariableTag);
+
+    /// <summary>Resolves a <c>&lt;var=Name&gt;</c> tag to a registered storage variable (case-insensitive name match),
+    /// so it renders as that variable's slot label. Returns null when nothing matches so the tag stays visible.</summary>
+    private StoryRegisterVariableNode? ResolveVariableTag(string name)
+    {
+        foreach (StoryLogicNode logic in _ProjectState.CurrentProject!.LogicNodes.Values)
+            if (logic.RegisterVariableNodes.Find(n => string.Equals(n.Name, name, StringComparison.OrdinalIgnoreCase)) is StoryRegisterVariableNode reg)
+                return reg;
+        return null;
+    }
 
     /// <summary>
     /// Resolves an <c>&lt;icon=Name&gt;</c> / <c>&lt;sprite=Name&gt;</c> tag to a project image (name match is

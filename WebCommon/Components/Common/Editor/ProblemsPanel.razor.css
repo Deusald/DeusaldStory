@@ -1,0 +1,146 @@
+.prb-root {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-width: 0;
+    height: 100%;
+    overflow: hidden;
+    background: var(--surface);
+}
+
+.prb-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.9rem 1.1rem;
+    border-bottom: 1px solid var(--border);
+}
+
+.prb-head-title {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-weight: 600;
+}
+
+.prb-head-sub {
+    margin-top: 0.15rem;
+    font-size: 0.8rem;
+    color: var(--text-dim);
+}
+
+.prb-recheck {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.35rem 0.7rem;
+    border: 1px solid var(--border);
+    border-radius: 0.4rem;
+    background: var(--surface-2);
+    color: var(--text);
+    cursor: pointer;
+    font-size: 0.85rem;
+}
+
+.prb-recheck:hover {
+    border-color: var(--accent);
+}
+
+.prb-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 0.75rem 1.1rem 1.5rem;
+}
+
+.prb-count {
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-dim);
+    margin-bottom: 0.5rem;
+}
+
+.prb-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+}
+
+.prb-item {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    width: 100%;
+    padding: 0.55rem 0.7rem;
+    border: 1px solid var(--border);
+    border-left-width: 3px;
+    border-radius: 0.4rem;
+    background: var(--surface-2);
+    color: var(--text);
+    cursor: pointer;
+    text-align: left;
+}
+
+.prb-item:hover {
+    border-color: var(--accent);
+}
+
+.prb-item.prb-error {
+    border-left-color: var(--danger);
+}
+
+.prb-item.prb-warning {
+    border-left-color: var(--warning);
+}
+
+.prb-item-icon {
+    flex: 0 0 auto;
+    display: inline-flex;
+}
+
+.prb-item.prb-error .prb-item-icon {
+    color: var(--danger);
+}
+
+.prb-item.prb-warning .prb-item-icon {
+    color: var(--warning);
+}
+
+.prb-item-msg {
+    flex: 1 1 auto;
+    min-width: 0;
+    font-size: 0.88rem;
+    line-height: 1.3;
+}
+
+.prb-item-go {
+    flex: 0 0 auto;
+    color: var(--text-dim);
+    font-size: 1.1rem;
+}
+
+.prb-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 3rem 1rem;
+    text-align: center;
+    color: var(--text-dim);
+}
+
+.prb-empty i {
+    font-size: 1.6rem;
+    color: var(--success);
+}
+
+.prb-empty-title {
+    font-weight: 600;
+    color: var(--text);
+}
+
+.prb-empty-sub {
+    font-size: 0.83rem;
+}

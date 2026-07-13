@@ -37,6 +37,11 @@
             @* The variables editor spans the whole centre (list + edit); only the rail stays. *@
             <VariablesPanel/>
         }
+        else if (_ActiveTool == EditorRail.Tool.Problems)
+        {
+            @* The problems list spans the whole centre; clicking a row navigates the graph behind it. *@
+            <ProblemsPanel OnNavigate="OnProblemNavigate"/>
+        }
         else
         {
             <div class="ed-stage">
@@ -104,6 +109,11 @@
                     @* In preview, the inspector column becomes the External Variables tweak panel that re-renders the preview. *@
                     <PreviewVariablesPanel Logic="inspectLogic" Values="_PreviewVars" ValuesChanged="StateHasChanged"/>
                 }
+                else if (_SelectedNode?.Kind == StoryNodeKind.End)
+                {
+                    @* The story End node: choose which whole-story storage variables are released here. *@
+                    <EndUnregisterEditor/>
+                }
                 else
                 {
                     <EditorInspector Node="_SelectedNode"/>
@@ -121,6 +131,9 @@
 <LocalizationKeyPickerModal @ref="_LocalizationPicker" OnConfirm="OnLocalizationPicked"/>
 <IconPickerModal           @ref="_IconPicker"          OnConfirm="OnIconPicked"/>
 <VariablePickerModal       @ref="_VariablePicker"      OnConfirm="OnVariablePicked"/>
+<RegisterVariableModal     @ref="_RegisterVariableModal" OnConfirm="OnRegisterVariableConfirmed"/>
+<SetVariableModal          @ref="_SetVariableModal"      OnConfirm="OnSetVariableConfirmed"/>
+<UnregisterVariablePickerModal @ref="_UnregisterPicker"  OnConfirm="OnUnregisterPicked"/>
 
 @code {
     private EditorMode        _Mode = EditorMode.Edit;
@@ -137,6 +150,9 @@
     private LocalizationKeyPickerModal? _LocalizationPicker;
     private IconPickerModal?           _IconPicker;
     private VariablePickerModal?       _VariablePicker;
+    private RegisterVariableModal?     _RegisterVariableModal;
+    private SetVariableModal?          _SetVariableModal;
+    private UnregisterVariablePickerModal? _UnregisterPicker;
 
     // Where the next created node is placed — the right-clicked canvas point (or a staggered default).
     private double _PendingX;
@@ -355,7 +371,10 @@
                 new NodePaletteItem(StoryNodeKind.LightDarkSwitch,  "bi-circle-half",     "Light/Dark switch",     "Outputs one of two icons depending on the render theme (dark or paper/light)."),
                 new NodePaletteItem(StoryNodeKind.SmartFormat,      "bi-braces-asterisk", "SmartFormat node",      "Formats a text with SmartFormat, substituting connected External Variable values."),
                 new NodePaletteItem(StoryNodeKind.ExternalVariable, "bi-braces",          "External Variable node", "Feeds a story variable's value into a SmartFormat node."),
-                new NodePaletteItem(StoryNodeKind.FlowText,         "bi-text-paragraph",  "FlowText node",         "On the flow spine — renders a connected text block, then continues to the next flow node.")
+                new NodePaletteItem(StoryNodeKind.FlowText,         "bi-text-paragraph",  "FlowText node",         "On the flow spine — renders a connected text block, then continues to the next flow node."),
+                new NodePaletteItem(StoryNodeKind.RegisterVariable,   "bi-box-seam",        "Register variable",     "On the flow spine — claims a physical storage slot for a new variable."),
+                new NodePaletteItem(StoryNodeKind.SetVariable,        "bi-pencil-square",   "Set variable",          "On the flow spine — assigns a value to an already-registered variable."),
+                new NodePaletteItem(StoryNodeKind.UnregisterVariable, "bi-box-arrow-up",    "Unregister variable",   "On the flow spine — releases a registered variable and frees its slot.")
             ]
             :
             [
@@ -392,6 +411,9 @@
                     _SelectedId = ft.Id;
                 RebuildNodes();
                 break;
+            case StoryNodeKind.RegisterVariable:   _RegisterVariableModal?.Show(ComputeFreeSlots()); break;
+            case StoryNodeKind.SetVariable:        _SetVariableModal?.Show();                break;
+            case StoryNodeKind.UnregisterVariable: _UnregisterPicker?.Show(Guid.Empty, Guid.Empty); break;
         }
     }
 
@@ -431,6 +453,104 @@
         }
         else if (_ProjectState.AddExternalVariableNode(_CurrentId, result.VariableId, _PendingX, _PendingY) is StoryExternalVariableNode node)
         {
+            _SelectedId = node.Id;
+        }
+        RebuildNodes();
+    }
+
+    /// <summary>The free storage slots per type on entry to the logic node being edited, so the Register modal only
+    /// offers slots that aren't already claimed on the path here. Null when not inside a logic node.</summary>
+    private IReadOnlyDictionary<StorageVariableType, IReadOnlyList<int>>? ComputeFreeSlots()
+    {
+        if (!_InLogic) return null;
+
+        StoryValidationResult result = StoryGraphValidator.Validate(Project);
+        Dictionary<StorageVariableType, IReadOnlyList<int>> dict = new();
+        foreach (StorageVariableType type in Enum.GetValues<StorageVariableType>())
+            if (result.FreeSlots(_CurrentId, type) is IReadOnlyList<int> free)
+                dict[type] = free;
+        return dict.Count > 0 ? dict : null;
+    }
+
+    /// <summary>Navigate to the graph location a validation problem points at (open its container, drill into the
+    /// logic node if it's an inner-graph issue, and select the offending node).</summary>
+    private void OnProblemNavigate(StoryProblem problem)
+    {
+        List<EditorCrumb>        crumbs = new();
+        List<StoryContainerNode> chain  = new();
+        Guid                     cur    = problem.ContainerId;
+        int                      guard  = 0;
+        while (cur != Guid.Empty
+               && Project.ContainerNodes.TryGetValue(cur, out StoryContainerNode? c)
+               && c.Id != Project.Metadata.RootStoryContainerNodeId
+               && guard++ < 64)
+        {
+            chain.Add(c);
+            cur = c.ParentContainer;
+        }
+        chain.Reverse();
+        foreach (StoryContainerNode c in chain)
+            crumbs.Add(new EditorCrumb(c.Id, c.Name, EditorScope.Container));
+
+        if (problem.LogicNodeId != Guid.Empty && problem.InnerNodeId != Guid.Empty
+            && Project.LogicNodes.TryGetValue(problem.LogicNodeId, out StoryLogicNode? lg))
+        {
+            crumbs.Add(new EditorCrumb(lg.Id, lg.Name, EditorScope.Logic));
+            _SelectedId = problem.InnerNodeId;
+        }
+        else if (problem.LogicNodeId != Guid.Empty)
+        {
+            _SelectedId = problem.LogicNodeId;
+        }
+        else
+        {
+            _SelectedId = Guid.Empty;
+        }
+
+        _Crumbs     = crumbs;
+        _ActiveTool = EditorRail.Tool.Graph;
+        _Mode       = EditorMode.Edit;
+        RebuildNodes();
+    }
+
+    private void OnRegisterVariableConfirmed(RegisterVariableModal.RegisterVariableArgs args)
+    {
+        Guid nodeId = args.EditNodeId;
+        if (nodeId == Guid.Empty)
+        {
+            if (_ProjectState.AddRegisterVariableNode(_CurrentId, _PendingX, _PendingY) is not StoryRegisterVariableNode created) return;
+            nodeId      = created.Id;
+            _SelectedId = created.Id;
+        }
+        _ProjectState.UpdateRegisterVariableNode(
+            _CurrentId, nodeId, args.Name, args.Description, args.Type, args.SlotIndex,
+            args.Mode, args.ValueCount, args.Secret, args.Assignment, args.SpecificValue, args.ConditionKeyId);
+        RebuildNodes();
+    }
+
+    private void OnSetVariableConfirmed(SetVariableModal.SetVariableArgs args)
+    {
+        Guid nodeId = args.EditNodeId;
+        if (nodeId == Guid.Empty)
+        {
+            if (_ProjectState.AddSetVariableNode(_CurrentId, _PendingX, _PendingY) is not StorySetVariableNode created) return;
+            nodeId      = created.Id;
+            _SelectedId = created.Id;
+        }
+        _ProjectState.UpdateSetVariableNode(
+            _CurrentId, nodeId, args.RegisteredVariableId, args.Assignment, args.Secret, args.SpecificValue);
+        RebuildNodes();
+    }
+
+    private void OnUnregisterPicked(UnregisterVariablePickerModal.UnregisterPickResult result)
+    {
+        if (result.EditNodeId != Guid.Empty)
+        {
+            _ProjectState.UpdateUnregisterVariableNode(_CurrentId, result.EditNodeId, result.RegisteredVariableId);
+        }
+        else if (_ProjectState.AddUnregisterVariableNode(_CurrentId, _PendingX, _PendingY) is StoryUnregisterVariableNode node)
+        {
+            _ProjectState.UpdateUnregisterVariableNode(_CurrentId, node.Id, result.RegisteredVariableId);
             _SelectedId = node.Id;
         }
         RebuildNodes();
@@ -535,6 +655,21 @@
                 if (_CurrentLogicNode?.ExternalVariableNodes.Find(n => n.Id == node.Id) is StoryExternalVariableNode ev)
                     _VariablePicker?.Show(ev.Id, ev.SelectedVariableId);
                 break;
+
+            case StoryNodeKind.RegisterVariable:
+                if (_CurrentLogicNode?.RegisterVariableNodes.Find(n => n.Id == node.Id) is StoryRegisterVariableNode reg)
+                    _RegisterVariableModal?.ShowEdit(reg, ComputeFreeSlots());
+                break;
+
+            case StoryNodeKind.SetVariable:
+                if (_CurrentLogicNode?.SetVariableNodes.Find(n => n.Id == node.Id) is StorySetVariableNode setNode)
+                    _SetVariableModal?.ShowEdit(setNode);
+                break;
+
+            case StoryNodeKind.UnregisterVariable:
+                if (_CurrentLogicNode?.UnregisterVariableNodes.Find(n => n.Id == node.Id) is StoryUnregisterVariableNode unreg)
+                    _UnregisterPicker?.Show(unreg.Id, unreg.RegisteredVariableId);
+                break;
         }
     }
 
@@ -556,6 +691,9 @@
             case StoryNodeKind.SmartFormat:     _ProjectState.DeleteSmartFormatNode(_CurrentId, node.Id);     break;
             case StoryNodeKind.ExternalVariable: _ProjectState.DeleteExternalVariableNode(_CurrentId, node.Id); break;
             case StoryNodeKind.FlowText:         _ProjectState.DeleteFlowTextNode(_CurrentId, node.Id);        break;
+            case StoryNodeKind.RegisterVariable:   _ProjectState.DeleteRegisterVariableNode(_CurrentId, node.Id);   break;
+            case StoryNodeKind.SetVariable:        _ProjectState.DeleteSetVariableNode(_CurrentId, node.Id);        break;
+            case StoryNodeKind.UnregisterVariable: _ProjectState.DeleteUnregisterVariableNode(_CurrentId, node.Id); break;
             default: return;
         }
 

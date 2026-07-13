@@ -63,6 +63,15 @@ namespace DeusaldStoryCommon
         /// <summary>FlowText nodes placed in the inner graph — the flow spine that renders text blocks in order.</summary>
         public List<StoryFlowTextNode> FlowTextNodes { get; } = new();
 
+        /// <summary>Register-variable nodes on the flow spine — each claims a physical storage slot for a new variable.</summary>
+        public List<StoryRegisterVariableNode> RegisterVariableNodes { get; } = new();
+
+        /// <summary>Set-variable nodes on the flow spine — each assigns a value to an already-registered variable.</summary>
+        public List<StorySetVariableNode> SetVariableNodes { get; } = new();
+
+        /// <summary>Unregister-variable nodes on the flow spine — each releases a registered variable and frees its slot.</summary>
+        public List<StoryUnregisterVariableNode> UnregisterVariableNodes { get; } = new();
+
         /// <summary>Wires between the inner graph's connection points (Entry/Exit ports and content-node ports).</summary>
         public List<StoryConnection> ContentConnections { get; } = new();
     }

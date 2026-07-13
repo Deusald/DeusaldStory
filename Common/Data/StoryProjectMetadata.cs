@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 
 namespace DeusaldStoryCommon
 {
@@ -11,6 +12,13 @@ namespace DeusaldStoryCommon
         public DateTime UpdatedAt                { get; set; } = DateTime.UtcNow;
         public Guid     RootStoryContainerNodeId { get; set; } = Guid.Empty;
         public int      FormatVersion            { get; set; } = 1;
+
+        /// <summary>
+        /// Storage variables (by their <see cref="StoryRegisterVariableNode.Id"/>) that are released when the story
+        /// reaches The End — for variables that live through the entire story and so have no natural Unregister node.
+        /// The validator treats these as unregistered at End; the printed Gamebook clears their slots there.
+        /// </summary>
+        public List<Guid> UnregisterAtEnd { get; set; } = new();
 
         /// <summary>
         /// Platform-local reference to the linked Deusald Localization project: a folder path on desktop,

@@ -63,7 +63,10 @@ namespace DeusaldStoryWeb
         LightDarkSwitch, // inside a logic node: picks between two icons by render theme (info)
         SmartFormat,     // inside a logic node: formats a text with connected variable values (purple)
         ExternalVariable, // inside a logic node: picks a story variable, feeds a SmartFormat variables input (teal)
-        FlowText         // inside a logic node: on the flow spine, renders a text block then continues flow (amber)
+        FlowText,         // inside a logic node: on the flow spine, renders a text block then continues flow (amber)
+        RegisterVariable,   // inside a logic node: on the flow spine, claims a storage slot for a new variable (green)
+        SetVariable,        // inside a logic node: on the flow spine, sets an already-registered variable's value (blue)
+        UnregisterVariable  // inside a logic node: on the flow spine, releases a registered variable and frees its slot (red)
     }
 
     /// <summary>A point on the graph canvas in world (un-panned, un-scaled) coordinates.</summary>
@@ -411,8 +414,80 @@ namespace DeusaldStoryWeb
                 nodes.Add(node);
             }
 
+            // ── Register-variable nodes (green) — on the flow spine, claim a storage slot for a new variable. ──
+            foreach (StoryRegisterVariableNode reg in logic.RegisterVariableNodes)
+            {
+                EdNode node = new()
+                {
+                    Id        = reg.Id,
+                    Kind      = StoryNodeKind.RegisterVariable,
+                    Title     = string.IsNullOrWhiteSpace(reg.Name) ? "(unnamed variable)" : reg.Name,
+                    Subtitle  = $"{StorageSlots.Label(reg.Type, reg.SlotIndex)} · {reg.Type}",
+                    X         = reg.X,
+                    Y         = reg.Y,
+                    Deletable = true
+                };
+                node.Inputs.Add(new EdPort { Id = reg.FlowIn.Id, Name = "Flow", Type = PortType.Flow });
+                node.Outputs.Add(new EdPort { Id = reg.FlowOut.Id, Name = "Flow", Type = PortType.Flow });
+                nodes.Add(node);
+            }
+
+            // ── Set-variable nodes (blue) — on the flow spine, set an already-registered variable's value. ──
+            foreach (StorySetVariableNode set in logic.SetVariableNodes)
+            {
+                StoryRegisterVariableNode? target = FindRegister(project, set.RegisteredVariableId);
+                EdNode node = new()
+                {
+                    Id        = set.Id,
+                    Kind      = StoryNodeKind.SetVariable,
+                    Title     = target is not null ? $"Set {NameOf(target)}" : "Set (no variable)",
+                    Subtitle  = target is not null ? StorageSlots.Label(target.Type, target.SlotIndex) : "",
+                    X         = set.X,
+                    Y         = set.Y,
+                    Deletable = true
+                };
+                node.Inputs.Add(new EdPort { Id = set.FlowIn.Id, Name = "Flow", Type = PortType.Flow });
+                node.Outputs.Add(new EdPort { Id = set.FlowOut.Id, Name = "Flow", Type = PortType.Flow });
+                nodes.Add(node);
+            }
+
+            // ── Unregister-variable nodes (red) — on the flow spine, release a registered variable and free its slot. ──
+            foreach (StoryUnregisterVariableNode unreg in logic.UnregisterVariableNodes)
+            {
+                StoryRegisterVariableNode? target = FindRegister(project, unreg.RegisteredVariableId);
+                EdNode node = new()
+                {
+                    Id        = unreg.Id,
+                    Kind      = StoryNodeKind.UnregisterVariable,
+                    Title     = target is not null ? $"Unregister {NameOf(target)}" : "Unregister (no variable)",
+                    Subtitle  = target is not null ? StorageSlots.Label(target.Type, target.SlotIndex) : "",
+                    X         = unreg.X,
+                    Y         = unreg.Y,
+                    Deletable = true
+                };
+                node.Inputs.Add(new EdPort { Id = unreg.FlowIn.Id, Name = "Flow", Type = PortType.Flow });
+                node.Outputs.Add(new EdPort { Id = unreg.FlowOut.Id, Name = "Flow", Type = PortType.Flow });
+                nodes.Add(node);
+            }
+
             return nodes;
         }
+
+        /// <summary>Finds the Register-variable node with <paramref name="id"/> anywhere in the project's logic nodes.</summary>
+        public static StoryRegisterVariableNode? FindRegister(StoryProject project, Guid id)
+        {
+            if (id == Guid.Empty) return null;
+            foreach (StoryLogicNode logic in project.LogicNodes.Values)
+            {
+                StoryRegisterVariableNode? found = logic.RegisterVariableNodes.Find(n => n.Id == id);
+                if (found is not null) return found;
+            }
+            return null;
+        }
+
+        /// <summary>A registered variable's display name, falling back to a placeholder when unnamed.</summary>
+        private static string NameOf(StoryRegisterVariableNode reg) =>
+            string.IsNullOrWhiteSpace(reg.Name) ? "(unnamed variable)" : reg.Name;
 
         /// <summary>Projects a logic node's inner content connections into canvas edges.</summary>
         public static List<EdEdge> BuildLogicEdges(StoryLogicNode logic) =>
@@ -468,6 +543,9 @@ namespace DeusaldStoryWeb
             StoryNodeKind.SmartFormat      => "SMART FORMAT",
             StoryNodeKind.ExternalVariable => "EXTERNAL VARIABLE",
             StoryNodeKind.FlowText         => "FLOW TEXT",
+            StoryNodeKind.RegisterVariable   => "REGISTER VARIABLE",
+            StoryNodeKind.SetVariable        => "SET VARIABLE",
+            StoryNodeKind.UnregisterVariable => "UNREGISTER VARIABLE",
             _                       => ""
         };
 
@@ -489,6 +567,9 @@ namespace DeusaldStoryWeb
             StoryNodeKind.SmartFormat      => "var(--purple)",
             StoryNodeKind.ExternalVariable => "var(--code-func)",
             StoryNodeKind.FlowText         => "var(--warning)",
+            StoryNodeKind.RegisterVariable   => "var(--success)",
+            StoryNodeKind.SetVariable        => "var(--info)",
+            StoryNodeKind.UnregisterVariable => "var(--danger)",
             _                       => "var(--text-dim)"
         };
     }

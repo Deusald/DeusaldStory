@@ -1,0 +1,69 @@
+@namespace DeusaldStoryWeb.Components.Common
+@inject ProjectStateService _ProjectState
+
+@* ─────────────────────────────────────────────────────────────────────────
+   Inspector shown when the story's End node is selected. Lists the registered
+   storage variables and lets the author mark which ones are released at The End
+   — for variables that live through the whole story and so have no natural
+   Unregister node. The graph validator treats these as unregistered at End.
+   ───────────────────────────────────────────────────────────────────────── *@
+
+<div class="eue-root">
+
+    <div class="eue-header">
+        <span class="eue-kind" style="color:var(--danger)">
+            <span class="eue-kind-dot" style="background:var(--danger)"></span>
+            END
+        </span>
+        <div class="eue-title">The End</div>
+        <div class="eue-sub">Release any storage variables that stay registered through to the end of the story.</div>
+    </div>
+
+    <div class="eue-body">
+        @{
+            List<StoryRegisterVariableNode> vars = RegisteredVariables();
+        }
+        @if (vars.Count == 0)
+        {
+            <div class="eue-empty">No storage variables registered anywhere in the story yet.</div>
+        }
+        else
+        {
+            <div class="eue-section-head">Release at The End</div>
+            @foreach (StoryRegisterVariableNode v in vars)
+            {
+                StoryRegisterVariableNode variable = v;
+                <label class="eue-item">
+                    <input type="checkbox"
+                           checked="@IsReleased(variable.Id)"
+                           @onchange="e => Toggle(variable.Id, (bool)(e.Value ?? false))"/>
+                    <span class="eue-item-name">@(string.IsNullOrWhiteSpace(variable.Name) ? "(unnamed)" : variable.Name)</span>
+                    <span class="eue-item-slot">@StorageSlots.Label(variable.Type, variable.SlotIndex)</span>
+                </label>
+            }
+        }
+    </div>
+
+</div>
+
+@code {
+    private StoryProject Project => _ProjectState.CurrentProject!;
+
+    private List<StoryRegisterVariableNode> RegisteredVariables()
+    {
+        List<StoryRegisterVariableNode> list = new();
+        foreach (StoryLogicNode logic in Project.LogicNodes.Values)
+            list.AddRange(logic.RegisterVariableNodes);
+        return list.OrderBy(v => v.Name, StringComparer.OrdinalIgnoreCase).ToList();
+    }
+
+    private bool IsReleased(Guid registeredVariableId) => Project.Metadata.UnregisterAtEnd.Contains(registeredVariableId);
+
+    private void Toggle(Guid registeredVariableId, bool released)
+    {
+        HashSet<Guid> set = new(Project.Metadata.UnregisterAtEnd);
+        if (released) set.Add(registeredVariableId);
+        else          set.Remove(registeredVariableId);
+        _ProjectState.SetEndUnregister(set);
+    }
+}

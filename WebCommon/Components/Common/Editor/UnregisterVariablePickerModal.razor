@@ -1,0 +1,98 @@
+@namespace DeusaldStoryWeb.Components.Common
+@inject ProjectStateService _ProjectState
+
+@* ─────────────────────────────────────────────────────────────────────────
+   Picks a registered variable for an Unregister-variable node to release.
+   Used by both the create and edit flows.
+   ───────────────────────────────────────────────────────────────────────── *@
+
+@if (_Visible)
+{
+    <div class="modal-backdrop" @onclick="Cancel"></div>
+
+    <div class="modal-box uvp-box" @onclick:stopPropagation="true">
+
+        <div class="modal-header">
+            <span class="modal-title">Unregister variable</span>
+            <button class="modal-close" @onclick="Cancel" title="Close">
+                <i class="bi bi-x-lg"></i>
+            </button>
+        </div>
+
+        <div class="modal-body uvp-body">
+
+            @{
+                List<StoryRegisterVariableNode> vars = RegisteredVariables();
+            }
+            @if (vars.Count == 0)
+            {
+                <div class="uvp-empty">
+                    <i class="bi bi-box-seam"></i>
+                    <span>No variables registered yet — add a Register-variable node first.</span>
+                </div>
+            }
+            else
+            {
+                <div class="uvp-list">
+                    @foreach (StoryRegisterVariableNode v in vars)
+                    {
+                        StoryRegisterVariableNode variable = v;
+                        <button class="uvp-item @(_RegisteredVariableId == variable.Id ? "selected" : "")"
+                                @onclick="() => _RegisteredVariableId = variable.Id">
+                            <span class="uvp-item-name">@(string.IsNullOrWhiteSpace(variable.Name) ? "(unnamed)" : variable.Name)</span>
+                            <span class="uvp-item-slot">@StorageSlots.Label(variable.Type, variable.SlotIndex)</span>
+                        </button>
+                    }
+                </div>
+            }
+
+        </div>
+
+        <div class="modal-footer">
+            <button class="modal-btn modal-btn-ghost" @onclick="Cancel">Cancel</button>
+            <button class="modal-btn modal-btn-primary"
+                    @onclick="Confirm"
+                    disabled="@(_RegisteredVariableId == Guid.Empty)">
+                Select variable
+            </button>
+        </div>
+
+    </div>
+}
+
+@code {
+    [Parameter] public EventCallback<UnregisterPickResult> OnConfirm { get; set; }
+
+    private bool _Visible;
+    private Guid _EditNodeId;   // empty = creating a new node
+    private Guid _RegisteredVariableId;
+
+    /// <summary>Opens the picker. <paramref name="editNodeId"/> is empty to create a node, set to edit one.</summary>
+    public void Show(Guid editNodeId, Guid currentRegisteredVariableId)
+    {
+        _EditNodeId           = editNodeId;
+        _RegisteredVariableId = currentRegisteredVariableId;
+        _Visible              = true;
+        StateHasChanged();
+    }
+
+    private List<StoryRegisterVariableNode> RegisteredVariables()
+    {
+        List<StoryRegisterVariableNode> list = new();
+        foreach (StoryLogicNode logic in _ProjectState.CurrentProject!.LogicNodes.Values)
+            list.AddRange(logic.RegisterVariableNodes);
+        return list.OrderBy(v => v.Name, StringComparer.OrdinalIgnoreCase).ToList();
+    }
+
+    private async Task Confirm()
+    {
+        if (_RegisteredVariableId == Guid.Empty) return;
+        _Visible = false;
+        await OnConfirm.InvokeAsync(new UnregisterPickResult(_EditNodeId, _RegisteredVariableId));
+    }
+
+    private void Cancel() => _Visible = false;
+
+    /// <summary>Result passed back to the parent. <see cref="EditNodeId"/> is empty for a create, set for an edit.</summary>
+    public record UnregisterPickResult(Guid EditNodeId, Guid RegisteredVariableId);
+}

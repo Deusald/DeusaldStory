@@ -1,0 +1,277 @@
+@namespace DeusaldStoryWeb.Components.Common
+
+@* ─────────────────────────────────────────────────────────────────────────
+   Creates / edits a Register-variable node: defines a storage variable's
+   identity (name, description, storage type), claims a physical slot, and sets
+   how its initial value is assigned. Used by both the create and edit flows.
+   ───────────────────────────────────────────────────────────────────────── *@
+
+@if (_Visible)
+{
+    <div class="modal-backdrop" @onclick="Cancel"></div>
+
+    <div class="modal-box rvm-box" @onclick:stopPropagation="true">
+
+        <div class="modal-header">
+            <span class="modal-title">@(_IsEdit ? "Edit variable" : "Register variable")</span>
+            <button class="modal-close" @onclick="Cancel" title="Close">
+                <i class="bi bi-x-lg"></i>
+            </button>
+        </div>
+
+        <div class="modal-body">
+
+            @* ── Name ──────────────────────────────────────────────────── *@
+            <div class="modal-field">
+                <label class="modal-label">Name</label>
+                <input class="modal-input"
+                       type="text"
+                       placeholder="Secret treasure number"
+                       @bind="_Name"
+                       @bind:event="oninput"
+                       maxlength="100"/>
+            </div>
+
+            @* ── Description ───────────────────────────────────────────── *@
+            <div class="modal-field">
+                <label class="modal-label">
+                    Description
+                    <span class="modal-label-hint">optional</span>
+                </label>
+                <textarea class="modal-input rvm-textarea"
+                          placeholder="What this variable represents in the story…"
+                          @bind="_Description"
+                          @bind:event="oninput"
+                          rows="2"
+                          maxlength="500"></textarea>
+            </div>
+
+            @* ── Storage type + slot ───────────────────────────────────── *@
+            <div class="rvm-row">
+                <div class="modal-field rvm-grow">
+                    <label class="modal-label">Storage type</label>
+                    <select class="modal-input" @bind="_Type">
+                        <option value="@StorageVariableType.Number">Number (D6 / token)</option>
+                        <option value="@StorageVariableType.Dial">Dial (−7…7)</option>
+                        <option value="@StorageVariableType.String">String (written)</option>
+                    </select>
+                </div>
+                <div class="modal-field rvm-grow">
+                    <label class="modal-label">Slot</label>
+                    <select class="modal-input" @bind="_SlotIndex">
+                        @foreach (int i in AvailableSlots())
+                        {
+                            <option value="@i">@StorageSlots.Label(_Type, i)</option>
+                        }
+                    </select>
+                </div>
+            </div>
+
+            @if (_Type == StorageVariableType.Number)
+            {
+                @* ── Number storage mode + value count ──────────────────── *@
+                <div class="rvm-row">
+                    <div class="modal-field rvm-grow">
+                        <label class="modal-label">Stored with</label>
+                        <select class="modal-input" @bind="_Mode">
+                            <option value="@NumberStorageMode.Dice">D6 die</option>
+                            <option value="@NumberStorageMode.Token">Number token</option>
+                        </select>
+                    </div>
+                    <div class="modal-field rvm-grow">
+                        <label class="modal-label">Values</label>
+                        <select class="modal-input" @bind="_ValueCount">
+                            <option value="@NumberValueCount.One">1 — presence flag</option>
+                            <option value="@NumberValueCount.Two">2 — even / odd</option>
+                            <option value="@NumberValueCount.Three">3 — 1&2 / 3&4 / 5&6</option>
+                            <option value="@NumberValueCount.Four">4 — 1 / 2 / 3 / 4</option>
+                            <option value="@NumberValueCount.Five">5 — 1 … 5</option>
+                            <option value="@NumberValueCount.Six">6 — 1 … 6</option>
+                        </select>
+                    </div>
+                </div>
+            }
+
+            @if (_Type is StorageVariableType.Number or StorageVariableType.Dial)
+            {
+                @* ── Assignment ────────────────────────────────────────── *@
+                <div class="modal-field">
+                    <label class="modal-label">Initial value</label>
+                    <select class="modal-input" @bind="_Assignment">
+                        <option value="@NumberAssignment.Unset">Leave unset (no instruction)</option>
+                        <option value="@NumberAssignment.SetSpecific">Set to a specific value</option>
+                        <option value="@NumberAssignment.Randomize">Randomize (roll / draw)</option>
+                    </select>
+                </div>
+
+                @if (_Assignment == NumberAssignment.SetSpecific)
+                {
+                    <div class="modal-field">
+                        <label class="modal-label">Value</label>
+                        <input class="modal-input"
+                               type="number"
+                               min="@ValueMin"
+                               max="@ValueMax"
+                               @bind="_SpecificValue"
+                               @bind:event="oninput"/>
+                    </div>
+                }
+
+                @if (_Type == StorageVariableType.Dial ||
+                    (_Type == StorageVariableType.Number && _Mode == NumberStorageMode.Token))
+                {
+                    <div class="modal-field">
+                        <label class="rvm-check">
+                            <input type="checkbox"
+                                   checked="@_Secret"
+                                   @onchange="e => _Secret = (bool)(e.Value ?? false)"/>
+                            <span>
+                                Secret
+                                <span class="modal-label-hint">players set / draw it without learning the value until told</span>
+                            </span>
+                        </label>
+                    </div>
+                }
+            }
+
+        </div>
+
+        <div class="modal-footer">
+            <button class="modal-btn modal-btn-ghost" @onclick="Cancel">Cancel</button>
+            <button class="modal-btn modal-btn-primary"
+                    @onclick="Confirm"
+                    disabled="@(!_CanConfirm)">
+                @(_IsEdit ? "Save changes" : "Register")
+            </button>
+        </div>
+
+    </div>
+}
+
+@code {
+    [Parameter] public EventCallback<RegisterVariableArgs> OnConfirm { get; set; }
+
+    /// <summary>Free slot indices per type at the target node, supplied when opening. Null for a type = list every slot.</summary>
+    private IReadOnlyDictionary<StorageVariableType, IReadOnlyList<int>>? FreeSlots;
+
+    private bool _Visible;
+    private bool _IsEdit;
+    private Guid _EditNodeId;
+
+    private string              _Name        = "";
+    private string              _Description = "";
+    private StorageVariableType _Type        = StorageVariableType.Number;
+    private int                 _SlotIndex;
+    private NumberStorageMode   _Mode        = NumberStorageMode.Dice;
+    private NumberValueCount    _ValueCount  = NumberValueCount.Six;
+    private bool                _Secret;
+    private NumberAssignment    _Assignment  = NumberAssignment.Unset;
+    private int                 _SpecificValue;
+    private Guid                _ConditionKeyId;
+
+    /// <summary>Opens the modal to register a brand-new variable. <paramref name="freeSlots"/> restricts the slot list.</summary>
+    public void Show(IReadOnlyDictionary<StorageVariableType, IReadOnlyList<int>>? freeSlots = null)
+    {
+        FreeSlots       = freeSlots;
+        _IsEdit         = false;
+        _EditNodeId     = Guid.Empty;
+        _Name           = "";
+        _Description    = "";
+        _Type           = StorageVariableType.Number;
+        _SlotIndex      = FirstFreeSlot(StorageVariableType.Number);
+        _Mode           = NumberStorageMode.Dice;
+        _ValueCount     = NumberValueCount.Six;
+        _Secret         = false;
+        _Assignment     = NumberAssignment.Unset;
+        _SpecificValue  = 1;
+        _ConditionKeyId = Guid.Empty;
+        _Visible        = true;
+        StateHasChanged();
+    }
+
+    /// <summary>Opens the modal to edit an existing Register-variable node. <paramref name="freeSlots"/> restricts the slot list.</summary>
+    public void ShowEdit(StoryRegisterVariableNode node, IReadOnlyDictionary<StorageVariableType, IReadOnlyList<int>>? freeSlots = null)
+    {
+        FreeSlots       = freeSlots;
+        _IsEdit         = true;
+        _EditNodeId     = node.Id;
+        _Name           = node.Name;
+        _Description    = node.Description;
+        _Type           = node.Type;
+        _SlotIndex      = node.SlotIndex;
+        _Mode           = node.Mode;
+        _ValueCount     = node.ValueCount;
+        _Secret         = node.Secret;
+        _Assignment     = node.Assignment;
+        _SpecificValue  = node.SpecificValue;
+        _ConditionKeyId = node.ConditionKeyId;
+        _Visible        = true;
+        StateHasChanged();
+    }
+
+    // The value the currently-edited node already sits on is always offered even if "occupied" by itself.
+    private IEnumerable<int> AvailableSlots()
+    {
+        List<int> slots = new();
+        if (FreeSlots is not null && FreeSlots.TryGetValue(_Type, out IReadOnlyList<int>? free))
+            slots.AddRange(free);
+        else
+            for (int i = 0; i < StorageSlots.Count(_Type); ++i) slots.Add(i);
+
+        if (_IsEdit && !slots.Contains(_SlotIndex)) slots.Add(_SlotIndex);
+        slots.Sort();
+        if (slots.Count == 0) slots.Add(_SlotIndex);
+        return slots;
+    }
+
+    private int FirstFreeSlot(StorageVariableType type) => AvailableSlotsFor(type).FirstOrDefault();
+
+    private IEnumerable<int> AvailableSlotsFor(StorageVariableType type)
+    {
+        if (FreeSlots is not null && FreeSlots.TryGetValue(type, out IReadOnlyList<int>? free) && free.Count > 0)
+            return free;
+        return Enumerable.Range(0, StorageSlots.Count(type));
+    }
+
+    private int ValueMin => _Type == StorageVariableType.Dial ? -7 : 1;
+    private int ValueMax => _Type == StorageVariableType.Dial ? 7  : StorageSlots.ToNumber(_ValueCount);
+
+    private bool _CanConfirm => !string.IsNullOrWhiteSpace(_Name);
+
+    private async Task Confirm()
+    {
+        if (!_CanConfirm) return;
+        _Visible = false;
+
+        int specific = Math.Clamp(_SpecificValue, ValueMin, ValueMax);
+
+        await OnConfirm.InvokeAsync(new RegisterVariableArgs(
+            _EditNodeId,
+            _Name.Trim(),
+            _Description.Trim(),
+            _Type,
+            _SlotIndex,
+            _Mode,
+            _ValueCount,
+            _Secret,
+            _Assignment,
+            specific,
+            _ConditionKeyId));
+    }
+
+    private void Cancel() => _Visible = false;
+
+    /// <summary>Result passed back to the parent. <see cref="EditNodeId"/> is empty for a create, set for an edit.</summary>
+    public record RegisterVariableArgs(
+        Guid                EditNodeId,
+        string              Name,
+        string              Description,
+        StorageVariableType Type,
+        int                 SlotIndex,
+        NumberStorageMode   Mode,
+        NumberValueCount    ValueCount,
+        bool                Secret,
+        NumberAssignment    Assignment,
+        int                 SpecificValue,
+        Guid                ConditionKeyId);
+}

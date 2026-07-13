@@ -35,13 +35,21 @@ namespace DeusaldStoryCommon
             @"&lt;(icon|sprite)=([^&]+?)&gt;",
             RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
+        // Matches an encoded storage-variable reference "&lt;var=Name&gt;" — replaced by the
+        // variable's slot label (e.g. SA), styled by storage kind, when a resolver is supplied.
+        private static readonly Regex _VarTag = new Regex(
+            @"&lt;var=([^&]+?)&gt;",
+            RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
         /// <summary>
         /// Renders <paramref name="text"/> to safe HTML. Pass <paramref name="resolveImage"/> to enable the
         /// <c>&lt;icon=Name&gt;</c> / <c>&lt;sprite=Name&gt;</c> tags: it is called with the tag name
         /// (<c>"icon"</c> or <c>"sprite"</c>, lower-cased) and the referenced image name, and returns the matching
         /// image or <c>null</c> to leave the tag unresolved (escaped).
         /// </summary>
-        public static string ToSafeHtml(string text, Func<string, string, StoryImage?>? resolveImage = null)
+        public static string ToSafeHtml(
+            string text, Func<string, string, StoryImage?>? resolveImage = null,
+            Func<string, StoryRegisterVariableNode?>? resolveVariable = null)
         {
             if (string.IsNullOrEmpty(text)) return text ?? string.Empty;
 
@@ -50,6 +58,9 @@ namespace DeusaldStoryCommon
 
             if (resolveImage is not null)
                 result = _ImageTag.Replace(result, match => RestoreImage(match, resolveImage));
+
+            if (resolveVariable is not null)
+                result = _VarTag.Replace(result, match => RestoreVariable(match, resolveVariable));
 
             return result;
         }
@@ -74,6 +85,17 @@ namespace DeusaldStoryCommon
             string cls = tag == "icon" ? "lpv-inline-icon" : "lpv-sprite";
             string alt = WebUtility.HtmlEncode(name);
             return $"<img class=\"{cls}\" src=\"data:image/png;base64,{image.Data}\" alt=\"{alt}\">";
+        }
+
+        private static string RestoreVariable(Match match, Func<string, StoryRegisterVariableNode?> resolveVariable)
+        {
+            string                     name = WebUtility.HtmlDecode(match.Groups[1].Value);
+            StoryRegisterVariableNode? reg  = resolveVariable(name);
+            if (reg is null) return match.Value; // unresolved — keep the escaped tag visible
+
+            string label = WebUtility.HtmlEncode(StorageSlots.Label(reg.Type, reg.SlotIndex));
+            string kind  = reg.Type.ToString().ToLowerInvariant();
+            return $"<span class=\"lpv-var lpv-var-{kind}\">{label}</span>";
         }
     }
 }

@@ -494,6 +494,138 @@ public class ProjectStateService(
         MarkKeyDirty(logicId);
     }
 
+    /// <summary>Adds a Register-variable node (claims a storage slot for a new variable) to a logic node's flow spine.</summary>
+    public StoryRegisterVariableNode? AddRegisterVariableNode(Guid logicId, double x, double y)
+    {
+        if (!CurrentProject!.LogicNodes.TryGetValue(logicId, out StoryLogicNode? logic)) return null;
+
+        StoryRegisterVariableNode node = new() { X = x, Y = y };
+        logic.RegisterVariableNodes.Add(node);
+        MarkKeyDirty(logicId);
+        return node;
+    }
+
+    /// <summary>Updates a Register-variable node's definition (identity, slot and value parameters).</summary>
+    public void UpdateRegisterVariableNode(
+        Guid logicId, Guid nodeId, string name, string description, StorageVariableType type, int slotIndex,
+        NumberStorageMode mode, NumberValueCount valueCount, bool secret, NumberAssignment assignment,
+        int specificValue, Guid conditionKeyId)
+    {
+        if (!CurrentProject!.LogicNodes.TryGetValue(logicId, out StoryLogicNode? logic)) return;
+        StoryRegisterVariableNode? node = logic.RegisterVariableNodes.Find(n => n.Id == nodeId);
+        if (node is null) return;
+
+        node.Name           = name;
+        node.Description    = description;
+        node.Type           = type;
+        node.SlotIndex      = slotIndex;
+        node.Mode           = mode;
+        node.ValueCount     = valueCount;
+        node.Secret         = secret;
+        node.Assignment     = assignment;
+        node.SpecificValue  = specificValue;
+        node.ConditionKeyId = conditionKeyId;
+        MarkKeyDirty(logicId);
+    }
+
+    /// <summary>Deletes a Register-variable node and any inner wire that touched its flow ports.</summary>
+    public void DeleteRegisterVariableNode(Guid logicId, Guid nodeId)
+    {
+        if (!CurrentProject!.LogicNodes.TryGetValue(logicId, out StoryLogicNode? logic)) return;
+        StoryRegisterVariableNode? node = logic.RegisterVariableNodes.Find(n => n.Id == nodeId);
+        if (node is null) return;
+
+        logic.RegisterVariableNodes.Remove(node);
+        logic.ContentConnections.RemoveAll(c =>
+            c.FromPoint == node.FlowOut.Id || c.ToPoint == node.FlowOut.Id ||
+            c.FromPoint == node.FlowIn.Id  || c.ToPoint == node.FlowIn.Id);
+        MarkKeyDirty(logicId);
+    }
+
+    /// <summary>Adds a Set-variable node (assigns a value to an already-registered variable) to a logic node's flow spine.</summary>
+    public StorySetVariableNode? AddSetVariableNode(Guid logicId, double x, double y)
+    {
+        if (!CurrentProject!.LogicNodes.TryGetValue(logicId, out StoryLogicNode? logic)) return null;
+
+        StorySetVariableNode node = new() { X = x, Y = y };
+        logic.SetVariableNodes.Add(node);
+        MarkKeyDirty(logicId);
+        return node;
+    }
+
+    /// <summary>Updates a Set-variable node's target and value assignment.</summary>
+    public void UpdateSetVariableNode(
+        Guid logicId, Guid nodeId, Guid registeredVariableId, NumberAssignment assignment, bool secret, int specificValue)
+    {
+        if (!CurrentProject!.LogicNodes.TryGetValue(logicId, out StoryLogicNode? logic)) return;
+        StorySetVariableNode? node = logic.SetVariableNodes.Find(n => n.Id == nodeId);
+        if (node is null) return;
+
+        node.RegisteredVariableId = registeredVariableId;
+        node.Assignment           = assignment;
+        node.Secret               = secret;
+        node.SpecificValue        = specificValue;
+        MarkKeyDirty(logicId);
+    }
+
+    /// <summary>Deletes a Set-variable node and any inner wire that touched its flow ports.</summary>
+    public void DeleteSetVariableNode(Guid logicId, Guid nodeId)
+    {
+        if (!CurrentProject!.LogicNodes.TryGetValue(logicId, out StoryLogicNode? logic)) return;
+        StorySetVariableNode? node = logic.SetVariableNodes.Find(n => n.Id == nodeId);
+        if (node is null) return;
+
+        logic.SetVariableNodes.Remove(node);
+        logic.ContentConnections.RemoveAll(c =>
+            c.FromPoint == node.FlowOut.Id || c.ToPoint == node.FlowOut.Id ||
+            c.FromPoint == node.FlowIn.Id  || c.ToPoint == node.FlowIn.Id);
+        MarkKeyDirty(logicId);
+    }
+
+    /// <summary>Adds an Unregister-variable node (releases a registered variable, freeing its slot) to a logic node's flow spine.</summary>
+    public StoryUnregisterVariableNode? AddUnregisterVariableNode(Guid logicId, double x, double y)
+    {
+        if (!CurrentProject!.LogicNodes.TryGetValue(logicId, out StoryLogicNode? logic)) return null;
+
+        StoryUnregisterVariableNode node = new() { X = x, Y = y };
+        logic.UnregisterVariableNodes.Add(node);
+        MarkKeyDirty(logicId);
+        return node;
+    }
+
+    /// <summary>Updates which registered variable an Unregister-variable node releases.</summary>
+    public void UpdateUnregisterVariableNode(Guid logicId, Guid nodeId, Guid registeredVariableId)
+    {
+        if (!CurrentProject!.LogicNodes.TryGetValue(logicId, out StoryLogicNode? logic)) return;
+        StoryUnregisterVariableNode? node = logic.UnregisterVariableNodes.Find(n => n.Id == nodeId);
+        if (node is null) return;
+
+        node.RegisteredVariableId = registeredVariableId;
+        MarkKeyDirty(logicId);
+    }
+
+    /// <summary>Deletes an Unregister-variable node and any inner wire that touched its flow ports.</summary>
+    public void DeleteUnregisterVariableNode(Guid logicId, Guid nodeId)
+    {
+        if (!CurrentProject!.LogicNodes.TryGetValue(logicId, out StoryLogicNode? logic)) return;
+        StoryUnregisterVariableNode? node = logic.UnregisterVariableNodes.Find(n => n.Id == nodeId);
+        if (node is null) return;
+
+        logic.UnregisterVariableNodes.Remove(node);
+        logic.ContentConnections.RemoveAll(c =>
+            c.FromPoint == node.FlowOut.Id || c.ToPoint == node.FlowOut.Id ||
+            c.FromPoint == node.FlowIn.Id  || c.ToPoint == node.FlowIn.Id);
+        MarkKeyDirty(logicId);
+    }
+
+    /// <summary>Sets which registered storage variables are released when the story reaches The End (edited on the End node).</summary>
+    public void SetEndUnregister(IEnumerable<Guid> registeredVariableIds)
+    {
+        if (CurrentProject is null) return;
+        CurrentProject.Metadata.UnregisterAtEnd = registeredVariableIds.ToList();
+        MarkDirty();
+    }
+
     /// <summary>
     /// Wires an output (<paramref name="fromPoint"/>) to an input (<paramref name="toPoint"/>) inside a logic node's
     /// content graph. An output leads to one place, so any existing wire leaving <paramref name="fromPoint"/> is
@@ -598,6 +730,33 @@ public class ProjectStateService(
         {
             ft.X = x;
             ft.Y = y;
+            MarkKeyDirty(logicId);
+            return;
+        }
+
+        StoryRegisterVariableNode? reg = logic.RegisterVariableNodes.Find(n => n.Id == movedId);
+        if (reg is not null)
+        {
+            reg.X = x;
+            reg.Y = y;
+            MarkKeyDirty(logicId);
+            return;
+        }
+
+        StorySetVariableNode? set = logic.SetVariableNodes.Find(n => n.Id == movedId);
+        if (set is not null)
+        {
+            set.X = x;
+            set.Y = y;
+            MarkKeyDirty(logicId);
+            return;
+        }
+
+        StoryUnregisterVariableNode? unreg = logic.UnregisterVariableNodes.Find(n => n.Id == movedId);
+        if (unreg is not null)
+        {
+            unreg.X = x;
+            unreg.Y = y;
             MarkKeyDirty(logicId);
         }
     }
