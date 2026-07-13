@@ -150,7 +150,7 @@
 .lpv-screen ::deep .lpv-sprite {
     display: block;
     width: auto;
-    max-width: 35%;
+    max-width: 20%;
     height: auto;
     margin: 14px auto;
     border-radius: var(--r-sm);
