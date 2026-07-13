@@ -70,14 +70,6 @@ namespace DeusaldStoryWeb
     /// </summary>
     public sealed record NodePaletteItem(StoryNodeKind Kind, string Icon, string Label, string Description);
 
-    /// <summary>Kind of an inspector content block.</summary>
-    public enum StoryBlockKind
-    {
-        Narration,
-        Dialogue,
-        Choice
-    }
-
     /// <summary>An input or output connection port drawn on a node card.</summary>
     public sealed class EdPort
     {
@@ -103,7 +95,6 @@ namespace DeusaldStoryWeb
 
         public List<EdPort> Inputs  { get; } = new();
         public List<EdPort> Outputs { get; } = new();
-        public List<EdBlock> Blocks { get; } = new();
     }
 
     /// <summary>
@@ -120,14 +111,6 @@ namespace DeusaldStoryWeb
 
     /// <summary>A user request to wire an output port to an input port, raised by the graph on drop.</summary>
     public readonly record struct EdConnectRequest(Guid FromPoint, Guid ToPoint);
-
-    /// <summary>A single content block shown in the inspector (mock — content authoring is a later step).</summary>
-    public sealed class EdBlock
-    {
-        public StoryBlockKind Kind    { get; init; }
-        public string?        Speaker { get; init; }
-        public string         Text    { get; init; } = "";
-    }
 
     /// <summary>Projects a persisted story container into the editor's canvas view models.</summary>
     public static class EditorProjection
@@ -433,22 +416,6 @@ namespace DeusaldStoryWeb
             StoryNodeKind.Icon         => "var(--orange)",
             StoryNodeKind.LightDarkSwitch => "var(--info)",
             _                       => "var(--text-dim)"
-        };
-
-        public static string BlockLabel(StoryBlockKind k) => k switch
-        {
-            StoryBlockKind.Narration => "NARRATION",
-            StoryBlockKind.Dialogue  => "DIALOGUE",
-            StoryBlockKind.Choice    => "CHOICE",
-            _                        => ""
-        };
-
-        public static string BlockColor(StoryBlockKind k) => k switch
-        {
-            StoryBlockKind.Narration => "var(--success)",
-            StoryBlockKind.Dialogue  => "var(--info)",
-            StoryBlockKind.Choice    => "var(--warning)",
-            _                        => "var(--text-dim)"
         };
     }
 }

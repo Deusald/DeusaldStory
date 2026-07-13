@@ -27,52 +27,46 @@
             }
         </div>
 
-        @* ── Tabs ────────────────────────────────────────────────────── *@
-        <div class="ins-tabs">
-            @foreach (string tab in _Tabs)
-            {
-                string t = tab;
-                <button class="ins-tab @(t == _ActiveTab ? "active" : "")" @onclick="() => _ActiveTab = t">@t</button>
-            }
-        </div>
-
         @* ── Body ────────────────────────────────────────────────────── *@
         <div class="ins-body">
-            @if (_ActiveTab == "Content")
+
+            @if (!string.IsNullOrEmpty(Node.Thumb))
+            {
+                <div class="ins-thumb">
+                    <img src="data:image/png;base64,@Node.Thumb" alt="@Node.Title"/>
+                </div>
+            }
+
+            @if (Node.Inputs.Count > 0)
             {
                 <div class="ins-section-head">
-                    <span class="ins-section-label">Content blocks</span>
-                    <span class="ins-section-count">@Node.Blocks.Count blocks</span>
+                    <span class="ins-section-label">Inputs</span>
+                    <span class="ins-section-count">@Node.Inputs.Count</span>
                 </div>
-
-                @foreach (EdBlock block in Node.Blocks)
+                @foreach (EdPort port in Node.Inputs)
                 {
-                    <div class="ins-block">
-                        <div class="ins-block-head">
-                            <span class="ins-block-kind" style="color:@StoryStyle.BlockColor(block.Kind)">
-                                <span class="ins-block-dot" style="background:@StoryStyle.BlockColor(block.Kind)"></span>
-                                @StoryStyle.BlockLabel(block.Kind)
-                            </span>
-                            <button class="ins-block-menu" title="Block options"><i class="bi bi-three-dots"></i></button>
-                        </div>
-                        @if (!string.IsNullOrEmpty(block.Speaker))
-                        {
-                            <div class="ins-block-speaker">@block.Speaker</div>
-                        }
-                        <div class="ins-block-text">@block.Text</div>
+                    <div class="ins-port">
+                        <span class="ins-port-dot ins-port-in"></span>
+                        <span class="ins-port-name">@PortName(port)</span>
+                        <span class="ins-port-type">@PortTypeLabel(port.Type)</span>
                     </div>
                 }
-
-                <button class="ins-add-block">
-                    <i class="bi bi-plus-lg"></i> Add block
-                </button>
             }
-            else
+
+            @if (Node.Outputs.Count > 0)
             {
-                <div class="ins-placeholder">
-                    <i class="bi bi-cone-striped"></i>
-                    <span>@_ActiveTab — coming soon</span>
+                <div class="ins-section-head">
+                    <span class="ins-section-label">Outputs</span>
+                    <span class="ins-section-count">@Node.Outputs.Count</span>
                 </div>
+                @foreach (EdPort port in Node.Outputs)
+                {
+                    <div class="ins-port">
+                        <span class="ins-port-dot ins-port-out"></span>
+                        <span class="ins-port-name">@PortName(port)</span>
+                        <span class="ins-port-type">@PortTypeLabel(port.Type)</span>
+                    </div>
+                }
             }
         </div>
     }
@@ -81,6 +75,12 @@
 @code {
     [Parameter] public EdNode? Node { get; set; }
 
-    private static readonly string[] _Tabs = ["Content", "Localization", "Variables", "Lua"];
-    private string _ActiveTab = "Content";
+    private static string PortName(EdPort port) => string.IsNullOrEmpty(port.Name) ? "(unnamed)" : port.Name;
+
+    private static string PortTypeLabel(PortType type) => type switch
+    {
+        PortType.Title => "title",
+        PortType.Icon  => "icon",
+        _              => "flow"
+    };
 }

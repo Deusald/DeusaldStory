@@ -312,12 +312,14 @@
 
     // ── Pan / drag ─────────────────────────────────────────────────────────
 
-    private void CanvasDown(PointerEventArgs e)
+    private async Task CanvasDown(PointerEventArgs e)
     {
         _SelectedEdgeId = null;
         _Panning        = true;
         _LastClientX    = e.ClientX;
         _LastClientY    = e.ClientY;
+        // Pressing empty canvas clears the node selection (and empties the inspector).
+        if (SelectedId != Guid.Empty) await SelectedChanged.InvokeAsync(Guid.Empty);
     }
 
     private async Task NodeDown(PointerEventArgs e, EdNode node)
