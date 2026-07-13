@@ -120,6 +120,7 @@ namespace DeusaldStoryCommon
             entryActive = new Dictionary<Guid, HashSet<Guid>>();
             endActive   = new HashSet<Guid>();
             HashSet<Guid> divergenceFlagged = new();
+            Dictionary<Guid, StoryLogicNode> regOwnerById = BuildRegisterOwnerIndex(project);
 
             if (!project.ContainerNodes.TryGetValue(project.Metadata.RootStoryContainerNodeId, out StoryContainerNode? root)
                 || root.EntryPoints.Count == 0)
@@ -157,7 +158,7 @@ namespace DeusaldStoryCommon
                     switch (step.Kind)
                     {
                         case StepKind.Logic: VisitLogic(step.Logic!, active, guard + 1); break;
-                        case StepKind.End:   CheckReleasedAtEnd(project, active, endReached, regById, problems, logic.Id, logic.ParentContainer); break;
+                        case StepKind.End:   CheckReleasedAtEnd(project, active, endReached, regById, regOwnerById, problems); break;
                         // Dangling exits are reported by Pass A; stop this branch.
                     }
                 }
@@ -252,21 +253,28 @@ namespace DeusaldStoryCommon
         private static void CheckReleasedAtEnd(
             StoryProject project, HashSet<Guid> active, HashSet<Guid> endActive,
             Dictionary<Guid, StoryRegisterVariableNode> regById,
-            List<StoryProblem> problems, Guid logicId, Guid containerId)
+            Dictionary<Guid, StoryLogicNode> regOwnerById, List<StoryProblem> problems)
         {
             HashSet<Guid> releasedAtEnd = new(project.Metadata.UnregisterAtEnd);
             foreach (Guid id in active)
             {
                 endActive.Add(id); // a variable still registered when the story reaches End — a release candidate
                 if (releasedAtEnd.Contains(id)) continue; // released by the story End node
-                problems.Add(new StoryProblem
+                // Navigate to the node holding the still-active registration (the register id in `active`
+                // uniquely identifies it — a variable can't be registered again while active), not the last
+                // logic node before The End.
+                StoryProblem problem = new()
                 {
                     Severity    = StoryProblemSeverity.Error,
                     Message     = $"Variable '{TargetName(id, regById)}' is still registered when the story reaches The End — unregister it first (or release it on the End node).",
-                    ContainerId = containerId,
-                    LogicNodeId = logicId,
                     InnerNodeId = id
-                });
+                };
+                if (regOwnerById.TryGetValue(id, out StoryLogicNode? owner))
+                {
+                    problem.LogicNodeId = owner.Id;
+                    problem.ContainerId = owner.ParentContainer;
+                }
+                problems.Add(problem);
             }
         }
 
@@ -337,6 +345,17 @@ namespace DeusaldStoryCommon
             foreach (StoryLogicNode logic in project.LogicNodes.Values)
                 foreach (StoryRegisterVariableNode reg in logic.RegisterVariableNodes)
                     map[reg.Id] = reg;
+            return map;
+        }
+
+        /// <summary>Maps each register-node id to the logic node that owns it — so a variable still active at
+        /// The End can be navigated to its registration node rather than the last node before End.</summary>
+        private static Dictionary<Guid, StoryLogicNode> BuildRegisterOwnerIndex(StoryProject project)
+        {
+            Dictionary<Guid, StoryLogicNode> map = new();
+            foreach (StoryLogicNode logic in project.LogicNodes.Values)
+                foreach (StoryRegisterVariableNode reg in logic.RegisterVariableNodes)
+                    map[reg.Id] = logic;
             return map;
         }
 
