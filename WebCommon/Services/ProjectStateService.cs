@@ -516,22 +516,31 @@ public class ProjectStateService(
     public void UpdateRegisterVariableNode(
         Guid logicId, Guid nodeId, string name, string description, StorageVariableType type, int slotIndex,
         NumberStorageMode mode, NumberValueCount valueCount, bool secret, NumberAssignment assignment,
-        int specificValue, Guid conditionKeyId)
+        int specificValue, Guid conditionKeyId, StorageInstructionPlacement placement, StringValueMode stringMode,
+        string stringValue, StringInputKind stringInputKind)
     {
         if (!CurrentProject!.LogicNodes.TryGetValue(logicId, out StoryLogicNode? logic)) return;
         StoryRegisterVariableNode? node = logic.RegisterVariableNodes.Find(n => n.Id == nodeId);
         if (node is null) return;
 
-        node.Name           = name;
-        node.Description    = description;
-        node.Type           = type;
-        node.SlotIndex      = slotIndex;
-        node.Mode           = mode;
-        node.ValueCount     = valueCount;
-        node.Secret         = secret;
-        node.Assignment     = assignment;
-        node.SpecificValue  = specificValue;
-        node.ConditionKeyId = conditionKeyId;
+        node.Name            = name;
+        node.Description     = description;
+        node.Type            = type;
+        node.SlotIndex       = slotIndex;
+        node.Mode            = mode;
+        node.ValueCount      = valueCount;
+        node.Secret          = secret;
+        node.Assignment      = assignment;
+        node.SpecificValue   = specificValue;
+        node.ConditionKeyId  = conditionKeyId;
+        node.Placement       = placement;
+        node.StringMode      = stringMode;
+        node.StringValue     = stringValue;
+        node.StringInputKind = stringInputKind;
+
+        // The Instruction port only exists for a player-input String — drop any stale wire when it no longer applies.
+        if (type != StorageVariableType.String || stringMode != StringValueMode.PlayerInput)
+            logic.ContentConnections.RemoveAll(c => c.ToPoint == node.InstructionIn.Id);
         MarkKeyDirty(logicId);
     }
 
@@ -545,7 +554,8 @@ public class ProjectStateService(
         logic.RegisterVariableNodes.Remove(node);
         logic.ContentConnections.RemoveAll(c =>
             c.FromPoint == node.FlowOut.Id || c.ToPoint == node.FlowOut.Id ||
-            c.FromPoint == node.FlowIn.Id  || c.ToPoint == node.FlowIn.Id);
+            c.FromPoint == node.FlowIn.Id  || c.ToPoint == node.FlowIn.Id  ||
+            c.ToPoint   == node.InstructionIn.Id);
         MarkKeyDirty(logicId);
     }
 
@@ -562,7 +572,8 @@ public class ProjectStateService(
 
     /// <summary>Updates a Set-variable node's target and value assignment.</summary>
     public void UpdateSetVariableNode(
-        Guid logicId, Guid nodeId, Guid registeredVariableId, NumberAssignment assignment, bool secret, int specificValue)
+        Guid logicId, Guid nodeId, Guid registeredVariableId, NumberAssignment assignment, bool secret, int specificValue,
+        StorageInstructionPlacement placement, StringValueMode stringMode, string stringValue, StringInputKind stringInputKind)
     {
         if (!CurrentProject!.LogicNodes.TryGetValue(logicId, out StoryLogicNode? logic)) return;
         StorySetVariableNode? node = logic.SetVariableNodes.Find(n => n.Id == nodeId);
@@ -572,6 +583,15 @@ public class ProjectStateService(
         node.Assignment           = assignment;
         node.Secret               = secret;
         node.SpecificValue        = specificValue;
+        node.Placement            = placement;
+        node.StringMode           = stringMode;
+        node.StringValue          = stringValue;
+        node.StringInputKind      = stringInputKind;
+
+        // The Instruction port only exists for a player-input String target — drop any stale wire when it no longer applies.
+        StoryRegisterVariableNode? target = EditorProjection.FindRegister(CurrentProject!, registeredVariableId);
+        if (target is not { Type: StorageVariableType.String } || stringMode != StringValueMode.PlayerInput)
+            logic.ContentConnections.RemoveAll(c => c.ToPoint == node.InstructionIn.Id);
         MarkKeyDirty(logicId);
     }
 
@@ -585,7 +605,8 @@ public class ProjectStateService(
         logic.SetVariableNodes.Remove(node);
         logic.ContentConnections.RemoveAll(c =>
             c.FromPoint == node.FlowOut.Id || c.ToPoint == node.FlowOut.Id ||
-            c.FromPoint == node.FlowIn.Id  || c.ToPoint == node.FlowIn.Id);
+            c.FromPoint == node.FlowIn.Id  || c.ToPoint == node.FlowIn.Id  ||
+            c.ToPoint   == node.InstructionIn.Id);
         MarkKeyDirty(logicId);
     }
 
@@ -600,14 +621,15 @@ public class ProjectStateService(
         return node;
     }
 
-    /// <summary>Updates which registered variable an Unregister-variable node releases.</summary>
-    public void UpdateUnregisterVariableNode(Guid logicId, Guid nodeId, Guid registeredVariableId)
+    /// <summary>Updates which registered variable an Unregister-variable node releases, and where its instruction sits.</summary>
+    public void UpdateUnregisterVariableNode(Guid logicId, Guid nodeId, Guid registeredVariableId, StorageInstructionPlacement placement)
     {
         if (!CurrentProject!.LogicNodes.TryGetValue(logicId, out StoryLogicNode? logic)) return;
         StoryUnregisterVariableNode? node = logic.UnregisterVariableNodes.Find(n => n.Id == nodeId);
         if (node is null) return;
 
         node.RegisteredVariableId = registeredVariableId;
+        node.Placement            = placement;
         MarkKeyDirty(logicId);
     }
 

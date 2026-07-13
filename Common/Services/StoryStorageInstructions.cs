@@ -6,46 +6,133 @@ using JetBrains.Annotations;
 namespace DeusaldStoryCommon
 {
     /// <summary>
+    /// One player-facing storage instruction produced by a logic node's flow spine, ready for a preview to render.
+    /// For the Gamebook it is a printed line (<see cref="Text"/>); for the App a player-input String instead surfaces
+    /// as an input field (<see cref="IsAppInput"/>) prompted by <see cref="Text"/>. <see cref="Placement"/> decides
+    /// whether it sits above or below the section text.
+    /// </summary>
+    public sealed class StorageInstruction
+    {
+        /// <summary>The printed Gamebook line, or — for an App input field — the "what to write" prompt/label.</summary>
+        public string Text { get; set; } = "";
+
+        /// <summary>Where this instruction sits relative to the section text.</summary>
+        public StorageInstructionPlacement Placement { get; set; }
+
+        /// <summary>True only for a player-input String rendered in the App — draw an input field rather than a line.</summary>
+        public bool IsAppInput { get; set; }
+
+        /// <summary>App input field only — whether it accepts text or a number.</summary>
+        public StringInputKind InputKind { get; set; }
+
+        /// <summary>App input field only — the slot label the value is written to (e.g. <c>SA</c>).</summary>
+        public string Slot { get; set; } = "";
+    }
+
+    /// <summary>
     /// Turns a logic node's storage operations (Register / Set / Unregister on its flow spine) into the player-facing
-    /// instruction lines the printed Gamebook shows — "Roll a D6 and place it on slot NA", "Clear slot NA", … — in
-    /// flow order. Operations that set no value (an unset registration) produce no line. Wording comes from the
-    /// framework <see cref="StoryCommonLocalizationKeys"/> (with built-in English fallbacks), SmartFormatted with the
-    /// slot label and any value. Host-agnostic so the App preview, Gamebook preview and PDF export share it.
+    /// instructions the previews show — printed lines for the Gamebook, input fields for player-input Strings in the
+    /// App — in flow order. Operations that set no value (unset registrations) produce nothing; the App only surfaces
+    /// player-input Strings (everything else it stores silently). Wording comes from the framework
+    /// <see cref="StoryCommonLocalizationKeys"/> (with built-in English fallbacks), SmartFormatted with the slot label
+    /// and any value. Host-agnostic so the App preview, Gamebook preview and PDF export share it.
     /// </summary>
     [PublicAPI]
     public static class StoryStorageInstructions
     {
-        /// <summary>The ordered instruction lines for <paramref name="logic"/>'s storage operations (empty when none).</summary>
-        public static List<string> For(
+        /// <summary>The ordered storage instructions for <paramref name="logic"/>'s operations (empty when none).</summary>
+        public static List<StorageInstruction> For(
             StoryProject project, LocProject? localization, StoryLogicNode logic,
             StoryRenderTarget target = StoryRenderTarget.App)
         {
-            List<string> lines = new();
+            List<StorageInstruction> list = new();
             foreach (StorageOp op in StoryLogicFlow.StorageOps(logic, target))
             {
-                string? line = op.Kind switch
+                StorageInstruction? entry = op.Kind switch
                 {
-                    StorageOpKind.Register   => RegisterLine(localization, op.Register!),
-                    StorageOpKind.Set        => SetLine(project, localization, op.Set!),
-                    StorageOpKind.Unregister => ClearLine(project, localization, op.Unregister!.RegisteredVariableId),
+                    StorageOpKind.Register   => RegisterEntry(project, localization, logic, op.Register!, target),
+                    StorageOpKind.Set        => SetEntry(project, localization, logic, op.Set!, target),
+                    StorageOpKind.Unregister => ClearEntry(project, localization, op.Unregister!, target),
                     _                        => null
                 };
-                if (!string.IsNullOrEmpty(line)) lines.Add(line!);
+                if (entry is not null) list.Add(entry);
             }
-            return lines;
+            return list;
         }
 
-        private static string? RegisterLine(LocProject? localization, StoryRegisterVariableNode reg) =>
-            AssignmentLine(localization, reg.Type, reg.SlotIndex, reg.Mode, reg.ValueCount, reg.Assignment, reg.Secret, reg.SpecificValue);
-
-        private static string? SetLine(StoryProject project, LocProject? localization, StorySetVariableNode set)
+        private static StorageInstruction? RegisterEntry(
+            StoryProject project, LocProject? localization, StoryLogicNode logic, StoryRegisterVariableNode reg, StoryRenderTarget target)
         {
-            StoryRegisterVariableNode? target = FindRegister(project, set.RegisteredVariableId);
-            if (target is null) return null;
-            return AssignmentLine(localization, target.Type, target.SlotIndex, target.Mode, target.ValueCount, set.Assignment, set.Secret, set.SpecificValue);
+            if (reg.Type == StorageVariableType.String)
+                return StringEntry(project, localization, logic, reg.SlotIndex, reg.StringMode, reg.StringValue,
+                    reg.StringInputKind, reg.InstructionIn.Id, reg.Placement, target);
+
+            // Number/Dial values are stored silently in the App — only the Gamebook prints them.
+            if (target == StoryRenderTarget.App) return null;
+            string? line = AssignmentLine(localization, reg.Type, reg.SlotIndex, reg.Mode, reg.ValueCount, reg.Assignment, reg.Secret, reg.SpecificValue);
+            return Line(line, reg.Placement);
         }
 
-        /// <summary>The instruction for assigning (or clearing) a value on a slot — shared by Register and Set.</summary>
+        private static StorageInstruction? SetEntry(
+            StoryProject project, LocProject? localization, StoryLogicNode logic, StorySetVariableNode set, StoryRenderTarget target)
+        {
+            StoryRegisterVariableNode? targetReg = FindRegister(project, set.RegisteredVariableId);
+            if (targetReg is null) return null;
+
+            if (targetReg.Type == StorageVariableType.String)
+                return StringEntry(project, localization, logic, targetReg.SlotIndex, set.StringMode, set.StringValue,
+                    set.StringInputKind, set.InstructionIn.Id, set.Placement, target);
+
+            if (target == StoryRenderTarget.App) return null;
+            string? line = AssignmentLine(localization, targetReg.Type, targetReg.SlotIndex, targetReg.Mode, targetReg.ValueCount, set.Assignment, set.Secret, set.SpecificValue);
+            return Line(line, set.Placement);
+        }
+
+        private static StorageInstruction? ClearEntry(
+            StoryProject project, LocProject? localization, StoryUnregisterVariableNode unreg, StoryRenderTarget target)
+        {
+            // A cleared slot needs no App action — the App just drops the value.
+            if (target == StoryRenderTarget.App) return null;
+            return Line(ClearLine(project, localization, unreg.RegisteredVariableId), unreg.Placement);
+        }
+
+        /// <summary>Builds the instruction for a String slot given its value mode — the branch that splits App vs Gamebook.</summary>
+        private static StorageInstruction? StringEntry(
+            StoryProject project, LocProject? localization, StoryLogicNode logic, int slotIndex, StringValueMode mode,
+            string stringValue, StringInputKind inputKind, Guid instructionPortId, StorageInstructionPlacement placement,
+            StoryRenderTarget target)
+        {
+            string slot = StorageSlots.Label(StorageVariableType.String, slotIndex);
+
+            switch (mode)
+            {
+                case StringValueMode.Unset:
+                    return null; // slot claimed, nothing written
+
+                case StringValueMode.Specific:
+                    // The App fills a baked value silently; only the Gamebook instructs the player to write it.
+                    if (target == StoryRenderTarget.App) return null;
+                    return Line(Resolve(localization, StoryCommonLocalizationKeys.StorageStringWriteSpecific, slot, value: stringValue), placement);
+
+                case StringValueMode.PlayerInput:
+                    string prompt = StoryLogicRenderer.ResolvePortText(project, localization, logic, instructionPortId, target);
+                    if (string.IsNullOrEmpty(prompt))
+                        prompt = Resolve(localization, StoryCommonLocalizationKeys.StorageStringWrite, slot);
+
+                    return target == StoryRenderTarget.App
+                        ? new StorageInstruction { Text = prompt, Placement = placement, IsAppInput = true, InputKind = inputKind, Slot = slot }
+                        : Line(prompt, placement);
+
+                default:
+                    return null;
+            }
+        }
+
+        /// <summary>Wraps a printed line in an instruction (null/empty line = no instruction).</summary>
+        private static StorageInstruction? Line(string? text, StorageInstructionPlacement placement) =>
+            string.IsNullOrEmpty(text) ? null : new StorageInstruction { Text = text!, Placement = placement };
+
+        /// <summary>The instruction for assigning (or clearing) a Number/Dial value on a slot — shared by Register and Set.</summary>
         private static string? AssignmentLine(
             LocProject? localization, StorageVariableType type, int slotIndex, NumberStorageMode mode,
             NumberValueCount valueCount, NumberAssignment assignment, bool secret, int specificValue)
@@ -58,9 +145,6 @@ namespace DeusaldStoryCommon
 
             switch (type)
             {
-                case StorageVariableType.String:
-                    return Resolve(localization, StoryCommonLocalizationKeys.StorageStringWrite, slot);
-
                 case StorageVariableType.Dial:
                     return assignment == NumberAssignment.Randomize
                         ? Resolve(localization, StoryCommonLocalizationKeys.StorageDialRandom, slot)
@@ -107,11 +191,11 @@ namespace DeusaldStoryCommon
             return Resolve(localization, StoryCommonLocalizationKeys.StorageClearSlot, slot);
         }
 
-        private static string Resolve(LocProject? localization, Guid keyId, string slot, int? max = null, int? value = null)
+        private static string Resolve(LocProject? localization, Guid keyId, string slot, int? max = null, object? value = null)
         {
             Dictionary<string, object> vals = new(StringComparer.OrdinalIgnoreCase) { ["slot"] = slot };
-            if (max is int m)   vals["max"]   = m;
-            if (value is int v) vals["value"] = v;
+            if (max is int m)          vals["max"]   = m;
+            if (value is not null)     vals["value"] = value;
             return StoryCommonLocalizationKeys.Resolve(localization, keyId, vals);
         }
 

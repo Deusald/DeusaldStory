@@ -27,6 +27,23 @@ namespace DeusaldStoryCommon
         /// <summary>The value used when <see cref="Assignment"/> is <see cref="NumberAssignment.SetSpecific"/>.</summary>
         public int SpecificValue { get; set; }
 
+        /// <summary>Where this node's Gamebook instruction / App input field sits relative to the section text.</summary>
+        public StorageInstructionPlacement Placement { get; set; }
+
+        // ── String value parameters (used when the target variable is String) ───
+
+        /// <summary>String only — how the value is decided (clear it, a baked value, or player-entered).</summary>
+        public StringValueMode StringMode { get; set; }
+
+        /// <summary>String / <see cref="StringValueMode.Specific"/> — the baked value the player writes and the App fills.</summary>
+        public string StringValue { get; set; } = string.Empty;
+
+        /// <summary>String / <see cref="StringValueMode.PlayerInput"/> — whether the App input field accepts text or a number.</summary>
+        public StringInputKind StringInputKind { get; set; }
+
+        /// <summary>String / <see cref="StringValueMode.PlayerInput"/> — Text input port carrying the "what to write" instruction (a Localization output).</summary>
+        public StoryConnectionPoint InstructionIn { get; set; } = new() { Name = "Instruction" };
+
         /// <summary>Flow input — wired from a previous flow node's output.</summary>
         public StoryConnectionPoint FlowIn { get; set; } = new() { Name = "Flow" };
 

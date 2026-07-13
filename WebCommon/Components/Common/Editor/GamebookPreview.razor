@@ -66,12 +66,16 @@
                 </div>
             </div>
 
-            @if (sec.Rendered.Instructions.Count > 0)
+            @{
+                List<StorageInstruction> aboveStorage = sec.Rendered.Instructions.Where(i => i.Placement == StorageInstructionPlacement.Above).ToList();
+                List<StorageInstruction> belowStorage = sec.Rendered.Instructions.Where(i => i.Placement == StorageInstructionPlacement.Below).ToList();
+            }
+            @if (aboveStorage.Count > 0)
             {
                 <div class="gbp-storage">
-                    @foreach (string line in sec.Rendered.Instructions)
+                    @foreach (StorageInstruction ins in aboveStorage)
                     {
-                        <div class="gbp-storage-line"><i class="bi bi-box-seam"></i> <span>@SafeHtml(line)</span></div>
+                        <div class="gbp-storage-line"><i class="bi bi-box-seam"></i> <span>@SafeHtml(ins.Text)</span></div>
                     }
                 </div>
             }
@@ -102,6 +106,16 @@
                 {
                     <div class="gbp-block">@SafeHtml(block)</div>
                 }
+            }
+
+            @if (belowStorage.Count > 0)
+            {
+                <div class="gbp-storage">
+                    @foreach (StorageInstruction ins in belowStorage)
+                    {
+                        <div class="gbp-storage-line"><i class="bi bi-box-seam"></i> <span>@SafeHtml(ins.Text)</span></div>
+                    }
+                </div>
             }
 
             <div class="gbp-continue">

@@ -85,6 +85,57 @@
                         </div>
                     }
                 }
+
+                @if (Selected is StoryRegisterVariableNode strSel && strSel.Type == StorageVariableType.String)
+                {
+                    <div class="modal-field">
+                        <label class="modal-label">New value</label>
+                        <select class="modal-input" @bind="_StringMode">
+                            <option value="@StringValueMode.Unset">Unset (clear it)</option>
+                            <option value="@StringValueMode.Specific">Set a specific value</option>
+                            <option value="@StringValueMode.PlayerInput">Player fills it in</option>
+                        </select>
+                    </div>
+
+                    @if (_StringMode == StringValueMode.Specific)
+                    {
+                        <div class="modal-field">
+                            <label class="modal-label">Written value</label>
+                            <input class="modal-input"
+                                   type="text"
+                                   placeholder="What the player writes on the slot"
+                                   @bind="_StringValue"
+                                   @bind:event="oninput"
+                                   maxlength="30"/>
+                        </div>
+                    }
+
+                    @if (_StringMode == StringValueMode.PlayerInput)
+                    {
+                        <div class="modal-field">
+                            <label class="modal-label">Player enters</label>
+                            <select class="modal-input" @bind="_StringInputKind">
+                                <option value="@StringInputKind.Text">Text</option>
+                                <option value="@StringInputKind.Number">Number</option>
+                            </select>
+                            <span class="modal-label-hint">
+                                App shows an input field (1–30 characters). Wire a Localization node into the node's
+                                Instruction port to tell the player what to write.
+                            </span>
+                        </div>
+                    }
+                }
+
+                @if (Selected is not null)
+                {
+                    <div class="modal-field">
+                        <label class="modal-label">Placement</label>
+                        <select class="modal-input" @bind="_Placement">
+                            <option value="@StorageInstructionPlacement.Below">Below the text</option>
+                            <option value="@StorageInstructionPlacement.Above">Above the text</option>
+                        </select>
+                    </div>
+                }
             }
 
         </div>
@@ -113,6 +164,11 @@
     private bool             _Secret;
     private int              _SpecificValue = 1;
 
+    private StorageInstructionPlacement _Placement;
+    private StringValueMode             _StringMode;
+    private string                      _StringValue = "";
+    private StringInputKind             _StringInputKind;
+
     /// <summary>Opens the modal to create a new Set-variable node.</summary>
     public void Show()
     {
@@ -122,6 +178,10 @@
         _Assignment           = NumberAssignment.SetSpecific;
         _Secret               = false;
         _SpecificValue        = 1;
+        _Placement            = StorageInstructionPlacement.Below;
+        _StringMode           = StringValueMode.Unset;
+        _StringValue          = "";
+        _StringInputKind      = StringInputKind.Text;
         _Visible              = true;
         StateHasChanged();
     }
@@ -135,6 +195,10 @@
         _Assignment           = node.Assignment;
         _Secret               = node.Secret;
         _SpecificValue        = node.SpecificValue;
+        _Placement            = node.Placement;
+        _StringMode           = node.StringMode;
+        _StringValue          = node.StringValue;
+        _StringInputKind      = node.StringInputKind;
         _Visible              = true;
         StateHasChanged();
     }
@@ -163,16 +227,21 @@
             : _SpecificValue;
 
         await OnConfirm.InvokeAsync(new SetVariableArgs(
-            _EditNodeId, _RegisteredVariableId, _Assignment, _Secret, specific));
+            _EditNodeId, _RegisteredVariableId, _Assignment, _Secret, specific,
+            _Placement, _StringMode, _StringValue.Trim(), _StringInputKind));
     }
 
     private void Cancel() => _Visible = false;
 
     /// <summary>Result passed back to the parent. <see cref="EditNodeId"/> is empty for a create, set for an edit.</summary>
     public record SetVariableArgs(
-        Guid             EditNodeId,
-        Guid             RegisteredVariableId,
-        NumberAssignment Assignment,
-        bool             Secret,
-        int              SpecificValue);
+        Guid                        EditNodeId,
+        Guid                        RegisteredVariableId,
+        NumberAssignment            Assignment,
+        bool                        Secret,
+        int                         SpecificValue,
+        StorageInstructionPlacement Placement,
+        StringValueMode             StringMode,
+        string                      StringValue,
+        StringInputKind             StringInputKind);
 }

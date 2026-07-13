@@ -229,3 +229,38 @@
     background: color-mix(in srgb, var(--success) 18%, transparent);
     color: var(--success);
 }
+
+/* ── Player-input String field — the App asks the player to fill a variable. */
+.lpv-input {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    margin: 0.5rem 0;
+}
+
+.lpv-input-label {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.9rem;
+    color: var(--text-2, inherit);
+}
+
+.lpv-input-slot {
+    padding: 0 0.32em;
+    border-radius: 0.3em;
+    font-family: var(--font-mono, monospace);
+    font-size: 0.82em;
+    font-weight: 600;
+    background: color-mix(in srgb, var(--success) 18%, transparent);
+    color: var(--success);
+}
+
+.lpv-input-box {
+    padding: 0.4rem 0.6rem;
+    border: 1px solid var(--border, #ccc);
+    border-radius: var(--r-sm);
+    background: var(--surface, #fff);
+    color: inherit;
+    font: inherit;
+}

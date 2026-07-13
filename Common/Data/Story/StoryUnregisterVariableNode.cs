@@ -17,6 +17,9 @@ namespace DeusaldStoryCommon
         /// <summary>The registered variable this releases (a <see cref="StoryRegisterVariableNode.Id"/>). Empty when nothing picked yet.</summary>
         public Guid RegisteredVariableId { get; set; }
 
+        /// <summary>Where this node's Gamebook "clear slot" instruction sits relative to the section text.</summary>
+        public StorageInstructionPlacement Placement { get; set; }
+
         /// <summary>Flow input — wired from a previous flow node's output.</summary>
         public StoryConnectionPoint FlowIn { get; set; } = new() { Name = "Flow" };
 

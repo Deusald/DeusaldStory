@@ -77,6 +77,9 @@ namespace DeusaldStoryCommon
         /// <summary>Number/D6, specific value — place a die already showing {value}.</summary>
         public static readonly Guid StorageNumberDiceSpecific = new("a1b2c3d4-001c-4000-8000-00000000001c");
 
+        /// <summary>String, write a specific baked value. SmartFormat tokens: <c>{slot}</c>, <c>{value}</c>.</summary>
+        public static readonly Guid StorageStringWriteSpecific = new("a1b2c3d4-001d-4000-8000-00000000001d");
+
         // Built-in English fallbacks, keyed by the ids above, used when the linked localization lacks the key.
         private static readonly Dictionary<Guid, string> _Fallbacks = new()
         {
@@ -97,7 +100,8 @@ namespace DeusaldStoryCommon
             [StorageDialSetSecret]             = "Secretly set dial {slot} to {value} (keep the hidden side up).",
             [StorageDialRandom]                = "Set dial {slot} to a random value from −7 to 7.",
             [StorageStringWrite]               = "Write the required value on sheet slot {slot}.",
-            [StorageNumberDiceSpecific]        = "Place a D6 showing {value} on slot {slot}."
+            [StorageNumberDiceSpecific]        = "Place a D6 showing {value} on slot {slot}.",
+            [StorageStringWriteSpecific]       = "Write \"{value}\" on sheet slot {slot}."
         };
 
         /// <summary>

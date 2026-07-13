@@ -29,6 +29,42 @@ namespace DeusaldStoryCommon
         Token
     }
 
+    /// <summary>
+    /// Where a storage node's player-facing output sits relative to the section text — the printed-Gamebook
+    /// instruction line and, in the App, any player input field. Defaults to <see cref="Below"/>.
+    /// </summary>
+    public enum StorageInstructionPlacement
+    {
+        /// <summary>After the section text (the default).</summary>
+        Below,
+
+        /// <summary>Before the section text.</summary>
+        Above
+    }
+
+    /// <summary>How a String storage variable's value is decided when it is registered or later set.</summary>
+    public enum StringValueMode
+    {
+        /// <summary>Claim the slot but write nothing — no instruction, and no App input field.</summary>
+        Unset,
+
+        /// <summary>Bake a specific value the story author chooses; the App fills it silently (automatic).</summary>
+        Specific,
+
+        /// <summary>The player writes their own value — the App shows an input field; the Gamebook prints the wired instruction.</summary>
+        PlayerInput
+    }
+
+    /// <summary>What kind of value the App input field accepts when a String is filled by the player.</summary>
+    public enum StringInputKind
+    {
+        /// <summary>Free text.</summary>
+        Text,
+
+        /// <summary>A number.</summary>
+        Number
+    }
+
     /// <summary>How a Number/Dial value is assigned when a variable is registered or later set.</summary>
     public enum NumberAssignment
     {

@@ -53,6 +53,17 @@
             </div>
         </div>
 
+        @{
+            List<StorageInstruction> aboveFields = _Rendered.Instructions.Where(i => i.IsAppInput && i.Placement == StorageInstructionPlacement.Above).ToList();
+            List<StorageInstruction> belowFields = _Rendered.Instructions.Where(i => i.IsAppInput && i.Placement == StorageInstructionPlacement.Below).ToList();
+        }
+
+        @* Player-input String fields sit above the text when so placed. Number/Dial/specific values store silently. *@
+        @foreach (StorageInstruction field in aboveFields)
+        {
+            @InputField(field)
+        }
+
         @if (_Rendered.Blocks.Count == 0)
         {
             <div class="lpv-block lpv-placeholder">No text blocks connected — wire the Entry flow into a FlowText node.</div>
@@ -72,7 +83,10 @@
             }
         }
 
-        @* The app stores variables invisibly, so player-facing storage instructions are only shown in the Gamebook preview. *@
+        @foreach (StorageInstruction field in belowFields)
+        {
+            @InputField(field)
+        }
 
         @if (_Rendered.Choices.Count > 0)
         {
@@ -114,6 +128,26 @@
 
 @code {
     [Parameter] public StoryLogicNode Logic { get; set; } = default!;
+
+    /// <summary>A preview-only input field the player would fill for a player-input String variable (min 1 / max 30 chars).</summary>
+    private RenderFragment InputField(StorageInstruction field) =>@<div class="lpv-input">
+        <label class="lpv-input-label">
+            @if (string.IsNullOrEmpty(field.Text))
+            {
+                <span class="lpv-placeholder">(no instruction connected)</span>
+            }
+            else
+            {
+                @SafeHtml(field.Text)
+            }
+            <span class="lpv-input-slot">@field.Slot</span>
+        </label>
+        <input class="lpv-input-box"
+               type="@(field.InputKind == StringInputKind.Number ? "number" : "text")"
+               minlength="1"
+               maxlength="30"
+               placeholder="@(field.InputKind == StringInputKind.Number ? "Enter a number…" : "Enter text…")"/>
+    </div>;
 
     /// <summary>External Variable values driving SmartFormat blocks (variable id → value); owned by the parent.</summary>
     [Parameter] public Dictionary<Guid, string> Values { get; set; } = new();

@@ -565,7 +565,8 @@
         }
         _ProjectState.UpdateRegisterVariableNode(
             _CurrentId, nodeId, args.Name, args.Description, args.Type, args.SlotIndex,
-            args.Mode, args.ValueCount, args.Secret, args.Assignment, args.SpecificValue, args.ConditionKeyId);
+            args.Mode, args.ValueCount, args.Secret, args.Assignment, args.SpecificValue, args.ConditionKeyId,
+            args.Placement, args.StringMode, args.StringValue, args.StringInputKind);
         RebuildNodes();
     }
 
@@ -579,7 +580,8 @@
             _SelectedId = created.Id;
         }
         _ProjectState.UpdateSetVariableNode(
-            _CurrentId, nodeId, args.RegisteredVariableId, args.Assignment, args.Secret, args.SpecificValue);
+            _CurrentId, nodeId, args.RegisteredVariableId, args.Assignment, args.Secret, args.SpecificValue,
+            args.Placement, args.StringMode, args.StringValue, args.StringInputKind);
         RebuildNodes();
     }
 
@@ -614,11 +616,11 @@
     {
         if (result.EditNodeId != Guid.Empty)
         {
-            _ProjectState.UpdateUnregisterVariableNode(_CurrentId, result.EditNodeId, result.RegisteredVariableId);
+            _ProjectState.UpdateUnregisterVariableNode(_CurrentId, result.EditNodeId, result.RegisteredVariableId, result.Placement);
         }
         else if (_ProjectState.AddUnregisterVariableNode(_CurrentId, _PendingX, _PendingY) is StoryUnregisterVariableNode node)
         {
-            _ProjectState.UpdateUnregisterVariableNode(_CurrentId, node.Id, result.RegisteredVariableId);
+            _ProjectState.UpdateUnregisterVariableNode(_CurrentId, node.Id, result.RegisteredVariableId, result.Placement);
             _SelectedId = node.Id;
         }
         RebuildNodes();
@@ -739,7 +741,7 @@
 
             case StoryNodeKind.UnregisterVariable:
                 if (_CurrentLogicNode?.UnregisterVariableNodes.Find(n => n.Id == node.Id) is StoryUnregisterVariableNode unreg)
-                    _UnregisterPicker?.Show(unreg.Id, unreg.RegisteredVariableId);
+                    _UnregisterPicker?.Show(unreg.Id, unreg.RegisteredVariableId, unreg.Placement);
                 break;
 
             case StoryNodeKind.SetExternalVariable:
