@@ -145,10 +145,12 @@
     image-rendering: pixelated; /* icons are square power-of-two pixel art */
 }
 
-/* Standalone <sprite=Name> — a centred picture, as an <img> would render. */
+/* Standalone <sprite=Name> — a centred picture. Capped to a fraction of the
+   screen so a large source PNG reads at story proportions, not full width. */
 .lpv-screen ::deep .lpv-sprite {
     display: block;
-    max-width: 100%;
+    width: auto;
+    max-width: 35%;
     height: auto;
     margin: 14px auto;
     border-radius: var(--r-sm);
