@@ -22,13 +22,16 @@ namespace DeusaldStoryCommon
 
         // ── Inner content graph ────────────────────────────────────────────────
         // The logic node opens into its own graph. The single EntryPoint (above) is drawn there as the Entry
-        // node — with two extra config inputs, Title and Icon — and each ExitPoint is drawn as its own Exit
-        // node, reusing their X/Y as inner canvas positions and their ids as the inner flow-port ids (exactly
-        // how a container reuses its boundary points inside itself). Localization/Icon nodes and their wiring
-        // live here too and are serialized as part of this logic node's file.
+        // node — with three extra config inputs, Title, Subtitle and Icon — and each ExitPoint is drawn as its
+        // own Exit node, reusing their X/Y as inner canvas positions and their ids as the inner flow-port ids
+        // (exactly how a container reuses its boundary points inside itself). Localization/Icon nodes and their
+        // wiring live here too and are serialized as part of this logic node's file.
 
         /// <summary>The Entry node's Title input port — accepts a Localization node's output.</summary>
         public StoryConnectionPoint TitleIn { get; set; } = new() { Name = "Title" };
+
+        /// <summary>The Entry node's Subtitle input port — accepts a Localization node's output; optional.</summary>
+        public StoryConnectionPoint SubtitleIn { get; set; } = new() { Name = "Subtitle" };
 
         /// <summary>The Entry node's Icon input port — accepts an Icon node's output.</summary>
         public StoryConnectionPoint IconIn { get; set; } = new() { Name = "Icon" };

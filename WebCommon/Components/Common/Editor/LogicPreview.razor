@@ -3,7 +3,8 @@
 
 @* ─────────────────────────────────────────────────────────────────────────
    Renders a logic node's output as a screen: the localized title (Entry's Title
-   input) as a heading with the connected icon, then the ordered sequence of text
+   input) as a heading with the connected icon and, when connected, a smaller
+   subtitle beneath it, then the ordered sequence of text
    blocks produced by walking the flow spine — Entry's flow output through each
    FlowText node until an Exit. A FlowText block whose text comes from a
    SmartFormat node renders against the External Variable values the author tweaks
@@ -36,14 +37,20 @@
                     <img src="data:image/png;base64,@_IconData" alt="icon"/>
                 </div>
             }
-            @if (string.IsNullOrEmpty(_Title))
-            {
-                <div class="lpv-title lpv-placeholder">No title connected</div>
-            }
-            else
-            {
-                <div class="lpv-title">@SafeHtml(_Title)</div>
-            }
+            <div class="lpv-titles">
+                @if (string.IsNullOrEmpty(_Title))
+                {
+                    <div class="lpv-title lpv-placeholder">No title connected</div>
+                }
+                else
+                {
+                    <div class="lpv-title">@SafeHtml(_Title)</div>
+                }
+                @if (!string.IsNullOrEmpty(_Subtitle))
+                {
+                    <div class="lpv-subtitle">@SafeHtml(_Subtitle)</div>
+                }
+            </div>
         </div>
 
         @{
@@ -78,12 +85,14 @@
     [Parameter] public Dictionary<Guid, string> Values { get; set; } = new();
 
     private bool    _Paper;    // false = dark (default), true = paper/light
-    private string  _Title = "";
+    private string  _Title    = "";
+    private string  _Subtitle = "";
     private string? _IconData; // base64 PNG, or null when no icon connected
 
     protected override void OnParametersSet()
     {
-        _Title    = ResolveText(FromPointInto(Logic.TitleIn.Id), 0);
+        _Title    = ResolveText(FromPointInto(Logic.TitleIn.Id),    0);
+        _Subtitle = ResolveText(FromPointInto(Logic.SubtitleIn.Id), 0);
         _IconData = ResolveIcon();
     }
 

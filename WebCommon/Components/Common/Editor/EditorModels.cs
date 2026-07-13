@@ -257,7 +257,7 @@ namespace DeusaldStoryWeb
 
         /// <summary>
         /// Builds the graph nodes for a logic node's inner content graph: its single Entry node (the reused
-        /// <see cref="StoryLogicNode.EntryPoint"/>, with the extra Title/Icon config inputs), one Exit node per
+        /// <see cref="StoryLogicNode.EntryPoint"/>, with the extra Title/Subtitle/Icon config inputs), one Exit node per
         /// <see cref="StoryLogicNode.ExitPoints"/> entry, and every Localization/Icon content node. Names for
         /// content nodes are resolved from <paramref name="localization"/> and the project's image library.
         /// </summary>
@@ -265,7 +265,7 @@ namespace DeusaldStoryWeb
         {
             List<EdNode> nodes = new();
 
-            // ── Entry node (green) — flow starts here; Title/Icon feed its content. ──
+            // ── Entry node (green) — flow starts here; Title/Subtitle/Icon feed its content. ──
             (double ex, double ey) = PointPos(logic.EntryPoint, _LOGIC_ENTRY_X, _LOGIC_ENTRY_Y);
             EdNode entry = new()
             {
@@ -276,8 +276,9 @@ namespace DeusaldStoryWeb
                 Y         = ey,
                 Deletable = false
             };
-            entry.Inputs.Add(new EdPort { Id = logic.TitleIn.Id, Name = "Title", Type = PortType.Text });
-            entry.Inputs.Add(new EdPort { Id = logic.IconIn.Id,  Name = "Icon",  Type = PortType.Icon });
+            entry.Inputs.Add(new EdPort { Id = logic.TitleIn.Id,    Name = "Title",    Type = PortType.Text });
+            entry.Inputs.Add(new EdPort { Id = logic.SubtitleIn.Id, Name = "Subtitle", Type = PortType.Text });
+            entry.Inputs.Add(new EdPort { Id = logic.IconIn.Id,     Name = "Icon",     Type = PortType.Icon });
             entry.Outputs.Add(new EdPort { Id = logic.EntryPoint.Id, Name = "Out", Type = PortType.Flow });
             nodes.Add(entry);
 

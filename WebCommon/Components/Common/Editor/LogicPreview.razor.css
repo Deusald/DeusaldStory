@@ -88,14 +88,28 @@
     gap: 20px;
 }
 
-.lpv-title {
+/* Title + optional subtitle stack, sitting beside the icon. */
+.lpv-titles {
     flex: 1;
     min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.lpv-title {
     font-size: 22px;
     font-weight: 700;
     letter-spacing: -.02em;
     color: var(--lpv-title);
     line-height: 1.25;
+}
+
+.lpv-subtitle {
+    font-size: 15px;
+    font-weight: 500;
+    color: var(--lpv-text);
+    line-height: 1.3;
 }
 
 .lpv-icon {

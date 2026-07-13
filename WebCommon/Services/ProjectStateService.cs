@@ -849,7 +849,7 @@ public class ProjectStateService(
     /// <summary>Removes inner content connections whose endpoints no longer exist (e.g. after an exit is deleted).</summary>
     private static void PruneContentConnections(StoryLogicNode logic)
     {
-        HashSet<Guid> valid = new() { logic.EntryPoint.Id, logic.TitleIn.Id, logic.IconIn.Id };
+        HashSet<Guid> valid = new() { logic.EntryPoint.Id, logic.TitleIn.Id, logic.SubtitleIn.Id, logic.IconIn.Id };
         foreach (StoryConnectionPoint p in logic.ExitPoints) valid.Add(p.Id);
         foreach (StoryLocalizationNode n in logic.LocalizationNodes) valid.Add(n.OutPoint.Id);
         foreach (StoryIconNode n in logic.IconNodes) valid.Add(n.OutPoint.Id);
