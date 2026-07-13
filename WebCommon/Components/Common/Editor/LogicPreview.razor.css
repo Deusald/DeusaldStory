@@ -48,58 +48,7 @@
     color: var(--text-bright);
 }
 
-/* External Variables — a compact card of value pickers that re-render the SmartFormat output. */
-.lpv-vars {
-    width: 50%;
-    min-width: 360px;
-    max-width: 100%;
-    background: var(--surface-1);
-    border: 1px solid var(--border);
-    border-radius: var(--r-md);
-    box-shadow: var(--shadow-sm);
-    margin-bottom: 16px;
-    overflow: hidden;
-}
-.lpv-vars-head {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 10px 14px;
-    border-bottom: 1px solid var(--border);
-    font-size: 12px;
-    font-weight: 700;
-    letter-spacing: .04em;
-    text-transform: uppercase;
-    color: var(--text-soft);
-}
-.lpv-vars-head > i { color: var(--code-func); }
-.lpv-vars-body {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    padding: 12px 14px;
-}
-.lpv-var-row {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-}
-.lpv-var-name {
-    flex: none;
-    min-width: 120px;
-    font-size: 13px;
-    font-weight: 600;
-    color: var(--text-bright);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-.lpv-var-input {
-    flex: 1;
-    min-width: 0;
-}
-
-/* A screen: title heading + a framed icon/text row. */
+/* A screen: a title/icon header, then the ordered flow text blocks. */
 .lpv-screen {
     width: 50%;
     min-width: 360px;
@@ -132,22 +81,21 @@
     --lpv-icon-bg:      #efe8d8;
 }
 
+/* Header — icon beside the title heading. */
+.lpv-head {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+}
+
 .lpv-title {
+    flex: 1;
+    min-width: 0;
     font-size: 22px;
     font-weight: 700;
     letter-spacing: -.02em;
     color: var(--lpv-title);
     line-height: 1.25;
-}
-
-.lpv-frame {
-    display: flex;
-    align-items: center;
-    gap: 24px;
-    padding: 22px;
-    background: var(--lpv-frame-bg);
-    border: 1px solid var(--lpv-frame-border);
-    border-radius: var(--r-md);
 }
 
 .lpv-icon {
@@ -168,12 +116,16 @@
     image-rendering: pixelated;
 }
 
-.lpv-text {
-    flex: 1;
-    min-width: 0;
+/* A rendered text block (one FlowText node). */
+.lpv-block {
     font-size: 15px;
-    line-height: 1.5;
+    line-height: 1.6;
     color: var(--lpv-text);
+    padding: 18px 22px;
+    background: var(--lpv-frame-bg);
+    border: 1px solid var(--lpv-frame-border);
+    border-radius: var(--r-md);
+    white-space: pre-wrap;
 }
 
 .lpv-placeholder {

@@ -118,6 +118,7 @@
 .edg-node-lds       { border-left: 3px solid var(--info); }
 .edg-node-sf        { border-left: 3px solid var(--purple); }
 .edg-node-extvar    { border-left: 3px solid var(--code-func); }
+.edg-node-flowtext  { border-left: 3px solid var(--warning); }
 
 /* Inline thumbnail (Icon node preview). Fixed top/height match THUMB_* in EditorGraph.razor:
    title top 36 + title height 20 + THUMB_GAP 8 = 64; height = THUMB_H. Assumes no subtitle. */

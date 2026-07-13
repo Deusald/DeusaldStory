@@ -58,7 +58,7 @@
                 }
                 else if (_Mode == EditorMode.Preview && _CurrentLogicNode is StoryLogicNode previewLogic)
                 {
-                    <LogicPreview Logic="previewLogic"/>
+                    <LogicPreview Logic="previewLogic" Values="_PreviewVars"/>
                 }
                 else
                 {
@@ -73,7 +73,15 @@
             </div>
 
             <div class="ed-inspector">
-                <EditorInspector Node="_SelectedNode"/>
+                @if (_Mode == EditorMode.Preview && _CurrentLogicNode is StoryLogicNode inspectLogic)
+                {
+                    @* In preview, the inspector column becomes the External Variables tweak panel that re-renders the preview. *@
+                    <PreviewVariablesPanel Logic="inspectLogic" Values="_PreviewVars" ValuesChanged="StateHasChanged"/>
+                }
+                else
+                {
+                    <EditorInspector Node="_SelectedNode"/>
+                }
             </div>
         }
 
@@ -107,6 +115,10 @@
     // Where the next created node is placed — the right-clicked canvas point (or a staggered default).
     private double _PendingX;
     private double _PendingY;
+
+    // Transient External Variable values driving the logic-node preview (variable id → value). Reset on each
+    // entry into Preview so a fresh render starts from the variables' defaults; shared with the inspector panel.
+    private Dictionary<Guid, string> _PreviewVars = new();
 
     private EdNode? _SelectedNode => _Nodes.Find(n => n.Id == _SelectedId);
 
@@ -169,7 +181,12 @@
         _Edges = EditorProjection.BuildEdges(container);
     }
 
-    private void OnModeChanged(EditorMode mode) => _Mode = mode;
+    private void OnModeChanged(EditorMode mode)
+    {
+        // Entering preview starts the External Variable tweaks fresh (panel re-seeds them to the defaults).
+        if (mode == EditorMode.Preview) _PreviewVars = new Dictionary<Guid, string>();
+        _Mode = mode;
+    }
 
     /// <summary>Rail tool picked — swap the centre panel. Only Media has its own panel; the rest keep the graph.</summary>
     private void OnToolSelected(EditorRail.Tool tool) => _ActiveTool = tool;
@@ -268,7 +285,8 @@
                 new NodePaletteItem(StoryNodeKind.Icon,             "bi-emoji-smile",     "Icon node",             "Picks a project icon to show alongside this logic node's content."),
                 new NodePaletteItem(StoryNodeKind.LightDarkSwitch,  "bi-circle-half",     "Light/Dark switch",     "Outputs one of two icons depending on the render theme (dark or paper/light)."),
                 new NodePaletteItem(StoryNodeKind.SmartFormat,      "bi-braces-asterisk", "SmartFormat node",      "Formats a text with SmartFormat, substituting connected External Variable values."),
-                new NodePaletteItem(StoryNodeKind.ExternalVariable, "bi-braces",          "External Variable node", "Feeds a story variable's value into a SmartFormat node.")
+                new NodePaletteItem(StoryNodeKind.ExternalVariable, "bi-braces",          "External Variable node", "Feeds a story variable's value into a SmartFormat node."),
+                new NodePaletteItem(StoryNodeKind.FlowText,         "bi-text-paragraph",  "FlowText node",         "On the flow spine — renders a connected text block, then continues to the next flow node.")
             ]
             :
             [
@@ -299,6 +317,12 @@
                 RebuildNodes();
                 break;
             case StoryNodeKind.ExternalVariable: _VariablePicker?.Show(Guid.Empty, Guid.Empty); break;
+            case StoryNodeKind.FlowText:
+                // No config — create it straight away at the pending position.
+                if (_ProjectState.AddFlowTextNode(_CurrentId, _PendingX, _PendingY) is StoryFlowTextNode ft)
+                    _SelectedId = ft.Id;
+                RebuildNodes();
+                break;
         }
     }
 
@@ -462,6 +486,7 @@
             case StoryNodeKind.LightDarkSwitch: _ProjectState.DeleteLightDarkSwitchNode(_CurrentId, node.Id); break;
             case StoryNodeKind.SmartFormat:     _ProjectState.DeleteSmartFormatNode(_CurrentId, node.Id);     break;
             case StoryNodeKind.ExternalVariable: _ProjectState.DeleteExternalVariableNode(_CurrentId, node.Id); break;
+            case StoryNodeKind.FlowText:         _ProjectState.DeleteFlowTextNode(_CurrentId, node.Id);        break;
             default: return;
         }
 

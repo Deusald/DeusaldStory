@@ -1,0 +1,89 @@
+.pvp-root {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    background: var(--surface-1);
+    overflow: hidden;
+}
+
+/* ── Header ──────────────────────────────────────────────────────────────── */
+
+.pvp-header {
+    flex: none;
+    padding: 16px 18px 14px;
+}
+
+.pvp-kind {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: .08em;
+    color: var(--code-func);
+    margin-bottom: 7px;
+}
+.pvp-kind-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 2px;
+    background: var(--code-func);
+}
+
+.pvp-title {
+    font-size: 17px;
+    font-weight: 600;
+    color: var(--text-bright);
+    letter-spacing: -.01em;
+    line-height: 1.2;
+}
+
+.pvp-subtitle {
+    margin-top: 6px;
+    font-size: 12.5px;
+    line-height: 1.5;
+    color: var(--text-dim);
+}
+
+/* ── Body ────────────────────────────────────────────────────────────────── */
+
+.pvp-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px 18px 20px;
+    border-top: 1px solid var(--border-subtle);
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.pvp-field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+.pvp-label {
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--text-soft);
+}
+.pvp-hint {
+    font-size: 11.5px;
+    line-height: 1.4;
+    color: var(--text-faint);
+}
+
+.pvp-empty {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    gap: 8px;
+    padding: 24px 12px;
+    color: var(--text-ghost);
+    font-size: 12.5px;
+    line-height: 1.5;
+}
+.pvp-empty i { font-size: 24px; }

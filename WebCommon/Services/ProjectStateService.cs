@@ -423,6 +423,32 @@ public class ProjectStateService(
         MarkKeyDirty(logicId);
     }
 
+    /// <summary>Adds a FlowText node (renders a text block on the flow spine) to a logic node's inner graph.</summary>
+    public StoryFlowTextNode? AddFlowTextNode(Guid logicId, double x, double y)
+    {
+        if (!CurrentProject!.LogicNodes.TryGetValue(logicId, out StoryLogicNode? logic)) return null;
+
+        StoryFlowTextNode node = new() { X = x, Y = y };
+        logic.FlowTextNodes.Add(node);
+        MarkKeyDirty(logicId);
+        return node;
+    }
+
+    /// <summary>Deletes a FlowText node and any inner wire that touched its flow or text ports.</summary>
+    public void DeleteFlowTextNode(Guid logicId, Guid nodeId)
+    {
+        if (!CurrentProject!.LogicNodes.TryGetValue(logicId, out StoryLogicNode? logic)) return;
+        StoryFlowTextNode? node = logic.FlowTextNodes.Find(n => n.Id == nodeId);
+        if (node is null) return;
+
+        logic.FlowTextNodes.Remove(node);
+        logic.ContentConnections.RemoveAll(c =>
+            c.FromPoint == node.FlowOut.Id || c.ToPoint == node.FlowOut.Id ||
+            c.FromPoint == node.FlowIn.Id  || c.ToPoint == node.FlowIn.Id  ||
+            c.ToPoint   == node.TextIn.Id);
+        MarkKeyDirty(logicId);
+    }
+
     /// <summary>
     /// Wires an output (<paramref name="fromPoint"/>) to an input (<paramref name="toPoint"/>) inside a logic node's
     /// content graph. An output leads to one place, so any existing wire leaving <paramref name="fromPoint"/> is
@@ -518,6 +544,15 @@ public class ProjectStateService(
         {
             ev.X = x;
             ev.Y = y;
+            MarkKeyDirty(logicId);
+            return;
+        }
+
+        StoryFlowTextNode? ft = logic.FlowTextNodes.Find(n => n.Id == movedId);
+        if (ft is not null)
+        {
+            ft.X = x;
+            ft.Y = y;
             MarkKeyDirty(logicId);
         }
     }
@@ -788,6 +823,12 @@ public class ProjectStateService(
             valid.Add(n.OutPoint.Id);
         }
         foreach (StoryExternalVariableNode n in logic.ExternalVariableNodes) valid.Add(n.OutPoint.Id);
+        foreach (StoryFlowTextNode n in logic.FlowTextNodes)
+        {
+            valid.Add(n.FlowIn.Id);
+            valid.Add(n.TextIn.Id);
+            valid.Add(n.FlowOut.Id);
+        }
 
         logic.ContentConnections.RemoveAll(c => !valid.Contains(c.FromPoint) || !valid.Contains(c.ToPoint));
     }

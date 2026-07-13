@@ -1,0 +1,104 @@
+@namespace DeusaldStoryWeb.Components.Common
+@inject ProjectStateService _ProjectState
+
+@* ─────────────────────────────────────────────────────────────────────────
+   Shown in the inspector column while a logic node is in Preview mode. Lists
+   the story variables referenced by the node's External Variable nodes and lets
+   the author tweak each value; changes flow into the shared Values dictionary
+   and raise ValuesChanged so the LogicPreview re-renders its SmartFormat output.
+   ───────────────────────────────────────────────────────────────────────── *@
+
+<div class="pvp-root">
+
+    <div class="pvp-header">
+        <span class="pvp-kind">
+            <span class="pvp-kind-dot"></span>
+            EXTERNAL VARIABLES
+        </span>
+        <div class="pvp-title">Preview values</div>
+        <div class="pvp-subtitle">Tweak the connected variables to see how the text renders.</div>
+    </div>
+
+    <div class="pvp-body">
+        @{
+            List<StoryVariable> vars = ReferencedVariables();
+        }
+        @if (vars.Count == 0)
+        {
+            <div class="pvp-empty">
+                <i class="bi bi-braces"></i>
+                <span>No External Variable nodes are connected in this logic node.</span>
+            </div>
+        }
+        else
+        {
+            @foreach (StoryVariable v in vars)
+            {
+                StoryVariable variable = v;
+                <div class="pvp-field">
+                    <label class="pvp-label">@(string.IsNullOrWhiteSpace(variable.Name) ? "(unnamed)" : variable.Name)</label>
+                    @if (variable.PossibleValues.Count > 0)
+                    {
+                        <select class="modal-input"
+                                value="@PreviewValue(variable)"
+                                @onchange="e => OnValueChanged(variable.Id, e)">
+                            @foreach (string val in variable.PossibleValues)
+                            {
+                                <option value="@val">@(string.IsNullOrEmpty(val) ? "(empty)" : val)</option>
+                            }
+                        </select>
+                    }
+                    else
+                    {
+                        <input class="modal-input" type="text"
+                               value="@PreviewValue(variable)"
+                               @oninput="e => OnValueChanged(variable.Id, e)"/>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(variable.Description))
+                    {
+                        <div class="pvp-hint">@variable.Description</div>
+                    }
+                </div>
+            }
+        }
+    </div>
+
+</div>
+
+@code {
+    [Parameter] public StoryLogicNode            Logic         { get; set; } = default!;
+    [Parameter] public Dictionary<Guid, string>  Values        { get; set; } = new();
+    [Parameter] public EventCallback             ValuesChanged { get; set; }
+
+    protected override void OnParametersSet() => SeedValues();
+
+    /// <summary>The distinct story variables referenced by this logic node's External Variable nodes.</summary>
+    private List<StoryVariable> ReferencedVariables()
+    {
+        Dictionary<Guid, StoryVariable> map = new();
+        foreach (StoryExternalVariableNode n in Logic.ExternalVariableNodes)
+            if (Variable(n.SelectedVariableId) is StoryVariable v)
+                map[v.Id] = v;
+        return map.Values.OrderBy(v => v.Name, StringComparer.OrdinalIgnoreCase).ToList();
+    }
+
+    /// <summary>Ensures every referenced variable has a value (defaulting to its first possible value).</summary>
+    private void SeedValues()
+    {
+        foreach (StoryVariable v in ReferencedVariables())
+            if (!Values.ContainsKey(v.Id))
+                Values[v.Id] = v.PossibleValues.FirstOrDefault() ?? "";
+    }
+
+    private string PreviewValue(StoryVariable v) =>
+        Values.TryGetValue(v.Id, out string? val) ? val : v.PossibleValues.FirstOrDefault() ?? "";
+
+    private StoryVariable? Variable(Guid id) =>
+        id != Guid.Empty && _ProjectState.CurrentProject!.Variables.TryGetValue(id, out StoryVariable? v) ? v : null;
+
+    private async Task OnValueChanged(Guid variableId, ChangeEventArgs e)
+    {
+        Values[variableId] = e.Value?.ToString() ?? "";
+        await ValuesChanged.InvokeAsync();
+    }
+}

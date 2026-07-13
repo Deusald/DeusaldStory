@@ -48,6 +48,9 @@ namespace DeusaldStoryCommon
         /// <summary>External Variable nodes placed in the inner graph (each feeds a variable value into a SmartFormat node).</summary>
         public List<StoryExternalVariableNode> ExternalVariableNodes { get; } = new();
 
+        /// <summary>FlowText nodes placed in the inner graph — the flow spine that renders text blocks in order.</summary>
+        public List<StoryFlowTextNode> FlowTextNodes { get; } = new();
+
         /// <summary>Wires between the inner graph's connection points (Entry/Exit ports and content-node ports).</summary>
         public List<StoryConnection> ContentConnections { get; } = new();
     }

@@ -26,13 +26,14 @@ namespace DeusaldStoryWeb
 
     /// <summary>
     /// What a connection port carries, so wiring only joins compatible ports. Ordinary story flow is
-    /// <see cref="Flow"/> (all container/logic-boundary ports); the logic node's Title/Icon config inputs and the
-    /// matching content-node outputs use <see cref="Title"/>/<see cref="Icon"/>.
+    /// <see cref="Flow"/> (all container/logic-boundary ports, and the FlowText spine); resolved localization /
+    /// SmartFormat text uses <see cref="Text"/>; icons use <see cref="Icon"/>; variable values use
+    /// <see cref="Variable"/>.
     /// </summary>
     public enum PortType
     {
         Flow,
-        Title,
+        Text,
         Icon,
         Variable
     }
@@ -57,11 +58,12 @@ namespace DeusaldStoryWeb
         PortalOut,  // a portal's exit node — flow re-emerges here and continues on (orange)
         LogicEntry, // inside a logic node: the single Entry node (Title/Icon inputs + flow output) (green)
         LogicExit,  // inside a logic node: one Exit node per exit branch (flow input) (red)
-        Localization, // inside a logic node: picks a localization key, feeds a Title input (accent)
+        Localization, // inside a logic node: picks a localization key, emits its text (accent)
         Icon,       // inside a logic node: picks a project icon, feeds an Icon input (orange)
         LightDarkSwitch, // inside a logic node: picks between two icons by render theme (info)
         SmartFormat,     // inside a logic node: formats a text with connected variable values (purple)
-        ExternalVariable // inside a logic node: picks a story variable, feeds a SmartFormat variables input (teal)
+        ExternalVariable, // inside a logic node: picks a story variable, feeds a SmartFormat variables input (teal)
+        FlowText         // inside a logic node: on the flow spine, renders a text block then continues flow (amber)
     }
 
     /// <summary>A point on the graph canvas in world (un-panned, un-scaled) coordinates.</summary>
@@ -268,7 +270,7 @@ namespace DeusaldStoryWeb
                 Y         = ey,
                 Deletable = false
             };
-            entry.Inputs.Add(new EdPort { Id = logic.TitleIn.Id, Name = "Title", Type = PortType.Title });
+            entry.Inputs.Add(new EdPort { Id = logic.TitleIn.Id, Name = "Title", Type = PortType.Text });
             entry.Inputs.Add(new EdPort { Id = logic.IconIn.Id,  Name = "Icon",  Type = PortType.Icon });
             entry.Outputs.Add(new EdPort { Id = logic.EntryPoint.Id, Name = "Out", Type = PortType.Flow });
             nodes.Add(entry);
@@ -305,7 +307,7 @@ namespace DeusaldStoryWeb
                     Y         = loc.Y,
                     Deletable = true
                 };
-                node.Outputs.Add(new EdPort { Id = loc.OutPoint.Id, Name = "Text", Type = PortType.Title });
+                node.Outputs.Add(new EdPort { Id = loc.OutPoint.Id, Name = "Text", Type = PortType.Text });
                 nodes.Add(node);
             }
 
@@ -359,9 +361,9 @@ namespace DeusaldStoryWeb
                     Deletable = true,
                     Editable  = false
                 };
-                node.Inputs.Add(new EdPort { Id = sf.LocalizationIn.Id, Name = "Text",      Type = PortType.Title });
+                node.Inputs.Add(new EdPort { Id = sf.LocalizationIn.Id, Name = "Text",      Type = PortType.Text });
                 node.Inputs.Add(new EdPort { Id = sf.VariablesIn.Id,    Name = "Variables", Type = PortType.Variable });
-                node.Outputs.Add(new EdPort { Id = sf.OutPoint.Id, Name = "Text", Type = PortType.Title });
+                node.Outputs.Add(new EdPort { Id = sf.OutPoint.Id, Name = "Text", Type = PortType.Text });
                 nodes.Add(node);
             }
 
@@ -380,6 +382,25 @@ namespace DeusaldStoryWeb
                     Deletable = true
                 };
                 node.Outputs.Add(new EdPort { Id = ev.OutPoint.Id, Name = "Value", Type = PortType.Variable });
+                nodes.Add(node);
+            }
+
+            // ── FlowText nodes (amber) — sit on the flow spine, render a text block, continue flow. ──
+            foreach (StoryFlowTextNode ft in logic.FlowTextNodes)
+            {
+                EdNode node = new()
+                {
+                    Id        = ft.Id,
+                    Kind      = StoryNodeKind.FlowText,
+                    Title     = "FlowText",
+                    X         = ft.X,
+                    Y         = ft.Y,
+                    Deletable = true,
+                    Editable  = false
+                };
+                node.Inputs.Add(new EdPort { Id = ft.FlowIn.Id, Name = "Flow", Type = PortType.Flow });
+                node.Inputs.Add(new EdPort { Id = ft.TextIn.Id, Name = "Text", Type = PortType.Text });
+                node.Outputs.Add(new EdPort { Id = ft.FlowOut.Id, Name = "Flow", Type = PortType.Flow });
                 nodes.Add(node);
             }
 
@@ -439,6 +460,7 @@ namespace DeusaldStoryWeb
             StoryNodeKind.LightDarkSwitch => "LIGHT / DARK",
             StoryNodeKind.SmartFormat      => "SMART FORMAT",
             StoryNodeKind.ExternalVariable => "EXTERNAL VARIABLE",
+            StoryNodeKind.FlowText         => "FLOW TEXT",
             _                       => ""
         };
 
@@ -459,6 +481,7 @@ namespace DeusaldStoryWeb
             StoryNodeKind.LightDarkSwitch => "var(--info)",
             StoryNodeKind.SmartFormat      => "var(--purple)",
             StoryNodeKind.ExternalVariable => "var(--code-func)",
+            StoryNodeKind.FlowText         => "var(--warning)",
             _                       => "var(--text-dim)"
         };
     }

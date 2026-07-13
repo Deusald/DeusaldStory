@@ -2,15 +2,16 @@
 @inject ProjectStateService _ProjectState
 
 @* ─────────────────────────────────────────────────────────────────────────
-   Renders a logic node's output as a screen: the localized title as a heading,
-   then a framed row with the connected icon on the left and the localized text
-   beside it. When the title text is produced by a SmartFormat node, its result
-   depends on the values of the connected External Variable nodes — the "External
-   Variables" panel lets the author tweak each value and re-renders live.
+   Renders a logic node's output as a screen: the localized title (Entry's Title
+   input) as a heading with the connected icon, then the ordered sequence of text
+   blocks produced by walking the flow spine — Entry's flow output through each
+   FlowText node until an Exit. A FlowText block whose text comes from a
+   SmartFormat node renders against the External Variable values the author tweaks
+   in the inspector (passed in via Values).
 
    A Dark/Light toggle flips only the inner window between the dark theme and a
-   paper-like light theme (the story is printed on paper later); the toggle also
-   decides which side of a Light/Dark switch node is shown.
+   paper-like light theme; it also decides which side of a Light/Dark switch node
+   is shown.
    ───────────────────────────────────────────────────────────────────────── *@
 
 <div class="lpv-root">
@@ -26,87 +27,63 @@
         </div>
     </div>
 
-    @* ── External Variables — tweak the values SmartFormat renders against. ── *@
-    @{
-        List<StoryVariable> vars = ReferencedVariables();
-    }
-    @if (vars.Count > 0)
-    {
-        <div class="lpv-vars">
-            <div class="lpv-vars-head">
-                <i class="bi bi-braces"></i>
-                <span>External Variables</span>
-            </div>
-            <div class="lpv-vars-body">
-                @foreach (StoryVariable v in vars)
-                {
-                    StoryVariable variable = v;
-                    <div class="lpv-var-row">
-                        <span class="lpv-var-name">@(string.IsNullOrWhiteSpace(variable.Name) ? "(unnamed)" : variable.Name)</span>
-                        @if (variable.PossibleValues.Count > 0)
-                        {
-                            <select class="modal-input lpv-var-input"
-                                    value="@PreviewValue(variable)"
-                                    @onchange="e => OnVarValueChanged(variable.Id, e)">
-                                @foreach (string val in variable.PossibleValues)
-                                {
-                                    <option value="@val">@(string.IsNullOrEmpty(val) ? "(empty)" : val)</option>
-                                }
-                            </select>
-                        }
-                        else
-                        {
-                            <input class="modal-input lpv-var-input" type="text"
-                                   value="@PreviewValue(variable)"
-                                   @oninput="e => OnVarValueChanged(variable.Id, e)"/>
-                        }
-                    </div>
-                }
-            </div>
-        </div>
-    }
-
     <div class="lpv-screen @(_Paper ? "paper" : "")">
 
-        @if (string.IsNullOrEmpty(_Title))
-        {
-            <div class="lpv-title lpv-placeholder">No title connected</div>
-        }
-        else
-        {
-            <div class="lpv-title">@_Title</div>
-        }
-
-        <div class="lpv-frame">
+        <div class="lpv-head">
             @if (_IconData is not null)
             {
                 <div class="lpv-icon">
                     <img src="data:image/png;base64,@_IconData" alt="icon"/>
                 </div>
             }
-            <div class="lpv-text @(string.IsNullOrEmpty(_Title) ? "lpv-placeholder" : "")">
-                @(string.IsNullOrEmpty(_Title) ? "No text connected" : _Title)
-            </div>
+            @if (string.IsNullOrEmpty(_Title))
+            {
+                <div class="lpv-title lpv-placeholder">No title connected</div>
+            }
+            else
+            {
+                <div class="lpv-title">@SafeHtml(_Title)</div>
+            }
         </div>
+
+        @{
+            List<string> blocks = RenderBlocks();
+        }
+        @if (blocks.Count == 0)
+        {
+            <div class="lpv-block lpv-placeholder">No text blocks connected — wire the Entry flow into a FlowText node.</div>
+        }
+        else
+        {
+            @foreach (string block in blocks)
+            {
+                @if (string.IsNullOrEmpty(block))
+                {
+                    <div class="lpv-block lpv-placeholder">(empty text)</div>
+                }
+                else
+                {
+                    <div class="lpv-block">@SafeHtml(block)</div>
+                }
+            }
+        }
 
     </div>
 </div>
 
 @code {
-    [Parameter] public StoryLogicNode Logic { get; set; } = default!;
+    [Parameter] public StoryLogicNode           Logic  { get; set; } = default!;
+
+    /// <summary>External Variable values driving SmartFormat blocks (variable id → value); owned by the parent.</summary>
+    [Parameter] public Dictionary<Guid, string> Values { get; set; } = new();
 
     private bool    _Paper;    // false = dark (default), true = paper/light
     private string  _Title = "";
     private string? _IconData; // base64 PNG, or null when no icon connected
 
-    // Transient preview values for the referenced variables, keyed by variable id. Not persisted — they only
-    // drive how the SmartFormat nodes render in this preview.
-    private readonly Dictionary<Guid, string> _VarValues = new();
-
     protected override void OnParametersSet()
     {
-        SeedVarValues();
-        _Title    = ResolveTitle();
+        _Title    = ResolveText(FromPointInto(Logic.TitleIn.Id), 0);
         _IconData = ResolveIcon();
     }
 
@@ -116,43 +93,34 @@
         _IconData = ResolveIcon(); // a Light/Dark switch may resolve to a different icon
     }
 
-    private void OnVarValueChanged(Guid variableId, ChangeEventArgs e)
+    /// <summary>Renders preview text with a whitelist of basic formatting tags (b/i/br/…), everything else escaped.</summary>
+    private static MarkupString SafeHtml(string text) => (MarkupString)PreviewHtmlSanitizer.ToSafeHtml(text);
+
+    // ── Flow-block rendering ─────────────────────────────────────────────────
+
+    /// <summary>
+    /// Walks the flow spine from the Entry's flow output through each FlowText node, resolving each block's text,
+    /// until the flow reaches a non-FlowText target (an Exit) or a dead end. Loop-guarded.
+    /// </summary>
+    private List<string> RenderBlocks()
     {
-        _VarValues[variableId] = e.Value?.ToString() ?? "";
-        _Title = ResolveTitle();   // re-render the SmartFormat output against the new value
+        List<string> blocks = new();
+        Guid         target = FlowTargetOf(Logic.EntryPoint.Id);
+        int          guard  = 0;
+
+        while (guard++ < 128 && Logic.FlowTextNodes.Find(n => n.FlowIn.Id == target) is StoryFlowTextNode ft)
+        {
+            blocks.Add(ResolveText(FromPointInto(ft.TextIn.Id), 0));
+            target = FlowTargetOf(ft.FlowOut.Id);
+        }
+        return blocks;
     }
 
-    // ── External variables ─────────────────────────────────────────────────
+    /// <summary>The input point wired from output <paramref name="fromPoint"/>, or empty when nothing is connected.</summary>
+    private Guid FlowTargetOf(Guid fromPoint) =>
+        Logic.ContentConnections.Find(c => c.FromPoint == fromPoint)?.ToPoint ?? Guid.Empty;
 
-    /// <summary>The distinct story variables referenced by this logic node's External Variable nodes.</summary>
-    private List<StoryVariable> ReferencedVariables()
-    {
-        Dictionary<Guid, StoryVariable> map = new();
-        foreach (StoryExternalVariableNode n in Logic.ExternalVariableNodes)
-            if (Variable(n.SelectedVariableId) is StoryVariable v)
-                map[v.Id] = v;
-        return map.Values.OrderBy(v => v.Name, StringComparer.OrdinalIgnoreCase).ToList();
-    }
-
-    /// <summary>Ensures every referenced variable has a preview value (defaulting to its first possible value).</summary>
-    private void SeedVarValues()
-    {
-        foreach (StoryVariable v in ReferencedVariables())
-            if (!_VarValues.ContainsKey(v.Id))
-                _VarValues[v.Id] = v.PossibleValues.FirstOrDefault() ?? "";
-    }
-
-    /// <summary>The preview value in use for <paramref name="v"/> — the tweaked one, else its first possible value.</summary>
-    private string PreviewValue(StoryVariable v) =>
-        _VarValues.TryGetValue(v.Id, out string? val) ? val : v.PossibleValues.FirstOrDefault() ?? "";
-
-    private StoryVariable? Variable(Guid id) =>
-        id != Guid.Empty && _ProjectState.CurrentProject!.Variables.TryGetValue(id, out StoryVariable? v) ? v : null;
-
-    // ── Title resolution ────────────────────────────────────────────────────
-
-    /// <summary>Follows the wire into the Title input to whatever text node feeds it (Localization or SmartFormat).</summary>
-    private string ResolveTitle() => ResolveText(FromPointInto(Logic.TitleIn.Id), 0);
+    // ── Text resolution ──────────────────────────────────────────────────────
 
     /// <summary>
     /// Resolves the text emitted by <paramref name="fromPoint"/>: a Localization node yields its key's main-language
@@ -196,7 +164,14 @@
         return key.Translations.Find(t => t.LanguageId == main)?.Text ?? "";
     }
 
-    // ── Icon resolution ─────────────────────────────────────────────────────
+    /// <summary>The preview value in use for <paramref name="v"/> — the tweaked one, else its first possible value.</summary>
+    private string PreviewValue(StoryVariable v) =>
+        Values.TryGetValue(v.Id, out string? val) ? val : v.PossibleValues.FirstOrDefault() ?? "";
+
+    private StoryVariable? Variable(Guid id) =>
+        id != Guid.Empty && _ProjectState.CurrentProject!.Variables.TryGetValue(id, out StoryVariable? v) ? v : null;
+
+    // ── Icon resolution ──────────────────────────────────────────────────────
 
     /// <summary>Follows the wire into the Icon input, resolving through a Light/Dark switch when present.</summary>
     private string? ResolveIcon() => ResolveIconImage(FromPointInto(Logic.IconIn.Id), 0);
