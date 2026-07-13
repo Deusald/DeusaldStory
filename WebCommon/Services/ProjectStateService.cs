@@ -365,17 +365,78 @@ public class ProjectStateService(
         MarkKeyDirty(logicId);
     }
 
+    /// <summary>Adds a SmartFormat node (formats a text with connected variable values) to a logic node's inner graph.</summary>
+    public StorySmartFormatNode? AddSmartFormatNode(Guid logicId, double x, double y)
+    {
+        if (!CurrentProject!.LogicNodes.TryGetValue(logicId, out StoryLogicNode? logic)) return null;
+
+        StorySmartFormatNode node = new() { X = x, Y = y };
+        logic.SmartFormatNodes.Add(node);
+        MarkKeyDirty(logicId);
+        return node;
+    }
+
+    /// <summary>Deletes a SmartFormat node and any inner wire that touched its ports.</summary>
+    public void DeleteSmartFormatNode(Guid logicId, Guid nodeId)
+    {
+        if (!CurrentProject!.LogicNodes.TryGetValue(logicId, out StoryLogicNode? logic)) return;
+        StorySmartFormatNode? node = logic.SmartFormatNodes.Find(n => n.Id == nodeId);
+        if (node is null) return;
+
+        logic.SmartFormatNodes.Remove(node);
+        logic.ContentConnections.RemoveAll(c =>
+            c.FromPoint == node.OutPoint.Id     || c.ToPoint == node.OutPoint.Id ||
+            c.ToPoint   == node.LocalizationIn.Id || c.ToPoint == node.VariablesIn.Id);
+        MarkKeyDirty(logicId);
+    }
+
+    /// <summary>Adds an External Variable node (referencing <paramref name="variableId"/>) to a logic node's inner graph.</summary>
+    public StoryExternalVariableNode? AddExternalVariableNode(Guid logicId, Guid variableId, double x, double y)
+    {
+        if (!CurrentProject!.LogicNodes.TryGetValue(logicId, out StoryLogicNode? logic)) return null;
+
+        StoryExternalVariableNode node = new() { SelectedVariableId = variableId, X = x, Y = y };
+        logic.ExternalVariableNodes.Add(node);
+        MarkKeyDirty(logicId);
+        return node;
+    }
+
+    /// <summary>Changes the story variable an External Variable node points at.</summary>
+    public void UpdateExternalVariableNode(Guid logicId, Guid nodeId, Guid variableId)
+    {
+        if (!CurrentProject!.LogicNodes.TryGetValue(logicId, out StoryLogicNode? logic)) return;
+        StoryExternalVariableNode? node = logic.ExternalVariableNodes.Find(n => n.Id == nodeId);
+        if (node is null) return;
+        node.SelectedVariableId = variableId;
+        MarkKeyDirty(logicId);
+    }
+
+    /// <summary>Deletes an External Variable node and any inner wire that touched its output.</summary>
+    public void DeleteExternalVariableNode(Guid logicId, Guid nodeId)
+    {
+        if (!CurrentProject!.LogicNodes.TryGetValue(logicId, out StoryLogicNode? logic)) return;
+        StoryExternalVariableNode? node = logic.ExternalVariableNodes.Find(n => n.Id == nodeId);
+        if (node is null) return;
+
+        logic.ExternalVariableNodes.Remove(node);
+        logic.ContentConnections.RemoveAll(c => c.FromPoint == node.OutPoint.Id || c.ToPoint == node.OutPoint.Id);
+        MarkKeyDirty(logicId);
+    }
+
     /// <summary>
     /// Wires an output (<paramref name="fromPoint"/>) to an input (<paramref name="toPoint"/>) inside a logic node's
-    /// content graph. An output leads to one place and a Title/Icon input takes a single source, so any existing wire
-    /// on either endpoint is replaced. A no-op (returns null) if the exact wire already exists.
+    /// content graph. An output leads to one place, so any existing wire leaving <paramref name="fromPoint"/> is
+    /// replaced. A Title/Icon input takes a single source, so its previous wire is replaced too — except a SmartFormat
+    /// node's <b>variables</b> input, which accepts many External Variable outputs and keeps them all. A no-op
+    /// (returns null) if the exact wire already exists.
     /// </summary>
     public StoryConnection? ConnectContent(Guid logicId, Guid fromPoint, Guid toPoint)
     {
         if (!CurrentProject!.LogicNodes.TryGetValue(logicId, out StoryLogicNode? logic)) return null;
         if (logic.ContentConnections.Exists(c => c.FromPoint == fromPoint && c.ToPoint == toPoint)) return null;
 
-        logic.ContentConnections.RemoveAll(c => c.FromPoint == fromPoint || c.ToPoint == toPoint);
+        bool multiInput = logic.SmartFormatNodes.Exists(sf => sf.VariablesIn.Id == toPoint);
+        logic.ContentConnections.RemoveAll(c => c.FromPoint == fromPoint || (!multiInput && c.ToPoint == toPoint));
 
         StoryConnection connection = new() { FromPoint = fromPoint, ToPoint = toPoint };
         logic.ContentConnections.Add(connection);
@@ -439,6 +500,24 @@ public class ProjectStateService(
         {
             lds.X = x;
             lds.Y = y;
+            MarkKeyDirty(logicId);
+            return;
+        }
+
+        StorySmartFormatNode? sf = logic.SmartFormatNodes.Find(n => n.Id == movedId);
+        if (sf is not null)
+        {
+            sf.X = x;
+            sf.Y = y;
+            MarkKeyDirty(logicId);
+            return;
+        }
+
+        StoryExternalVariableNode? ev = logic.ExternalVariableNodes.Find(n => n.Id == movedId);
+        if (ev is not null)
+        {
+            ev.X = x;
+            ev.Y = y;
             MarkKeyDirty(logicId);
         }
     }
@@ -702,6 +781,13 @@ public class ProjectStateService(
             valid.Add(n.LightIn.Id);
             valid.Add(n.OutPoint.Id);
         }
+        foreach (StorySmartFormatNode n in logic.SmartFormatNodes)
+        {
+            valid.Add(n.LocalizationIn.Id);
+            valid.Add(n.VariablesIn.Id);
+            valid.Add(n.OutPoint.Id);
+        }
+        foreach (StoryExternalVariableNode n in logic.ExternalVariableNodes) valid.Add(n.OutPoint.Id);
 
         logic.ContentConnections.RemoveAll(c => !valid.Contains(c.FromPoint) || !valid.Contains(c.ToPoint));
     }

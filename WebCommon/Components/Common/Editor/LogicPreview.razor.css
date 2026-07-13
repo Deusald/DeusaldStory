@@ -48,6 +48,57 @@
     color: var(--text-bright);
 }
 
+/* External Variables — a compact card of value pickers that re-render the SmartFormat output. */
+.lpv-vars {
+    width: 50%;
+    min-width: 360px;
+    max-width: 100%;
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: var(--r-md);
+    box-shadow: var(--shadow-sm);
+    margin-bottom: 16px;
+    overflow: hidden;
+}
+.lpv-vars-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+    color: var(--text-soft);
+}
+.lpv-vars-head > i { color: var(--code-func); }
+.lpv-vars-body {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 12px 14px;
+}
+.lpv-var-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+.lpv-var-name {
+    flex: none;
+    min-width: 120px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-bright);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.lpv-var-input {
+    flex: 1;
+    min-width: 0;
+}
+
 /* A screen: title heading + a framed icon/text row. */
 .lpv-screen {
     width: 50%;

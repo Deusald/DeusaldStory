@@ -86,6 +86,7 @@
 <NewPortalNodeModal        @ref="_NewPortalModal"      OnConfirm="OnNewPortalConfirmed"/>
 <LocalizationKeyPickerModal @ref="_LocalizationPicker" OnConfirm="OnLocalizationPicked"/>
 <IconPickerModal           @ref="_IconPicker"          OnConfirm="OnIconPicked"/>
+<VariablePickerModal       @ref="_VariablePicker"      OnConfirm="OnVariablePicked"/>
 
 @code {
     private EditorMode        _Mode = EditorMode.Edit;
@@ -101,6 +102,7 @@
     private NewPortalNodeModal?        _NewPortalModal;
     private LocalizationKeyPickerModal? _LocalizationPicker;
     private IconPickerModal?           _IconPicker;
+    private VariablePickerModal?       _VariablePicker;
 
     // Where the next created node is placed — the right-clicked canvas point (or a staggered default).
     private double _PendingX;
@@ -262,9 +264,11 @@
         _InLogic
             ?
             [
-                new NodePaletteItem(StoryNodeKind.Localization,    "bi-translate",       "Localization node",  "Picks a localization key that supplies this logic node's title text."),
-                new NodePaletteItem(StoryNodeKind.Icon,            "bi-emoji-smile",     "Icon node",          "Picks a project icon to show alongside this logic node's content."),
-                new NodePaletteItem(StoryNodeKind.LightDarkSwitch, "bi-circle-half",     "Light/Dark switch",  "Outputs one of two icons depending on the render theme (dark or paper/light).")
+                new NodePaletteItem(StoryNodeKind.Localization,     "bi-translate",       "Localization node",     "Picks a localization key that supplies this logic node's title text."),
+                new NodePaletteItem(StoryNodeKind.Icon,             "bi-emoji-smile",     "Icon node",             "Picks a project icon to show alongside this logic node's content."),
+                new NodePaletteItem(StoryNodeKind.LightDarkSwitch,  "bi-circle-half",     "Light/Dark switch",     "Outputs one of two icons depending on the render theme (dark or paper/light)."),
+                new NodePaletteItem(StoryNodeKind.SmartFormat,      "bi-braces-asterisk", "SmartFormat node",      "Formats a text with SmartFormat, substituting connected External Variable values."),
+                new NodePaletteItem(StoryNodeKind.ExternalVariable, "bi-braces",          "External Variable node", "Feeds a story variable's value into a SmartFormat node.")
             ]
             :
             [
@@ -288,6 +292,13 @@
                     _SelectedId = lds.Id;
                 RebuildNodes();
                 break;
+            case StoryNodeKind.SmartFormat:
+                // No config — create it straight away at the pending position.
+                if (_ProjectState.AddSmartFormatNode(_CurrentId, _PendingX, _PendingY) is StorySmartFormatNode sf)
+                    _SelectedId = sf.Id;
+                RebuildNodes();
+                break;
+            case StoryNodeKind.ExternalVariable: _VariablePicker?.Show(Guid.Empty, Guid.Empty); break;
         }
     }
 
@@ -313,6 +324,19 @@
             _ProjectState.UpdateIconNode(_CurrentId, result.EditNodeId, result.ImageId);
         }
         else if (_ProjectState.AddIconNode(_CurrentId, result.ImageId, _PendingX, _PendingY) is StoryIconNode node)
+        {
+            _SelectedId = node.Id;
+        }
+        RebuildNodes();
+    }
+
+    private void OnVariablePicked(VariablePickerModal.VariablePickResult result)
+    {
+        if (result.EditNodeId != Guid.Empty)
+        {
+            _ProjectState.UpdateExternalVariableNode(_CurrentId, result.EditNodeId, result.VariableId);
+        }
+        else if (_ProjectState.AddExternalVariableNode(_CurrentId, result.VariableId, _PendingX, _PendingY) is StoryExternalVariableNode node)
         {
             _SelectedId = node.Id;
         }
@@ -413,6 +437,11 @@
                 if (_CurrentLogicNode?.IconNodes.Find(n => n.Id == node.Id) is StoryIconNode ico)
                     _IconPicker?.Show(ico.Id, ico.SelectedImageId);
                 break;
+
+            case StoryNodeKind.ExternalVariable:
+                if (_CurrentLogicNode?.ExternalVariableNodes.Find(n => n.Id == node.Id) is StoryExternalVariableNode ev)
+                    _VariablePicker?.Show(ev.Id, ev.SelectedVariableId);
+                break;
         }
     }
 
@@ -431,6 +460,8 @@
             case StoryNodeKind.Localization: _ProjectState.DeleteLocalizationNode(_CurrentId, node.Id);  break;
             case StoryNodeKind.Icon:         _ProjectState.DeleteIconNode(_CurrentId, node.Id);          break;
             case StoryNodeKind.LightDarkSwitch: _ProjectState.DeleteLightDarkSwitchNode(_CurrentId, node.Id); break;
+            case StoryNodeKind.SmartFormat:     _ProjectState.DeleteSmartFormatNode(_CurrentId, node.Id);     break;
+            case StoryNodeKind.ExternalVariable: _ProjectState.DeleteExternalVariableNode(_CurrentId, node.Id); break;
             default: return;
         }
 

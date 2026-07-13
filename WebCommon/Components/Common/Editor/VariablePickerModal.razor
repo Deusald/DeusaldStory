@@ -1,0 +1,141 @@
+@namespace DeusaldStoryWeb.Components.Common
+@inject ProjectStateService _ProjectState
+
+@* ─────────────────────────────────────────────────────────────────────────
+   Picks a single story-wide variable (from the Variables editor). Used by both
+   the create and edit flows of an External Variable node (see Editor).
+   ───────────────────────────────────────────────────────────────────────── *@
+
+@if (_Visible)
+{
+    <div class="modal-backdrop" @onclick="Cancel"></div>
+
+    <div class="modal-box vpk-box" @onclick:stopPropagation="true">
+
+        <div class="modal-header">
+            <span class="modal-title">Pick a variable</span>
+            <button class="modal-close" @onclick="Cancel" title="Close">
+                <i class="bi bi-x-lg"></i>
+            </button>
+        </div>
+
+        <div class="modal-body vpk-body">
+
+            <div class="vpk-search">
+                <i class="bi bi-search"></i>
+                <input class="modal-input"
+                       type="text"
+                       placeholder="Search variables…"
+                       @bind="_Search"
+                       @bind:event="oninput"
+                       @ref="_SearchInput"/>
+            </div>
+
+            @{
+                List<StoryVariable> vars = Filtered().ToList();
+            }
+            @if (Project.Variables.Count == 0)
+            {
+                <div class="vpk-empty">
+                    <i class="bi bi-braces"></i>
+                    <span>No variables yet — add some in the Variables panel first.</span>
+                </div>
+            }
+            else if (vars.Count == 0)
+            {
+                <div class="vpk-empty">
+                    <i class="bi bi-braces"></i>
+                    <span>No variables match.</span>
+                </div>
+            }
+            else
+            {
+                <div class="vpk-list">
+                    @foreach (StoryVariable v in vars)
+                    {
+                        StoryVariable variable = v;
+                        <button class="vpk-item @(_SelectedVariableId == variable.Id ? "selected" : "")"
+                                @onclick="() => _SelectedVariableId = variable.Id">
+                            <div class="vpk-item-name">
+                                <i class="bi bi-braces"></i>
+                                <span>@(string.IsNullOrWhiteSpace(variable.Name) ? "(unnamed)" : variable.Name)</span>
+                            </div>
+                            <div class="vpk-item-sub">
+                                @variable.PossibleValues.Count value@(variable.PossibleValues.Count == 1 ? "" : "s")
+                            </div>
+                        </button>
+                    }
+                </div>
+            }
+
+        </div>
+
+        <div class="modal-footer">
+            <button class="modal-btn modal-btn-ghost" @onclick="Cancel">Cancel</button>
+            <button class="modal-btn modal-btn-primary"
+                    @onclick="Confirm"
+                    disabled="@(_SelectedVariableId == Guid.Empty)">
+                Select variable
+            </button>
+        </div>
+
+    </div>
+}
+
+@code {
+    [Parameter] public EventCallback<VariablePickResult> OnConfirm { get; set; }
+
+    private bool             _Visible;
+    private Guid             _EditNodeId;   // empty = creating a new node
+    private Guid             _SelectedVariableId;
+    private string           _Search = "";
+    private ElementReference _SearchInput;
+    private bool             _FocusPending;
+
+    private StoryProject Project => _ProjectState.CurrentProject!;
+
+    /// <summary>Opens the picker. <paramref name="editNodeId"/> is empty to create a node, set to edit one.</summary>
+    public void Show(Guid editNodeId, Guid currentVariableId)
+    {
+        _EditNodeId         = editNodeId;
+        _SelectedVariableId = currentVariableId;
+        _Search             = "";
+        _Visible            = true;
+        _FocusPending       = true;
+        StateHasChanged();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_FocusPending && _Visible)
+        {
+            _FocusPending = false;
+            try { await _SearchInput.FocusAsync(); } catch { /* not rendered yet */ }
+        }
+    }
+
+    private IEnumerable<StoryVariable> Filtered()
+    {
+        IEnumerable<StoryVariable> vars = Project.Variables.Values;
+
+        string term = _Search.Trim();
+        if (term.Length > 0)
+            vars = vars.Where(v =>
+                v.Name.Contains(term, StringComparison.OrdinalIgnoreCase) ||
+                v.Description.Contains(term, StringComparison.OrdinalIgnoreCase));
+
+        return vars.OrderBy(v => v.Name, StringComparer.OrdinalIgnoreCase);
+    }
+
+    private async Task Confirm()
+    {
+        if (_SelectedVariableId == Guid.Empty) return;
+        _Visible = false;
+        await OnConfirm.InvokeAsync(new VariablePickResult(_EditNodeId, _SelectedVariableId));
+    }
+
+    private void Cancel() => _Visible = false;
+
+    /// <summary>Result passed back to the parent. <see cref="EditNodeId"/> is empty for a create, set for an edit.</summary>
+    public record VariablePickResult(Guid EditNodeId, Guid VariableId);
+}

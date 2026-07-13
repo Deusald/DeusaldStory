@@ -294,6 +294,8 @@
             StoryNodeKind.Localization    => "edg-node-loc",
             StoryNodeKind.Icon            => "edg-node-icon",
             StoryNodeKind.LightDarkSwitch => "edg-node-lds",
+            StoryNodeKind.SmartFormat      => "edg-node-sf",
+            StoryNodeKind.ExternalVariable => "edg-node-extvar",
             _                                          => ""
         };
         return $"{kind} {(n.Id == SelectedId ? "edg-node-sel" : "")}";
@@ -302,7 +304,7 @@
     private static bool ShowPortLabels(EdNode n) =>
         n.Kind is StoryNodeKind.Logic or StoryNodeKind.Container
                or StoryNodeKind.LogicEntry or StoryNodeKind.LogicExit
-               or StoryNodeKind.LightDarkSwitch;
+               or StoryNodeKind.LightDarkSwitch or StoryNodeKind.SmartFormat;
 
     /// <summary>True when a wire is being dragged and this input port carries the same signal type as its source.</summary>
     private bool IsCompatibleTarget(EdPort input) =>
@@ -464,6 +466,8 @@
         StoryNodeKind.Localization    => "localization node",
         StoryNodeKind.Icon            => "icon node",
         StoryNodeKind.LightDarkSwitch => "light/dark switch",
+        StoryNodeKind.SmartFormat      => "SmartFormat node",
+        StoryNodeKind.ExternalVariable => "external variable node",
         _                       => "node"
     };
 

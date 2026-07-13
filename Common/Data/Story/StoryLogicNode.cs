@@ -42,6 +42,12 @@ namespace DeusaldStoryCommon
         /// <summary>Light/Dark switch nodes placed in the inner graph (each picks between two icons by theme).</summary>
         public List<StoryLightDarkSwitchNode> LightDarkSwitchNodes { get; } = new();
 
+        /// <summary>SmartFormat nodes placed in the inner graph (each formats a text with connected variable values).</summary>
+        public List<StorySmartFormatNode> SmartFormatNodes { get; } = new();
+
+        /// <summary>External Variable nodes placed in the inner graph (each feeds a variable value into a SmartFormat node).</summary>
+        public List<StoryExternalVariableNode> ExternalVariableNodes { get; } = new();
+
         /// <summary>Wires between the inner graph's connection points (Entry/Exit ports and content-node ports).</summary>
         public List<StoryConnection> ContentConnections { get; } = new();
     }

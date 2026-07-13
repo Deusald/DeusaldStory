@@ -33,7 +33,8 @@ namespace DeusaldStoryWeb
     {
         Flow,
         Title,
-        Icon
+        Icon,
+        Variable
     }
 
     /// <summary>
@@ -58,7 +59,9 @@ namespace DeusaldStoryWeb
         LogicExit,  // inside a logic node: one Exit node per exit branch (flow input) (red)
         Localization, // inside a logic node: picks a localization key, feeds a Title input (accent)
         Icon,       // inside a logic node: picks a project icon, feeds an Icon input (orange)
-        LightDarkSwitch // inside a logic node: picks between two icons by render theme (info)
+        LightDarkSwitch, // inside a logic node: picks between two icons by render theme (info)
+        SmartFormat,     // inside a logic node: formats a text with connected variable values (purple)
+        ExternalVariable // inside a logic node: picks a story variable, feeds a SmartFormat variables input (teal)
     }
 
     /// <summary>A point on the graph canvas in world (un-panned, un-scaled) coordinates.</summary>
@@ -343,6 +346,43 @@ namespace DeusaldStoryWeb
                 nodes.Add(node);
             }
 
+            // ── SmartFormat nodes (purple) — a text input, a many-to-one variables input, one formatted output. ──
+            foreach (StorySmartFormatNode sf in logic.SmartFormatNodes)
+            {
+                EdNode node = new()
+                {
+                    Id        = sf.Id,
+                    Kind      = StoryNodeKind.SmartFormat,
+                    Title     = "SmartFormat",
+                    X         = sf.X,
+                    Y         = sf.Y,
+                    Deletable = true,
+                    Editable  = false
+                };
+                node.Inputs.Add(new EdPort { Id = sf.LocalizationIn.Id, Name = "Text",      Type = PortType.Title });
+                node.Inputs.Add(new EdPort { Id = sf.VariablesIn.Id,    Name = "Variables", Type = PortType.Variable });
+                node.Outputs.Add(new EdPort { Id = sf.OutPoint.Id, Name = "Text", Type = PortType.Title });
+                nodes.Add(node);
+            }
+
+            // ── External Variable nodes (teal) — reference a story variable, feed a SmartFormat variables input. ──
+            foreach (StoryExternalVariableNode ev in logic.ExternalVariableNodes)
+            {
+                bool found = project.Variables.TryGetValue(ev.SelectedVariableId, out StoryVariable? variable);
+                EdNode node = new()
+                {
+                    Id        = ev.Id,
+                    Kind      = StoryNodeKind.ExternalVariable,
+                    Title     = found ? variable!.Name : "(no variable)",
+                    Subtitle  = found ? variable!.Description : "",
+                    X         = ev.X,
+                    Y         = ev.Y,
+                    Deletable = true
+                };
+                node.Outputs.Add(new EdPort { Id = ev.OutPoint.Id, Name = "Value", Type = PortType.Variable });
+                nodes.Add(node);
+            }
+
             return nodes;
         }
 
@@ -397,6 +437,8 @@ namespace DeusaldStoryWeb
             StoryNodeKind.Localization => "LOCALIZATION",
             StoryNodeKind.Icon         => "ICON",
             StoryNodeKind.LightDarkSwitch => "LIGHT / DARK",
+            StoryNodeKind.SmartFormat      => "SMART FORMAT",
+            StoryNodeKind.ExternalVariable => "EXTERNAL VARIABLE",
             _                       => ""
         };
 
@@ -415,6 +457,8 @@ namespace DeusaldStoryWeb
             StoryNodeKind.Localization => "var(--accent)",
             StoryNodeKind.Icon         => "var(--orange)",
             StoryNodeKind.LightDarkSwitch => "var(--info)",
+            StoryNodeKind.SmartFormat      => "var(--purple)",
+            StoryNodeKind.ExternalVariable => "var(--code-func)",
             _                       => "var(--text-dim)"
         };
     }
