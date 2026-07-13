@@ -74,9 +74,9 @@ namespace DeusaldStoryCommon
     /// </summary>
     public static class StorageSlots
     {
-        public const int NumberCount = 8;
-        public const int DialCount   = 4;
-        public const int StringCount = 4;
+        public const int NumberCount = 12;
+        public const int DialCount   = 8;
+        public const int StringCount = 16;
 
         /// <summary>The number of slots available for <paramref name="type"/>.</summary>
         public static int Count(StorageVariableType type) => type switch
