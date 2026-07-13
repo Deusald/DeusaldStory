@@ -53,21 +53,40 @@
                 @if (Selected is StoryVariable sel)
                 {
                     <div class="modal-field">
-                        <label class="modal-label">Value</label>
-                        @if (sel.PossibleValues.Count == 0)
-                        {
-                            <div class="sev-hint">This variable has no possible values — add some in the Variables panel.</div>
-                        }
-                        else
-                        {
-                            <select class="modal-input" @bind="_Value">
-                                @foreach (string value in sel.PossibleValues)
-                                {
-                                    <option value="@value">@value</option>
-                                }
-                            </select>
-                        }
+                        <label class="nlm-check">
+                            <input type="checkbox"
+                                   checked="@_MapFromVariable"
+                                   @onchange="e => _MapFromVariable = (bool)(e.Value ?? false)"/>
+                            <span>
+                                Map from variable input
+                                <span class="modal-label-hint">assign a value wired from another variable instead of a fixed one</span>
+                            </span>
+                        </label>
                     </div>
+
+                    @if (_MapFromVariable)
+                    {
+                        <div class="sev-hint">The assigned value comes from whatever variable is wired into this node's <b>Value</b> input.</div>
+                    }
+                    else
+                    {
+                        <div class="modal-field">
+                            <label class="modal-label">Value</label>
+                            @if (sel.PossibleValues.Count == 0)
+                            {
+                                <div class="sev-hint">This variable has no possible values — add some in the Variables panel.</div>
+                            }
+                            else
+                            {
+                                <select class="modal-input" @bind="_Value">
+                                    @foreach (string value in sel.PossibleValues)
+                                    {
+                                        <option value="@value">@value</option>
+                                    }
+                                </select>
+                            }
+                        </div>
+                    }
                 }
             }
 
@@ -92,6 +111,7 @@
     private bool   _IsEdit;
     private Guid   _EditNodeId;
     private Guid   _SelectedVariableId;
+    private bool   _MapFromVariable;
     private string _Value = "";
 
     private StoryProject Project => _ProjectState.CurrentProject!;
@@ -102,6 +122,7 @@
         _IsEdit             = false;
         _EditNodeId         = Guid.Empty;
         _SelectedVariableId = Guid.Empty;
+        _MapFromVariable    = false;
         _Value              = "";
         _Visible            = true;
         StateHasChanged();
@@ -113,6 +134,7 @@
         _IsEdit             = true;
         _EditNodeId         = node.Id;
         _SelectedVariableId = node.SelectedVariableId;
+        _MapFromVariable    = node.Mode == StorySetExternalVariableMode.MapFromVariable;
         _Value              = node.Value;
         _Visible            = true;
         StateHasChanged();
@@ -122,7 +144,7 @@
         _SelectedVariableId != Guid.Empty && Project.Variables.TryGetValue(_SelectedVariableId, out StoryVariable? v) ? v : null;
 
     private bool CanConfirm =>
-        Selected is StoryVariable sel && (sel.PossibleValues.Count == 0 || !string.IsNullOrEmpty(_Value));
+        Selected is StoryVariable sel && (_MapFromVariable || sel.PossibleValues.Count == 0 || !string.IsNullOrEmpty(_Value));
 
     private List<StoryVariable> Variables() =>
         Project.Variables.Values.OrderBy(v => v.Name, StringComparer.OrdinalIgnoreCase).ToList();
@@ -139,11 +161,14 @@
     {
         if (!CanConfirm) return;
         _Visible = false;
-        await OnConfirm.InvokeAsync(new SetExternalVariableArgs(_EditNodeId, _SelectedVariableId, _Value));
+        StorySetExternalVariableMode mode = _MapFromVariable
+            ? StorySetExternalVariableMode.MapFromVariable
+            : StorySetExternalVariableMode.SpecificValue;
+        await OnConfirm.InvokeAsync(new SetExternalVariableArgs(_EditNodeId, _SelectedVariableId, mode, _Value));
     }
 
     private void Cancel() => _Visible = false;
 
     /// <summary>Result passed back to the parent. <see cref="EditNodeId"/> is empty for a create, set for an edit.</summary>
-    public record SetExternalVariableArgs(Guid EditNodeId, Guid SelectedVariableId, string Value);
+    public record SetExternalVariableArgs(Guid EditNodeId, Guid SelectedVariableId, StorySetExternalVariableMode Mode, string Value);
 }

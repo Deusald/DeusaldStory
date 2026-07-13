@@ -496,18 +496,20 @@ namespace DeusaldStoryWeb
             // ── Set-external-variable nodes (blue) — on the flow spine, assign a value to a story-wide external variable. ──
             foreach (StorySetExternalVariableNode se in logic.SetExternalVariableNodes)
             {
-                bool found = project.Variables.TryGetValue(se.SelectedVariableId, out StoryVariable? variable);
+                bool     found  = project.Variables.TryGetValue(se.SelectedVariableId, out StoryVariable? variable);
+                bool     mapped = se.Mode == StorySetExternalVariableMode.MapFromVariable;
                 EdNode node = new()
                 {
                     Id        = se.Id,
                     Kind      = StoryNodeKind.SetExternalVariable,
                     Title     = found ? $"Set {variable!.Name}" : "Set external (no variable)",
-                    Subtitle  = string.IsNullOrEmpty(se.Value) ? "" : $"= {se.Value}",
+                    Subtitle  = mapped ? "= mapped value" : string.IsNullOrEmpty(se.Value) ? "" : $"= {se.Value}",
                     X         = se.X,
                     Y         = se.Y,
                     Deletable = true
                 };
                 node.Inputs.Add(new EdPort { Id = se.FlowIn.Id, Name = "Flow", Type = PortType.Flow });
+                if (mapped) node.Inputs.Add(new EdPort { Id = se.ValueIn.Id, Name = "Value", Type = PortType.Variable });
                 node.Outputs.Add(new EdPort { Id = se.FlowOut.Id, Name = "Flow", Type = PortType.Flow });
                 nodes.Add(node);
             }

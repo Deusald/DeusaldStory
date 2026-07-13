@@ -636,19 +636,26 @@ public class ProjectStateService(
         return node;
     }
 
-    /// <summary>Updates which external variable a Set-external-variable node assigns, and the value it assigns.</summary>
-    public void UpdateSetExternalVariableNode(Guid logicId, Guid nodeId, Guid selectedVariableId, string value)
+    /// <summary>
+    /// Updates which external variable a Set-external-variable node assigns, the mode it uses, and — in
+    /// <see cref="StorySetExternalVariableMode.SpecificValue"/> mode — the fixed value it assigns. Leaving
+    /// map mode drops any wire feeding the node's value input.
+    /// </summary>
+    public void UpdateSetExternalVariableNode(Guid logicId, Guid nodeId, Guid selectedVariableId, StorySetExternalVariableMode mode, string value)
     {
         if (!CurrentProject!.LogicNodes.TryGetValue(logicId, out StoryLogicNode? logic)) return;
         StorySetExternalVariableNode? node = logic.SetExternalVariableNodes.Find(n => n.Id == nodeId);
         if (node is null) return;
 
         node.SelectedVariableId = selectedVariableId;
+        node.Mode               = mode;
         node.Value              = value;
+        if (mode != StorySetExternalVariableMode.MapFromVariable)
+            logic.ContentConnections.RemoveAll(c => c.FromPoint == node.ValueIn.Id || c.ToPoint == node.ValueIn.Id);
         MarkKeyDirty(logicId);
     }
 
-    /// <summary>Deletes a Set-external-variable node and any inner wire that touched its flow ports.</summary>
+    /// <summary>Deletes a Set-external-variable node and any inner wire that touched its flow or value ports.</summary>
     public void DeleteSetExternalVariableNode(Guid logicId, Guid nodeId)
     {
         if (!CurrentProject!.LogicNodes.TryGetValue(logicId, out StoryLogicNode? logic)) return;
@@ -658,7 +665,8 @@ public class ProjectStateService(
         logic.SetExternalVariableNodes.Remove(node);
         logic.ContentConnections.RemoveAll(c =>
             c.FromPoint == node.FlowOut.Id || c.ToPoint == node.FlowOut.Id ||
-            c.FromPoint == node.FlowIn.Id  || c.ToPoint == node.FlowIn.Id);
+            c.FromPoint == node.FlowIn.Id  || c.ToPoint == node.FlowIn.Id  ||
+            c.FromPoint == node.ValueIn.Id || c.ToPoint == node.ValueIn.Id);
         MarkKeyDirty(logicId);
     }
 
@@ -792,10 +800,11 @@ public class ProjectStateService(
 
     /// <summary>
     /// Wires an output (<paramref name="fromPoint"/>) to an input (<paramref name="toPoint"/>) inside a logic node's
-    /// content graph. An output leads to one place, so any existing wire leaving <paramref name="fromPoint"/> is
-    /// replaced. A Title/Icon input takes a single source, so its previous wire is replaced too — except a SmartFormat
-    /// node's <b>variables</b> input, which accepts many External Variable outputs and keeps them all. A no-op
-    /// (returns null) if the exact wire already exists.
+    /// content graph. A flow/text output leads to one place, so any existing wire leaving <paramref name="fromPoint"/>
+    /// is replaced — except a variable-supplying output (an External Variable or Prev Exit Variable node), which may
+    /// fan out to many inputs and keeps them all. A Title/Icon input takes a single source, so its previous wire is
+    /// replaced too — except a SmartFormat node's <b>variables</b> input, which accepts many variable outputs and
+    /// keeps them all. A no-op (returns null) if the exact wire already exists.
     /// </summary>
     public StoryConnection? ConnectContent(Guid logicId, Guid fromPoint, Guid toPoint)
     {
@@ -806,8 +815,10 @@ public class ProjectStateService(
         bool fromChoice = logic.ChoiceNodes.Exists(ch => ch.Options.Exists(o => o.FlowOut.Id == fromPoint));
         if (fromChoice && !logic.ExitPoints.Exists(e => e.Id == toPoint)) return null;
 
-        bool multiInput = logic.SmartFormatNodes.Exists(sf => sf.VariablesIn.Id == toPoint);
-        logic.ContentConnections.RemoveAll(c => c.FromPoint == fromPoint || (!multiInput && c.ToPoint == toPoint));
+        bool multiInput  = logic.SmartFormatNodes.Exists(sf => sf.VariablesIn.Id == toPoint);
+        bool multiOutput = logic.ExternalVariableNodes.Exists(ev => ev.OutPoint.Id == fromPoint)
+                        || logic.PrevExitVariable.OutPoint.Id == fromPoint;
+        logic.ContentConnections.RemoveAll(c => (!multiOutput && c.FromPoint == fromPoint) || (!multiInput && c.ToPoint == toPoint));
 
         StoryConnection connection = new() { FromPoint = fromPoint, ToPoint = toPoint };
         logic.ContentConnections.Add(connection);
@@ -1303,6 +1314,7 @@ public class ProjectStateService(
         {
             valid.Add(n.FlowIn.Id);
             valid.Add(n.FlowOut.Id);
+            valid.Add(n.ValueIn.Id);
         }
         foreach (StoryChoiceNode n in logic.ChoiceNodes)
         {

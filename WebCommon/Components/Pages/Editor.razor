@@ -592,7 +592,7 @@
             nodeId      = created.Id;
             _SelectedId = created.Id;
         }
-        _ProjectState.UpdateSetExternalVariableNode(_CurrentId, nodeId, args.SelectedVariableId, args.Value);
+        _ProjectState.UpdateSetExternalVariableNode(_CurrentId, nodeId, args.SelectedVariableId, args.Mode, args.Value);
         RebuildNodes();
     }
 
