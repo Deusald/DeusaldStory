@@ -33,6 +33,9 @@ namespace DeusaldStoryCommon
         /// <summary>Gamebook end-of-story line — e.g. "The End".</summary>
         public static readonly Guid GamebookTheEnd = new("a1b2c3d4-0004-4000-8000-000000000004");
 
+        /// <summary>Gamebook choice line. SmartFormat tokens: <c>{choice}</c> (the choice text), <c>{section}</c>.</summary>
+        public static readonly Guid GamebookChoiceToSection = new("a1b2c3d4-0005-4000-8000-000000000005");
+
         // ── Storage-variable player instructions (SmartFormat tokens: {slot}, {max}, {value}) ──
 
         /// <summary>Release a storage slot — e.g. "Clear slot NA and return its component."</summary>
@@ -78,6 +81,7 @@ namespace DeusaldStoryCommon
             [GamebookContinueToSection]        = "To continue go to section {section}",
             [GamebookContinueConditional]      = "To continue {condition} go to section {section}",
             [GamebookTheEnd]                   = "The End",
+            [GamebookChoiceToSection]          = "{choice} go to section {section}",
             [StorageClearSlot]                 = "Clear slot {slot} and return its component.",
             [StorageNumberDiceFull]            = "Roll a D6 and place it on slot {slot}.",
             [StorageNumberDiceReroll]          = "Roll a D6, rerolling until it shows 1–{max}, and place it on slot {slot}.",

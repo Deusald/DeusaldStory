@@ -74,21 +74,40 @@
 
         @* The app stores variables invisibly, so player-facing storage instructions are only shown in the Gamebook preview. *@
 
-        @* Continue button per exit — the app's dummy "next" that jumps the preview to the next logic node. *@
-        <div class="lpv-continue">
-            @foreach (StoryConnectionPoint exit in Logic.ExitPoints)
-            {
-                StoryConnectionPoint branch = exit;
-                <button class="lpv-continue-btn" @onclick="() => OnContinue.InvokeAsync(branch.Id)">
-                    <span>@_ContinueLabel</span>
-                    @if (Logic.ExitPoints.Count > 1 && !string.IsNullOrWhiteSpace(branch.Name))
-                    {
-                        <span class="lpv-continue-branch">@branch.Name</span>
-                    }
-                    <i class="bi bi-arrow-right"></i>
-                </button>
-            }
-        </div>
+        @if (_Rendered.Choices.Count > 0)
+        {
+            @* Choice buttons — each advances the preview along that choice's branch (its wired exit). *@
+            <div class="lpv-continue">
+                @foreach (StoryLogicRenderer.RenderedChoice c in _Rendered.Choices)
+                {
+                    StoryLogicRenderer.RenderedChoice choice = c;
+                    <button class="lpv-continue-btn"
+                            disabled="@(choice.ExitPointId == Guid.Empty)"
+                            @onclick="() => OnContinue.InvokeAsync(choice.ExitPointId)">
+                        <span>@(string.IsNullOrEmpty(choice.Text) ? "(choice)" : SafeHtml(choice.Text))</span>
+                        <i class="bi bi-arrow-right"></i>
+                    </button>
+                }
+            </div>
+        }
+        else
+        {
+            @* Continue button per exit — the app's dummy "next" that jumps the preview to the next logic node. *@
+            <div class="lpv-continue">
+                @foreach (StoryConnectionPoint exit in Logic.ExitPoints)
+                {
+                    StoryConnectionPoint branch = exit;
+                    <button class="lpv-continue-btn" @onclick="() => OnContinue.InvokeAsync(branch.Id)">
+                        <span>@_ContinueLabel</span>
+                        @if (Logic.ExitPoints.Count > 1 && !string.IsNullOrWhiteSpace(branch.Name))
+                        {
+                            <span class="lpv-continue-branch">@branch.Name</span>
+                        }
+                        <i class="bi bi-arrow-right"></i>
+                    </button>
+                }
+            </div>
+        }
 
     </div>
 </div>

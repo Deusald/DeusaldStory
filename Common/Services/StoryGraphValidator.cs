@@ -38,6 +38,7 @@ namespace DeusaldStoryCommon
             Lookups                               lk       = Lookups.Build(project);
 
             CheckDanglingOutputs(project, problems);
+            CheckChoiceOutputs(project, problems);
             CheckVariableBalance(project, lk, regById, localization, problems,
                 out Dictionary<Guid, HashSet<Guid>> entryActive, out HashSet<Guid> endActive);
 
@@ -108,6 +109,19 @@ namespace DeusaldStoryCommon
                         });
                 }
             }
+        }
+
+        // ── Choice outputs must each reach an exit ─────────────────────────────
+
+        /// <summary>Flags any Choice option whose flow-out isn't wired — every choice must lead to an exit.</summary>
+        private static void CheckChoiceOutputs(StoryProject project, List<StoryProblem> problems)
+        {
+            foreach (StoryLogicNode logic in project.LogicNodes.Values)
+                foreach (StoryChoiceNode choice in logic.ChoiceNodes)
+                    foreach (StoryChoiceOption option in choice.Options)
+                        if (!logic.ContentConnections.Exists(c => c.FromPoint == option.FlowOut.Id))
+                            problems.Add(Inner(logic, choice.Id,
+                                $"Choice '{NodeName(option.Name)}' in '{NodeName(logic.Name)}' is not connected to an exit."));
         }
 
         // ── Pass B: register/unregister balance from Start ─────────────────────

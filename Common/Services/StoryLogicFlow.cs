@@ -88,9 +88,13 @@ namespace DeusaldStoryCommon
                 {
                     from = ft.FlowOut.Id; // text block — pass through
                 }
+                else if (logic.SetExternalVariableNodes.Find(n => n.FlowIn.Id == to) is StorySetExternalVariableNode se)
+                {
+                    from = se.FlowOut.Id; // external-variable set — not a storage op, pass through
+                }
                 else
                 {
-                    break; // reached an Exit or a leaf input
+                    break; // reached an Exit, a Choice, or a leaf input
                 }
             }
 

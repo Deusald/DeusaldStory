@@ -66,7 +66,9 @@ namespace DeusaldStoryWeb
         FlowText,         // inside a logic node: on the flow spine, renders a text block then continues flow (amber)
         RegisterVariable,   // inside a logic node: on the flow spine, claims a storage slot for a new variable (green)
         SetVariable,        // inside a logic node: on the flow spine, sets an already-registered variable's value (blue)
-        UnregisterVariable  // inside a logic node: on the flow spine, releases a registered variable and frees its slot (red)
+        UnregisterVariable, // inside a logic node: on the flow spine, releases a registered variable and frees its slot (red)
+        SetExternalVariable, // inside a logic node: on the flow spine, assigns a value to a story-wide external variable (blue)
+        Choice              // inside a logic node: on the flow spine, offers the player a set of branches (one exit each) (accent)
     }
 
     /// <summary>A point on the graph canvas in world (un-panned, un-scaled) coordinates.</summary>
@@ -470,6 +472,47 @@ namespace DeusaldStoryWeb
                 nodes.Add(node);
             }
 
+            // ── Set-external-variable nodes (blue) — on the flow spine, assign a value to a story-wide external variable. ──
+            foreach (StorySetExternalVariableNode se in logic.SetExternalVariableNodes)
+            {
+                bool found = project.Variables.TryGetValue(se.SelectedVariableId, out StoryVariable? variable);
+                EdNode node = new()
+                {
+                    Id        = se.Id,
+                    Kind      = StoryNodeKind.SetExternalVariable,
+                    Title     = found ? $"Set {variable!.Name}" : "Set external (no variable)",
+                    Subtitle  = string.IsNullOrEmpty(se.Value) ? "" : $"= {se.Value}",
+                    X         = se.X,
+                    Y         = se.Y,
+                    Deletable = true
+                };
+                node.Inputs.Add(new EdPort { Id = se.FlowIn.Id, Name = "Flow", Type = PortType.Flow });
+                node.Outputs.Add(new EdPort { Id = se.FlowOut.Id, Name = "Flow", Type = PortType.Flow });
+                nodes.Add(node);
+            }
+
+            // ── Choice nodes (accent) — one flow input; per option a Text input and a Flow output wired to an Exit. ──
+            foreach (StoryChoiceNode choice in logic.ChoiceNodes)
+            {
+                EdNode node = new()
+                {
+                    Id        = choice.Id,
+                    Kind      = StoryNodeKind.Choice,
+                    Title     = "Choice",
+                    X         = choice.X,
+                    Y         = choice.Y,
+                    Deletable = true
+                };
+                node.Inputs.Add(new EdPort { Id = choice.FlowIn.Id, Name = "Flow", Type = PortType.Flow });
+                foreach (StoryChoiceOption option in choice.Options)
+                {
+                    string label = string.IsNullOrWhiteSpace(option.Name) ? "Choice" : option.Name;
+                    node.Inputs.Add(new EdPort  { Id = option.TextIn.Id,  Name = $"{label} text", Type = PortType.Text });
+                    node.Outputs.Add(new EdPort { Id = option.FlowOut.Id, Name = label,            Type = PortType.Flow });
+                }
+                nodes.Add(node);
+            }
+
             return nodes;
         }
 
@@ -546,6 +589,8 @@ namespace DeusaldStoryWeb
             StoryNodeKind.RegisterVariable   => "REGISTER VARIABLE",
             StoryNodeKind.SetVariable        => "SET VARIABLE",
             StoryNodeKind.UnregisterVariable => "UNREGISTER VARIABLE",
+            StoryNodeKind.SetExternalVariable => "SET EXTERNAL VARIABLE",
+            StoryNodeKind.Choice              => "CHOICE",
             _                       => ""
         };
 
@@ -570,6 +615,8 @@ namespace DeusaldStoryWeb
             StoryNodeKind.RegisterVariable   => "var(--success)",
             StoryNodeKind.SetVariable        => "var(--info)",
             StoryNodeKind.UnregisterVariable => "var(--danger)",
+            StoryNodeKind.SetExternalVariable => "var(--info)",
+            StoryNodeKind.Choice              => "var(--accent)",
             _                       => "var(--text-dim)"
         };
     }

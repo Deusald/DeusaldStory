@@ -139,6 +139,8 @@
 <RegisterVariableModal     @ref="_RegisterVariableModal" OnConfirm="OnRegisterVariableConfirmed"/>
 <SetVariableModal          @ref="_SetVariableModal"      OnConfirm="OnSetVariableConfirmed"/>
 <UnregisterVariablePickerModal @ref="_UnregisterPicker"  OnConfirm="OnUnregisterPicked"/>
+<SetExternalVariableModal  @ref="_SetExternalVariableModal" OnConfirm="OnSetExternalVariableConfirmed"/>
+<NewChoiceNodeModal        @ref="_NewChoiceNodeModal"       OnConfirm="OnChoiceConfirmed"/>
 
 @code {
     private EditorMode        _Mode = EditorMode.Edit;
@@ -158,6 +160,8 @@
     private RegisterVariableModal?     _RegisterVariableModal;
     private SetVariableModal?          _SetVariableModal;
     private UnregisterVariablePickerModal? _UnregisterPicker;
+    private SetExternalVariableModal?  _SetExternalVariableModal;
+    private NewChoiceNodeModal?        _NewChoiceNodeModal;
 
     // Where the next created node is placed — the right-clicked canvas point (or a staggered default).
     private double _PendingX;
@@ -379,7 +383,9 @@
                 new NodePaletteItem(StoryNodeKind.FlowText,         "bi-text-paragraph",  "FlowText node",         "On the flow spine — renders a connected text block, then continues to the next flow node."),
                 new NodePaletteItem(StoryNodeKind.RegisterVariable,   "bi-box-seam",        "Register variable",     "On the flow spine — claims a physical storage slot for a new variable."),
                 new NodePaletteItem(StoryNodeKind.SetVariable,        "bi-pencil-square",   "Set variable",          "On the flow spine — assigns a value to an already-registered variable."),
-                new NodePaletteItem(StoryNodeKind.UnregisterVariable, "bi-box-arrow-up",    "Unregister variable",   "On the flow spine — releases a registered variable and frees its slot.")
+                new NodePaletteItem(StoryNodeKind.UnregisterVariable, "bi-box-arrow-up",    "Unregister variable",   "On the flow spine — releases a registered variable and frees its slot."),
+                new NodePaletteItem(StoryNodeKind.SetExternalVariable, "bi-sliders",        "Set external variable", "On the flow spine — assigns a value to a story-wide external variable (App only; no Gamebook instruction)."),
+                new NodePaletteItem(StoryNodeKind.Choice,             "bi-signpost-split",  "Choice node",           "On the flow spine — offers the player a set of choices, each branching out to an exit.")
             ]
             :
             [
@@ -419,6 +425,8 @@
             case StoryNodeKind.RegisterVariable:   _RegisterVariableModal?.Show(ComputeFreeSlots()); break;
             case StoryNodeKind.SetVariable:        _SetVariableModal?.Show();                break;
             case StoryNodeKind.UnregisterVariable: _UnregisterPicker?.Show(Guid.Empty, Guid.Empty); break;
+            case StoryNodeKind.SetExternalVariable: _SetExternalVariableModal?.Show();        break;
+            case StoryNodeKind.Choice:              _NewChoiceNodeModal?.Show();              break;
         }
     }
 
@@ -550,6 +558,33 @@
         RebuildNodes();
     }
 
+    private void OnSetExternalVariableConfirmed(SetExternalVariableModal.SetExternalVariableArgs args)
+    {
+        Guid nodeId = args.EditNodeId;
+        if (nodeId == Guid.Empty)
+        {
+            if (_ProjectState.AddSetExternalVariableNode(_CurrentId, _PendingX, _PendingY) is not StorySetExternalVariableNode created) return;
+            nodeId      = created.Id;
+            _SelectedId = created.Id;
+        }
+        _ProjectState.UpdateSetExternalVariableNode(_CurrentId, nodeId, args.SelectedVariableId, args.Value);
+        RebuildNodes();
+    }
+
+    private void OnChoiceConfirmed(NewChoiceNodeModal.ChoiceArgs args)
+    {
+        Guid nodeId = args.EditNodeId;
+        if (nodeId == Guid.Empty)
+        {
+            if (_ProjectState.AddChoiceNode(_CurrentId, _PendingX, _PendingY) is not StoryChoiceNode created) return;
+            nodeId      = created.Id;
+            _SelectedId = created.Id;
+        }
+        _ProjectState.UpdateChoiceNode(_CurrentId, nodeId,
+            args.Options.Select(o => (o.Id, o.Name)).ToList());
+        RebuildNodes();
+    }
+
     private void OnUnregisterPicked(UnregisterVariablePickerModal.UnregisterPickResult result)
     {
         if (result.EditNodeId != Guid.Empty)
@@ -678,6 +713,16 @@
                 if (_CurrentLogicNode?.UnregisterVariableNodes.Find(n => n.Id == node.Id) is StoryUnregisterVariableNode unreg)
                     _UnregisterPicker?.Show(unreg.Id, unreg.RegisteredVariableId);
                 break;
+
+            case StoryNodeKind.SetExternalVariable:
+                if (_CurrentLogicNode?.SetExternalVariableNodes.Find(n => n.Id == node.Id) is StorySetExternalVariableNode setExt)
+                    _SetExternalVariableModal?.ShowEdit(setExt);
+                break;
+
+            case StoryNodeKind.Choice:
+                if (_CurrentLogicNode?.ChoiceNodes.Find(n => n.Id == node.Id) is StoryChoiceNode choice)
+                    _NewChoiceNodeModal?.ShowEdit(choice);
+                break;
         }
     }
 
@@ -702,6 +747,8 @@
             case StoryNodeKind.RegisterVariable:   _ProjectState.DeleteRegisterVariableNode(_CurrentId, node.Id);   break;
             case StoryNodeKind.SetVariable:        _ProjectState.DeleteSetVariableNode(_CurrentId, node.Id);        break;
             case StoryNodeKind.UnregisterVariable: _ProjectState.DeleteUnregisterVariableNode(_CurrentId, node.Id); break;
+            case StoryNodeKind.SetExternalVariable: _ProjectState.DeleteSetExternalVariableNode(_CurrentId, node.Id); break;
+            case StoryNodeKind.Choice:              _ProjectState.DeleteChoiceNode(_CurrentId, node.Id);             break;
             default: return;
         }
 

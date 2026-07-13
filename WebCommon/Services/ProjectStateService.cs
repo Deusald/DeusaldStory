@@ -619,6 +619,112 @@ public class ProjectStateService(
         MarkKeyDirty(logicId);
     }
 
+    /// <summary>Adds a Set-external-variable node (assigns a value to a story-wide external variable) to a logic node's flow spine.</summary>
+    public StorySetExternalVariableNode? AddSetExternalVariableNode(Guid logicId, double x, double y)
+    {
+        if (!CurrentProject!.LogicNodes.TryGetValue(logicId, out StoryLogicNode? logic)) return null;
+
+        StorySetExternalVariableNode node = new() { X = x, Y = y };
+        logic.SetExternalVariableNodes.Add(node);
+        MarkKeyDirty(logicId);
+        return node;
+    }
+
+    /// <summary>Updates which external variable a Set-external-variable node assigns, and the value it assigns.</summary>
+    public void UpdateSetExternalVariableNode(Guid logicId, Guid nodeId, Guid selectedVariableId, string value)
+    {
+        if (!CurrentProject!.LogicNodes.TryGetValue(logicId, out StoryLogicNode? logic)) return;
+        StorySetExternalVariableNode? node = logic.SetExternalVariableNodes.Find(n => n.Id == nodeId);
+        if (node is null) return;
+
+        node.SelectedVariableId = selectedVariableId;
+        node.Value              = value;
+        MarkKeyDirty(logicId);
+    }
+
+    /// <summary>Deletes a Set-external-variable node and any inner wire that touched its flow ports.</summary>
+    public void DeleteSetExternalVariableNode(Guid logicId, Guid nodeId)
+    {
+        if (!CurrentProject!.LogicNodes.TryGetValue(logicId, out StoryLogicNode? logic)) return;
+        StorySetExternalVariableNode? node = logic.SetExternalVariableNodes.Find(n => n.Id == nodeId);
+        if (node is null) return;
+
+        logic.SetExternalVariableNodes.Remove(node);
+        logic.ContentConnections.RemoveAll(c =>
+            c.FromPoint == node.FlowOut.Id || c.ToPoint == node.FlowOut.Id ||
+            c.FromPoint == node.FlowIn.Id  || c.ToPoint == node.FlowIn.Id);
+        MarkKeyDirty(logicId);
+    }
+
+    /// <summary>Adds a Choice node (player branch point) to a logic node's flow spine. Options are set via <see cref="UpdateChoiceNode"/>.</summary>
+    public StoryChoiceNode? AddChoiceNode(Guid logicId, double x, double y)
+    {
+        if (!CurrentProject!.LogicNodes.TryGetValue(logicId, out StoryLogicNode? logic)) return null;
+
+        StoryChoiceNode node = new() { X = x, Y = y };
+        logic.ChoiceNodes.Add(node);
+        MarkKeyDirty(logicId);
+        return node;
+    }
+
+    /// <summary>
+    /// Reconciles a Choice node's options to <paramref name="options"/>: options with a matching id keep their ports
+    /// (and wires) and get the new name, new options (empty id) are created, and removed options have their Text/Flow
+    /// wires pruned. Order follows <paramref name="options"/>.
+    /// </summary>
+    public void UpdateChoiceNode(Guid logicId, Guid nodeId, List<(Guid Id, string Name)> options)
+    {
+        if (!CurrentProject!.LogicNodes.TryGetValue(logicId, out StoryLogicNode? logic)) return;
+        StoryChoiceNode? node = logic.ChoiceNodes.Find(n => n.Id == nodeId);
+        if (node is null) return;
+
+        HashSet<Guid> kept = new();
+        List<StoryChoiceOption> rebuilt = new();
+        foreach ((Guid id, string name) in options)
+        {
+            StoryChoiceOption? existing = id != Guid.Empty ? node.Options.Find(o => o.Id == id) : null;
+            if (existing is not null)
+            {
+                existing.Name = name;
+                kept.Add(existing.Id);
+                rebuilt.Add(existing);
+            }
+            else
+            {
+                rebuilt.Add(new StoryChoiceOption { Name = name });
+            }
+        }
+
+        // Prune wires of removed options before swapping the list in.
+        foreach (StoryChoiceOption removed in node.Options)
+            if (!kept.Contains(removed.Id))
+                logic.ContentConnections.RemoveAll(c =>
+                    c.FromPoint == removed.FlowOut.Id || c.ToPoint == removed.FlowOut.Id ||
+                    c.ToPoint   == removed.TextIn.Id);
+
+        node.Options = rebuilt;
+        MarkKeyDirty(logicId);
+    }
+
+    /// <summary>Deletes a Choice node and any inner wire that touched its flow-in or any option's text/flow ports.</summary>
+    public void DeleteChoiceNode(Guid logicId, Guid nodeId)
+    {
+        if (!CurrentProject!.LogicNodes.TryGetValue(logicId, out StoryLogicNode? logic)) return;
+        StoryChoiceNode? node = logic.ChoiceNodes.Find(n => n.Id == nodeId);
+        if (node is null) return;
+
+        HashSet<Guid> ports = new() { node.FlowIn.Id };
+        foreach (StoryChoiceOption option in node.Options)
+        {
+            ports.Add(option.TextIn.Id);
+            ports.Add(option.FlowOut.Id);
+        }
+
+        logic.ChoiceNodes.Remove(node);
+        logic.ContentConnections.RemoveAll(c => ports.Contains(c.FromPoint) || ports.Contains(c.ToPoint));
+        MarkKeyDirty(logicId);
+    }
+
     /// <summary>Sets which registered storage variables are released when the story reaches The End (edited on the End node).</summary>
     public void SetEndUnregister(IEnumerable<Guid> registeredVariableIds)
     {
@@ -638,6 +744,10 @@ public class ProjectStateService(
     {
         if (!CurrentProject!.LogicNodes.TryGetValue(logicId, out StoryLogicNode? logic)) return null;
         if (logic.ContentConnections.Exists(c => c.FromPoint == fromPoint && c.ToPoint == toPoint)) return null;
+
+        // A Choice option's flow-out may lead only to an exit point (guards against a non-exit target being persisted).
+        bool fromChoice = logic.ChoiceNodes.Exists(ch => ch.Options.Exists(o => o.FlowOut.Id == fromPoint));
+        if (fromChoice && !logic.ExitPoints.Exists(e => e.Id == toPoint)) return null;
 
         bool multiInput = logic.SmartFormatNodes.Exists(sf => sf.VariablesIn.Id == toPoint);
         logic.ContentConnections.RemoveAll(c => c.FromPoint == fromPoint || (!multiInput && c.ToPoint == toPoint));
@@ -758,6 +868,24 @@ public class ProjectStateService(
         {
             unreg.X = x;
             unreg.Y = y;
+            MarkKeyDirty(logicId);
+            return;
+        }
+
+        StorySetExternalVariableNode? setExt = logic.SetExternalVariableNodes.Find(n => n.Id == movedId);
+        if (setExt is not null)
+        {
+            setExt.X = x;
+            setExt.Y = y;
+            MarkKeyDirty(logicId);
+            return;
+        }
+
+        StoryChoiceNode? choice = logic.ChoiceNodes.Find(n => n.Id == movedId);
+        if (choice is not null)
+        {
+            choice.X = x;
+            choice.Y = y;
             MarkKeyDirty(logicId);
         }
     }
@@ -1035,6 +1163,35 @@ public class ProjectStateService(
             valid.Add(n.FlowIn.Id);
             valid.Add(n.TextIn.Id);
             valid.Add(n.FlowOut.Id);
+        }
+        foreach (StoryRegisterVariableNode n in logic.RegisterVariableNodes)
+        {
+            valid.Add(n.FlowIn.Id);
+            valid.Add(n.FlowOut.Id);
+        }
+        foreach (StorySetVariableNode n in logic.SetVariableNodes)
+        {
+            valid.Add(n.FlowIn.Id);
+            valid.Add(n.FlowOut.Id);
+        }
+        foreach (StoryUnregisterVariableNode n in logic.UnregisterVariableNodes)
+        {
+            valid.Add(n.FlowIn.Id);
+            valid.Add(n.FlowOut.Id);
+        }
+        foreach (StorySetExternalVariableNode n in logic.SetExternalVariableNodes)
+        {
+            valid.Add(n.FlowIn.Id);
+            valid.Add(n.FlowOut.Id);
+        }
+        foreach (StoryChoiceNode n in logic.ChoiceNodes)
+        {
+            valid.Add(n.FlowIn.Id);
+            foreach (StoryChoiceOption o in n.Options)
+            {
+                valid.Add(o.TextIn.Id);
+                valid.Add(o.FlowOut.Id);
+            }
         }
 
         logic.ContentConnections.RemoveAll(c => !valid.Contains(c.FromPoint) || !valid.Contains(c.ToPoint));

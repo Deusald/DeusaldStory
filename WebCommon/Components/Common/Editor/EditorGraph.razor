@@ -238,7 +238,7 @@
     private const double SNAP_RADIUS  = 60;  // how close a drop must land to an input port to wire it
 
     /// <summary>A resolved connection-point position in world coordinates, keyed by point id.</summary>
-    private readonly record struct PortAnchor(Guid NodeId, double X, double Y, bool IsOutput, PortType Type);
+    private readonly record struct PortAnchor(Guid NodeId, double X, double Y, bool IsOutput, PortType Type, StoryNodeKind OwnerKind);
 
     private double _Scale = 1;
     private double _PanX  = 24;
@@ -285,9 +285,9 @@
         foreach (EdNode n in Nodes)
         {
             for (int i = 0; i < n.Inputs.Count; ++i)
-                anchors[n.Inputs[i].Id] = new PortAnchor(n.Id, n.X, n.Y + PortCenterY(n, i), false, n.Inputs[i].Type);
+                anchors[n.Inputs[i].Id] = new PortAnchor(n.Id, n.X, n.Y + PortCenterY(n, i), false, n.Inputs[i].Type, n.Kind);
             for (int i = 0; i < n.Outputs.Count; ++i)
-                anchors[n.Outputs[i].Id] = new PortAnchor(n.Id, n.X + NODE_W, n.Y + PortCenterY(n, i), true, n.Outputs[i].Type);
+                anchors[n.Outputs[i].Id] = new PortAnchor(n.Id, n.X + NODE_W, n.Y + PortCenterY(n, i), true, n.Outputs[i].Type, n.Kind);
         }
         return anchors;
     }
@@ -338,13 +338,18 @@
         n.Kind is StoryNodeKind.Logic or StoryNodeKind.Container
                or StoryNodeKind.LogicEntry or StoryNodeKind.LogicExit
                or StoryNodeKind.LightDarkSwitch or StoryNodeKind.SmartFormat
-               or StoryNodeKind.FlowText;
+               or StoryNodeKind.FlowText or StoryNodeKind.Choice;
 
-    /// <summary>True when a wire is being dragged and this input port carries the same signal type as its source.</summary>
+    /// <summary>
+    /// True when a wire is being dragged and this input port is a valid drop target for its source: same signal type,
+    /// and — when dragging from a Choice option's flow-out — only an Exit input qualifies (choices lead to exits only).
+    /// </summary>
     private bool IsCompatibleTarget(EdPort input) =>
         _ConnFrom is Guid from
         && _Anchors.TryGetValue(from, out PortAnchor src)
-        && src.Type == input.Type;
+        && _Anchors.TryGetValue(input.Id, out PortAnchor tgt)
+        && src.Type == input.Type
+        && (src.OwnerKind != StoryNodeKind.Choice || tgt.OwnerKind == StoryNodeKind.LogicExit);
 
     // ── Pan / drag ─────────────────────────────────────────────────────────
 
@@ -450,15 +455,18 @@
     /// </summary>
     private Guid? NearestInputPoint(Guid fromPoint)
     {
-        bool     haveSrc    = _Anchors.TryGetValue(fromPoint, out PortAnchor src);
-        Guid     sourceNode = haveSrc ? src.NodeId : Guid.Empty;
-        PortType sourceType = haveSrc ? src.Type   : PortType.Flow;
-        Guid?    best       = null;
-        double   bestDist   = SNAP_RADIUS * SNAP_RADIUS;
+        bool     haveSrc     = _Anchors.TryGetValue(fromPoint, out PortAnchor src);
+        Guid     sourceNode  = haveSrc ? src.NodeId   : Guid.Empty;
+        PortType sourceType  = haveSrc ? src.Type     : PortType.Flow;
+        bool     fromChoice  = haveSrc && src.OwnerKind == StoryNodeKind.Choice;
+        Guid?    best        = null;
+        double   bestDist    = SNAP_RADIUS * SNAP_RADIUS;
 
         foreach ((Guid pointId, PortAnchor a) in _Anchors)
         {
             if (a.IsOutput || a.NodeId == sourceNode || a.Type != sourceType) continue;
+            // A Choice option's flow-out may land only on an Exit node.
+            if (fromChoice && a.OwnerKind != StoryNodeKind.LogicExit) continue;
             double dx = a.X - _ConnX, dy = a.Y - _ConnY;
             double d2 = dx * dx + dy * dy;
             if (d2 <= bestDist)
@@ -512,6 +520,8 @@
         StoryNodeKind.SmartFormat      => "SmartFormat node",
         StoryNodeKind.ExternalVariable => "external variable node",
         StoryNodeKind.FlowText         => "flow text node",
+        StoryNodeKind.SetExternalVariable => "set external variable node",
+        StoryNodeKind.Choice              => "choice node",
         _                       => "node"
     };
 

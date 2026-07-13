@@ -102,6 +102,14 @@ namespace DeusaldStoryCommon
 
         private static List<ContinueLine> BuildContinueLines(StoryProject project, LocProject? localization, StoryLogicNode logic)
         {
+            // When the node ends in a Choice, the choices *are* the continue instructions — each is a labelled
+            // "go to section" line. Choice text is resolved once with empty values (the preview uses each variable's
+            // first possible value); node-driven variable branching is still enumerated per next-node combo below.
+            List<StoryLogicRenderer.RenderedChoice> choices =
+                StoryLogicRenderer.Choices(project, localization, logic, new Dictionary<Guid, string>());
+            if (choices.Count > 0)
+                return BuildChoiceLines(project, localization, choices);
+
             List<ContinueLine> lines = new();
 
             foreach (StoryConnectionPoint exit in logic.ExitPoints)
@@ -129,6 +137,64 @@ namespace DeusaldStoryCommon
             }
 
             return lines;
+        }
+
+        // ── Choice instructions ──────────────────────────────────────────────────
+
+        /// <summary>Builds the "<i>{choice}</i> go to section {section}" lines for a node whose spine ends in a Choice.</summary>
+        private static List<ContinueLine> BuildChoiceLines(
+            StoryProject project, LocProject? localization, List<StoryLogicRenderer.RenderedChoice> choices)
+        {
+            List<ContinueLine> lines = new();
+
+            foreach (StoryLogicRenderer.RenderedChoice choice in choices)
+            {
+                string label = string.IsNullOrWhiteSpace(choice.Text) ? "(choice)" : choice.Text;
+
+                if (choice.ExitPointId == Guid.Empty)
+                {
+                    lines.Add(new ContinueLine { Text = $"Choice “{label}” is not connected to an exit.", IsError = true });
+                    continue;
+                }
+
+                StoryFlowNavigator.NextLogicResult next = StoryFlowNavigator.ResolveNextLogic(project, choice.ExitPointId);
+                switch (next.Kind)
+                {
+                    case StoryFlowNavigator.NextKind.End:
+                        lines.Add(new ContinueLine
+                        {
+                            Text = $"{label} — {StoryCommonLocalizationKeys.Resolve(localization, StoryCommonLocalizationKeys.GamebookTheEnd)}"
+                        });
+                        break;
+
+                    case StoryFlowNavigator.NextKind.Dangling:
+                        lines.Add(new ContinueLine { Text = $"Choice “{label}” leads to an exit that is not connected.", IsError = true });
+                        break;
+
+                    case StoryFlowNavigator.NextKind.Logic when next.Logic is not null:
+                        lines.AddRange(ChoiceToNode(project, localization, label, next.Logic));
+                        break;
+                }
+            }
+
+            return lines;
+        }
+
+        /// <summary>Enumerates the choice target's variable combinations into one "<i>{choice}</i> go to section {section}" line each.</summary>
+        private static IEnumerable<ContinueLine> ChoiceToNode(StoryProject project, LocProject? localization, string choiceText, StoryLogicNode next)
+        {
+            List<StoryVariable>            vars   = OrderedVariables(project, next);
+            List<Dictionary<Guid, string>> combos = Combinations(vars, out _, out _);
+
+            foreach (Dictionary<Guid, string> combo in combos)
+            {
+                string section = SectionToken(next, vars, combo);
+                yield return new ContinueLine
+                {
+                    Text = StoryCommonLocalizationKeys.Resolve(localization, StoryCommonLocalizationKeys.GamebookChoiceToSection,
+                        new Dictionary<string, object> { ["choice"] = choiceText, ["section"] = section })
+                };
+            }
         }
 
         /// <summary>Enumerates the next node's variable combinations into one continue line each (a placeholder section per combo).</summary>

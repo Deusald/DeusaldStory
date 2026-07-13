@@ -1,0 +1,149 @@
+@namespace DeusaldStoryWeb.Components.Common
+@inject ProjectStateService _ProjectState
+
+@* ─────────────────────────────────────────────────────────────────────────
+   Creates / edits a Set-External-Variable node: picks a story-wide external
+   variable and the value to assign it (one of the variable's possible values).
+   The physical game components track external variables automatically, so this
+   emits no Gamebook instruction — it drives the App's play-time state only.
+   ───────────────────────────────────────────────────────────────────────── *@
+
+@if (_Visible)
+{
+    <div class="modal-backdrop" @onclick="Cancel"></div>
+
+    <div class="modal-box sev-box" @onclick:stopPropagation="true">
+
+        <div class="modal-header">
+            <span class="modal-title">@(_IsEdit ? "Edit set external variable" : "Set external variable")</span>
+            <button class="modal-close" @onclick="Cancel" title="Close">
+                <i class="bi bi-x-lg"></i>
+            </button>
+        </div>
+
+        <div class="modal-body sev-body">
+
+            @{
+                List<StoryVariable> vars = Variables();
+            }
+            @if (vars.Count == 0)
+            {
+                <div class="sev-empty">
+                    <i class="bi bi-braces"></i>
+                    <span>No variables yet — add some in the Variables panel first.</span>
+                </div>
+            }
+            else
+            {
+                <div class="modal-field">
+                    <label class="modal-label">Variable</label>
+                    <div class="sev-list">
+                        @foreach (StoryVariable v in vars)
+                        {
+                            StoryVariable variable = v;
+                            <button class="sev-item @(_SelectedVariableId == variable.Id ? "selected" : "")"
+                                    @onclick="() => SelectVariable(variable)">
+                                <span class="sev-item-name">@(string.IsNullOrWhiteSpace(variable.Name) ? "(unnamed)" : variable.Name)</span>
+                                <span class="sev-item-sub">@variable.PossibleValues.Count value@(variable.PossibleValues.Count == 1 ? "" : "s")</span>
+                            </button>
+                        }
+                    </div>
+                </div>
+
+                @if (Selected is StoryVariable sel)
+                {
+                    <div class="modal-field">
+                        <label class="modal-label">Value</label>
+                        @if (sel.PossibleValues.Count == 0)
+                        {
+                            <div class="sev-hint">This variable has no possible values — add some in the Variables panel.</div>
+                        }
+                        else
+                        {
+                            <select class="modal-input" @bind="_Value">
+                                @foreach (string value in sel.PossibleValues)
+                                {
+                                    <option value="@value">@value</option>
+                                }
+                            </select>
+                        }
+                    </div>
+                }
+            }
+
+        </div>
+
+        <div class="modal-footer">
+            <button class="modal-btn modal-btn-ghost" @onclick="Cancel">Cancel</button>
+            <button class="modal-btn modal-btn-primary"
+                    @onclick="Confirm"
+                    disabled="@(!CanConfirm)">
+                @(_IsEdit ? "Save changes" : "Add set node")
+            </button>
+        </div>
+
+    </div>
+}
+
+@code {
+    [Parameter] public EventCallback<SetExternalVariableArgs> OnConfirm { get; set; }
+
+    private bool   _Visible;
+    private bool   _IsEdit;
+    private Guid   _EditNodeId;
+    private Guid   _SelectedVariableId;
+    private string _Value = "";
+
+    private StoryProject Project => _ProjectState.CurrentProject!;
+
+    /// <summary>Opens the modal to create a new Set-External-Variable node.</summary>
+    public void Show()
+    {
+        _IsEdit             = false;
+        _EditNodeId         = Guid.Empty;
+        _SelectedVariableId = Guid.Empty;
+        _Value              = "";
+        _Visible            = true;
+        StateHasChanged();
+    }
+
+    /// <summary>Opens the modal to edit an existing Set-External-Variable node.</summary>
+    public void ShowEdit(StorySetExternalVariableNode node)
+    {
+        _IsEdit             = true;
+        _EditNodeId         = node.Id;
+        _SelectedVariableId = node.SelectedVariableId;
+        _Value              = node.Value;
+        _Visible            = true;
+        StateHasChanged();
+    }
+
+    private StoryVariable? Selected =>
+        _SelectedVariableId != Guid.Empty && Project.Variables.TryGetValue(_SelectedVariableId, out StoryVariable? v) ? v : null;
+
+    private bool CanConfirm =>
+        Selected is StoryVariable sel && (sel.PossibleValues.Count == 0 || !string.IsNullOrEmpty(_Value));
+
+    private List<StoryVariable> Variables() =>
+        Project.Variables.Values.OrderBy(v => v.Name, StringComparer.OrdinalIgnoreCase).ToList();
+
+    private void SelectVariable(StoryVariable variable)
+    {
+        _SelectedVariableId = variable.Id;
+        // Keep the current value if it's still valid; otherwise default to the first possible value.
+        if (!variable.PossibleValues.Contains(_Value))
+            _Value = variable.PossibleValues.FirstOrDefault() ?? "";
+    }
+
+    private async Task Confirm()
+    {
+        if (!CanConfirm) return;
+        _Visible = false;
+        await OnConfirm.InvokeAsync(new SetExternalVariableArgs(_EditNodeId, _SelectedVariableId, _Value));
+    }
+
+    private void Cancel() => _Visible = false;
+
+    /// <summary>Result passed back to the parent. <see cref="EditNodeId"/> is empty for a create, set for an edit.</summary>
+    public record SetExternalVariableArgs(Guid EditNodeId, Guid SelectedVariableId, string Value);
+}

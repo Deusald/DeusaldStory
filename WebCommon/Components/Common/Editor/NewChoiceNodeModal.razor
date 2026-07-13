@@ -1,0 +1,124 @@
+@namespace DeusaldStoryWeb.Components.Common
+
+@* ─────────────────────────────────────────────────────────────────────────
+   Creates / edits a Choice node: defines the branches the player can take. Each
+   choice has a name (author-facing) and — on the canvas — its own Text input and
+   flow output wired to one of the logic node's exits. Editing preserves each
+   choice's id so existing wires survive.
+   ───────────────────────────────────────────────────────────────────────── *@
+
+@if (_Visible)
+{
+    <div class="modal-backdrop" @onclick="Cancel"></div>
+
+    <div class="modal-box ncm-box" @onclick:stopPropagation="true">
+
+        <div class="modal-header">
+            <span class="modal-title">@(_IsEdit ? "Edit choice" : "Choice")</span>
+            <button class="modal-close" @onclick="Cancel" title="Close">
+                <i class="bi bi-x-lg"></i>
+            </button>
+        </div>
+
+        <div class="modal-body ncm-body">
+
+            <div class="modal-field">
+                <label class="modal-label">Choices</label>
+                <div class="ncm-list">
+                    @for (int i = 0; i < _Rows.Count; ++i)
+                    {
+                        int   index = i;
+                        Row   row   = _Rows[i];
+                        <div class="ncm-row">
+                            <span class="ncm-row-num">@(index + 1)</span>
+                            <input class="modal-input ncm-row-input"
+                                   type="text"
+                                   placeholder="Choice name…"
+                                   @bind="row.Name"
+                                   @bind:event="oninput"/>
+                            <button class="ncm-row-del"
+                                    title="Remove choice"
+                                    disabled="@(_Rows.Count <= 1)"
+                                    @onclick="() => RemoveRow(index)">
+                                <i class="bi bi-x-lg"></i>
+                            </button>
+                        </div>
+                    }
+                </div>
+                <button class="ncm-add" @onclick="AddRow">
+                    <i class="bi bi-plus-lg"></i> Add choice
+                </button>
+            </div>
+
+        </div>
+
+        <div class="modal-footer">
+            <button class="modal-btn modal-btn-ghost" @onclick="Cancel">Cancel</button>
+            <button class="modal-btn modal-btn-primary"
+                    @onclick="Confirm"
+                    disabled="@(_Rows.Count == 0)">
+                @(_IsEdit ? "Save changes" : "Add choice node")
+            </button>
+        </div>
+
+    </div>
+}
+
+@code {
+    [Parameter] public EventCallback<ChoiceArgs> OnConfirm { get; set; }
+
+    private bool       _Visible;
+    private bool       _IsEdit;
+    private Guid       _EditNodeId;
+    private List<Row>  _Rows = new();
+
+    private sealed class Row
+    {
+        public Guid   Id   { get; init; }         // empty for a new choice, set for an existing one
+        public string Name { get; set; } = "";
+    }
+
+    /// <summary>Opens the modal to create a new Choice node (two blank choices by default).</summary>
+    public void Show()
+    {
+        _IsEdit     = false;
+        _EditNodeId = Guid.Empty;
+        _Rows       = new() { new Row(), new Row() };
+        _Visible    = true;
+        StateHasChanged();
+    }
+
+    /// <summary>Opens the modal to edit an existing Choice node (rows carry each option's id so wires survive).</summary>
+    public void ShowEdit(StoryChoiceNode node)
+    {
+        _IsEdit     = true;
+        _EditNodeId = node.Id;
+        _Rows       = node.Options.Select(o => new Row { Id = o.Id, Name = o.Name }).ToList();
+        if (_Rows.Count == 0) _Rows.Add(new Row());
+        _Visible = true;
+        StateHasChanged();
+    }
+
+    private void AddRow() => _Rows.Add(new Row());
+
+    private void RemoveRow(int index)
+    {
+        if (_Rows.Count > 1) _Rows.RemoveAt(index);
+    }
+
+    private async Task Confirm()
+    {
+        if (_Rows.Count == 0) return;
+        _Visible = false;
+        List<ChoiceOptionSpec> options = _Rows.Select(r => new ChoiceOptionSpec(r.Id, r.Name.Trim())).ToList();
+        await OnConfirm.InvokeAsync(new ChoiceArgs(_EditNodeId, options));
+    }
+
+    private void Cancel() => _Visible = false;
+
+    /// <summary>One choice spec. <see cref="Id"/> is empty for a new choice, set to preserve an existing one's wires.</summary>
+    public record ChoiceOptionSpec(Guid Id, string Name);
+
+    /// <summary>Result passed back to the parent. <see cref="EditNodeId"/> is empty for a create, set for an edit.</summary>
+    public record ChoiceArgs(Guid EditNodeId, List<ChoiceOptionSpec> Options);
+}

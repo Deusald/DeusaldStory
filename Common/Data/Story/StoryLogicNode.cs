@@ -72,6 +72,12 @@ namespace DeusaldStoryCommon
         /// <summary>Unregister-variable nodes on the flow spine — each releases a registered variable and frees its slot.</summary>
         public List<StoryUnregisterVariableNode> UnregisterVariableNodes { get; } = new();
 
+        /// <summary>Set-external-variable nodes on the flow spine — each assigns a value to a story-wide external variable.</summary>
+        public List<StorySetExternalVariableNode> SetExternalVariableNodes { get; } = new();
+
+        /// <summary>Choice nodes on the flow spine — each presents the player with a set of branches (one exit per choice).</summary>
+        public List<StoryChoiceNode> ChoiceNodes { get; } = new();
+
         /// <summary>Wires between the inner graph's connection points (Entry/Exit ports and content-node ports).</summary>
         public List<StoryConnection> ContentConnections { get; } = new();
     }
