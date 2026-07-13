@@ -54,29 +54,34 @@ namespace DeusaldStoryCommon
         public static List<StorageOp> StorageOps(StoryLogicNode logic)
         {
             List<StorageOp> ops     = new();
-            HashSet<Guid>   visited = new();
+            HashSet<Guid>   visited = new(); // node ids already emitted (so we don't duplicate them below)
+            HashSet<Guid>   hops    = new(); // to-points already followed (inner cycle guard)
             Guid            from    = logic.EntryPoint.Id;
 
+            // First, walk the wired flow spine so operations placed on it keep their reading order.
             for (int guard = 0; guard < _GUARD; ++guard)
             {
                 StoryConnection? conn = logic.ContentConnections.Find(c => c.FromPoint == from);
                 if (conn is null) break;
                 Guid to = conn.ToPoint;
-                if (!visited.Add(to)) break; // inner cycle guard
+                if (!hops.Add(to)) break; // inner cycle guard
 
                 if (logic.RegisterVariableNodes.Find(n => n.FlowIn.Id == to) is StoryRegisterVariableNode reg)
                 {
                     ops.Add(new StorageOp { Kind = StorageOpKind.Register, Register = reg });
+                    visited.Add(reg.Id);
                     from = reg.FlowOut.Id;
                 }
                 else if (logic.SetVariableNodes.Find(n => n.FlowIn.Id == to) is StorySetVariableNode set)
                 {
                     ops.Add(new StorageOp { Kind = StorageOpKind.Set, Set = set });
+                    visited.Add(set.Id);
                     from = set.FlowOut.Id;
                 }
                 else if (logic.UnregisterVariableNodes.Find(n => n.FlowIn.Id == to) is StoryUnregisterVariableNode unreg)
                 {
                     ops.Add(new StorageOp { Kind = StorageOpKind.Unregister, Unregister = unreg });
+                    visited.Add(unreg.Id);
                     from = unreg.FlowOut.Id;
                 }
                 else if (logic.FlowTextNodes.Find(n => n.FlowIn.Id == to) is StoryFlowTextNode ft)
@@ -88,6 +93,19 @@ namespace DeusaldStoryCommon
                     break; // reached an Exit or a leaf input
                 }
             }
+
+            // Then append any storage nodes that aren't wired onto the spine — a node placed inside a logic node
+            // still performs its operation when the story visits the node, whether or not the author wired its flow
+            // ports. Register-before-Set-before-Unregister so an unwired register/unregister pair still balances.
+            foreach (StoryRegisterVariableNode reg in logic.RegisterVariableNodes)
+                if (!visited.Contains(reg.Id))
+                    ops.Add(new StorageOp { Kind = StorageOpKind.Register, Register = reg });
+            foreach (StorySetVariableNode set in logic.SetVariableNodes)
+                if (!visited.Contains(set.Id))
+                    ops.Add(new StorageOp { Kind = StorageOpKind.Set, Set = set });
+            foreach (StoryUnregisterVariableNode unreg in logic.UnregisterVariableNodes)
+                if (!visited.Contains(unreg.Id))
+                    ops.Add(new StorageOp { Kind = StorageOpKind.Unregister, Unregister = unreg });
 
             return ops;
         }

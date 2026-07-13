@@ -38,9 +38,10 @@ namespace DeusaldStoryCommon
             Lookups                               lk       = Lookups.Build(project);
 
             CheckDanglingOutputs(project, problems);
-            CheckVariableBalance(project, lk, regById, localization, problems, out Dictionary<Guid, HashSet<Guid>> entryActive);
+            CheckVariableBalance(project, lk, regById, localization, problems,
+                out Dictionary<Guid, HashSet<Guid>> entryActive, out HashSet<Guid> endActive);
 
-            return new StoryValidationResult(problems, entryActive, regById);
+            return new StoryValidationResult(problems, entryActive, endActive, regById);
         }
 
         // ── Pass A: every flow output must be wired ────────────────────────────
@@ -113,14 +114,18 @@ namespace DeusaldStoryCommon
 
         private static void CheckVariableBalance(
             StoryProject project, Lookups lk, Dictionary<Guid, StoryRegisterVariableNode> regById,
-            LocProject? localization, List<StoryProblem> problems, out Dictionary<Guid, HashSet<Guid>> entryActive)
+            LocProject? localization, List<StoryProblem> problems,
+            out Dictionary<Guid, HashSet<Guid>> entryActive, out HashSet<Guid> endActive)
         {
             entryActive = new Dictionary<Guid, HashSet<Guid>>();
+            endActive   = new HashSet<Guid>();
             HashSet<Guid> divergenceFlagged = new();
 
             if (!project.ContainerNodes.TryGetValue(project.Metadata.RootStoryContainerNodeId, out StoryContainerNode? root)
                 || root.EntryPoints.Count == 0)
                 return;
+
+            HashSet<Guid> endReached = endActive; // captured by the local recursion
 
             Dictionary<Guid, HashSet<Guid>> ea = entryActive; // captured by the local recursion
 
@@ -152,7 +157,7 @@ namespace DeusaldStoryCommon
                     switch (step.Kind)
                     {
                         case StepKind.Logic: VisitLogic(step.Logic!, active, guard + 1); break;
-                        case StepKind.End:   CheckReleasedAtEnd(project, active, regById, problems, logic.Id, logic.ParentContainer); break;
+                        case StepKind.End:   CheckReleasedAtEnd(project, active, endReached, regById, problems, logic.Id, logic.ParentContainer); break;
                         // Dangling exits are reported by Pass A; stop this branch.
                     }
                 }
@@ -245,12 +250,14 @@ namespace DeusaldStoryCommon
         }
 
         private static void CheckReleasedAtEnd(
-            StoryProject project, HashSet<Guid> active, Dictionary<Guid, StoryRegisterVariableNode> regById,
+            StoryProject project, HashSet<Guid> active, HashSet<Guid> endActive,
+            Dictionary<Guid, StoryRegisterVariableNode> regById,
             List<StoryProblem> problems, Guid logicId, Guid containerId)
         {
             HashSet<Guid> releasedAtEnd = new(project.Metadata.UnregisterAtEnd);
             foreach (Guid id in active)
             {
+                endActive.Add(id); // a variable still registered when the story reaches End — a release candidate
                 if (releasedAtEnd.Contains(id)) continue; // released by the story End node
                 problems.Add(new StoryProblem
                 {
@@ -390,14 +397,19 @@ namespace DeusaldStoryCommon
 
         public StoryValidationResult(
             List<StoryProblem> problems, Dictionary<Guid, HashSet<Guid>> entryActive,
-            Dictionary<Guid, StoryRegisterVariableNode> regById)
+            HashSet<Guid> endActive, Dictionary<Guid, StoryRegisterVariableNode> regById)
         {
             Problems      = problems;
             _EntryActive  = entryActive;
+            EndActive     = endActive;
             _RegById      = regById;
         }
 
         public List<StoryProblem> Problems { get; }
+
+        /// <summary>Register-node ids of variables still registered when the story reaches The End on some path — the
+        /// candidates the End node can release. A variable unregistered on every path never appears here.</summary>
+        public IReadOnlyCollection<Guid> EndActive { get; }
 
         /// <summary>Whether the logic node is reachable from Start (so its slot usage is known).</summary>
         public bool IsReachable(Guid logicId) => _EntryActive.ContainsKey(logicId);

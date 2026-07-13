@@ -21,11 +21,11 @@
 
     <div class="eue-body">
         @{
-            List<StoryRegisterVariableNode> vars = RegisteredVariables();
+            List<StoryRegisterVariableNode> vars = ReleaseCandidates();
         }
         @if (vars.Count == 0)
         {
-            <div class="eue-empty">No storage variables registered anywhere in the story yet.</div>
+            <div class="eue-empty">No variables remain registered when the story reaches The End — every one is released by an Unregister node.</div>
         }
         else
         {
@@ -49,11 +49,19 @@
 @code {
     private StoryProject Project => _ProjectState.CurrentProject!;
 
-    private List<StoryRegisterVariableNode> RegisteredVariables()
+    // Only variables that actually reach The End still registered are release candidates. Any variable released by
+    // an Unregister node on every path never appears here. Currently-selected ids are kept so they can be unchecked.
+    private List<StoryRegisterVariableNode> ReleaseCandidates()
     {
+        StoryValidationResult result = StoryGraphValidator.Validate(Project, _ProjectState.CurrentLocalization);
+
+        HashSet<Guid> ids = new(result.EndActive);
+        foreach (Guid selected in Project.Metadata.UnregisterAtEnd) ids.Add(selected);
+
         List<StoryRegisterVariableNode> list = new();
-        foreach (StoryLogicNode logic in Project.LogicNodes.Values)
-            list.AddRange(logic.RegisterVariableNodes);
+        foreach (Guid id in ids)
+            if (EditorProjection.FindRegister(Project, id) is StoryRegisterVariableNode reg)
+                list.Add(reg);
         return list.OrderBy(v => v.Name, StringComparer.OrdinalIgnoreCase).ToList();
     }
 
