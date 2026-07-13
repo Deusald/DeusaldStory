@@ -82,9 +82,14 @@ namespace DeusaldStoryCommon
                 return Resolve(localization, StoryCommonLocalizationKeys.StorageNumberFlagSet, slot);
 
             if (mode == NumberStorageMode.Dice)
+            {
+                if (assignment == NumberAssignment.SetSpecific)
+                    return Resolve(localization, StoryCommonLocalizationKeys.StorageNumberDiceSpecific, slot, value: specificValue);
+
                 return max is 4 or 5
                     ? Resolve(localization, StoryCommonLocalizationKeys.StorageNumberDiceReroll, slot, max: max)
                     : Resolve(localization, StoryCommonLocalizationKeys.StorageNumberDiceFull, slot);
+            }
 
             // Token.
             if (assignment == NumberAssignment.Randomize)
