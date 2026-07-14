@@ -46,7 +46,7 @@
                 @foreach (EdPort port in Node.Inputs)
                 {
                     <div class="ins-port">
-                        <span class="ins-port-dot ins-port-in"></span>
+                        <span class="ins-port-dot" style="background:@StoryStyle.PortColor(port.Type)"></span>
                         <span class="ins-port-name">@PortName(port)</span>
                         <span class="ins-port-type">@PortTypeLabel(port.Type)</span>
                     </div>
@@ -62,7 +62,7 @@
                 @foreach (EdPort port in Node.Outputs)
                 {
                     <div class="ins-port">
-                        <span class="ins-port-dot ins-port-out"></span>
+                        <span class="ins-port-dot" style="background:@StoryStyle.PortColor(port.Type)"></span>
                         <span class="ins-port-name">@PortName(port)</span>
                         <span class="ins-port-type">@PortTypeLabel(port.Type)</span>
                     </div>

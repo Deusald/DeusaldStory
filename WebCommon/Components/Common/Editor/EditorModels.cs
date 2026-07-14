@@ -794,14 +794,14 @@ namespace DeusaldStoryWeb
 
         /// <summary>
         /// The colour of a port's connection dot, keyed by what the port carries so a wire's signal type is
-        /// readable at a glance: flow (blue), variable (red), text (green), icon (pink).
+        /// readable at a glance: flow (blue), variable (red), text (green), icon (orange).
         /// </summary>
         public static string PortColor(PortType t) => t switch
         {
             PortType.Flow     => "var(--info)",
             PortType.Variable => "var(--danger)",
             PortType.Text     => "var(--success)",
-            PortType.Icon     => "var(--pink)",
+            PortType.Icon     => "var(--orange)",
             _                 => "var(--text-dim)"
         };
 
