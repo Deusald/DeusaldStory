@@ -413,13 +413,15 @@
         }
 
         // Plain left-drag on empty canvas starts a rubber-band selection (clears the current one).
-        _Selecting = true;
-        _SelStartX = (e.OffsetX - _PanX) / _Scale;
-        _SelStartY = (e.OffsetY - _PanY) / _Scale;
-        _SelCurX   = _SelStartX;
-        _SelCurY   = _SelStartY;
+        // Anchor from the measured canvas rect — OffsetX is relative to whatever child was hit, not the canvas.
         _Selected.Clear();
         if (SelectedId != Guid.Empty) await SelectedChanged.InvokeAsync(Guid.Empty);
+        double[] r = await RectAsync();
+        _SelStartX = (e.ClientX - r[0] - _PanX) / _Scale;
+        _SelStartY = (e.ClientY - r[1] - _PanY) / _Scale;
+        _SelCurX   = _SelStartX;
+        _SelCurY   = _SelStartY;
+        _Selecting = true;
     }
 
     private async Task NodeDown(PointerEventArgs e, EdNode node)
@@ -636,8 +638,10 @@
     private async Task CanvasContextMenu(MouseEventArgs e)
     {
         _MenuNode = null;
-        double wx = (e.OffsetX - _PanX) / _Scale;
-        double wy = (e.OffsetY - _PanY) / _Scale;
+        // Anchor from the measured canvas rect — OffsetX is relative to whatever child was hit, not the canvas.
+        double[] r = await RectAsync();
+        double wx = (e.ClientX - r[0] - _PanX) / _Scale;
+        double wy = (e.ClientY - r[1] - _PanY) / _Scale;
         await OnCanvasContextMenu.InvokeAsync(new CanvasPoint(wx, wy));
     }
 
