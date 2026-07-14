@@ -87,8 +87,7 @@
                             {
                                 <GamebookPreview Logic="previewLogic"
                                                  OnNavigate="OnGamebookNavigate"
-                                                 ScrollToKey="_GbpScrollKey"
-                                                 OnScrolled="() => _GbpScrollKey = null"/>
+                                                 ScrollToKey="_GbpScrollKey"/>
                             }
                             else
                             {
@@ -287,6 +286,7 @@
             _PreviewVars     = new Dictionary<Guid, string>();
             _PreviewGamebook = false;
             _PreviewNotice   = null;
+            _GbpScrollKey    = null;
         }
         _Mode = mode;
     }
@@ -296,6 +296,7 @@
     {
         _PreviewGamebook = gamebook;
         _PreviewNotice   = null;
+        _GbpScrollKey    = null;
     }
 
     /// <summary>

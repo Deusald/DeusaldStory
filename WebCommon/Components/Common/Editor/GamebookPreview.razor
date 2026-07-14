@@ -154,37 +154,30 @@
     /// <summary>The <see cref="StoryGamebookPreview.Section.Key"/> to scroll to the top of the view after render.</summary>
     [Parameter] public string? ScrollToKey { get; set; }
 
-    /// <summary>Raised once the requested <see cref="ScrollToKey"/> has been scrolled to, so the host can clear it.</summary>
-    [Parameter] public EventCallback OnScrolled { get; set; }
-
     private StoryGamebookPreview.Result _Result = new();
-    private string?                     _PendingScroll;
+    private string?                     _ScrolledKey;
     private IJSObjectReference?         _Module;
 
-    protected override void OnParametersSet()
-    {
-        _Result = Build();
-        // A fresh scroll request (the host sets it on a nav click, then clears it via OnScrolled) is honoured once.
-        if (!string.IsNullOrEmpty(ScrollToKey))
-            _PendingScroll = ScrollToKey;
-    }
+    protected override void OnParametersSet() => _Result = Build();
 
     private Task Navigate(StoryGamebookPreview.ContinueLine line) =>
         OnNavigate.InvokeAsync(new GamebookNavRequest(line.TargetLogicId, line.TargetSectionKey));
 
+    /// <summary>
+    /// Honour a new scroll request exactly once (tracked by <see cref="_ScrolledKey"/> so plain re-renders don't
+    /// re-scroll and fight the user's own scrolling). The host leaves <see cref="ScrollToKey"/> set — it need not be
+    /// cleared, which is what previously interrupted the smooth scroll mid-animation.
+    /// </summary>
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (_PendingScroll is null) return;
-        string key     = _PendingScroll;
-        _PendingScroll = null;
+        if (string.IsNullOrEmpty(ScrollToKey) || ScrollToKey == _ScrolledKey) return;
+        _ScrolledKey = ScrollToKey;
 
-        int index = _Result.Sections.FindIndex(s => s.Key == key);
-        if (index >= 0)
-        {
-            IJSObjectReference module = await ModuleAsync();
-            await module.InvokeVoidAsync("scrollToTopById", $"gbp-sec-{index}");
-        }
-        await OnScrolled.InvokeAsync();
+        int index = _Result.Sections.FindIndex(s => s.Key == ScrollToKey);
+        if (index < 0) return;
+
+        IJSObjectReference module = await ModuleAsync();
+        await module.InvokeVoidAsync("scrollToTopById", $"gbp-sec-{index}");
     }
 
     private async Task<IJSObjectReference> ModuleAsync() =>

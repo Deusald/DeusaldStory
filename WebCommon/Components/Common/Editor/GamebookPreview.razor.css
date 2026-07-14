@@ -174,7 +174,10 @@
 .gbp-continue-line.error { color: var(--danger); }
 .gbp-continue-line.error i { color: var(--danger); }
 
-/* A "go to section" line that links to its target section — clickable, styled as a link. */
+/* A "go to section" line that links to its target section — clickable, styled as a link.
+   Only font-family/colour are reset (a bare `font`/`color: inherit` would clobber the
+   .gbp-continue-line size/weight/colour set above and leave the text invisible). No transition,
+   so crossing the buttons while wheel-scrolling doesn't fire sustained repaints. */
 .gbp-continue-link {
     width: 100%;
     text-align: left;
@@ -184,14 +187,12 @@
     margin: -2px -4px;
     border-radius: 6px;
     cursor: pointer;
-    font: inherit;
-    color: inherit;
-    transition: background-color 0.12s ease;
+    font-family: inherit;
+    color: #55442a;
 }
-.gbp-continue-link span { text-decoration: underline; text-decoration-color: #c3b596; text-underline-offset: 2px; }
+.gbp-continue-link span { text-decoration: underline; text-decoration-color: #b89b6a; text-underline-offset: 2px; }
 .gbp-continue-link:hover { background-color: #efe7d4; }
-.gbp-continue-link:hover span { text-decoration-color: #8a7b5c; }
-.gbp-continue-link:hover i { color: #55442a; }
+.gbp-continue-link:hover span { text-decoration-color: #55442a; }
 
 /* Inline / standalone project images inside blocks (see LogicPreview for the tags). */
 .gbp-section ::deep .lpv-inline-icon {
