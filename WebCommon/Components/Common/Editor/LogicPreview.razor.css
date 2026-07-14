@@ -230,6 +230,13 @@
     color: var(--success);
 }
 
+/* On the paper screen the bright --success reads too faint, so use a darker ink and a framed edge. */
+.lpv-screen.paper ::deep .lpv-var-string {
+    color: #33521c;
+    background: color-mix(in srgb, #5e7a3a 22%, transparent);
+    border: 1px solid color-mix(in srgb, #5e7a3a 55%, transparent);
+}
+
 /* ── Player-input String field — the App asks the player to fill a variable. */
 .lpv-input {
     display: flex;

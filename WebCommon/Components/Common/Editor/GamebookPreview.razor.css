@@ -273,7 +273,9 @@
     color: var(--orange);
 }
 
+/* On the paper page the bright --success reads too faint, so use a darker ink and a framed edge. */
 .gbp-section ::deep .lpv-var-string {
-    background: color-mix(in srgb, var(--success) 18%, transparent);
-    color: var(--success);
+    color: #33521c;
+    background: color-mix(in srgb, #5e7a3a 22%, transparent);
+    border: 1px solid color-mix(in srgb, #5e7a3a 55%, transparent);
 }
