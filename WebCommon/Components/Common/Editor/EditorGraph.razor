@@ -115,7 +115,7 @@
                         EdPort port = n.Inputs[i];
                         <div class="edg-port-anchor edg-port-in" style="top:@F(PortCenterY(n, i))px;">
                             <span class="edg-port @(IsCompatibleTarget(port) ? "edg-port-target" : "")"
-                                  style="background:@color"
+                                  style="background:@StoryStyle.PortColor(port.Type)"
                                   @onpointerdown:stopPropagation="true"></span>
                             @if (ShowPortLabels(n) && !string.IsNullOrEmpty(port.Name))
                             {
@@ -129,7 +129,7 @@
                     {
                         EdPort port = n.Outputs[i];
                         <div class="edg-port-anchor edg-port-out" style="top:@F(PortCenterY(n, i))px;">
-                            <span class="edg-port" style="background:@color"
+                            <span class="edg-port" style="background:@StoryStyle.PortColor(port.Type)"
                                   @onpointerdown="e => StartConnect(e, port.Id)" @onpointerdown:stopPropagation="true"></span>
                             @if (ShowPortLabels(n) && !string.IsNullOrEmpty(port.Name))
                             {
@@ -338,15 +338,8 @@
         return null;
     }
 
-    private static bool ShowPortLabels(EdNode n) =>
-        n.Kind is StoryNodeKind.Logic or StoryNodeKind.Container
-               or StoryNodeKind.LogicEntry or StoryNodeKind.LogicExit
-               or StoryNodeKind.LightDarkSwitch or StoryNodeKind.SmartFormat
-               or StoryNodeKind.FlowText or StoryNodeKind.Choice
-               or StoryNodeKind.AppGamebookTextSplitter or StoryNodeKind.AppGamebookFlowSplitter
-               or StoryNodeKind.RegisterVariable or StoryNodeKind.SetVariable
-               or StoryNodeKind.UnregisterVariable or StoryNodeKind.SetExternalVariable
-               or StoryNodeKind.Condition;
+    // Every port carries a name (an author name, or its signal type as a fallback), so label them all.
+    private static bool ShowPortLabels(EdNode n) => true;
 
     /// <summary>
     /// True when a wire is being dragged and this input port is a valid drop target for its source: same signal type,

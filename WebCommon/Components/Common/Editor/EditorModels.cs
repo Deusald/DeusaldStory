@@ -155,7 +155,7 @@ namespace DeusaldStoryWeb
                     Deletable = false,
                     Editable  = false
                 };
-                node.Outputs.Add(new EdPort { Id = ep.Id, Name = ep.Name });
+                node.Outputs.Add(new EdPort { Id = ep.Id, Name = "Flow" });
                 nodes.Add(node);
             }
 
@@ -171,7 +171,7 @@ namespace DeusaldStoryWeb
                     Deletable = false,
                     Editable  = false
                 };
-                node.Inputs.Add(new EdPort { Id = xp.Id, Name = xp.Name });
+                node.Inputs.Add(new EdPort { Id = xp.Id, Name = "Flow" });
                 nodes.Add(node);
             }
 
@@ -189,13 +189,13 @@ namespace DeusaldStoryWeb
                     Y         = logic.Y,
                     Deletable = true
                 };
-                node.Inputs.Add(new EdPort { Id = logic.EntryPoint.Id, Name = logic.EntryPoint.Name });
+                node.Inputs.Add(new EdPort { Id = logic.EntryPoint.Id, Name = "Flow" });
                 if (logic.AcceptExitVariable)
                     node.Inputs.Add(new EdPort { Id = logic.ExitVariableIn.Id, Name = logic.ExitVariableIn.Name, Type = PortType.Variable });
 
                 if (logic.ExitMode == StoryLogicExitMode.SingleSelection)
                 {
-                    node.Outputs.Add(new EdPort { Id = logic.SelectionFlowOut.Id, Name = logic.SelectionFlowOut.Name, Type = PortType.Flow });
+                    node.Outputs.Add(new EdPort { Id = logic.SelectionFlowOut.Id, Name = "Flow", Type = PortType.Flow });
                     node.Outputs.Add(new EdPort { Id = logic.SelectionVarOut.Id,  Name = logic.SelectionVarOut.Name,  Type = PortType.Variable });
                 }
                 else
@@ -221,7 +221,7 @@ namespace DeusaldStoryWeb
                         Y         = ip.Y,
                         Deletable = true
                     };
-                    inNode.Inputs.Add(new EdPort { Id = ip.Id, Name = ip.Name });
+                    inNode.Inputs.Add(new EdPort { Id = ip.Id, Name = "Flow" });
                     nodes.Add(inNode);
                 }
 
@@ -235,7 +235,7 @@ namespace DeusaldStoryWeb
                     Y         = portal.OutPoint.Y,
                     Deletable = true
                 };
-                outNode.Outputs.Add(new EdPort { Id = portal.OutPoint.Id, Name = portal.OutPoint.Name });
+                outNode.Outputs.Add(new EdPort { Id = portal.OutPoint.Id, Name = "Flow" });
                 nodes.Add(outNode);
             }
 
@@ -303,7 +303,7 @@ namespace DeusaldStoryWeb
             entry.Inputs.Add(new EdPort { Id = logic.TitleIn.Id,    Name = "Title",    Type = PortType.Text });
             entry.Inputs.Add(new EdPort { Id = logic.SubtitleIn.Id, Name = "Subtitle", Type = PortType.Text });
             entry.Inputs.Add(new EdPort { Id = logic.IconIn.Id,     Name = "Icon",     Type = PortType.Icon });
-            entry.Outputs.Add(new EdPort { Id = logic.EntryPoint.Id, Name = "Out", Type = PortType.Flow });
+            entry.Outputs.Add(new EdPort { Id = logic.EntryPoint.Id, Name = "Flow", Type = PortType.Flow });
             nodes.Add(entry);
 
             // ── Exit nodes (red) — one per branch. ──
@@ -321,7 +321,7 @@ namespace DeusaldStoryWeb
                     Deletable = false,
                     Editable  = false
                 };
-                exit.Inputs.Add(new EdPort { Id = xp.Id, Type = PortType.Flow });
+                exit.Inputs.Add(new EdPort { Id = xp.Id, Name = "Flow", Type = PortType.Flow });
                 nodes.Add(exit);
             }
 
@@ -415,7 +415,7 @@ namespace DeusaldStoryWeb
                     Y         = ev.Y,
                     Deletable = true
                 };
-                node.Outputs.Add(new EdPort { Id = ev.OutPoint.Id, Name = "Value", Type = PortType.Variable });
+                node.Outputs.Add(new EdPort { Id = ev.OutPoint.Id, Name = "Variable", Type = PortType.Variable });
                 nodes.Add(node);
             }
 
@@ -598,7 +598,7 @@ namespace DeusaldStoryWeb
                     Deletable = false,
                     Editable  = true
                 };
-                node.Outputs.Add(new EdPort { Id = prev.OutPoint.Id, Name = "Value", Type = PortType.Variable });
+                node.Outputs.Add(new EdPort { Id = prev.OutPoint.Id, Name = "Variable", Type = PortType.Variable });
                 nodes.Add(node);
             }
 
@@ -726,6 +726,19 @@ namespace DeusaldStoryWeb
             StoryNodeKind.PrevExitVariable        => "PREV EXIT VARIABLE",
             StoryNodeKind.Condition               => "CONDITION",
             _                       => ""
+        };
+
+        /// <summary>
+        /// The colour of a port's connection dot, keyed by what the port carries so a wire's signal type is
+        /// readable at a glance: flow (blue), variable (red), text (green), icon (pink).
+        /// </summary>
+        public static string PortColor(PortType t) => t switch
+        {
+            PortType.Flow     => "var(--info)",
+            PortType.Variable => "var(--danger)",
+            PortType.Text     => "var(--success)",
+            PortType.Icon     => "var(--pink)",
+            _                 => "var(--text-dim)"
         };
 
         public static string NodeColor(StoryNodeKind k) => k switch
