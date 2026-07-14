@@ -92,9 +92,10 @@ namespace DeusaldStoryCommon
         /// for flow-only callers that carry no External Variable values — e.g. the storage-instruction generator
         /// reading a Register/Set node's Instruction port. Empty when nothing is connected.
         /// When <paramref name="slot"/> is supplied the port's text is SmartFormatted with a <c>{slot}</c> placeholder
-        /// bound to it — the storage slot label (e.g. <c>SA</c>) the instruction writes to. The value is merged into
-        /// any SmartFormat node in the path (so it resolves alongside the node's other variables in one pass) and, for
-        /// a plain Localization instruction carrying only <c>{slot}</c>, a final pass fills it in.
+        /// bound to it — the storage slot the instruction writes to, as its label (e.g. <c>SA</c>) or the styled
+        /// <see cref="PreviewHtmlSanitizer.SlotTag"/> pill markup. The value is merged into any SmartFormat node in the
+        /// path (so it resolves alongside the node's other variables in one pass) and, for a plain Localization
+        /// instruction carrying only <c>{slot}</c>, a final pass fills it in.
         /// </summary>
         public static string ResolvePortText(
             StoryProject project, LocProject? localization, StoryLogicNode logic, Guid toPoint,

@@ -41,6 +41,15 @@ namespace DeusaldStoryCommon
             @"&lt;var=([^&]+?)&gt;",
             RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
+        // Matches an encoded storage-slot label "&lt;slot=SA&gt;" — a Set/Register instruction's own {slot} tag,
+        // rendered as the same styled pill an inline String variable reference uses (needs no resolver).
+        private static readonly Regex _SlotTag = new Regex(
+            @"&lt;slot=([^&]+?)&gt;",
+            RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+        /// <summary>Wraps a storage-slot label (e.g. <c>SA</c>) in the tag <see cref="ToSafeHtml"/> renders as a styled pill.</summary>
+        public static string SlotTag(string label) => $"<slot={label}>";
+
         /// <summary>
         /// Renders <paramref name="text"/> to safe HTML. Pass <paramref name="resolveImage"/> to enable the
         /// <c>&lt;icon=Name&gt;</c> / <c>&lt;sprite=Name&gt;</c> tags: it is called with the tag name
@@ -61,6 +70,9 @@ namespace DeusaldStoryCommon
 
             if (resolveVariable is not null)
                 result = _VarTag.Replace(result, match => RestoreVariable(match, resolveVariable));
+
+            // Slot labels carry no lookup — always render them as the String-kind pill.
+            result = _SlotTag.Replace(result, RestoreSlot);
 
             return result;
         }
@@ -96,6 +108,13 @@ namespace DeusaldStoryCommon
             string label = WebUtility.HtmlEncode(StorageSlots.Label(reg.Type, reg.SlotIndex));
             string kind  = reg.Type.ToString().ToLowerInvariant();
             return $"<span class=\"lpv-var lpv-var-{kind}\">{label}</span>";
+        }
+
+        // A player-input String instruction only ever writes to a String slot, so style it as the String pill.
+        private static string RestoreSlot(Match match)
+        {
+            string label = WebUtility.HtmlEncode(WebUtility.HtmlDecode(match.Groups[1].Value));
+            return $"<span class=\"lpv-var lpv-var-string\">{label}</span>";
         }
     }
 }

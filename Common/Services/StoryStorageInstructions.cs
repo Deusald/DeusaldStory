@@ -115,9 +115,11 @@ namespace DeusaldStoryCommon
                     return Line(Resolve(localization, StoryCommonLocalizationKeys.StorageStringWriteSpecific, slot, value: stringValue), placement);
 
                 case StringValueMode.PlayerInput:
-                    string prompt = StoryLogicRenderer.ResolvePortText(project, localization, logic, instructionPortId, target, slot);
+                    // The {slot} the instruction injects renders as a styled pill, not the bare label.
+                    string slotTag = PreviewHtmlSanitizer.SlotTag(slot);
+                    string prompt   = StoryLogicRenderer.ResolvePortText(project, localization, logic, instructionPortId, target, slotTag);
                     if (string.IsNullOrEmpty(prompt))
-                        prompt = Resolve(localization, StoryCommonLocalizationKeys.StorageStringWrite, slot);
+                        prompt = Resolve(localization, StoryCommonLocalizationKeys.StorageStringWrite, slotTag);
 
                     return target == StoryRenderTarget.App
                         ? new StorageInstruction { Text = prompt, Placement = placement, IsAppInput = true, InputKind = inputKind, Slot = slot }
