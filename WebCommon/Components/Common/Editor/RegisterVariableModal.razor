@@ -175,6 +175,21 @@
                 }
             }
 
+            @* ── Preview value ──────────────────────────────────────────── *@
+            <div class="modal-field">
+                <label class="modal-label">
+                    Preview value
+                    <span class="modal-label-hint">optional</span>
+                </label>
+                <input class="modal-input"
+                       type="text"
+                       placeholder="value shown when a Get variable reads this in the App preview"
+                       @bind="_PreviewValue"
+                       @bind:event="oninput"
+                       maxlength="100"/>
+                <span class="modal-label-hint">the App tracks the live value at play time; used by a Get variable node that leaves its own preview value blank</span>
+            </div>
+
             @* ── Gamebook / App placement ───────────────────────────────── *@
             <div class="modal-field">
                 <label class="modal-label">Placement</label>
@@ -224,6 +239,7 @@
     private StringValueMode             _StringMode;
     private string                      _StringValue = "";
     private StringInputKind             _StringInputKind;
+    private string                      _PreviewValue = "";
 
     /// <summary>Opens the modal to register a brand-new variable. <paramref name="freeSlots"/> restricts the slot list.</summary>
     public void Show(IReadOnlyDictionary<StorageVariableType, IReadOnlyList<int>>? freeSlots = null)
@@ -245,6 +261,7 @@
         _StringMode      = StringValueMode.Unset;
         _StringValue     = "";
         _StringInputKind = StringInputKind.Text;
+        _PreviewValue    = "";
         _Visible        = true;
         StateHasChanged();
     }
@@ -269,6 +286,7 @@
         _StringMode      = node.StringMode;
         _StringValue     = node.StringValue;
         _StringInputKind = node.StringInputKind;
+        _PreviewValue    = node.PreviewValue;
         _Visible        = true;
         StateHasChanged();
     }
@@ -324,7 +342,8 @@
             _Placement,
             _StringMode,
             _StringValue.Trim(),
-            _StringInputKind));
+            _StringInputKind,
+            _PreviewValue.Trim()));
     }
 
     private void Cancel() => _Visible = false;
@@ -345,5 +364,6 @@
         StorageInstructionPlacement Placement,
         StringValueMode             StringMode,
         string                      StringValue,
-        StringInputKind             StringInputKind);
+        StringInputKind             StringInputKind,
+        string                      PreviewValue);
 }

@@ -141,6 +141,8 @@
 <LocalizationKeyPickerModal @ref="_LocalizationPicker" OnConfirm="OnLocalizationPicked"/>
 <IconPickerModal           @ref="_IconPicker"          OnConfirm="OnIconPicked"/>
 <VariablePickerModal       @ref="_VariablePicker"      OnConfirm="OnVariablePicked"/>
+<GetVariableModal          @ref="_GetVariableModal"    OnConfirm="OnGetVariableConfirmed"/>
+<LocalVariableModal        @ref="_LocalVariableModal"  OnConfirm="OnLocalVariableConfirmed"/>
 <RegisterVariableModal     @ref="_RegisterVariableModal" OnConfirm="OnRegisterVariableConfirmed"/>
 <SetVariableModal          @ref="_SetVariableModal"      OnConfirm="OnSetVariableConfirmed"/>
 <UnregisterVariablePickerModal @ref="_UnregisterPicker"  OnConfirm="OnUnregisterPicked"/>
@@ -165,6 +167,8 @@
     private LocalizationKeyPickerModal? _LocalizationPicker;
     private IconPickerModal?           _IconPicker;
     private VariablePickerModal?       _VariablePicker;
+    private GetVariableModal?          _GetVariableModal;
+    private LocalVariableModal?        _LocalVariableModal;
     private RegisterVariableModal?     _RegisterVariableModal;
     private SetVariableModal?          _SetVariableModal;
     private UnregisterVariablePickerModal? _UnregisterPicker;
@@ -448,6 +452,8 @@
                 new NodePaletteItem(StoryNodeKind.LightDarkSwitch,  "bi-circle-half",     "Light/Dark switch",     "Outputs one of two icons depending on the render theme (dark or paper/light)."),
                 new NodePaletteItem(StoryNodeKind.SmartFormat,      "bi-braces-asterisk", "SmartFormat node",      "Formats a text with SmartFormat, substituting connected External Variable values."),
                 new NodePaletteItem(StoryNodeKind.ExternalVariable, "bi-braces",          "External Variable node", "Feeds a story variable's value into a SmartFormat node."),
+                new NodePaletteItem(StoryNodeKind.GetVariable,      "bi-box-arrow-down",  "Get variable",           "Reads a registered variable's value into a SmartFormat/Condition input — the App value, or the slot tag in the Gamebook."),
+                new NodePaletteItem(StoryNodeKind.LocalVariable,    "bi-braces",          "Local variable",         "Supplies a named constant value into a SmartFormat/Condition input (formats text; never splits Gamebook sections)."),
                 new NodePaletteItem(StoryNodeKind.FlowText,         "bi-text-paragraph",  "FlowText node",         "On the flow spine — renders a connected text block, then continues to the next flow node."),
                 new NodePaletteItem(StoryNodeKind.RegisterVariable,   "bi-box-seam",        "Register variable",     "On the flow spine — claims a physical storage slot for a new variable."),
                 new NodePaletteItem(StoryNodeKind.SetVariable,        "bi-pencil-square",   "Set variable",          "On the flow spine — assigns a value to an already-registered variable."),
@@ -489,6 +495,8 @@
                 RebuildNodes();
                 break;
             case StoryNodeKind.ExternalVariable: _VariablePicker?.Show(Guid.Empty, Guid.Empty); break;
+            case StoryNodeKind.GetVariable:   _GetVariableModal?.Show();   break;
+            case StoryNodeKind.LocalVariable: _LocalVariableModal?.Show(); break;
             case StoryNodeKind.FlowText:
                 // No config — create it straight away at the pending position.
                 if (_ProjectState.AddFlowTextNode(_CurrentId, _PendingX, _PendingY) is StoryFlowTextNode ft)
@@ -578,6 +586,32 @@
         RebuildNodes();
     }
 
+    private void OnGetVariableConfirmed(GetVariableModal.GetVariableArgs args)
+    {
+        if (args.EditNodeId != Guid.Empty)
+        {
+            _ProjectState.UpdateGetVariableNode(_CurrentId, args.EditNodeId, args.RegisteredVariableId, args.NameOverride, args.PreviewValue);
+        }
+        else if (_ProjectState.AddGetVariableNode(_CurrentId, args.RegisteredVariableId, args.NameOverride, args.PreviewValue, _PendingX, _PendingY) is StoryGetVariableNode node)
+        {
+            _SelectedId = node.Id;
+        }
+        RebuildNodes();
+    }
+
+    private void OnLocalVariableConfirmed(LocalVariableModal.LocalVariableArgs args)
+    {
+        if (args.EditNodeId != Guid.Empty)
+        {
+            _ProjectState.UpdateLocalVariableNode(_CurrentId, args.EditNodeId, args.Name, args.Value);
+        }
+        else if (_ProjectState.AddLocalVariableNode(_CurrentId, args.Name, args.Value, _PendingX, _PendingY) is StoryLocalVariableNode node)
+        {
+            _SelectedId = node.Id;
+        }
+        RebuildNodes();
+    }
+
     /// <summary>The free storage slots per type on entry to the logic node being edited, so the Register modal only
     /// offers slots that aren't already claimed on the path here. Null when not inside a logic node.</summary>
     private IReadOnlyDictionary<StorageVariableType, IReadOnlyList<int>>? ComputeFreeSlots()
@@ -648,7 +682,7 @@
         _ProjectState.UpdateRegisterVariableNode(
             _CurrentId, nodeId, args.Name, args.Description, args.Type, args.SlotIndex,
             args.Mode, args.ValueCount, args.Secret, args.Assignment, args.SpecificValue, args.ConditionKeyId,
-            args.Placement, args.StringMode, args.StringValue, args.StringInputKind);
+            args.Placement, args.StringMode, args.StringValue, args.StringInputKind, args.PreviewValue);
         RebuildNodes();
     }
 
@@ -824,6 +858,16 @@
                     _VariablePicker?.Show(ev.Id, ev.SelectedVariableId);
                 break;
 
+            case StoryNodeKind.GetVariable:
+                if (_CurrentLogicNode?.GetVariableNodes.Find(n => n.Id == node.Id) is StoryGetVariableNode gv)
+                    _GetVariableModal?.ShowEdit(gv);
+                break;
+
+            case StoryNodeKind.LocalVariable:
+                if (_CurrentLogicNode?.LocalVariableNodes.Find(n => n.Id == node.Id) is StoryLocalVariableNode lv)
+                    _LocalVariableModal?.ShowEdit(lv);
+                break;
+
             case StoryNodeKind.RegisterVariable:
                 if (_CurrentLogicNode?.RegisterVariableNodes.Find(n => n.Id == node.Id) is StoryRegisterVariableNode reg)
                     _RegisterVariableModal?.ShowEdit(reg, ComputeFreeSlots());
@@ -896,6 +940,8 @@
             case StoryNodeKind.LightDarkSwitch: _ProjectState.DeleteLightDarkSwitchNode(_CurrentId, node.Id); break;
             case StoryNodeKind.SmartFormat:     _ProjectState.DeleteSmartFormatNode(_CurrentId, node.Id);     break;
             case StoryNodeKind.ExternalVariable: _ProjectState.DeleteExternalVariableNode(_CurrentId, node.Id); break;
+            case StoryNodeKind.GetVariable:      _ProjectState.DeleteGetVariableNode(_CurrentId, node.Id);      break;
+            case StoryNodeKind.LocalVariable:    _ProjectState.DeleteLocalVariableNode(_CurrentId, node.Id);    break;
             case StoryNodeKind.FlowText:         _ProjectState.DeleteFlowTextNode(_CurrentId, node.Id);        break;
             case StoryNodeKind.RegisterVariable:   _ProjectState.DeleteRegisterVariableNode(_CurrentId, node.Id);   break;
             case StoryNodeKind.SetVariable:        _ProjectState.DeleteSetVariableNode(_CurrentId, node.Id);        break;

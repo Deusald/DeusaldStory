@@ -483,6 +483,82 @@ public partial class ProjectStateService(
         MarkKeyDirty(logicId);
     }
 
+    /// <summary>Adds a Get Variable node (reads registered variable <paramref name="registeredVariableId"/>) to a logic node's inner graph.</summary>
+    public StoryGetVariableNode? AddGetVariableNode(Guid logicId, Guid registeredVariableId, string nameOverride, string previewValue, double x, double y)
+    {
+        if (!CurrentProject!.LogicNodes.TryGetValue(logicId, out StoryLogicNode? logic)) return null;
+
+        StoryGetVariableNode node = new()
+        {
+            RegisteredVariableId = registeredVariableId,
+            NameOverride         = nameOverride,
+            PreviewValue         = previewValue,
+            X                    = x,
+            Y                    = y
+        };
+        logic.GetVariableNodes.Add(node);
+        MarkKeyDirty(logicId);
+        return node;
+    }
+
+    /// <summary>Updates the registered variable, name override and preview value a Get Variable node reads.</summary>
+    public void UpdateGetVariableNode(Guid logicId, Guid nodeId, Guid registeredVariableId, string nameOverride, string previewValue)
+    {
+        if (!CurrentProject!.LogicNodes.TryGetValue(logicId, out StoryLogicNode? logic)) return;
+        StoryGetVariableNode? node = logic.GetVariableNodes.Find(n => n.Id == nodeId);
+        if (node is null) return;
+        node.RegisteredVariableId = registeredVariableId;
+        node.NameOverride         = nameOverride;
+        node.PreviewValue         = previewValue;
+        MarkKeyDirty(logicId);
+    }
+
+    /// <summary>Deletes a Get Variable node and any inner wire that touched its output.</summary>
+    public void DeleteGetVariableNode(Guid logicId, Guid nodeId)
+    {
+        if (!CurrentProject!.LogicNodes.TryGetValue(logicId, out StoryLogicNode? logic)) return;
+        StoryGetVariableNode? node = logic.GetVariableNodes.Find(n => n.Id == nodeId);
+        if (node is null) return;
+
+        logic.GetVariableNodes.Remove(node);
+        logic.ContentConnections.RemoveAll(c => c.FromPoint == node.OutPoint.Id || c.ToPoint == node.OutPoint.Id);
+        MarkKeyDirty(logicId);
+    }
+
+    /// <summary>Adds a Local Variable node (a named constant value) to a logic node's inner graph.</summary>
+    public StoryLocalVariableNode? AddLocalVariableNode(Guid logicId, string name, string value, double x, double y)
+    {
+        if (!CurrentProject!.LogicNodes.TryGetValue(logicId, out StoryLogicNode? logic)) return null;
+
+        StoryLocalVariableNode node = new() { Name = name, Value = value, X = x, Y = y };
+        logic.LocalVariableNodes.Add(node);
+        MarkKeyDirty(logicId);
+        return node;
+    }
+
+    /// <summary>Updates the name and value of a Local Variable node.</summary>
+    public void UpdateLocalVariableNode(Guid logicId, Guid nodeId, string name, string value)
+    {
+        if (!CurrentProject!.LogicNodes.TryGetValue(logicId, out StoryLogicNode? logic)) return;
+        StoryLocalVariableNode? node = logic.LocalVariableNodes.Find(n => n.Id == nodeId);
+        if (node is null) return;
+        node.Name  = name;
+        node.Value = value;
+        MarkKeyDirty(logicId);
+    }
+
+    /// <summary>Deletes a Local Variable node and any inner wire that touched its output.</summary>
+    public void DeleteLocalVariableNode(Guid logicId, Guid nodeId)
+    {
+        if (!CurrentProject!.LogicNodes.TryGetValue(logicId, out StoryLogicNode? logic)) return;
+        StoryLocalVariableNode? node = logic.LocalVariableNodes.Find(n => n.Id == nodeId);
+        if (node is null) return;
+
+        logic.LocalVariableNodes.Remove(node);
+        logic.ContentConnections.RemoveAll(c => c.FromPoint == node.OutPoint.Id || c.ToPoint == node.OutPoint.Id);
+        MarkKeyDirty(logicId);
+    }
+
     /// <summary>Adds a FlowText node (renders a text block on the flow spine) to a logic node's inner graph.</summary>
     public StoryFlowTextNode? AddFlowTextNode(Guid logicId, double x, double y)
     {
@@ -582,7 +658,7 @@ public partial class ProjectStateService(
         Guid logicId, Guid nodeId, string name, string description, StorageVariableType type, int slotIndex,
         NumberStorageMode mode, NumberValueCount valueCount, bool secret, NumberAssignment assignment,
         int specificValue, Guid conditionKeyId, StorageInstructionPlacement placement, StringValueMode stringMode,
-        string stringValue, StringInputKind stringInputKind)
+        string stringValue, StringInputKind stringInputKind, string previewValue)
     {
         if (!CurrentProject!.LogicNodes.TryGetValue(logicId, out StoryLogicNode? logic)) return;
         StoryRegisterVariableNode? node = logic.RegisterVariableNodes.Find(n => n.Id == nodeId);
@@ -602,6 +678,7 @@ public partial class ProjectStateService(
         node.StringMode      = stringMode;
         node.StringValue     = stringValue;
         node.StringInputKind = stringInputKind;
+        node.PreviewValue    = previewValue;
 
         // The Instruction port only exists for a player-input String — drop any stale wire when it no longer applies.
         if (type != StorageVariableType.String || stringMode != StringValueMode.PlayerInput)
@@ -946,6 +1023,8 @@ public partial class ProjectStateService(
         bool multiInput  = logic.SmartFormatNodes.Exists(sf => sf.VariablesIn.Id == toPoint)
                         || logic.ExitPoints.Exists(e => e.Id == toPoint);
         bool multiOutput = logic.ExternalVariableNodes.Exists(ev => ev.OutPoint.Id == fromPoint)
+                        || logic.GetVariableNodes.Exists(gv => gv.OutPoint.Id == fromPoint)
+                        || logic.LocalVariableNodes.Exists(lv => lv.OutPoint.Id == fromPoint)
                         || logic.PrevExitVariable.OutPoint.Id == fromPoint;
         logic.ContentConnections.RemoveAll(c => (!multiOutput && c.FromPoint == fromPoint) || (!multiInput && c.ToPoint == toPoint));
 
@@ -1037,6 +1116,24 @@ public partial class ProjectStateService(
         {
             ev.X = x;
             ev.Y = y;
+            MarkKeyDirty(logicId);
+            return;
+        }
+
+        StoryGetVariableNode? gv = logic.GetVariableNodes.Find(n => n.Id == movedId);
+        if (gv is not null)
+        {
+            gv.X = x;
+            gv.Y = y;
+            MarkKeyDirty(logicId);
+            return;
+        }
+
+        StoryLocalVariableNode? lv = logic.LocalVariableNodes.Find(n => n.Id == movedId);
+        if (lv is not null)
+        {
+            lv.X = x;
+            lv.Y = y;
             MarkKeyDirty(logicId);
             return;
         }
@@ -1432,6 +1529,8 @@ public partial class ProjectStateService(
             valid.Add(n.OutPoint.Id);
         }
         foreach (StoryExternalVariableNode n in logic.ExternalVariableNodes) valid.Add(n.OutPoint.Id);
+        foreach (StoryGetVariableNode n in logic.GetVariableNodes) valid.Add(n.OutPoint.Id);
+        foreach (StoryLocalVariableNode n in logic.LocalVariableNodes) valid.Add(n.OutPoint.Id);
         foreach (StoryFlowTextNode n in logic.FlowTextNodes)
         {
             valid.Add(n.FlowIn.Id);

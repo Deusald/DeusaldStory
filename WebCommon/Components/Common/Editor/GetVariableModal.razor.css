@@ -1,0 +1,60 @@
+.gvm-box {
+    width: 26rem;
+    max-width: 92vw;
+}
+
+.gvm-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    max-height: 14rem;
+    overflow-y: auto;
+}
+
+.gvm-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    padding: 0.4rem 0.6rem;
+    border: 1px solid var(--border);
+    border-radius: 0.4rem;
+    background: var(--surface);
+    color: var(--text);
+    cursor: pointer;
+    text-align: left;
+}
+
+.gvm-item:hover {
+    border-color: var(--code-func);
+}
+
+.gvm-item.selected {
+    border-color: var(--code-func);
+    background: var(--surface-2);
+}
+
+.gvm-item-name {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.gvm-item-slot {
+    flex: 0 0 auto;
+    font-family: var(--font-mono, monospace);
+    font-size: 0.8rem;
+    color: var(--text-dim);
+}
+
+.gvm-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 1.5rem 1rem;
+    color: var(--text-dim);
+    text-align: center;
+}

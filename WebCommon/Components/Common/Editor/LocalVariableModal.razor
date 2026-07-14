@@ -1,0 +1,106 @@
+@namespace DeusaldStoryWeb.Components.Common
+
+@* ─────────────────────────────────────────────────────────────────────────
+   Creates / edits a Local Variable node: a named constant value wired into a
+   SmartFormat variables input (or a Condition) to format text with a fixed
+   value. The value is constant, so it never dimensions Gamebook sections.
+   ───────────────────────────────────────────────────────────────────────── *@
+
+@if (_Visible)
+{
+    <div class="modal-backdrop" @onclick="Cancel"></div>
+
+    <div class="modal-box lvm-box" @onclick:stopPropagation="true">
+
+        <div class="modal-header">
+            <span class="modal-title">@(_IsEdit ? "Edit local variable" : "Local variable")</span>
+            <button class="modal-close" @onclick="Cancel" title="Close">
+                <i class="bi bi-x-lg"></i>
+            </button>
+        </div>
+
+        <div class="modal-body">
+
+            <div class="modal-field">
+                <label class="modal-label">Name</label>
+                <input class="modal-input"
+                       type="text"
+                       placeholder="token name"
+                       @bind="_Name"
+                       @bind:event="oninput"
+                       maxlength="100"/>
+                <span class="modal-label-hint">the <code>{token}</code> name this value fills in the text</span>
+            </div>
+
+            <div class="modal-field">
+                <label class="modal-label">Value</label>
+                <input class="modal-input"
+                       type="text"
+                       placeholder="constant value"
+                       @bind="_Value"
+                       @bind:event="oninput"
+                       maxlength="200"/>
+            </div>
+
+            <div class="modal-note">
+                <i class="bi bi-info-circle"></i>
+                <span>Wire this node's <b>Value</b> output into a SmartFormat variables input (or a Condition) to use it.</span>
+            </div>
+
+        </div>
+
+        <div class="modal-footer">
+            <button class="modal-btn modal-btn-ghost" @onclick="Cancel">Cancel</button>
+            <button class="modal-btn modal-btn-primary"
+                    @onclick="Confirm"
+                    disabled="@(string.IsNullOrWhiteSpace(_Name))">
+                @(_IsEdit ? "Save changes" : "Add local variable node")
+            </button>
+        </div>
+
+    </div>
+}
+
+@code {
+    [Parameter] public EventCallback<LocalVariableArgs> OnConfirm { get; set; }
+
+    private bool   _Visible;
+    private bool   _IsEdit;
+    private Guid   _EditNodeId;
+    private string _Name  = "";
+    private string _Value = "";
+
+    /// <summary>Opens the modal to create a new Local Variable node.</summary>
+    public void Show()
+    {
+        _IsEdit     = false;
+        _EditNodeId = Guid.Empty;
+        _Name       = "";
+        _Value      = "";
+        _Visible    = true;
+        StateHasChanged();
+    }
+
+    /// <summary>Opens the modal to edit an existing Local Variable node.</summary>
+    public void ShowEdit(StoryLocalVariableNode node)
+    {
+        _IsEdit     = true;
+        _EditNodeId = node.Id;
+        _Name       = node.Name;
+        _Value      = node.Value;
+        _Visible    = true;
+        StateHasChanged();
+    }
+
+    private async Task Confirm()
+    {
+        if (string.IsNullOrWhiteSpace(_Name)) return;
+        _Visible = false;
+        await OnConfirm.InvokeAsync(new LocalVariableArgs(_EditNodeId, _Name.Trim(), _Value.Trim()));
+    }
+
+    private void Cancel() => _Visible = false;
+
+    /// <summary>Result passed back to the parent. <see cref="EditNodeId"/> is empty for a create, set for an edit.</summary>
+    public record LocalVariableArgs(Guid EditNodeId, string Name, string Value);
+}

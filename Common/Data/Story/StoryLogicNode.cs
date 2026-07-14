@@ -90,6 +90,12 @@ namespace DeusaldStoryCommon
         /// <summary>External Variable nodes placed in the inner graph (each feeds a variable value into a SmartFormat node).</summary>
         public List<StoryExternalVariableNode> ExternalVariableNodes { get; } = new();
 
+        /// <summary>Get Variable nodes placed in the inner graph (each reads a registered storage variable's value — App value / Gamebook slot tag).</summary>
+        public List<StoryGetVariableNode> GetVariableNodes { get; } = new();
+
+        /// <summary>Local Variable nodes placed in the inner graph (each supplies a named constant value into a SmartFormat or Condition input).</summary>
+        public List<StoryLocalVariableNode> LocalVariableNodes { get; } = new();
+
         /// <summary>FlowText nodes placed in the inner graph — the flow spine that renders text blocks in order.</summary>
         public List<StoryFlowTextNode> FlowTextNodes { get; } = new();
 

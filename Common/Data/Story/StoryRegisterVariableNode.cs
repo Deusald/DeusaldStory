@@ -45,6 +45,9 @@ namespace DeusaldStoryCommon
         /// <summary>Optional "gamebook condition" localization key used to phrase a reveal/branch on this variable. Empty = none.</summary>
         public Guid ConditionKeyId { get; set; }
 
+        /// <summary>The value the App preview / Conditions use when a <see cref="StoryGetVariableNode"/> reading this variable leaves its own preview value blank (the App tracks the live value at play time).</summary>
+        public string PreviewValue { get; set; } = string.Empty;
+
         /// <summary>Where this node's Gamebook instruction / App input field sits relative to the section text.</summary>
         public StorageInstructionPlacement Placement { get; set; }
 

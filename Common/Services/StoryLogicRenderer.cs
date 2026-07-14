@@ -203,6 +203,14 @@ namespace DeusaldStoryCommon
                         vals[v.Name] = StoryBuiltInVariables.IsBuiltIn(v.Id)
                             ? StoryBuiltInVariables.ValueFor(target) // the medium variable follows the render target, not the preview values
                             : PreviewValue(v, values);
+                    else if (logic.GetVariableNodes.Find(n => n.OutPoint.Id == c.FromPoint) is StoryGetVariableNode gv
+                        && GetVariableName(project, gv) is { Length: > 0 } gvName)
+                        // App: the App tracks the live value, so the preview substitutes the author's preview value.
+                        // Gamebook: the physical value is unknown at print time — emit the slot tag (TA/NA/DA pill) instead.
+                        vals[gvName] = target == StoryRenderTarget.App ? GetVariablePreviewValue(project, gv) : GetVariableSlotTag(project, gv);
+                    else if (logic.LocalVariableNodes.Find(n => n.OutPoint.Id == c.FromPoint) is StoryLocalVariableNode lv
+                        && !string.IsNullOrWhiteSpace(lv.Name))
+                        vals[lv.Name] = lv.Value;
                     else if (c.FromPoint == logic.PrevExitVariable.OutPoint.Id && logic.AcceptExitVariable)
                     {
                         // The upstream Selection value for this section (keyed by the Prev Exit Variable node's id).
@@ -234,6 +242,40 @@ namespace DeusaldStoryCommon
         private static StoryVariable? Variable(StoryProject project, Guid id) =>
             StoryBuiltInVariables.Find(id)
             ?? (id != Guid.Empty && project.Variables.TryGetValue(id, out StoryVariable? v) ? v : null);
+
+        /// <summary>The SmartFormat token name a Get Variable node supplies under — its override, else the register's own name (empty when unresolved).</summary>
+        private static string GetVariableName(StoryProject project, StoryGetVariableNode gv)
+        {
+            if (!string.IsNullOrWhiteSpace(gv.NameOverride)) return gv.NameOverride;
+            return FindRegister(project, gv.RegisteredVariableId)?.Name ?? "";
+        }
+
+        /// <summary>The App-preview value for a Get Variable node — its own preview value, falling back to the register's when blank.</summary>
+        private static string GetVariablePreviewValue(StoryProject project, StoryGetVariableNode gv) =>
+            !string.IsNullOrEmpty(gv.PreviewValue)
+                ? gv.PreviewValue
+                : FindRegister(project, gv.RegisteredVariableId)?.PreviewValue ?? "";
+
+        /// <summary>The Gamebook substitution for a Get Variable node — the referenced slot's styled tag (TA/NA/DA pill), so no value is printed.</summary>
+        private static string GetVariableSlotTag(StoryProject project, StoryGetVariableNode gv)
+        {
+            StoryRegisterVariableNode? reg = FindRegister(project, gv.RegisteredVariableId);
+            if (reg is null) return "";
+            // A named register resolves to its kind-coloured <var=Name> pill; an unnamed one falls back to the raw slot tag.
+            return string.IsNullOrWhiteSpace(reg.Name)
+                ? PreviewHtmlSanitizer.SlotTag(StorageSlots.Label(reg.Type, reg.SlotIndex))
+                : $"<var={reg.Name}>";
+        }
+
+        /// <summary>Finds a registered storage variable (a Register node) anywhere in the project by its id.</summary>
+        private static StoryRegisterVariableNode? FindRegister(StoryProject project, Guid id)
+        {
+            if (id == Guid.Empty) return null;
+            foreach (StoryLogicNode l in project.LogicNodes.Values)
+                if (l.RegisterVariableNodes.Find(n => n.Id == id) is StoryRegisterVariableNode found)
+                    return found;
+            return null;
+        }
 
         // ── Icon resolution ──────────────────────────────────────────────────────
 

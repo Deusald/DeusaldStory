@@ -70,6 +70,8 @@ namespace DeusaldStoryWeb
         LightDarkSwitch, // inside a logic node: picks between two icons by render theme (info)
         SmartFormat,     // inside a logic node: formats a text with connected variable values (purple)
         ExternalVariable, // inside a logic node: picks a story variable, feeds a SmartFormat variables input (teal)
+        GetVariable,      // inside a logic node: reads a registered storage variable — App value / Gamebook slot tag (teal)
+        LocalVariable,    // inside a logic node: a named constant value fed into a SmartFormat/Condition input (teal)
         FlowText,         // inside a logic node: on the flow spine, renders a text block then continues flow (amber)
         RegisterVariable,   // inside a logic node: on the flow spine, claims a storage slot for a new variable (green)
         SetVariable,        // inside a logic node: on the flow spine, sets an already-registered variable's value (blue)
@@ -442,6 +444,44 @@ namespace DeusaldStoryWeb
                 nodes.Add(node);
             }
 
+            // ── Get Variable nodes (teal) — read a registered storage variable's value into a SmartFormat/Condition input. ──
+            foreach (StoryGetVariableNode gv in logic.GetVariableNodes)
+            {
+                StoryRegisterVariableNode? reg = FindRegister(project, gv.RegisteredVariableId);
+                bool   found = reg is not null;
+                string name  = !string.IsNullOrWhiteSpace(gv.NameOverride) ? gv.NameOverride
+                             : found ? reg!.Name : "";
+                EdNode node = new()
+                {
+                    Id        = gv.Id,
+                    Kind      = StoryNodeKind.GetVariable,
+                    Title     = string.IsNullOrWhiteSpace(name) ? "(no variable)" : name,
+                    Subtitle  = found ? $"{StorageSlots.Label(reg!.Type, reg.SlotIndex)} · {reg.Type}" : "unregistered",
+                    X         = gv.X,
+                    Y         = gv.Y,
+                    Deletable = true
+                };
+                node.Outputs.Add(new EdPort { Id = gv.OutPoint.Id, Name = "Value", Type = PortType.Variable });
+                nodes.Add(node);
+            }
+
+            // ── Local Variable nodes (teal) — a named constant value fed into a SmartFormat/Condition input. ──
+            foreach (StoryLocalVariableNode lv in logic.LocalVariableNodes)
+            {
+                EdNode node = new()
+                {
+                    Id        = lv.Id,
+                    Kind      = StoryNodeKind.LocalVariable,
+                    Title     = string.IsNullOrWhiteSpace(lv.Name) ? "(unnamed)" : lv.Name,
+                    Subtitle  = lv.Value,
+                    X         = lv.X,
+                    Y         = lv.Y,
+                    Deletable = true
+                };
+                node.Outputs.Add(new EdPort { Id = lv.OutPoint.Id, Name = "Value", Type = PortType.Variable });
+                nodes.Add(node);
+            }
+
             // ── FlowText nodes (amber) — sit on the flow spine, render a text block, continue flow. ──
             foreach (StoryFlowTextNode ft in logic.FlowTextNodes)
             {
@@ -742,6 +782,8 @@ namespace DeusaldStoryWeb
             StoryNodeKind.LightDarkSwitch => "LIGHT / DARK",
             StoryNodeKind.SmartFormat      => "SMART FORMAT",
             StoryNodeKind.ExternalVariable => "EXTERNAL VARIABLE",
+            StoryNodeKind.GetVariable      => "GET VARIABLE",
+            StoryNodeKind.LocalVariable    => "LOCAL VARIABLE",
             StoryNodeKind.FlowText         => "FLOW TEXT",
             StoryNodeKind.RegisterVariable   => "REGISTER VARIABLE",
             StoryNodeKind.SetVariable        => "SET VARIABLE",
@@ -778,6 +820,8 @@ namespace DeusaldStoryWeb
             StoryNodeKind.LightDarkSwitch => "bi-circle-half",
             StoryNodeKind.SmartFormat      => "bi-braces-asterisk",
             StoryNodeKind.ExternalVariable => "bi-braces",
+            StoryNodeKind.GetVariable      => "bi-box-arrow-down",
+            StoryNodeKind.LocalVariable    => "bi-braces",
             StoryNodeKind.FlowText         => "bi-text-paragraph",
             StoryNodeKind.RegisterVariable   => "bi-box-seam",
             StoryNodeKind.SetVariable        => "bi-pencil-square",
@@ -822,6 +866,8 @@ namespace DeusaldStoryWeb
             StoryNodeKind.LightDarkSwitch => "var(--info)",
             StoryNodeKind.SmartFormat      => "var(--purple)",
             StoryNodeKind.ExternalVariable => "var(--code-func)",
+            StoryNodeKind.GetVariable      => "var(--code-func)",
+            StoryNodeKind.LocalVariable    => "var(--code-func)",
             StoryNodeKind.FlowText         => "var(--warning)",
             StoryNodeKind.RegisterVariable   => "var(--success)",
             StoryNodeKind.SetVariable        => "var(--info)",

@@ -109,6 +109,17 @@ namespace DeusaldStoryCommon
                 return values.TryGetValue(v.Id, out string? val) ? val : v.PossibleValues.FirstOrDefault() ?? "";
             }
 
+            // A Get Variable reads a storage variable whose value is physical/live and unknown at build time, so the
+            // condition branches on a representative preview value in both mediums: the node's own, or — when blank —
+            // the register's default preview value.
+            if (logic.GetVariableNodes.Find(n => n.OutPoint.Id == fromPoint) is StoryGetVariableNode gv)
+                return !string.IsNullOrEmpty(gv.PreviewValue)
+                    ? gv.PreviewValue
+                    : FindRegister(project, gv.RegisteredVariableId)?.PreviewValue ?? "";
+
+            if (logic.LocalVariableNodes.Find(n => n.OutPoint.Id == fromPoint) is StoryLocalVariableNode lv)
+                return lv.Value;
+
             if (fromPoint == logic.PrevExitVariable.OutPoint.Id && logic.AcceptExitVariable)
                 return values.TryGetValue(logic.PrevExitVariable.Id, out string? sel) ? sel : "";
 
@@ -117,6 +128,16 @@ namespace DeusaldStoryCommon
 
         private static Guid FromInto(StoryLogicNode logic, Guid toPoint) =>
             logic.ContentConnections.Find(c => c.ToPoint == toPoint)?.FromPoint ?? Guid.Empty;
+
+        /// <summary>Finds a registered storage variable (a Register node) anywhere in the project by its id.</summary>
+        private static StoryRegisterVariableNode? FindRegister(StoryProject project, Guid id)
+        {
+            if (id == Guid.Empty) return null;
+            foreach (StoryLogicNode l in project.LogicNodes.Values)
+                if (l.RegisterVariableNodes.Find(n => n.Id == id) is StoryRegisterVariableNode found)
+                    return found;
+            return null;
+        }
 
         public static List<StorageOp> StorageOps(
             StoryProject project, StoryLogicNode logic, StoryRenderTarget target = StoryRenderTarget.App,
