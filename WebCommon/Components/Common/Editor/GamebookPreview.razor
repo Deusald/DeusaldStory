@@ -31,13 +31,18 @@
     @for (int i = 0; i < result.Sections.Count; i++)
     {
         StoryGamebookPreview.Section sec = result.Sections[i];
-        <div class="gbp-section" id="@($"gbp-sec-{i}")">
+        bool selected = IsSelected(sec);
+        <div class="gbp-section @(selected ? "selected" : "")" id="@($"gbp-sec-{i}")">
 
             <div class="gbp-section-head">
                 <span class="gbp-section-tag">[§ @(i + 1)]</span>
                 @if (!string.IsNullOrEmpty(sec.Label))
                 {
                     <span class="gbp-section-combo">@sec.Label</span>
+                }
+                @if (selected)
+                {
+                    <span class="gbp-section-badge gbp-section-selected"><i class="bi bi-eye-fill"></i> Preview selected</span>
                 }
                 @if (sec.IsInstructions)
                 {
@@ -162,6 +167,10 @@
 
     private Task Navigate(StoryGamebookPreview.ContinueLine line) =>
         OnNavigate.InvokeAsync(new GamebookNavRequest(line.TargetLogicId, line.TargetSectionKey));
+
+    /// <summary>The section the last "go to section" click jumped to — flagged transiently, never persisted.</summary>
+    private bool IsSelected(StoryGamebookPreview.Section sec) =>
+        !string.IsNullOrEmpty(ScrollToKey) && sec.Key == ScrollToKey;
 
     /// <summary>
     /// Honour a new scroll request exactly once (tracked by <see cref="_ScrolledKey"/> so plain re-renders don't

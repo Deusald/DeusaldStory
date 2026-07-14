@@ -61,9 +61,13 @@ export function rect(el) {
     return [r.left, r.top, r.width, r.height];
 }
 
-// Scroll the element with the given id to the top of its scrollable ancestor
-// (used by the Gamebook preview to jump to a clicked "go to section" target).
+// Scroll the Gamebook preview so the element with the given id sits at the top of the
+// scroll view (clamped: if it can't reach the top the container scrolls to its bottom).
 export function scrollToTopById(id) {
     const el = document.getElementById(id);
-    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    if (!el) return;
+    const container = el.closest('.gbp-root');
+    if (!container) { el.scrollIntoView({ behavior: 'smooth', block: 'start' }); return; }
+    const delta = el.getBoundingClientRect().top - container.getBoundingClientRect().top;
+    container.scrollBy({ top: delta, behavior: 'smooth' });
 }

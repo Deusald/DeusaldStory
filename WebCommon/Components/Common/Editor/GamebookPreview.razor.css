@@ -46,6 +46,11 @@
     --gbp-frame-border: #e0d7c4;
     --gbp-icon-bg:      #efe8d8;
 }
+/* The section the last "go to section" click jumped to — a transient preview highlight. */
+.gbp-section.selected {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 55%, transparent), var(--shadow-md);
+}
 
 /* Section header — the placeholder token, combo values and an optional Instructions badge. */
 .gbp-section-head {
@@ -85,6 +90,12 @@
     border: 1px solid #e0cfa8;
     border-radius: var(--r-pill);
     padding: 3px 10px;
+}
+/* The "Preview selected" marker on the jumped-to section — uses the app accent to stand out. */
+.gbp-section-selected {
+    color: #fff;
+    background: var(--accent);
+    border-color: color-mix(in srgb, var(--accent) 70%, #000);
 }
 
 /* Header — icon beside the title heading. */
