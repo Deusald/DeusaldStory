@@ -3,6 +3,7 @@
 @namespace DeusaldStoryWeb.Components.Pages
 @inject ProjectStateService _ProjectState
 @inject NavigationManager   _Nav
+@implements IDisposable
 
 @if (!_ProjectState.HasProject)
 {
@@ -52,7 +53,7 @@
                                  SelectedId="_SelectedId"
                                  SelectedChanged="OnSelect"
                                  OnAddNode="OnAddNode"
-                                 OnNodeMoved="OnNodeMoved"
+                                 OnNodesMoved="OnNodesMoved"
                                  OnNodeActivated="OnNodeActivated"
                                  OnConnect="OnConnect"
                                  OnDisconnect="OnDisconnect"
@@ -62,6 +63,8 @@
                                  OnNodeAddPortalIn="OnNodeAddPortalIn"
                                  OnNodeReparent="OnNodeReparent"
                                  OnNodeMoveToParent="OnNodeMoveToParent"
+                                 OnUndo="OnUndo"
+                                 OnRedo="OnRedo"
                                  CanMoveToParent="@(!_InLogic && !IsRootContainer)"/>
                 }
                 else if (_Mode == EditorMode.Preview && _CurrentLogicNode is StoryLogicNode previewLogic)
@@ -207,6 +210,33 @@
         Guid root = Project.Metadata.RootStoryContainerNodeId;
         _Crumbs   = [new EditorCrumb(root, RootName())];
         RebuildNodes();
+
+        // An Undo/Redo (from the toolbar or a keyboard shortcut) reverts the model out-of-band — rebuild the view.
+        _ProjectState.HistoryApplied += OnHistoryApplied;
+    }
+
+    public void Dispose() => _ProjectState.HistoryApplied -= OnHistoryApplied;
+
+    private void OnUndo() => _ProjectState.Undo();
+    private void OnRedo() => _ProjectState.Redo();
+
+    /// <summary>The model was reverted by Undo/Redo — drop any breadcrumbs / selection that no longer exist and rebuild.</summary>
+    private void OnHistoryApplied()
+    {
+        // Walk back out of any container/logic node that the reverted action removed (always keep the Root crumb).
+        while (_Crumbs.Count > 1)
+        {
+            EditorCrumb tail  = _Crumbs[^1];
+            bool        alive = tail.Scope == EditorScope.Logic
+                ? Project.LogicNodes.ContainsKey(tail.Id)
+                : Project.ContainerNodes.ContainsKey(tail.Id);
+            if (alive) break;
+            _Crumbs.RemoveAt(_Crumbs.Count - 1);
+        }
+
+        RebuildNodes();
+        if (_Nodes.All(n => n.Id != _SelectedId)) _SelectedId = Guid.Empty;
+        InvokeAsync(StateHasChanged);
     }
 
     private string RootName() =>
@@ -904,7 +934,15 @@
 
     // ── Persist a drag ─────────────────────────────────────────────────────
 
-    private void OnNodeMoved(EdNode moved)
+    /// <summary>Persist a drag. The whole (possibly multi-selection) group is one atomic, undoable step.</summary>
+    private void OnNodesMoved(IReadOnlyList<EdNode> moved)
+    {
+        using (_ProjectState.BeginBatch())
+            foreach (EdNode node in moved)
+                PersistMove(node);
+    }
+
+    private void PersistMove(EdNode moved)
     {
         // A comment note lives in either graph (container or logic inner); resolve it against the current owner.
         if (moved.Kind == StoryNodeKind.Comment)

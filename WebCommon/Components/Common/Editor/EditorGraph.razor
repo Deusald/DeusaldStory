@@ -241,7 +241,7 @@
     [Parameter] public Guid                      SelectedId          { get; set; }
     [Parameter] public EventCallback<Guid>       SelectedChanged     { get; set; }
     [Parameter] public EventCallback<CanvasPoint> OnAddNode          { get; set; }
-    [Parameter] public EventCallback<EdNode>     OnNodeMoved         { get; set; }
+    [Parameter] public EventCallback<IReadOnlyList<EdNode>> OnNodesMoved { get; set; }
     [Parameter] public EventCallback<EdNode>     OnNodeActivated     { get; set; }
     [Parameter] public EventCallback<CanvasPoint> OnCanvasContextMenu { get; set; }
     [Parameter] public EventCallback<EdConnectRequest> OnConnect     { get; set; }
@@ -251,6 +251,8 @@
     [Parameter] public EventCallback<EdNode>     OnNodeAddPortalIn   { get; set; }
     [Parameter] public EventCallback<EdNodeReparent> OnNodeReparent  { get; set; }
     [Parameter] public EventCallback<EdNode>     OnNodeMoveToParent  { get; set; }
+    [Parameter] public EventCallback             OnUndo              { get; set; }
+    [Parameter] public EventCallback             OnRedo              { get; set; }
 
     /// <summary>Whether the current graph's nodes can be pushed up a level (false in the Root container).</summary>
     [Parameter] public bool CanMoveToParent { get; set; }
@@ -496,8 +498,8 @@
             if (_DragGroup.Count == 1 && IsReparentable(_DragGroup[0]) && ContainerUnder(_DragGroup[0]) is Guid target)
                 await OnNodeReparent.InvokeAsync(new EdNodeReparent(_DragGroup[0].Id, target));
             else
-                foreach (EdNode n in _DragGroup)
-                    await OnNodeMoved.InvokeAsync(n);
+                // One callback for the whole drag so a multi-selection move is a single (atomic, undoable) step.
+                await OnNodesMoved.InvokeAsync(_DragGroup.ToList());
         }
 
         // Drop a pending wire onto the nearest input port under the cursor (forgiving — no pixel-perfect hit needed).
@@ -712,6 +714,14 @@
     {
         _SpaceHeld = held;
     }
+
+    /// <summary>Called from JS on Ctrl/Cmd+Z — bubbles up to the editor to undo the last action.</summary>
+    [JSInvokable]
+    public Task Undo() => OnUndo.InvokeAsync();
+
+    /// <summary>Called from JS on Ctrl/Cmd+Y (or Ctrl/Cmd+Shift+Z) — bubbles up to the editor to redo.</summary>
+    [JSInvokable]
+    public Task Redo() => OnRedo.InvokeAsync();
 
     public async ValueTask DisposeAsync()
     {

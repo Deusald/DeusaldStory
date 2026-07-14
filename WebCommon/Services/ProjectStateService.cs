@@ -10,7 +10,7 @@ namespace DeusaldStoryWeb;
 /// Inject as a singleton so all pages share the same state.
 /// </summary>
 [PublicAPI]
-public class ProjectStateService(
+public partial class ProjectStateService(
     RecentProjectsStore recents,
     IProjectStoreFactory storeFactory,
     IProjectLocationService location)
@@ -92,6 +92,7 @@ public class ProjectStateService(
         IsDirty             = true;
         ChangedFileIds.Clear();
         ChangedFileIds.Add(root.Id);
+        ResetHistory();
         ProjectChanged?.Invoke();
         DirtyStateChanged?.Invoke();
     }
@@ -122,6 +123,9 @@ public class ProjectStateService(
         Connect(root, rootNode.EntryPoints[0].Id, logic.EntryPoint.Id);
         Connect(root, logic.ExitPoints[0].Id, container.EntryPoints[0].Id);
         Connect(root, container.ExitPoints[0].Id, rootNode.ExitPoints[0].Id);
+
+        // The debug scaffold isn't a user edit — don't make it undoable.
+        ResetHistory();
     }
 #endif
 
@@ -141,6 +145,7 @@ public class ProjectStateService(
         StoryLogicExitMode                exitMode             = StoryLogicExitMode.SeparatePaths,
         bool                              acceptExitVariable   = false)
     {
+        using var _ = Edit(); // node + parent container change together
         StoryLogicNode node = new()
         {
             Name                 = name,
@@ -181,6 +186,7 @@ public class ProjectStateService(
         double                            x,
         double                            y)
     {
+        using var _ = Edit(); // node + parent container change together
         StoryContainerNode node = new()
         {
             Name            = name,
@@ -211,6 +217,7 @@ public class ProjectStateService(
     /// </summary>
     public void ReparentNode(Guid fromContainerId, Guid nodeId, Guid toContainerId, double x, double y)
     {
+        using var _ = Edit(); // node + both containers change together
         if (fromContainerId == toContainerId) return;
         if (!CurrentProject!.ContainerNodes.TryGetValue(fromContainerId, out StoryContainerNode? from)) return;
         if (!CurrentProject.ContainerNodes.TryGetValue(toContainerId, out StoryContainerNode? to)) return;
@@ -257,6 +264,7 @@ public class ProjectStateService(
         double x,
         double y)
     {
+        using var _ = Edit(); // portal + parent container change together
         StoryPortalNode portal = new()
         {
             Name            = name,
@@ -1239,6 +1247,7 @@ public class ProjectStateService(
     /// </summary>
     public void DeleteLogicNode(Guid containerId, Guid logicId)
     {
+        using var _ = Edit(); // node removal + parent/connection cleanup are one step
         if (!CurrentProject!.LogicNodes.TryGetValue(logicId, out StoryLogicNode? logic)) return;
 
         List<Guid> pointIds = [logic.EntryPoint.Id, .. logic.ExitPoints.Select(p => p.Id)];
@@ -1258,6 +1267,7 @@ public class ProjectStateService(
     /// </summary>
     public void DeleteContainerNode(Guid parentContainerId, Guid containerId)
     {
+        using var _ = Edit(); // the whole nested subtree + connection cleanup are one step
         if (!CurrentProject!.ContainerNodes.TryGetValue(containerId, out StoryContainerNode? container)) return;
 
         List<Guid> boundaryPoints = [.. container.EntryPoints.Select(p => p.Id), .. container.ExitPoints.Select(p => p.Id)];
@@ -1299,6 +1309,7 @@ public class ProjectStateService(
     /// </summary>
     public void DeletePortalIn(Guid containerId, Guid inPointId)
     {
+        using var _ = Edit(); // in-point removal + connection cleanup (or whole-pair delete) are one step
         StoryPortalNode? portal = FindPortalByPoint(inPointId);
         if (portal is null) return;
 
@@ -1316,6 +1327,7 @@ public class ProjectStateService(
     /// <summary>Deletes a whole portal pair (its out point and every in point) from <paramref name="containerId"/>.</summary>
     public void DeletePortal(Guid containerId, Guid portalId)
     {
+        using var _ = Edit(); // portal removal + parent/connection cleanup are one step
         if (!CurrentProject!.PortalNodes.TryGetValue(portalId, out StoryPortalNode? portal)) return;
 
         List<Guid> pointIds = [portal.OutPoint.Id, .. portal.InPoints.Select(p => p.Id)];
@@ -1345,6 +1357,7 @@ public class ProjectStateService(
         StoryLogicExitMode                    exitMode,
         bool                                  acceptExitVariable)
     {
+        using var _ = Edit(); // node edit + container connection cleanup are one step
         if (!CurrentProject!.LogicNodes.TryGetValue(logicId, out StoryLogicNode? logic)) return;
 
         logic.Name                 = name;
@@ -1469,6 +1482,7 @@ public class ProjectStateService(
         IReadOnlyList<(Guid Id, string Name)> entries,
         IReadOnlyList<(Guid Id, string Name)> exits)
     {
+        using var _ = Edit(); // container edit + parent/self connection cleanup are one step
         if (!CurrentProject!.ContainerNodes.TryGetValue(containerId, out StoryContainerNode? container)) return;
 
         container.Name        = name;
@@ -1546,6 +1560,7 @@ public class ProjectStateService(
         CurrentLocalization = localization;
         IsDirty             = false;
         ChangedFileIds.Clear();
+        ResetHistory();
         ProjectChanged?.Invoke();
         DirtyStateChanged?.Invoke();
     }
@@ -1647,6 +1662,7 @@ public class ProjectStateService(
         CurrentLocalization = null;
         IsDirty             = false;
         ChangedFileIds.Clear();
+        ResetHistory();
         ProjectChanged?.Invoke();
         DirtyStateChanged?.Invoke();
     }
@@ -1689,10 +1705,18 @@ public class ProjectStateService(
     public void MarkKeyDirty(Guid keyId)
     {
         ChangedFileIds.Add(keyId);
-        MarkDirty();
+        TrackTouch(keyId);
+        RaiseDirty();
     }
 
+    /// <summary>Marks the project dirty without a specific key — used for metadata-only edits (e.g. End unregister).</summary>
     public void MarkDirty()
+    {
+        TrackTouch(_MetadataKey);
+        RaiseDirty();
+    }
+
+    private void RaiseDirty()
     {
         if (!IsDirty)
         {

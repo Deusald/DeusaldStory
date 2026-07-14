@@ -66,8 +66,15 @@
         }
     </div>
 
-    @* ── Right: saved state · export · import ────────────────────────── *@
+    @* ── Right: undo/redo · saved state · export · import ────────────── *@
     <div class="etb-right">
+        <button class="etb-icon-btn" @onclick="Undo" disabled="@(!_ProjectState.CanUndo)" title="Undo (Ctrl+Z)">
+            <i class="bi bi-arrow-counterclockwise"></i>
+        </button>
+        <button class="etb-icon-btn" @onclick="Redo" disabled="@(!_ProjectState.CanRedo)" title="Redo (Ctrl+Y)">
+            <i class="bi bi-arrow-clockwise"></i>
+        </button>
+
         @if (_ProjectState.IsDirty)
         {
             <button class="etb-save-btn" @onclick="Save">
@@ -133,7 +140,12 @@
     {
         _ProjectState.DirtyStateChanged  += OnStateChanged;
         _ProjectState.ProjectDataChanged += OnStateChanged;
+        _ProjectState.HistoryChanged     += OnStateChanged;
+        _ProjectState.HistoryApplied     += OnStateChanged;
     }
+
+    private void Undo() => _ProjectState.Undo();
+    private void Redo() => _ProjectState.Redo();
 
     private Task SetMode(EditorMode mode)
     {
@@ -173,5 +185,7 @@
     {
         _ProjectState.DirtyStateChanged  -= OnStateChanged;
         _ProjectState.ProjectDataChanged -= OnStateChanged;
+        _ProjectState.HistoryChanged     -= OnStateChanged;
+        _ProjectState.HistoryApplied     -= OnStateChanged;
     }
 }

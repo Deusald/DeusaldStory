@@ -177,10 +177,14 @@
     cursor: pointer;
     transition: background var(--dur) var(--ease), color var(--dur) var(--ease), border-color var(--dur) var(--ease);
 }
-.etb-icon-btn:hover {
+.etb-icon-btn:hover:not(:disabled) {
     background: var(--surface-3);
     border-color: var(--border-strong);
     color: var(--text-soft);
+}
+.etb-icon-btn:disabled {
+    opacity: .35;
+    cursor: default;
 }
 
 /* ── Export menu ─────────────────────────────────────────────────────────── */

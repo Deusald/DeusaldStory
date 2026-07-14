@@ -11,7 +11,22 @@ function inEditable() {
 }
 
 function onKeyDown(e) {
-    if (e.code !== 'Space' || inEditable()) return;
+    if (inEditable()) return; // never hijack keys while typing in an input / textarea
+
+    // Undo / Redo — Ctrl+Z, Ctrl+Y, Ctrl+Shift+Z (Cmd on macOS).
+    if (e.ctrlKey || e.metaKey) {
+        const key = e.key.toLowerCase();
+        if (key === 'z' && !e.shiftKey) {
+            e.preventDefault();
+            _dotnet && _dotnet.invokeMethodAsync('Undo');
+        } else if (key === 'y' || (key === 'z' && e.shiftKey)) {
+            e.preventDefault();
+            _dotnet && _dotnet.invokeMethodAsync('Redo');
+        }
+        return;
+    }
+
+    if (e.code !== 'Space') return;
     e.preventDefault(); // stop the page from scrolling while Space is held to pan
     _dotnet && _dotnet.invokeMethodAsync('SetSpaceHeld', true);
 }
