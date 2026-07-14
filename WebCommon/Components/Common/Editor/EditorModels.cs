@@ -757,6 +757,42 @@ namespace DeusaldStoryWeb
         };
 
         /// <summary>
+        /// The Bootstrap icon shown in a node's header (in place of the old kind dot). Mirrors the icons the node
+        /// palette uses for the kinds it offers; boundary/built-in kinds (Start/End/Entry/Exit/portals) that never
+        /// appear in the palette get their own arrow glyphs.
+        /// </summary>
+        public static string NodeIcon(StoryNodeKind k) => k switch
+        {
+            StoryNodeKind.Start     => "bi-play-fill",
+            StoryNodeKind.End       => "bi-stop-fill",
+            StoryNodeKind.Entry     => "bi-box-arrow-in-right",
+            StoryNodeKind.Exit      => "bi-box-arrow-right",
+            StoryNodeKind.Logic     => "bi-diamond-half",
+            StoryNodeKind.Container => "bi-collection",
+            StoryNodeKind.PortalIn  => "bi-box-arrow-in-right",
+            StoryNodeKind.PortalOut => "bi-box-arrow-right",
+            StoryNodeKind.LogicEntry   => "bi-box-arrow-in-right",
+            StoryNodeKind.LogicExit    => "bi-box-arrow-right",
+            StoryNodeKind.Localization => "bi-translate",
+            StoryNodeKind.Icon         => "bi-emoji-smile",
+            StoryNodeKind.LightDarkSwitch => "bi-circle-half",
+            StoryNodeKind.SmartFormat      => "bi-braces-asterisk",
+            StoryNodeKind.ExternalVariable => "bi-braces",
+            StoryNodeKind.FlowText         => "bi-text-paragraph",
+            StoryNodeKind.RegisterVariable   => "bi-box-seam",
+            StoryNodeKind.SetVariable        => "bi-pencil-square",
+            StoryNodeKind.UnregisterVariable => "bi-box-arrow-up",
+            StoryNodeKind.SetExternalVariable => "bi-sliders",
+            StoryNodeKind.Choice              => "bi-signpost-split",
+            StoryNodeKind.AppGamebookTextSplitter => "bi-fonts",
+            StoryNodeKind.AppGamebookFlowSplitter => "bi-signpost-2",
+            StoryNodeKind.PrevExitVariable        => "bi-braces",
+            StoryNodeKind.Condition               => "bi-diamond",
+            StoryNodeKind.Comment                 => "bi-chat-left-text",
+            _                       => "bi-circle"
+        };
+
+        /// <summary>
         /// The colour of a port's connection dot, keyed by what the port carries so a wire's signal type is
         /// readable at a glance: flow (blue), variable (red), text (green), icon (pink).
         /// </summary>

@@ -44,7 +44,8 @@
 
                         EdEdge e      = edge;
                         bool   active = edge.Id == _SelectedEdgeId;
-                        string stroke = active ? "var(--accent)" : "var(--text-dim)";
+                        // Tint the wire in its signal colour (the connected ports' type) so the flow it carries reads at a glance.
+                        string stroke = active ? "var(--accent)" : StoryStyle.PortColor(from.Type);
                         <path d="@EdgePath(from.X, from.Y, to.X, to.Y)"
                               style="stroke:transparent; stroke-width:14px; fill:none; pointer-events:stroke; cursor:pointer;"
                               @onpointerdown="() => SelectEdge(e.Id)" @onpointerdown:stopPropagation="true"
@@ -79,7 +80,6 @@
             @foreach (EdNode node in Nodes)
             {
                 EdNode n     = node;
-                string color = StoryStyle.NodeColor(n.Kind);
                 bool   sub   = HasSub(n);
                 if (n.Kind == StoryNodeKind.Comment)
                 {
@@ -106,8 +106,8 @@
                      @oncontextmenu:stopPropagation="true" @oncontextmenu:preventDefault="true">
 
                     <div class="edg-node-head">
-                        <span class="edg-node-kind" style="color:@color">
-                            <span class="edg-node-kind-dot" style="background:@color"></span>
+                        <span class="edg-node-kind">
+                            <i class="edg-node-kind-ico bi @StoryStyle.NodeIcon(n.Kind)"></i>
                             @StoryStyle.NodeLabel(n.Kind)
                         </span>
                         @if (!n.Deletable)
@@ -342,26 +342,12 @@
 
     // ── Node styling ───────────────────────────────────────────────────────
 
+    // Node type is conveyed by the header icon + label, not a card colour, so the class only carries state.
     private string NodeClass(EdNode n)
     {
-        string kind = n.Kind switch
-        {
-            StoryNodeKind.Logic     => "edg-node-logic",
-            StoryNodeKind.Container => "edg-node-container",
-            StoryNodeKind.Start or StoryNodeKind.Entry or StoryNodeKind.LogicEntry => "edg-node-entry",
-            StoryNodeKind.End   or StoryNodeKind.Exit  or StoryNodeKind.LogicExit  => "edg-node-exit",
-            StoryNodeKind.PortalIn or StoryNodeKind.PortalOut => "edg-node-portal",
-            StoryNodeKind.Localization    => "edg-node-loc",
-            StoryNodeKind.Icon            => "edg-node-icon",
-            StoryNodeKind.LightDarkSwitch => "edg-node-lds",
-            StoryNodeKind.SmartFormat      => "edg-node-sf",
-            StoryNodeKind.ExternalVariable or StoryNodeKind.PrevExitVariable => "edg-node-extvar",
-            StoryNodeKind.FlowText         => "edg-node-flowtext",
-            _                                          => ""
-        };
         string sel  = IsSelected(n)          ? "edg-node-sel"  : "";
         string drop = n.Id == _DropTargetId  ? "edg-node-drop" : "";
-        return $"{kind} {sel} {drop}";
+        return $"{sel} {drop}";
     }
 
     // ── Reparent (drop a logic/container node onto a container) ───────────────
