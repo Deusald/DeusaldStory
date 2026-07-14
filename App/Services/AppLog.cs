@@ -21,7 +21,7 @@ public static class AppLog
     /// app-data / ~/Library area) so the folder we reveal is unmistakably ours and
     /// holds only our logs. Stable across launches.
     private static string _LogFilePath { get; } =
-        Path.Combine(FileSystem.AppDataDirectory, "DeusaldLocalizer", "Logs", "deusald-localizer.log");
+        Path.Combine(FileSystem.AppDataDirectory, "DeusaldStory", "Logs", "deusald-story.log");
 
     /// Wire the file logger into the MAUI logging builder.
     public static ILoggingBuilder AddAppFileLog(this ILoggingBuilder builder)
