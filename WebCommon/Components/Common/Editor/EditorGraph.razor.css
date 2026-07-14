@@ -59,13 +59,24 @@
     position: absolute;
     inset: 0;
     overflow: hidden;
-    cursor: grab;
+    cursor: default;
     /* Dotted grid */
     background-image: radial-gradient(circle, var(--border-subtle) 1px, transparent 1px);
     background-size: 22px 22px;
     touch-action: none;
 }
-.edg-canvas:active { cursor: grabbing; }
+.edg-canvas-panning   { cursor: grabbing; }
+.edg-canvas-selecting { cursor: crosshair; }
+
+/* Rubber-band selection marquee (lives in world space, so it pans/zooms with the nodes). */
+.edg-select-box {
+    position: absolute;
+    border: 1px solid var(--accent);
+    background: var(--accent-soft);
+    border-radius: 2px;
+    pointer-events: none;
+    z-index: 3;
+}
 
 .edg-world {
     position: absolute;
@@ -353,8 +364,10 @@
     box-shadow: var(--shadow-md);
     overflow: hidden;
     z-index: 5;
+    cursor: pointer;
 }
 
+/* Children never swallow the pointer, so a click always reports its offset against the map itself. */
 .edg-minimap-label {
     position: absolute;
     top: 6px;
@@ -363,6 +376,7 @@
     font-weight: 700;
     letter-spacing: .12em;
     color: var(--text-ghost);
+    pointer-events: none;
 }
 
 .edg-minimap-node {
@@ -370,4 +384,5 @@
     height: 6px;
     border-radius: 2px;
     opacity: .85;
+    pointer-events: none;
 }

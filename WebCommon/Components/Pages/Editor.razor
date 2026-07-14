@@ -365,12 +365,11 @@
 
     // ── Add node (palette → detail modal) ──────────────────────────────────
 
-    /// <summary>Toolbar "Add node" — no cursor position, so stagger a default spot, then open the palette.</summary>
-    private void OnAddNode()
+    /// <summary>Toolbar "Add node" — the graph supplies the current view centre; drop the node there.</summary>
+    private void OnAddNode(CanvasPoint point)
     {
-        int count = _Nodes.Count;
-        _PendingX = 320 + count % 6 * 30;
-        _PendingY = 140 + count % 6 * 26;
+        _PendingX = point.X;
+        _PendingY = point.Y;
         _NodePalette?.Show(PaletteItems());
     }
 

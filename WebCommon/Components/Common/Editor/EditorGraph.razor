@@ -1,19 +1,22 @@
 @namespace DeusaldStoryWeb.Components.Common
+@implements IAsyncDisposable
+@inject IJSRuntime _JS
 
 <div class="edg-root">
 
     @* ── Floating toolbar ────────────────────────────────────────────── *@
     <div class="edg-toolbar">
-        <button class="edg-tool-btn edg-tool-primary" @onclick="() => OnAddNode.InvokeAsync()">
+        <button class="edg-tool-btn edg-tool-primary" @onclick="AddNodeAtCenter">
             <i class="bi bi-plus-lg"></i> Add node
         </button>
         <span class="edg-tool-count">@Nodes.Count nodes</span>
-        <span class="edg-tool-hint">drag a port to connect · double-click a container to open it</span>
+        <span class="edg-tool-hint">drag to select · middle-drag or Space+drag to pan · double-click a container to open it</span>
     </div>
 
     @* ── Canvas ──────────────────────────────────────────────────────── *@
-    <div class="edg-canvas"
-         @onpointerdown="CanvasDown"
+    <div class="edg-canvas @(_Panning ? "edg-canvas-panning" : "") @(_Selecting ? "edg-canvas-selecting" : "")"
+         @ref="_CanvasEl"
+         @onpointerdown="CanvasDown" @onpointerdown:preventDefault="true"
          @onpointermove="CanvasMove"
          @onpointerup="CanvasUp"
          @onpointerleave="CanvasUp"
@@ -80,7 +83,7 @@
                 bool   sub   = HasSub(n);
                 if (n.Kind == StoryNodeKind.Comment)
                 {
-                    <div class="edg-node edg-node-comment @(n.Id == SelectedId ? "edg-node-sel" : "")"
+                    <div class="edg-node edg-node-comment @(IsSelected(n) ? "edg-node-sel" : "")"
                          style="left:@F(n.X)px; top:@F(n.Y)px;"
                          @onpointerdown="e => NodeDown(e, n)" @onpointerdown:stopPropagation="true"
                          @ondblclick="() => OnNodeEdit.InvokeAsync(n)" @ondblclick:stopPropagation="true"
@@ -156,12 +159,21 @@
                     }
                 </div>
             }
+
+            @* Rubber-band selection marquee, drawn in world space so it tracks pan/zoom with the nodes. *@
+            @if (_Selecting)
+            {
+                double sx = Math.Min(_SelStartX, _SelCurX), sy = Math.Min(_SelStartY, _SelCurY);
+                double sw = Math.Abs(_SelCurX - _SelStartX), sh = Math.Abs(_SelCurY - _SelStartY);
+                <div class="edg-select-box" style="left:@F(sx)px; top:@F(sy)px; width:@F(sw)px; height:@F(sh)px;"></div>
+            }
         </div>
 
         @* ── Minimap ─────────────────────────────────────────────────── *@
         @if (Nodes.Count > 0)
         {
-            <div class="edg-minimap">
+            <div class="edg-minimap"
+                 @onpointerdown="MinimapDown" @onpointerdown:stopPropagation="true" @onpointerdown:preventDefault="true">
                 <div class="edg-minimap-label">MAP</div>
                 @{
                     const double mapW = 168, mapH = 96, pad = 10, nodeH = 82;
@@ -228,7 +240,7 @@
     [Parameter] public List<EdEdge>              Edges               { get; set; } = [];
     [Parameter] public Guid                      SelectedId          { get; set; }
     [Parameter] public EventCallback<Guid>       SelectedChanged     { get; set; }
-    [Parameter] public EventCallback             OnAddNode           { get; set; }
+    [Parameter] public EventCallback<CanvasPoint> OnAddNode          { get; set; }
     [Parameter] public EventCallback<EdNode>     OnNodeMoved         { get; set; }
     [Parameter] public EventCallback<EdNode>     OnNodeActivated     { get; set; }
     [Parameter] public EventCallback<CanvasPoint> OnCanvasContextMenu { get; set; }
@@ -265,12 +277,25 @@
     private double _PanX  = 24;
     private double _PanY  = 28;
 
-    private bool    _Panning;
-    private EdNode? _DragNode;
-    private bool    _DragMoved;
-    private Guid?   _DropTargetId; // container the dragged (logic/container) node currently hovers over
-    private double  _LastClientX;
-    private double  _LastClientY;
+    private ElementReference       _CanvasEl;
+    private IJSObjectReference?    _Module;
+    private DotNetObjectReference<EditorGraph>? _SelfRef;
+    private bool                   _SpaceHeld; // Space held → left-drag pans instead of selecting
+
+    private bool           _Panning;
+    private List<EdNode>   _DragGroup = new(); // node(s) being dragged (one, or the whole multi-selection)
+    private bool           _DragMoved;
+    private Guid?          _DropTargetId; // container the (single) dragged node currently hovers over
+    private double         _LastClientX;
+    private double         _LastClientY;
+
+    // Rubber-band selection (world coordinates). Active while _Selecting.
+    private readonly HashSet<Guid> _Selected = new(); // multi-selected node ids (beyond the primary SelectedId)
+    private bool   _Selecting;
+    private double _SelStartX;
+    private double _SelStartY;
+    private double _SelCurX;
+    private double _SelCurY;
 
     private Guid?  _SelectedEdgeId;
     private Guid?  _ConnFrom;  // output point currently being dragged from
@@ -332,7 +357,7 @@
             StoryNodeKind.FlowText         => "edg-node-flowtext",
             _                                          => ""
         };
-        string sel  = n.Id == SelectedId     ? "edg-node-sel"  : "";
+        string sel  = IsSelected(n)          ? "edg-node-sel"  : "";
         string drop = n.Id == _DropTargetId  ? "edg-node-drop" : "";
         return $"{kind} {sel} {drop}";
     }
@@ -374,22 +399,50 @@
     private async Task CanvasDown(PointerEventArgs e)
     {
         _SelectedEdgeId = null;
-        _Panning        = true;
         _LastClientX    = e.ClientX;
         _LastClientY    = e.ClientY;
-        // Pressing empty canvas clears the node selection (and empties the inspector).
+
+        // Right button belongs to the context menu / palette — never pan or select on it.
+        if (e.Button == 2) return;
+
+        // Middle button, or Space held, pans the view (and keeps any current selection).
+        if (e.Button == 1 || _SpaceHeld)
+        {
+            _Panning = true;
+            return;
+        }
+
+        // Plain left-drag on empty canvas starts a rubber-band selection (clears the current one).
+        _Selecting = true;
+        _SelStartX = (e.OffsetX - _PanX) / _Scale;
+        _SelStartY = (e.OffsetY - _PanY) / _Scale;
+        _SelCurX   = _SelStartX;
+        _SelCurY   = _SelStartY;
+        _Selected.Clear();
         if (SelectedId != Guid.Empty) await SelectedChanged.InvokeAsync(Guid.Empty);
     }
 
     private async Task NodeDown(PointerEventArgs e, EdNode node)
     {
         _SelectedEdgeId = null;
-        _DragNode       = node;
         _DragMoved      = false;
         _Panning        = false;
+        _Selecting      = false;
         _LastClientX    = e.ClientX;
         _LastClientY    = e.ClientY;
-        if (node.Id != SelectedId) await SelectedChanged.InvokeAsync(node.Id);
+
+        // Grabbing a node that's part of a multi-selection drags the whole group; grabbing any other node
+        // collapses the selection to just that node.
+        if (_Selected.Count > 1 && _Selected.Contains(node.Id))
+        {
+            _DragGroup = Nodes.Where(n => _Selected.Contains(n.Id)).ToList();
+        }
+        else
+        {
+            _Selected.Clear();
+            _DragGroup = [node];
+            if (node.Id != SelectedId) await SelectedChanged.InvokeAsync(node.Id);
+        }
     }
 
     private void CanvasMove(PointerEventArgs e)
@@ -400,13 +453,24 @@
             _ConnY     += (e.ClientY - _LastClientY) / _Scale;
             _ConnMoved  = true;
         }
-        else if (_DragNode is not null)
+        else if (_DragGroup.Count > 0)
         {
-            _DragNode.X += (e.ClientX - _LastClientX) / _Scale;
-            _DragNode.Y += (e.ClientY - _LastClientY) / _Scale;
-            _DragMoved   = true;
-            // Highlight the container the node would drop into, so reparenting is discoverable mid-drag.
-            _DropTargetId = IsReparentable(_DragNode) ? ContainerUnder(_DragNode) : null;
+            double dx = (e.ClientX - _LastClientX) / _Scale;
+            double dy = (e.ClientY - _LastClientY) / _Scale;
+            foreach (EdNode n in _DragGroup)
+            {
+                n.X += dx;
+                n.Y += dy;
+            }
+            _DragMoved = true;
+            // A lone reparentable node highlights the container it would drop into (disabled for group drags).
+            _DropTargetId = _DragGroup.Count == 1 && IsReparentable(_DragGroup[0]) ? ContainerUnder(_DragGroup[0]) : null;
+        }
+        else if (_Selecting)
+        {
+            _SelCurX += (e.ClientX - _LastClientX) / _Scale;
+            _SelCurY += (e.ClientY - _LastClientY) / _Scale;
+            UpdateMarqueeSelection();
         }
         else if (_Panning)
         {
@@ -424,25 +488,93 @@
 
     private async Task CanvasUp(PointerEventArgs e)
     {
-        if (_DragNode is not null && _DragMoved)
+        if (_DragGroup.Count > 0 && _DragMoved)
         {
-            // Dropping a logic/container node onto another container reparents it; otherwise it's a plain move.
-            if (IsReparentable(_DragNode) && ContainerUnder(_DragNode) is Guid target)
-                await OnNodeReparent.InvokeAsync(new EdNodeReparent(_DragNode.Id, target));
+            // A single reparentable node dropped onto a container moves inside it; everything else is a plain move.
+            if (_DragGroup.Count == 1 && IsReparentable(_DragGroup[0]) && ContainerUnder(_DragGroup[0]) is Guid target)
+                await OnNodeReparent.InvokeAsync(new EdNodeReparent(_DragGroup[0].Id, target));
             else
-                await OnNodeMoved.InvokeAsync(_DragNode);
+                foreach (EdNode n in _DragGroup)
+                    await OnNodeMoved.InvokeAsync(n);
         }
 
         // Drop a pending wire onto the nearest input port under the cursor (forgiving — no pixel-perfect hit needed).
         if (_ConnFrom is Guid from && _ConnMoved && NearestInputPoint(from) is Guid to)
             await OnConnect.InvokeAsync(new EdConnectRequest(from, to));
 
+        // Finish a marquee: a single hit becomes the primary selection so the inspector fills in.
+        if (_Selecting)
+        {
+            UpdateMarqueeSelection();
+            if (_Selected.Count == 1)
+            {
+                Guid only = _Selected.First();
+                _Selected.Clear();
+                await SelectedChanged.InvokeAsync(only);
+            }
+        }
+
         _Panning      = false;
-        _DragNode     = null;
+        _DragGroup    = new();
         _DragMoved    = false;
         _DropTargetId = null;
         _ConnFrom     = null;
         _ConnMoved    = false;
+        _Selecting    = false;
+    }
+
+    /// <summary>Recomputes the multi-selection from the current marquee rectangle (nodes whose card it overlaps).</summary>
+    private void UpdateMarqueeSelection()
+    {
+        double x0 = Math.Min(_SelStartX, _SelCurX), x1 = Math.Max(_SelStartX, _SelCurX);
+        double y0 = Math.Min(_SelStartY, _SelCurY), y1 = Math.Max(_SelStartY, _SelCurY);
+        _Selected.Clear();
+        foreach (EdNode n in Nodes)
+        {
+            double nx1 = n.X + NODE_W, ny1 = n.Y + SelectHeight(n);
+            if (n.X <= x1 && nx1 >= x0 && n.Y <= y1 && ny1 >= y0)
+                _Selected.Add(n.Id);
+        }
+    }
+
+    /// <summary>Card height used for marquee hit-testing (comment cards flow, so use a representative height).</summary>
+    private static double SelectHeight(EdNode n) => n.Kind == StoryNodeKind.Comment ? 72 : NodeHeight(n);
+
+    private bool IsSelected(EdNode n) => n.Id == SelectedId || _Selected.Contains(n.Id);
+
+    // ── Add node at the view centre / minimap navigation ────────────────────
+
+    /// <summary>Toolbar "Add node" — drop the palette's node at the centre of the visible canvas, not a far-off default.</summary>
+    private async Task AddNodeAtCenter()
+    {
+        double[] r  = await RectAsync();
+        double   wx = (r[2] / 2 - _PanX) / _Scale;
+        double   wy = (r[3] / 2 - _PanY) / _Scale;
+        await OnAddNode.InvokeAsync(new CanvasPoint(wx, wy));
+    }
+
+    /// <summary>Click the minimap — recentre the view on the world point that was clicked.</summary>
+    private async Task MinimapDown(PointerEventArgs e)
+    {
+        if (Nodes.Count == 0) return;
+        const double mapW = 168, mapH = 96, pad = 10, nodeH = 82;
+        double minX = Nodes.Min(n => n.X), maxX = Nodes.Max(n => n.X) + NODE_W;
+        double minY = Nodes.Min(n => n.Y), maxY = Nodes.Max(n => n.Y) + nodeH;
+        double bw = Math.Max(1, maxX - minX), bh = Math.Max(1, maxY - minY);
+        double s  = Math.Min((mapW - 2 * pad) / bw, (mapH - 2 * pad) / bh);
+
+        double worldX = minX + (e.OffsetX - pad) / s;
+        double worldY = minY + (e.OffsetY - pad) / s;
+
+        double[] r = await RectAsync();
+        _PanX = r[2] / 2 - worldX * _Scale;
+        _PanY = r[3] / 2 - worldY * _Scale;
+    }
+
+    private async Task<double[]> RectAsync()
+    {
+        IJSObjectReference module = await ModuleAsync();
+        return await module.InvokeAsync<double[]>("rect", _CanvasEl);
     }
 
     private void OnWheel(WheelEventArgs e)
@@ -557,4 +689,37 @@
     }
 
     private static string F(double v) => v.ToString(System.Globalization.CultureInfo.InvariantCulture);
+
+    // ── JS module (element measuring + Space-key bridge) ────────────────────
+
+    private async Task<IJSObjectReference> ModuleAsync() =>
+        _Module ??= await _JS.InvokeAsync<IJSObjectReference>("import", "./js/editor-graph.js");
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        _SelfRef = DotNetObjectReference.Create(this);
+        await (await ModuleAsync()).InvokeVoidAsync("register", _SelfRef);
+    }
+
+    /// <summary>Called from JS when the Space key is pressed or released (Space + left-drag pans the canvas).</summary>
+    [JSInvokable]
+    public void SetSpaceHeld(bool held)
+    {
+        _SpaceHeld = held;
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        try
+        {
+            if (_Module is not null)
+            {
+                await _Module.InvokeVoidAsync("unregister");
+                await _Module.DisposeAsync();
+            }
+        }
+        catch (JSDisconnectedException) { /* circuit already gone — nothing to unwind */ }
+        _SelfRef?.Dispose();
+    }
 }
