@@ -85,7 +85,10 @@
                         <div class="ed-preview-body">
                             @if (_PreviewGamebook)
                             {
-                                <GamebookPreview Logic="previewLogic"/>
+                                <GamebookPreview Logic="previewLogic"
+                                                 OnNavigate="OnGamebookNavigate"
+                                                 ScrollToKey="_GbpScrollKey"
+                                                 OnScrolled="() => _GbpScrollKey = null"/>
                             }
                             else
                             {
@@ -184,6 +187,9 @@
     // that don't navigate (reaches End / an unwired exit).
     private bool    _PreviewGamebook;
     private string? _PreviewNotice;
+
+    // The Gamebook section a "go to section" click asked to scroll to (cleared once the preview has scrolled there).
+    private string? _GbpScrollKey;
 
     private EdNode? _SelectedNode => _Nodes.Find(n => n.Id == _SelectedId);
 
@@ -325,6 +331,23 @@
                 _PreviewNotice = "This exit isn't connected — wire it to the next node.";
                 break;
         }
+    }
+
+    /// <summary>
+    /// Gamebook-preview "go to section" click — switch the preview to the line's target logic node (replacing the last
+    /// breadcrumb, as the App continue does) and ask the preview to scroll that specific section to the top of the view.
+    /// </summary>
+    private void OnGamebookNavigate(GamebookNavRequest request)
+    {
+        if (request.LogicId == Guid.Empty || !Project.LogicNodes.TryGetValue(request.LogicId, out StoryLogicNode? target))
+            return;
+
+        if (request.LogicId != _CurrentId)
+        {
+            _Crumbs[^1] = new EditorCrumb(target.Id, target.Name, EditorScope.Logic);
+            RebuildNodes();
+        }
+        _GbpScrollKey = request.SectionKey;
     }
 
     /// <summary>Rail tool picked — swap the centre panel. Only Media has its own panel; the rest keep the graph.</summary>

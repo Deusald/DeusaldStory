@@ -1,5 +1,7 @@
 @namespace DeusaldStoryWeb.Components.Common
+@implements IAsyncDisposable
 @inject ProjectStateService _ProjectState
+@inject IJSRuntime _JS
 
 @* ─────────────────────────────────────────────────────────────────────────
    The Gamebook preview: renders a logic node as it would appear printed — one
@@ -12,7 +14,7 @@
 <div class="gbp-root">
 
     @{
-        StoryGamebookPreview.Result result = Build();
+        StoryGamebookPreview.Result result = _Result;
     }
 
     <div class="gbp-summary">
@@ -29,7 +31,7 @@
     @for (int i = 0; i < result.Sections.Count; i++)
     {
         StoryGamebookPreview.Section sec = result.Sections[i];
-        <div class="gbp-section">
+        <div class="gbp-section" id="@($"gbp-sec-{i}")">
 
             <div class="gbp-section-head">
                 <span class="gbp-section-tag">[§ @(i + 1)]</span>
@@ -121,10 +123,20 @@
             <div class="gbp-continue">
                 @foreach (StoryGamebookPreview.ContinueLine line in result.Continue)
                 {
-                    <div class="gbp-continue-line @(line.IsError ? "error" : "")">
-                        <i class="bi @(line.IsError ? "bi-exclamation-triangle-fill" : "bi-arrow-return-right")"></i>
-                        <span>@line.Text</span>
-                    </div>
+                    @if (line.TargetLogicId != Guid.Empty)
+                    {
+                        <button type="button" class="gbp-continue-line gbp-continue-link" @onclick="() => Navigate(line)">
+                            <i class="bi bi-arrow-return-right"></i>
+                            <span>@line.Text</span>
+                        </button>
+                    }
+                    else
+                    {
+                        <div class="gbp-continue-line @(line.IsError ? "error" : "")">
+                            <i class="bi @(line.IsError ? "bi-exclamation-triangle-fill" : "bi-arrow-return-right")"></i>
+                            <span>@line.Text</span>
+                        </div>
+                    }
                 }
             </div>
 
@@ -135,6 +147,57 @@
 
 @code {
     [Parameter] public StoryLogicNode Logic { get; set; } = default!;
+
+    /// <summary>Raised when the user clicks a navigable "go to section" line — the host switches the preview and scrolls.</summary>
+    [Parameter] public EventCallback<GamebookNavRequest> OnNavigate { get; set; }
+
+    /// <summary>The <see cref="StoryGamebookPreview.Section.Key"/> to scroll to the top of the view after render.</summary>
+    [Parameter] public string? ScrollToKey { get; set; }
+
+    /// <summary>Raised once the requested <see cref="ScrollToKey"/> has been scrolled to, so the host can clear it.</summary>
+    [Parameter] public EventCallback OnScrolled { get; set; }
+
+    private StoryGamebookPreview.Result _Result = new();
+    private string?                     _PendingScroll;
+    private IJSObjectReference?         _Module;
+
+    protected override void OnParametersSet()
+    {
+        _Result = Build();
+        // A fresh scroll request (the host sets it on a nav click, then clears it via OnScrolled) is honoured once.
+        if (!string.IsNullOrEmpty(ScrollToKey))
+            _PendingScroll = ScrollToKey;
+    }
+
+    private Task Navigate(StoryGamebookPreview.ContinueLine line) =>
+        OnNavigate.InvokeAsync(new GamebookNavRequest(line.TargetLogicId, line.TargetSectionKey));
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_PendingScroll is null) return;
+        string key     = _PendingScroll;
+        _PendingScroll = null;
+
+        int index = _Result.Sections.FindIndex(s => s.Key == key);
+        if (index >= 0)
+        {
+            IJSObjectReference module = await ModuleAsync();
+            await module.InvokeVoidAsync("scrollToTopById", $"gbp-sec-{index}");
+        }
+        await OnScrolled.InvokeAsync();
+    }
+
+    private async Task<IJSObjectReference> ModuleAsync() =>
+        _Module ??= await _JS.InvokeAsync<IJSObjectReference>("import", "./js/editor-graph.js");
+
+    public async ValueTask DisposeAsync()
+    {
+        try
+        {
+            if (_Module is not null) await _Module.DisposeAsync();
+        }
+        catch (JSDisconnectedException) { /* circuit already gone — nothing to unwind */ }
+    }
 
     private StoryGamebookPreview.Result Build() =>
         StoryGamebookPreview.Build(_ProjectState.CurrentProject!, _ProjectState.CurrentLocalization, Logic);

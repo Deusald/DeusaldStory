@@ -45,6 +45,13 @@ namespace DeusaldStoryWeb
     /// </summary>
     public sealed record EditorCrumb(Guid Id, string Name, EditorScope Scope = EditorScope.Container);
 
+    /// <summary>
+    /// A request from the Gamebook preview to follow a clicked "go to section" line: switch the preview to
+    /// <see cref="LogicId"/> and scroll to the section whose <see cref="StoryGamebookPreview.Section.Key"/> is
+    /// <see cref="SectionKey"/>.
+    /// </summary>
+    public sealed record GamebookNavRequest(Guid LogicId, string SectionKey);
+
     /// <summary>Visual/semantic kind of a story node, mapped to a colour + label in the graph.</summary>
     public enum StoryNodeKind
     {

@@ -31,6 +31,8 @@ namespace DeusaldStoryCommon
         public sealed class Section
         {
             public string                           Label            { get; set; } = "";
+            /// <summary>Stable per-combination reference token (see <see cref="SectionToken"/>) — how continue lines point here.</summary>
+            public string                           Key              { get; set; } = "";
             public StoryLogicRenderer.RenderedLogic Rendered         { get; set; } = new();
             public bool                             IsInstructions   { get; set; }
             public List<string>                     InstructionLines { get; set; } = new();
@@ -41,6 +43,10 @@ namespace DeusaldStoryCommon
         {
             public string Text    { get; set; } = "";
             public bool   IsError { get; set; }
+            /// <summary>The logic node this line leads to, or <see cref="Guid.Empty"/> for End/error lines (not navigable).</summary>
+            public Guid   TargetLogicId    { get; set; }
+            /// <summary>The <see cref="Section.Key"/> of the specific target section this line points to (empty when not navigable).</summary>
+            public string TargetSectionKey { get; set; } = "";
         }
 
         public static Result Build(StoryProject project, LocProject? localization, StoryLogicNode logic)
@@ -69,13 +75,15 @@ namespace DeusaldStoryCommon
         {
             StoryLogicRenderer.RenderedLogic rendered = StoryLogicRenderer.Render(project, localization, logic, values, paper: true, StoryRenderTarget.Gamebook);
             string                           label    = ComboLabel(vars, values);
+            string                           key      = SectionToken(logic, vars, values);
 
             if (!logic.GamebookInstructions)
-                return new Section { Label = label, Rendered = rendered };
+                return new Section { Label = label, Key = key, Rendered = rendered };
 
             return new Section
             {
                 Label            = label,
+                Key              = key,
                 Rendered         = rendered,
                 IsInstructions   = true,
                 InstructionLines = InstructionLines(localization, vars, values)
@@ -203,7 +211,9 @@ namespace DeusaldStoryCommon
                 yield return new ContinueLine
                 {
                     Text = StoryCommonLocalizationKeys.Resolve(localization, StoryCommonLocalizationKeys.GamebookChoiceToSection,
-                        new Dictionary<string, object> { ["choice"] = choiceText, ["section"] = section })
+                        new Dictionary<string, object> { ["choice"] = choiceText, ["section"] = section }),
+                    TargetLogicId    = next.Id,
+                    TargetSectionKey = section
                 };
             }
         }
@@ -274,7 +284,9 @@ namespace DeusaldStoryCommon
                 yield return new ContinueLine
                 {
                     Text = StoryCommonLocalizationKeys.Resolve(localization, StoryCommonLocalizationKeys.GamebookChoiceToSection,
-                        new Dictionary<string, object> { ["choice"] = label, ["section"] = section })
+                        new Dictionary<string, object> { ["choice"] = label, ["section"] = section }),
+                    TargetLogicId    = receiver.Id,
+                    TargetSectionKey = section
                 };
             }
         }
@@ -296,7 +308,7 @@ namespace DeusaldStoryCommon
                     : StoryCommonLocalizationKeys.Resolve(localization, StoryCommonLocalizationKeys.GamebookContinueConditional,
                         new Dictionary<string, object> { ["condition"] = condition, ["section"] = section });
 
-                yield return new ContinueLine { Text = text };
+                yield return new ContinueLine { Text = text, TargetLogicId = next.Id, TargetSectionKey = section };
             }
         }
 

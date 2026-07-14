@@ -60,3 +60,10 @@ export function rect(el) {
     const r = el.getBoundingClientRect();
     return [r.left, r.top, r.width, r.height];
 }
+
+// Scroll the element with the given id to the top of its scrollable ancestor
+// (used by the Gamebook preview to jump to a clicked "go to section" target).
+export function scrollToTopById(id) {
+    const el = document.getElementById(id);
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
