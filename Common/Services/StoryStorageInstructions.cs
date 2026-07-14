@@ -115,7 +115,7 @@ namespace DeusaldStoryCommon
                     return Line(Resolve(localization, StoryCommonLocalizationKeys.StorageStringWriteSpecific, slot, value: stringValue), placement);
 
                 case StringValueMode.PlayerInput:
-                    string prompt = StoryLogicRenderer.ResolvePortText(project, localization, logic, instructionPortId, target);
+                    string prompt = StoryLogicRenderer.ResolvePortText(project, localization, logic, instructionPortId, target, slot);
                     if (string.IsNullOrEmpty(prompt))
                         prompt = Resolve(localization, StoryCommonLocalizationKeys.StorageStringWrite, slot);
 

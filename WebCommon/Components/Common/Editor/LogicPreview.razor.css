@@ -243,24 +243,20 @@
     align-items: center;
     gap: 0.5rem;
     font-size: 0.9rem;
-    color: var(--text-2, inherit);
+    color: var(--lpv-text);
 }
 
-.lpv-input-slot {
-    padding: 0 0.32em;
-    border-radius: 0.3em;
-    font-family: var(--font-mono, monospace);
-    font-size: 0.82em;
-    font-weight: 600;
-    background: color-mix(in srgb, var(--success) 18%, transparent);
-    color: var(--success);
-}
-
+/* Follow the screen's theme tokens (dark by default, paper when light) so the field and its text
+   stay legible in both — a global --surface/inherit read wrong against the themed screen. */
 .lpv-input-box {
     padding: 0.4rem 0.6rem;
-    border: 1px solid var(--border, #ccc);
+    border: 1px solid var(--lpv-frame-border);
     border-radius: var(--r-sm);
-    background: var(--surface, #fff);
-    color: inherit;
+    background: var(--lpv-frame-bg);
+    color: var(--lpv-title);
     font: inherit;
+}
+.lpv-input-box::placeholder {
+    color: var(--lpv-text);
+    opacity: 0.6;
 }

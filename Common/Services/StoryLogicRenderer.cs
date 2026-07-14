@@ -91,11 +91,23 @@ namespace DeusaldStoryCommon
         /// Resolves the text wired into <paramref name="toPoint"/> (a Localization / SmartFormat / splitter output),
         /// for flow-only callers that carry no External Variable values — e.g. the storage-instruction generator
         /// reading a Register/Set node's Instruction port. Empty when nothing is connected.
+        /// When <paramref name="slot"/> is supplied the port's text is SmartFormatted with a <c>{slot}</c> placeholder
+        /// bound to it — the storage slot label (e.g. <c>SA</c>) the instruction writes to. The value is merged into
+        /// any SmartFormat node in the path (so it resolves alongside the node's other variables in one pass) and, for
+        /// a plain Localization instruction carrying only <c>{slot}</c>, a final pass fills it in.
         /// </summary>
         public static string ResolvePortText(
             StoryProject project, LocProject? localization, StoryLogicNode logic, Guid toPoint,
-            StoryRenderTarget target = StoryRenderTarget.App) =>
-            ResolveText(project, localization, logic, _EmptyValues, FromPointInto(logic, toPoint), target, 0);
+            StoryRenderTarget target = StoryRenderTarget.App, string? slot = null)
+        {
+            Dictionary<string, object>? extra = slot is null
+                ? null
+                : new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase) { ["slot"] = slot };
+            string text = ResolveText(project, localization, logic, _EmptyValues, FromPointInto(logic, toPoint), target, 0, extra);
+            // A plain Localization instruction ("…in slot {slot}") never hit a SmartFormat node above, so bind {slot}
+            // now; when it was resolved through a SmartFormat node {slot} is already gone and this is a no-op.
+            return extra is null ? text : StoryConditionPreview.Render(text, extra, out _);
+        }
 
         // ── Flow-spine walk ──────────────────────────────────────────────────────
 
@@ -159,7 +171,8 @@ namespace DeusaldStoryCommon
 
         private static string ResolveText(
             StoryProject project, LocProject? localization, StoryLogicNode logic,
-            IReadOnlyDictionary<Guid, string> values, Guid fromPoint, StoryRenderTarget target, int depth)
+            IReadOnlyDictionary<Guid, string> values, Guid fromPoint, StoryRenderTarget target, int depth,
+            IReadOnlyDictionary<string, object>? extraValues = null)
         {
             if (fromPoint == Guid.Empty || depth > 8) return "";
 
@@ -170,14 +183,18 @@ namespace DeusaldStoryCommon
             {
                 // Emit the branch for the medium being rendered; an unconnected branch resolves to empty text.
                 Guid input = target == StoryRenderTarget.App ? ts.AppTextIn.Id : ts.GamebookTextIn.Id;
-                return ResolveText(project, localization, logic, values, FromPointInto(logic, input), target, depth + 1);
+                return ResolveText(project, localization, logic, values, FromPointInto(logic, input), target, depth + 1, extraValues);
             }
 
             if (logic.SmartFormatNodes.Find(n => n.OutPoint.Id == fromPoint) is StorySmartFormatNode sf)
             {
-                string format = ResolveText(project, localization, logic, values, FromPointInto(logic, sf.LocalizationIn.Id), target, depth + 1);
+                string format = ResolveText(project, localization, logic, values, FromPointInto(logic, sf.LocalizationIn.Id), target, depth + 1, extraValues);
 
                 Dictionary<string, object> vals = new(StringComparer.OrdinalIgnoreCase);
+                // Caller-supplied placeholders (e.g. a Set/Register instruction's {slot}) resolve alongside the node's
+                // own variables in this one pass — SmartFormat throws on any unknown token, so they must share a dict.
+                if (extraValues is not null)
+                    foreach (KeyValuePair<string, object> kv in extraValues) vals[kv.Key] = kv.Value;
                 foreach (StoryConnection c in logic.ContentConnections.Where(c => c.ToPoint == sf.VariablesIn.Id))
                 {
                     if (logic.ExternalVariableNodes.Find(n => n.OutPoint.Id == c.FromPoint) is StoryExternalVariableNode ev

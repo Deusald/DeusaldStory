@@ -131,6 +131,7 @@
 
     /// <summary>A preview-only input field the player would fill for a player-input String variable (min 1 / max 30 chars).</summary>
     private RenderFragment InputField(StorageInstruction field) =>@<div class="lpv-input">
+        @* No slot badge here — the App tracks which variable a value writes to automatically; the player only sees the prompt. *@
         <label class="lpv-input-label">
             @if (string.IsNullOrEmpty(field.Text))
             {
@@ -140,7 +141,6 @@
             {
                 @SafeHtml(field.Text)
             }
-            <span class="lpv-input-slot">@field.Slot</span>
         </label>
         <input class="lpv-input-box"
                type="@(field.InputKind == StringInputKind.Number ? "number" : "text")"
