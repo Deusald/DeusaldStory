@@ -501,6 +501,63 @@ public class ProjectStateService(
         MarkKeyDirty(logicId);
     }
 
+    // ── Comment notes ──────────────────────────────────────────────────────
+    // A comment lives either in a container's graph or in a logic node's inner graph; the owner id resolves to
+    // whichever exists. Comments have no ports, so there are never wires to clean up on delete.
+
+    /// <summary>Adds a free-text comment note to <paramref name="ownerId"/>'s graph (a container or a logic node).</summary>
+    public StoryCommentNode? AddCommentNode(Guid ownerId, string text, double x, double y)
+    {
+        StoryCommentNode node = new() { Text = text, X = x, Y = y };
+        if (CurrentProject!.LogicNodes.TryGetValue(ownerId, out StoryLogicNode? logic))
+            logic.CommentNodes.Add(node);
+        else if (CurrentProject.ContainerNodes.TryGetValue(ownerId, out StoryContainerNode? container))
+            container.Comments.Add(node);
+        else
+            return null;
+        MarkKeyDirty(ownerId);
+        return node;
+    }
+
+    /// <summary>Updates a comment note's text.</summary>
+    public void UpdateCommentNode(Guid ownerId, Guid nodeId, string text)
+    {
+        if (FindCommentNode(ownerId, nodeId) is not StoryCommentNode node) return;
+        node.Text = text;
+        MarkKeyDirty(ownerId);
+    }
+
+    /// <summary>Moves a comment note to a new canvas position.</summary>
+    public void MoveCommentNode(Guid ownerId, Guid nodeId, double x, double y)
+    {
+        if (FindCommentNode(ownerId, nodeId) is not StoryCommentNode node) return;
+        node.X = x;
+        node.Y = y;
+        MarkKeyDirty(ownerId);
+    }
+
+    /// <summary>Deletes a comment note from <paramref name="ownerId"/>'s graph.</summary>
+    public void DeleteCommentNode(Guid ownerId, Guid nodeId)
+    {
+        if (CurrentProject!.LogicNodes.TryGetValue(ownerId, out StoryLogicNode? logic))
+            logic.CommentNodes.RemoveAll(n => n.Id == nodeId);
+        else if (CurrentProject.ContainerNodes.TryGetValue(ownerId, out StoryContainerNode? container))
+            container.Comments.RemoveAll(n => n.Id == nodeId);
+        else
+            return;
+        MarkKeyDirty(ownerId);
+    }
+
+    /// <summary>Finds a comment note by id in <paramref name="ownerId"/>'s container graph or logic inner graph.</summary>
+    private StoryCommentNode? FindCommentNode(Guid ownerId, Guid nodeId)
+    {
+        if (CurrentProject!.LogicNodes.TryGetValue(ownerId, out StoryLogicNode? logic))
+            return logic.CommentNodes.Find(n => n.Id == nodeId);
+        if (CurrentProject.ContainerNodes.TryGetValue(ownerId, out StoryContainerNode? container))
+            return container.Comments.Find(n => n.Id == nodeId);
+        return null;
+    }
+
     /// <summary>Adds a Register-variable node (claims a storage slot for a new variable) to a logic node's flow spine.</summary>
     public StoryRegisterVariableNode? AddRegisterVariableNode(Guid logicId, double x, double y)
     {

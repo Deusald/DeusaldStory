@@ -72,7 +72,8 @@ namespace DeusaldStoryWeb
         AppGamebookTextSplitter, // inside a logic node: emits one of two texts depending on the render target (App/Gamebook) (purple)
         AppGamebookFlowSplitter, // inside a logic node: on the flow spine, routes flow by the render target (App/Gamebook) (amber)
         PrevExitVariable,        // inside a logic node: exposes the upstream node's Selection variable, optionally remapped (teal)
-        Condition                // inside a logic node: on the flow spine, branches flow True/False by testing a variable (info)
+        Condition,               // inside a logic node: on the flow spine, branches flow True/False by testing a variable (info)
+        Comment                  // in a container's graph or a logic node's inner graph: a free-text author note, no ports (dim)
     }
 
     /// <summary>A point on the graph canvas in world (un-panned, un-scaled) coordinates.</summary>
@@ -258,8 +259,23 @@ namespace DeusaldStoryWeb
                 nodes.Add(node);
             }
 
+            foreach (StoryCommentNode comment in container.Comments)
+                nodes.Add(BuildCommentNode(comment));
+
             return nodes;
         }
+
+        /// <summary>Projects a comment note into a portless canvas node whose <see cref="EdNode.Title"/> carries its text.</summary>
+        private static EdNode BuildCommentNode(StoryCommentNode comment) => new()
+        {
+            Id        = comment.Id,
+            Kind      = StoryNodeKind.Comment,
+            Title     = comment.Text,
+            X         = comment.X,
+            Y         = comment.Y,
+            Deletable = true,
+            Editable  = true
+        };
 
         /// <summary>Projects a container's persisted connections into canvas edges.</summary>
         public static List<EdEdge> BuildEdges(StoryContainerNode container) =>
@@ -622,6 +638,10 @@ namespace DeusaldStoryWeb
                 nodes.Add(node);
             }
 
+            // ── Comment notes (dim, portless) — free-text author notes; ignored during playback. ──
+            foreach (StoryCommentNode comment in logic.CommentNodes)
+                nodes.Add(BuildCommentNode(comment));
+
             return nodes;
         }
 
@@ -725,6 +745,7 @@ namespace DeusaldStoryWeb
             StoryNodeKind.AppGamebookFlowSplitter => "APP / GAMEBOOK FLOW",
             StoryNodeKind.PrevExitVariable        => "PREV EXIT VARIABLE",
             StoryNodeKind.Condition               => "CONDITION",
+            StoryNodeKind.Comment                 => "COMMENT",
             _                       => ""
         };
 
@@ -768,6 +789,7 @@ namespace DeusaldStoryWeb
             StoryNodeKind.AppGamebookFlowSplitter => "var(--warning)",
             StoryNodeKind.PrevExitVariable        => "var(--code-func)",
             StoryNodeKind.Condition               => "var(--info)",
+            StoryNodeKind.Comment                 => "var(--text-dim)",
             _                       => "var(--text-dim)"
         };
     }

@@ -25,6 +25,9 @@ namespace DeusaldStoryCommon
         public List<Guid> Logic      { get; } = new();
         public List<Guid> Portals    { get; } = new();
 
+        /// <summary>Free-text comment notes placed in this container's graph (no ports; documentation only).</summary>
+        public List<StoryCommentNode> Comments { get; } = new();
+
         /// <summary>Wires between the connection points of this container's own boundary and its children.</summary>
         public List<StoryConnection> Connections { get; } = new();
     }

@@ -1,0 +1,89 @@
+@namespace DeusaldStoryWeb.Components.Common
+
+@* ─────────────────────────────────────────────────────────────────────────
+   Creates / edits a Comment note — a free-text annotation the author places on
+   a graph to explain how things connect. It has no ports and is ignored during
+   playback. The same modal is used inside a container's graph and inside a
+   logic node's inner graph.
+   ───────────────────────────────────────────────────────────────────────── *@
+
+@if (_Visible)
+{
+    <div class="modal-backdrop" @onclick="Cancel"></div>
+
+    <div class="modal-box ncm-box" @onclick:stopPropagation="true">
+
+        <div class="modal-header">
+            <span class="modal-title">@(_IsEdit ? "Edit comment" : "Comment")</span>
+            <button class="modal-close" @onclick="Cancel" title="Close">
+                <i class="bi bi-x-lg"></i>
+            </button>
+        </div>
+
+        <div class="modal-body">
+
+            <div class="modal-field">
+                <label class="modal-label">Note</label>
+                <textarea class="modal-input ncm-text"
+                          rows="5"
+                          placeholder="Describe how these nodes connect…"
+                          @bind="_Text"
+                          @bind:event="oninput"></textarea>
+            </div>
+
+            <div class="modal-note">
+                <i class="bi bi-info-circle"></i>
+                <span>A comment is a free-text note only — it has no ports and takes no part in playback.</span>
+            </div>
+
+        </div>
+
+        <div class="modal-footer">
+            <button class="modal-btn modal-btn-ghost" @onclick="Cancel">Cancel</button>
+            <button class="modal-btn modal-btn-primary" @onclick="Confirm">
+                @(_IsEdit ? "Save changes" : "Add comment")
+            </button>
+        </div>
+
+    </div>
+}
+
+@code {
+    [Parameter] public EventCallback<CommentArgs> OnConfirm { get; set; }
+
+    private bool   _Visible;
+    private bool   _IsEdit;
+    private Guid   _EditNodeId;
+    private string _Text = "";
+
+    /// <summary>Opens the modal to create a new Comment note.</summary>
+    public void Show()
+    {
+        _IsEdit     = false;
+        _EditNodeId = Guid.Empty;
+        _Text       = "";
+        _Visible    = true;
+        StateHasChanged();
+    }
+
+    /// <summary>Opens the modal to edit an existing Comment note.</summary>
+    public void ShowEdit(Guid nodeId, string text)
+    {
+        _IsEdit     = true;
+        _EditNodeId = nodeId;
+        _Text       = text;
+        _Visible    = true;
+        StateHasChanged();
+    }
+
+    private async Task Confirm()
+    {
+        _Visible = false;
+        await OnConfirm.InvokeAsync(new CommentArgs(_EditNodeId, _Text.Trim()));
+    }
+
+    private void Cancel() => _Visible = false;
+
+    /// <summary>Result passed back to the parent. <see cref="EditNodeId"/> is empty for a create, set for an edit.</summary>
+    public record CommentArgs(Guid EditNodeId, string Text);
+}

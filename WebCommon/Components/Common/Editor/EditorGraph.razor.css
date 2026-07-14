@@ -126,6 +126,33 @@
 .edg-node-extvar    { border-left: 3px solid var(--code-func); }
 .edg-node-flowtext  { border-left: 3px solid var(--warning); }
 
+/* Comment note — a portless free-text card. Unlike other nodes its contents flow (no absolute children),
+   so the card grows to fit the text instead of relying on a computed height. */
+.edg-node-comment {
+    border-left: 3px solid var(--text-dim);
+    border-style: dashed;
+    background: var(--surface-1);
+}
+.edg-node-comment-head {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 9px 12px 0;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: .08em;
+    color: var(--text-ghost);
+}
+.edg-node-comment-head i { font-size: 10px; }
+.edg-node-comment-body {
+    padding: 5px 12px 11px;
+    font-size: 12.5px;
+    line-height: 1.45;
+    color: var(--text-soft);
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
 /* Inline thumbnail (Icon node preview). Fixed top/height match THUMB_* in EditorGraph.razor:
    title top 36 + title height 20 + THUMB_GAP 8 = 64; height = THUMB_H. Assumes no subtitle. */
 .edg-node-thumb {

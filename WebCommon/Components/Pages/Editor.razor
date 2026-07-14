@@ -142,6 +142,7 @@
 <SetExternalVariableModal  @ref="_SetExternalVariableModal" OnConfirm="OnSetExternalVariableConfirmed"/>
 <NewChoiceNodeModal        @ref="_NewChoiceNodeModal"       OnConfirm="OnChoiceConfirmed"/>
 <NewConditionNodeModal     @ref="_NewConditionNodeModal"    OnConfirm="OnConditionConfirmed"/>
+<NewCommentNodeModal       @ref="_NewCommentNodeModal"      OnConfirm="OnCommentConfirmed"/>
 <PrevExitVariableModal     @ref="_PrevExitVariableModal"    OnConfirm="OnPrevExitVariableConfirmed"/>
 
 @code {
@@ -165,6 +166,7 @@
     private SetExternalVariableModal?  _SetExternalVariableModal;
     private NewChoiceNodeModal?        _NewChoiceNodeModal;
     private NewConditionNodeModal?     _NewConditionNodeModal;
+    private NewCommentNodeModal?       _NewCommentNodeModal;
     private PrevExitVariableModal?     _PrevExitVariableModal;
 
     // Where the next created node is placed — the right-clicked canvas point (or a staggered default).
@@ -401,13 +403,15 @@
                 new NodePaletteItem(StoryNodeKind.Choice,             "bi-signpost-split",  "Choice node",           "On the flow spine — offers the player a set of choices, each branching out to an exit."),
                 new NodePaletteItem(StoryNodeKind.AppGamebookTextSplitter, "bi-fonts",       "App/Gamebook text splitter", "Emits its App text when rendering the app and its Gamebook text when rendering the printed gamebook (either may be empty)."),
                 new NodePaletteItem(StoryNodeKind.AppGamebookFlowSplitter, "bi-signpost-2",  "App/Gamebook flow splitter", "On the flow spine — routes flow down its App branch for the app and its Gamebook branch for the printed gamebook."),
-                new NodePaletteItem(StoryNodeKind.Condition,              "bi-diamond",     "Condition node",             "On the flow spine — tests a connected variable and branches flow down its True or False output.")
+                new NodePaletteItem(StoryNodeKind.Condition,              "bi-diamond",     "Condition node",             "On the flow spine — tests a connected variable and branches flow down its True or False output."),
+                new NodePaletteItem(StoryNodeKind.Comment,                "bi-chat-left-text", "Comment",                 "A free-text note explaining how nodes connect. No ports; ignored during playback.")
             ]
             :
             [
                 new NodePaletteItem(StoryNodeKind.Logic,     "bi-diamond-half",       "Logic node",     "A stop point that generates content and runs calculations on variables."),
                 new NodePaletteItem(StoryNodeKind.Container, "bi-collection",         "Container node", "Groups other nodes into a nested sub-graph with its own entries and exits."),
-                new NodePaletteItem(StoryNodeKind.PortalIn,  "bi-box-arrow-in-right", "Portal node",    "A linked in/out pair that teleports flow across the graph to keep it clean.")
+                new NodePaletteItem(StoryNodeKind.PortalIn,  "bi-box-arrow-in-right", "Portal node",    "A linked in/out pair that teleports flow across the graph to keep it clean."),
+                new NodePaletteItem(StoryNodeKind.Comment,   "bi-chat-left-text",     "Comment",        "A free-text note explaining how nodes connect. No ports; ignored during playback.")
             ];
 
     private void OnPaletteSelect(NodePaletteItem item)
@@ -456,8 +460,29 @@
                 RebuildNodes();
                 break;
             case StoryNodeKind.Condition: _NewConditionNodeModal?.Show(); break;
+            case StoryNodeKind.Comment:   _NewCommentNodeModal?.Show();   break;
         }
     }
+
+    private void OnCommentConfirmed(NewCommentNodeModal.CommentArgs args)
+    {
+        if (args.EditNodeId == Guid.Empty)
+        {
+            if (_ProjectState.AddCommentNode(_CurrentId, args.Text, _PendingX, _PendingY) is StoryCommentNode created)
+                _SelectedId = created.Id;
+        }
+        else
+        {
+            _ProjectState.UpdateCommentNode(_CurrentId, args.EditNodeId, args.Text);
+        }
+        RebuildNodes();
+    }
+
+    /// <summary>The comment note with <paramref name="id"/> in the current graph (container graph or logic inner graph).</summary>
+    private StoryCommentNode? FindComment(Guid id) =>
+        _InLogic
+            ? _CurrentLogicNode?.CommentNodes.Find(n => n.Id == id)
+            : Project.ContainerNodes.TryGetValue(_CurrentId, out StoryContainerNode? c) ? c.Comments.Find(n => n.Id == id) : null;
 
     // ── Localization / Icon content-node pickers ───────────────────────────
 
@@ -776,6 +801,11 @@
                     _NewConditionNodeModal?.ShowEdit(cond);
                 break;
 
+            case StoryNodeKind.Comment:
+                if (FindComment(node.Id) is StoryCommentNode comment)
+                    _NewCommentNodeModal?.ShowEdit(comment.Id, comment.Text);
+                break;
+
             case StoryNodeKind.PrevExitVariable:
                 if (_CurrentLogicNode is StoryLogicNode owner)
                 {
@@ -822,6 +852,7 @@
             case StoryNodeKind.AppGamebookTextSplitter: _ProjectState.DeleteAppGamebookTextSplitterNode(_CurrentId, node.Id); break;
             case StoryNodeKind.AppGamebookFlowSplitter: _ProjectState.DeleteAppGamebookFlowSplitterNode(_CurrentId, node.Id); break;
             case StoryNodeKind.Condition:               _ProjectState.DeleteConditionNode(_CurrentId, node.Id);             break;
+            case StoryNodeKind.Comment:                 _ProjectState.DeleteCommentNode(_CurrentId, node.Id);               break;
             default: return;
         }
 
@@ -876,6 +907,13 @@
 
     private void OnNodeMoved(EdNode moved)
     {
+        // A comment note lives in either graph (container or logic inner); resolve it against the current owner.
+        if (moved.Kind == StoryNodeKind.Comment)
+        {
+            _ProjectState.MoveCommentNode(_CurrentId, moved.Id, moved.X, moved.Y);
+            return;
+        }
+
         // Inside a logic node's inner graph — the Entry/Exit points or a content node moved.
         if (_InLogic)
         {

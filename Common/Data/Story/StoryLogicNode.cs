@@ -117,6 +117,9 @@ namespace DeusaldStoryCommon
         /// <summary>App/Gamebook flow-splitter nodes on the flow spine — each routes the spine by the render target.</summary>
         public List<StoryAppGamebookFlowSplitterNode> AppGamebookFlowSplitterNodes { get; } = new();
 
+        /// <summary>Free-text comment notes placed in this logic node's inner graph (no ports; documentation only).</summary>
+        public List<StoryCommentNode> CommentNodes { get; } = new();
+
         /// <summary>Wires between the inner graph's connection points (Entry/Exit ports and content-node ports).</summary>
         public List<StoryConnection> ContentConnections { get; } = new();
     }

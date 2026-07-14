@@ -78,6 +78,23 @@
                 EdNode n     = node;
                 string color = StoryStyle.NodeColor(n.Kind);
                 bool   sub   = HasSub(n);
+                if (n.Kind == StoryNodeKind.Comment)
+                {
+                    <div class="edg-node edg-node-comment @(n.Id == SelectedId ? "edg-node-sel" : "")"
+                         style="left:@F(n.X)px; top:@F(n.Y)px;"
+                         @onpointerdown="e => NodeDown(e, n)" @onpointerdown:stopPropagation="true"
+                         @ondblclick="() => OnNodeEdit.InvokeAsync(n)" @ondblclick:stopPropagation="true"
+                         @oncontextmenu="e => NodeContextMenu(e, n)"
+                         @oncontextmenu:stopPropagation="true" @oncontextmenu:preventDefault="true">
+                        <div class="edg-node-comment-head">
+                            <i class="bi bi-chat-left-text"></i> COMMENT
+                        </div>
+                        <div class="edg-node-comment-body">
+                            @(string.IsNullOrWhiteSpace(n.Title) ? "(empty note)" : n.Title)
+                        </div>
+                    </div>
+                    continue;
+                }
                 <div class="edg-node @NodeClass(n)"
                      style="left:@F(n.X)px; top:@F(n.Y)px; height:@F(NodeHeight(n))px;"
                      @onpointerdown="e => NodeDown(e, n)" @onpointerdown:stopPropagation="true"
@@ -527,6 +544,7 @@
         StoryNodeKind.AppGamebookFlowSplitter => "App/Gamebook flow splitter",
         StoryNodeKind.PrevExitVariable        => "selection variable",
         StoryNodeKind.Condition               => "condition node",
+        StoryNodeKind.Comment                 => "comment",
         _                       => "node"
     };
 
