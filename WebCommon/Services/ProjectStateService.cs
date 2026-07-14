@@ -941,7 +941,10 @@ public partial class ProjectStateService(
         bool fromChoice = logic.ChoiceNodes.Exists(ch => ch.Options.Exists(o => o.FlowOut.Id == fromPoint));
         if (fromChoice && !logic.ExitPoints.Exists(e => e.Id == toPoint)) return null;
 
-        bool multiInput  = logic.SmartFormatNodes.Exists(sf => sf.VariablesIn.Id == toPoint);
+        // An exit is a flow-convergence point: several internal paths can end at the same exit, so it accepts many
+        // incoming flows (a SmartFormat variables slot likewise aggregates many variables).
+        bool multiInput  = logic.SmartFormatNodes.Exists(sf => sf.VariablesIn.Id == toPoint)
+                        || logic.ExitPoints.Exists(e => e.Id == toPoint);
         bool multiOutput = logic.ExternalVariableNodes.Exists(ev => ev.OutPoint.Id == fromPoint)
                         || logic.PrevExitVariable.OutPoint.Id == fromPoint;
         logic.ContentConnections.RemoveAll(c => (!multiOutput && c.FromPoint == fromPoint) || (!multiInput && c.ToPoint == toPoint));
