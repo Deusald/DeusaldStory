@@ -36,18 +36,18 @@ namespace DeusaldStoryCommon
             RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
         // Matches an encoded storage-variable reference "&lt;var=Name&gt;" — replaced by the
-        // variable's slot label (e.g. SA), styled by storage kind, when a resolver is supplied.
+        // variable's slot label (e.g. TA), styled by storage kind, when a resolver is supplied.
         private static readonly Regex _VarTag = new Regex(
             @"&lt;var=([^&]+?)&gt;",
             RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
-        // Matches an encoded storage-slot label "&lt;slot=SA&gt;" — a Set/Register instruction's own {slot} tag,
+        // Matches an encoded storage-slot label "&lt;slot=TA&gt;" — a Set/Register instruction's own {slot} tag,
         // rendered as the same styled pill an inline String variable reference uses (needs no resolver).
         private static readonly Regex _SlotTag = new Regex(
             @"&lt;slot=([^&]+?)&gt;",
             RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
-        /// <summary>Wraps a storage-slot label (e.g. <c>SA</c>) in the tag <see cref="ToSafeHtml"/> renders as a styled pill.</summary>
+        /// <summary>Wraps a storage-slot label (e.g. <c>TA</c>) in the tag <see cref="ToSafeHtml"/> renders as a styled pill.</summary>
         public static string SlotTag(string label) => $"<slot={label}>";
 
         /// <summary>

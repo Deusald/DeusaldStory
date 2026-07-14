@@ -25,7 +25,7 @@ namespace DeusaldStoryCommon
         /// <summary>App input field only — whether it accepts text or a number.</summary>
         public StringInputKind InputKind { get; set; }
 
-        /// <summary>App input field only — the slot label the value is written to (e.g. <c>SA</c>).</summary>
+        /// <summary>App input field only — the slot label the value is written to (e.g. <c>TA</c>).</summary>
         public string Slot { get; set; } = "";
     }
 

@@ -5,7 +5,7 @@ namespace DeusaldStoryCommon
     /// <summary>
     /// Which physical game component tracks a storage variable when the story is played as a printed Gamebook.
     /// Each kind has its own bank of indexed slots (see <see cref="StorageSlots"/>): Number → <c>NA, NB…</c>,
-    /// Dial → <c>DA, DB…</c>, String → <c>SA, SB…</c>.
+    /// Dial → <c>DA, DB…</c>, String → <c>TA, TB…</c>.
     /// </summary>
     public enum StorageVariableType
     {
@@ -123,12 +123,12 @@ namespace DeusaldStoryCommon
             _                          => 0
         };
 
-        /// <summary>The slot label prefix for <paramref name="type"/> (N/D/S).</summary>
+        /// <summary>The slot label prefix for <paramref name="type"/> (N/D/T).</summary>
         public static char Prefix(StorageVariableType type) => type switch
         {
             StorageVariableType.Number => 'N',
             StorageVariableType.Dial   => 'D',
-            StorageVariableType.String => 'S',
+            StorageVariableType.String => 'T',
             _                          => '?'
         };
 
