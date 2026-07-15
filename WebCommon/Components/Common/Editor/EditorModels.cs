@@ -577,14 +577,15 @@ namespace DeusaldStoryWeb
             // ── Set-external-variable nodes (blue) — on the flow spine, assign a value to a story-wide external variable. ──
             foreach (StorySetExternalVariableNode se in logic.SetExternalVariableNodes)
             {
-                bool     found  = project.Variables.TryGetValue(se.SelectedVariableId, out StoryVariable? variable);
-                bool     mapped = se.Mode == StorySetExternalVariableMode.MapFromVariable;
+                bool     found    = project.Variables.TryGetValue(se.SelectedVariableId, out StoryVariable? variable);
+                bool     remapped = se.Mode == StorySetExternalVariableMode.RemapFromVariable;
+                bool     mapped   = remapped || se.Mode == StorySetExternalVariableMode.MapFromVariable;
                 EdNode node = new()
                 {
                     Id        = se.Id,
                     Kind      = StoryNodeKind.SetExternalVariable,
                     Title     = found ? $"Set {variable!.Name}" : "Set external (no variable)",
-                    Subtitle  = mapped ? "= mapped value" : string.IsNullOrEmpty(se.Value) ? "" : $"= {se.Value}",
+                    Subtitle  = remapped ? "= remapped value" : mapped ? "= mapped value" : string.IsNullOrEmpty(se.Value) ? "" : $"= {se.Value}",
                     X         = se.X,
                     Y         = se.Y,
                     Deletable = true

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 
 namespace DeusaldStoryCommon
 {
@@ -11,8 +12,9 @@ namespace DeusaldStoryCommon
     /// <see cref="StorySetExternalVariableMode.SpecificValue"/> mode (the default) it assigns a fixed <see cref="Value"/>
     /// — one of that variable's declared <see cref="StoryVariable.PossibleValues"/>; in
     /// <see cref="StorySetExternalVariableMode.MapFromVariable"/> mode it instead assigns whatever value is wired into
-    /// <see cref="ValueIn"/> from another variable source. Flow passes straight through
-    /// <see cref="FlowIn"/> → <see cref="FlowOut"/>.
+    /// <see cref="ValueIn"/> from another variable source; in <see cref="StorySetExternalVariableMode.RemapFromVariable"/>
+    /// mode it assigns the wired value after translating it through the <see cref="ValueMap"/> conversion table. Flow
+    /// passes straight through <see cref="FlowIn"/> → <see cref="FlowOut"/>.
     /// </summary>
     public class StorySetExternalVariableNode
     {
@@ -29,13 +31,20 @@ namespace DeusaldStoryCommon
         /// <summary>The value assigned in <see cref="StorySetExternalVariableMode.SpecificValue"/> mode — one of the variable's <see cref="StoryVariable.PossibleValues"/>.</summary>
         public string Value { get; set; } = string.Empty;
 
+        /// <summary>
+        /// The conversion table used in <see cref="StorySetExternalVariableMode.RemapFromVariable"/> mode: each row maps an
+        /// incoming wired value (<see cref="StorySetExternalVariableRemap.From"/>) to the external variable value assigned
+        /// for it (<see cref="StorySetExternalVariableRemap.To"/>). Unused in the other modes.
+        /// </summary>
+        public List<StorySetExternalVariableRemap> ValueMap { get; set; } = new();
+
         /// <summary>Flow input — wired from a previous flow node's output.</summary>
         public StoryConnectionPoint FlowIn { get; set; } = new() { Name = "Flow" };
 
         /// <summary>Flow output — wired to the next flow node's input or an Exit.</summary>
         public StoryConnectionPoint FlowOut { get; set; } = new() { Name = "Flow" };
 
-        /// <summary>Variable input — the value source in <see cref="StorySetExternalVariableMode.MapFromVariable"/> mode.</summary>
+        /// <summary>Variable input — the value source in <see cref="StorySetExternalVariableMode.MapFromVariable"/> and <see cref="StorySetExternalVariableMode.RemapFromVariable"/> modes.</summary>
         public StoryConnectionPoint ValueIn { get; set; } = new() { Name = "Value" };
     }
 }

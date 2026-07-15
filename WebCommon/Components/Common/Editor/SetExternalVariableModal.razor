@@ -53,39 +53,80 @@
                 @if (Selected is StoryVariable sel)
                 {
                     <div class="modal-field">
-                        <label class="nlm-check">
-                            <input type="checkbox"
-                                   checked="@_MapFromVariable"
-                                   @onchange="e => _MapFromVariable = (bool)(e.Value ?? false)"/>
-                            <span>
-                                Map from variable input
-                                <span class="modal-label-hint">assign a value wired from another variable instead of a fixed one</span>
-                            </span>
-                        </label>
+                        <label class="modal-label">How to assign</label>
+                        <select class="modal-input" value="@((int)_Mode)" @onchange="OnModeChanged">
+                            <option value="@((int)StorySetExternalVariableMode.SpecificValue)">Set to selected value</option>
+                            <option value="@((int)StorySetExternalVariableMode.MapFromVariable)">Map from variable input</option>
+                            <option value="@((int)StorySetExternalVariableMode.RemapFromVariable)">Remap from variable input</option>
+                        </select>
                     </div>
 
-                    @if (_MapFromVariable)
+                    @switch (_Mode)
                     {
-                        <div class="sev-hint">The assigned value comes from whatever variable is wired into this node's <b>Value</b> input.</div>
-                    }
-                    else
-                    {
-                        <div class="modal-field">
-                            <label class="modal-label">Value</label>
+                        case StorySetExternalVariableMode.SpecificValue:
+                            <div class="modal-field">
+                                <label class="modal-label">Value</label>
+                                @if (sel.PossibleValues.Count == 0)
+                                {
+                                    <div class="sev-hint">This variable has no possible values — add some in the Variables panel.</div>
+                                }
+                                else
+                                {
+                                    <select class="modal-input" @bind="_Value">
+                                        @foreach (string value in sel.PossibleValues)
+                                        {
+                                            <option value="@value">@value</option>
+                                        }
+                                    </select>
+                                }
+                            </div>
+                            break;
+
+                        case StorySetExternalVariableMode.MapFromVariable:
+                            <div class="sev-hint">The assigned value comes from whatever variable is wired into this node's <b>Value</b> input.</div>
+                            break;
+
+                        case StorySetExternalVariableMode.RemapFromVariable:
+                            <div class="sev-hint">
+                                Each incoming value wired into this node's <b>Value</b> input is converted to the
+                                external variable value you pick below before being assigned.
+                            </div>
                             @if (sel.PossibleValues.Count == 0)
                             {
                                 <div class="sev-hint">This variable has no possible values — add some in the Variables panel.</div>
                             }
                             else
                             {
-                                <select class="modal-input" @bind="_Value">
-                                    @foreach (string value in sel.PossibleValues)
-                                    {
-                                        <option value="@value">@value</option>
-                                    }
-                                </select>
+                                <div class="modal-field">
+                                    <label class="modal-label">Value conversions</label>
+                                    <div class="sev-map">
+                                        @for (int i = 0; i < _ValueMap.Count; ++i)
+                                        {
+                                            int row = i;
+                                            <div class="sev-map-row">
+                                                <input class="modal-input sev-map-from" placeholder="incoming value"
+                                                       value="@_ValueMap[row].From"
+                                                       @onchange="e => _ValueMap[row].From = e.Value?.ToString() ?? string.Empty"/>
+                                                <i class="bi bi-arrow-right sev-map-arrow"></i>
+                                                <select class="modal-input sev-map-to" value="@_ValueMap[row].To"
+                                                        @onchange="e => _ValueMap[row].To = e.Value?.ToString() ?? string.Empty">
+                                                    @foreach (string value in sel.PossibleValues)
+                                                    {
+                                                        <option value="@value">@value</option>
+                                                    }
+                                                </select>
+                                                <button class="sev-map-del" title="Remove conversion" @onclick="() => RemoveMapping(row)">
+                                                    <i class="bi bi-x-lg"></i>
+                                                </button>
+                                            </div>
+                                        }
+                                    </div>
+                                    <button class="modal-btn modal-btn-ghost sev-map-add" @onclick="() => AddMapping(sel)">
+                                        <i class="bi bi-plus-lg"></i> Add conversion
+                                    </button>
+                                </div>
                             }
-                        </div>
+                            break;
                     }
                 }
             }
@@ -107,12 +148,13 @@
 @code {
     [Parameter] public EventCallback<SetExternalVariableArgs> OnConfirm { get; set; }
 
-    private bool   _Visible;
-    private bool   _IsEdit;
-    private Guid   _EditNodeId;
-    private Guid   _SelectedVariableId;
-    private bool   _MapFromVariable;
-    private string _Value = "";
+    private bool                                _Visible;
+    private bool                                _IsEdit;
+    private Guid                                _EditNodeId;
+    private Guid                                _SelectedVariableId;
+    private StorySetExternalVariableMode        _Mode;
+    private string                              _Value = "";
+    private List<StorySetExternalVariableRemap> _ValueMap = new();
 
     private StoryProject Project => _ProjectState.CurrentProject!;
 
@@ -122,8 +164,9 @@
         _IsEdit             = false;
         _EditNodeId         = Guid.Empty;
         _SelectedVariableId = Guid.Empty;
-        _MapFromVariable    = false;
+        _Mode               = StorySetExternalVariableMode.SpecificValue;
         _Value              = "";
+        _ValueMap           = new();
         _Visible            = true;
         StateHasChanged();
     }
@@ -134,8 +177,10 @@
         _IsEdit             = true;
         _EditNodeId         = node.Id;
         _SelectedVariableId = node.SelectedVariableId;
-        _MapFromVariable    = node.Mode == StorySetExternalVariableMode.MapFromVariable;
+        _Mode               = node.Mode;
         _Value              = node.Value;
+        // Clone so edits stay local until the author confirms.
+        _ValueMap           = node.ValueMap.Select(m => new StorySetExternalVariableRemap { From = m.From, To = m.To }).ToList();
         _Visible            = true;
         StateHasChanged();
     }
@@ -144,7 +189,8 @@
         _SelectedVariableId != Guid.Empty && Project.Variables.TryGetValue(_SelectedVariableId, out StoryVariable? v) ? v : null;
 
     private bool CanConfirm =>
-        Selected is StoryVariable sel && (_MapFromVariable || sel.PossibleValues.Count == 0 || !string.IsNullOrEmpty(_Value));
+        Selected is StoryVariable sel
+     && (_Mode != StorySetExternalVariableMode.SpecificValue || sel.PossibleValues.Count == 0 || !string.IsNullOrEmpty(_Value));
 
     private List<StoryVariable> Variables() =>
         Project.Variables.Values.OrderBy(v => v.Name, StringComparer.OrdinalIgnoreCase).ToList();
@@ -155,20 +201,37 @@
         // Keep the current value if it's still valid; otherwise default to the first possible value.
         if (!variable.PossibleValues.Contains(_Value))
             _Value = variable.PossibleValues.FirstOrDefault() ?? "";
+        // Drop conversions whose target is no longer a possible value of the newly picked variable.
+        _ValueMap.RemoveAll(m => !variable.PossibleValues.Contains(m.To));
+    }
+
+    private void OnModeChanged(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out int mode))
+            _Mode = (StorySetExternalVariableMode)mode;
+    }
+
+    private void AddMapping(StoryVariable variable) =>
+        _ValueMap.Add(new StorySetExternalVariableRemap { From = "", To = variable.PossibleValues.FirstOrDefault() ?? "" });
+
+    private void RemoveMapping(int index)
+    {
+        if (index >= 0 && index < _ValueMap.Count) _ValueMap.RemoveAt(index);
     }
 
     private async Task Confirm()
     {
         if (!CanConfirm) return;
         _Visible = false;
-        StorySetExternalVariableMode mode = _MapFromVariable
-            ? StorySetExternalVariableMode.MapFromVariable
-            : StorySetExternalVariableMode.SpecificValue;
-        await OnConfirm.InvokeAsync(new SetExternalVariableArgs(_EditNodeId, _SelectedVariableId, mode, _Value));
+        // Only carry the conversion table when it's actually used.
+        List<StorySetExternalVariableRemap> valueMap = _Mode == StorySetExternalVariableMode.RemapFromVariable ? _ValueMap : new();
+        await OnConfirm.InvokeAsync(new SetExternalVariableArgs(_EditNodeId, _SelectedVariableId, _Mode, _Value, valueMap));
     }
 
     private void Cancel() => _Visible = false;
 
     /// <summary>Result passed back to the parent. <see cref="EditNodeId"/> is empty for a create, set for an edit.</summary>
-    public record SetExternalVariableArgs(Guid EditNodeId, Guid SelectedVariableId, StorySetExternalVariableMode Mode, string Value);
+    public record SetExternalVariableArgs(
+        Guid EditNodeId, Guid SelectedVariableId, StorySetExternalVariableMode Mode, string Value,
+        List<StorySetExternalVariableRemap> ValueMap);
 }

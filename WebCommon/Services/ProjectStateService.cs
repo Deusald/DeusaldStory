@@ -802,10 +802,13 @@ public partial class ProjectStateService(
 
     /// <summary>
     /// Updates which external variable a Set-external-variable node assigns, the mode it uses, and — in
-    /// <see cref="StorySetExternalVariableMode.SpecificValue"/> mode — the fixed value it assigns. Leaving
-    /// map mode drops any wire feeding the node's value input.
+    /// <see cref="StorySetExternalVariableMode.SpecificValue"/> mode — the fixed value it assigns, or in
+    /// <see cref="StorySetExternalVariableMode.RemapFromVariable"/> mode the incoming-value conversion table.
+    /// Leaving the map/remap modes (which both consume the value input) drops any wire feeding it.
     /// </summary>
-    public void UpdateSetExternalVariableNode(Guid logicId, Guid nodeId, Guid selectedVariableId, StorySetExternalVariableMode mode, string value)
+    public void UpdateSetExternalVariableNode(
+        Guid logicId, Guid nodeId, Guid selectedVariableId, StorySetExternalVariableMode mode, string value,
+        List<StorySetExternalVariableRemap> valueMap)
     {
         if (!CurrentProject!.LogicNodes.TryGetValue(logicId, out StoryLogicNode? logic)) return;
         StorySetExternalVariableNode? node = logic.SetExternalVariableNodes.Find(n => n.Id == nodeId);
@@ -814,7 +817,9 @@ public partial class ProjectStateService(
         node.SelectedVariableId = selectedVariableId;
         node.Mode               = mode;
         node.Value              = value;
-        if (mode != StorySetExternalVariableMode.MapFromVariable)
+        node.ValueMap           = valueMap;
+        bool consumesInput = mode is StorySetExternalVariableMode.MapFromVariable or StorySetExternalVariableMode.RemapFromVariable;
+        if (!consumesInput)
             logic.ContentConnections.RemoveAll(c => c.FromPoint == node.ValueIn.Id || c.ToPoint == node.ValueIn.Id);
         MarkKeyDirty(logicId);
     }

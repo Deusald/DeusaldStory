@@ -62,3 +62,55 @@
     font-size: 0.85rem;
     color: var(--text-dim);
 }
+
+.sev-map {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    max-height: 12rem;
+    overflow-y: auto;
+}
+
+.sev-map-row {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.sev-map-from {
+    flex: 1 1 0;
+    min-width: 0;
+}
+
+.sev-map-to {
+    flex: 1 1 0;
+    min-width: 0;
+}
+
+.sev-map-arrow {
+    flex: 0 0 auto;
+    color: var(--text-dim);
+}
+
+.sev-map-del {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.9rem;
+    height: 1.9rem;
+    border: 1px solid var(--border);
+    border-radius: 0.4rem;
+    background: var(--surface);
+    color: var(--text-dim);
+    cursor: pointer;
+}
+
+.sev-map-del:hover {
+    border-color: var(--danger);
+    color: var(--danger);
+}
+
+.sev-map-add {
+    margin-top: 0.5rem;
+}
