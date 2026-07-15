@@ -117,14 +117,17 @@
                             </span>
                         }
                     </div>
-                    <div class="edg-node-title">@n.Title</div>
+                    @if (HasTitle(n))
+                    {
+                        <div class="edg-node-title" style="top:@F(TitleTop)px;">@n.Title</div>
+                    }
                     @if (sub)
                     {
-                        <div class="edg-node-preview">@n.Subtitle</div>
+                        <div class="edg-node-preview" style="top:@F(SubTop(n))px;">@n.Subtitle</div>
                     }
                     @if (HasThumb(n))
                     {
-                        <div class="edg-node-thumb">
+                        <div class="edg-node-thumb" style="top:@F(ThumbTop(n))px;">
                             <img src="data:image/png;base64,@n.Thumb" alt="@n.Title"/>
                         </div>
                     }
@@ -313,11 +316,26 @@
 
     // ── Node geometry ──────────────────────────────────────────────────────
 
+    // A node whose title only repeats its kind label (SmartFormat, FlowText, Exit…) hides the title line; the header
+    // block below it collapses so the title slot leaves no gap, which is why the positions are computed, not fixed.
+    private static bool HasTitle(EdNode n) => !string.IsNullOrEmpty(n.Title) && !StoryStyle.IsRedundantTitle(n.Kind, n.Title);
     private static bool HasSub(EdNode n) => !string.IsNullOrEmpty(n.Subtitle);
     private static bool HasThumb(EdNode n) => !string.IsNullOrEmpty(n.Thumb);
 
+    private static double TitleTop => HEAD_TOP + HEAD_H + TITLE_GAP;
+
+    private static double SubTop(EdNode n) =>
+        HEAD_TOP + HEAD_H + (HasTitle(n) ? TITLE_GAP + TITLE_H : 0) + SUB_GAP;
+
+    private static double ThumbTop(EdNode n) =>
+        HEAD_TOP + HEAD_H
+        + (HasTitle(n) ? TITLE_GAP + TITLE_H : 0)
+        + (HasSub(n)   ? SUB_GAP + SUB_H     : 0)
+        + THUMB_GAP;
+
     private static double PortsTop(EdNode n) =>
-        HEAD_TOP + HEAD_H + TITLE_GAP + TITLE_H
+        HEAD_TOP + HEAD_H
+        + (HasTitle(n) ? TITLE_GAP + TITLE_H : 0)
         + (HasSub(n)   ? SUB_GAP + SUB_H     : 0)
         + (HasThumb(n) ? THUMB_GAP + THUMB_H : 0)
         + PORTS_GAP;

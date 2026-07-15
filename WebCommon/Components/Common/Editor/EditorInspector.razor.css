@@ -88,6 +88,20 @@
 }
 .ins-section-count { font-size: 11px; color: var(--text-faint); }
 
+/* ── Connected text (SmartFormat / FlowText) ─────────────────────────────── */
+
+.ins-text {
+    font-size: 12.5px;
+    line-height: 1.5;
+    color: var(--text-bright);
+    white-space: pre-wrap;
+    word-break: break-word;
+    padding: 8px 10px;
+    background: var(--surface-sunken, rgba(255, 255, 255, .03));
+    border: 1px solid var(--border-subtle);
+    border-radius: 6px;
+}
+
 /* ── Thumbnail (Icon node preview) ───────────────────────────────────────── */
 
 .ins-thumb {

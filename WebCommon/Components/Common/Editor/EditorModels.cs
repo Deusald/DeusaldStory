@@ -724,6 +724,17 @@ namespace DeusaldStoryWeb
         };
 
         /// <summary>
+        /// True when a node's <see cref="EdNode.Title"/> carries no information beyond the kind label already shown in
+        /// the header (e.g. a SmartFormat / FlowText / Exit node whose title just repeats its type) — so callers can
+        /// skip drawing the redundant title line. Compares case- and whitespace-insensitively.
+        /// </summary>
+        public static bool IsRedundantTitle(StoryNodeKind kind, string title)
+        {
+            static string Norm(string s) => new string(s.Where(c => !char.IsWhiteSpace(c)).ToArray()).ToUpperInvariant();
+            return !string.IsNullOrWhiteSpace(title) && Norm(title) == Norm(NodeLabel(kind));
+        }
+
+        /// <summary>
         /// The Bootstrap icon shown in a node's header (in place of the old kind dot). Mirrors the icons the node
         /// palette uses for the kinds it offers; boundary/built-in kinds (Start/End/Entry/Exit/portals) that never
         /// appear in the palette get their own arrow glyphs.

@@ -156,7 +156,7 @@
    title top 36 + title height 20 + THUMB_GAP 8 = 64; height = THUMB_H. Assumes no subtitle. */
 .edg-node-thumb {
     position: absolute;
-    top: 64px;
+    /* top is set inline (computed) — see .edg-node-title. */
     left: 14px;
     right: 14px;
     height: 46px;
@@ -213,7 +213,7 @@
 
 .edg-node-title {
     position: absolute;
-    top: 36px;
+    /* top is set inline (computed) so the header block can collapse when the title is hidden. */
     left: 14px;
     right: 14px;
     height: 20px;
@@ -228,7 +228,7 @@
 
 .edg-node-preview {
     position: absolute;
-    top: 62px;
+    /* top is set inline (computed) — see .edg-node-title. */
     left: 14px;
     right: 14px;
     height: 16px;

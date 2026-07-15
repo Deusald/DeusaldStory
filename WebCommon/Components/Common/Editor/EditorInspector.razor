@@ -1,4 +1,5 @@
 @namespace DeusaldStoryWeb.Components.Common
+@inject ProjectStateService _ProjectState
 
 <div class="ins-root">
 
@@ -20,7 +21,11 @@
                     @StoryStyle.NodeLabel(Node.Kind)
                 </span>
             </div>
-            <div class="ins-title">@Node.Title</div>
+            @* Skip the title when it only repeats the kind label above (e.g. SmartFormat / FlowText / Exit). *@
+            @if (!StoryStyle.IsRedundantTitle(Node.Kind, Node.Title))
+            {
+                <div class="ins-title">@Node.Title</div>
+            }
             @if (!string.IsNullOrEmpty(Node.Subtitle))
             {
                 <div class="ins-subtitle">@Node.Subtitle</div>
@@ -29,6 +34,15 @@
 
         @* ── Body ────────────────────────────────────────────────────── *@
         <div class="ins-body">
+
+            @* SmartFormat / FlowText carry no config of their own — surface the text wired into them. *@
+            @if (ConnectedText is string connected)
+            {
+                <div class="ins-section-head">
+                    <span class="ins-section-label">Connected text</span>
+                </div>
+                <div class="ins-text">@(string.IsNullOrWhiteSpace(connected) ? "(nothing connected)" : connected)</div>
+            }
 
             @if (!string.IsNullOrEmpty(Node.Thumb))
             {
@@ -73,7 +87,25 @@
 </div>
 
 @code {
-    [Parameter] public EdNode? Node { get; set; }
+    [Parameter] public EdNode?        Node  { get; set; }
+    /// <summary>The logic node whose inner graph the selected node lives in (null in a container graph); used to resolve wired-in text.</summary>
+    [Parameter] public StoryLogicNode? Logic { get; set; }
+
+    /// <summary>
+    /// For a SmartFormat / FlowText node, the text resolved from whatever is wired into its Text input (the format
+    /// string for SmartFormat, the formatted result for FlowText). Null for every other kind — those show no text row.
+    /// </summary>
+    private string? ConnectedText
+    {
+        get
+        {
+            if (Logic is null || Node is null) return null;
+            if (Node.Kind is not (StoryNodeKind.SmartFormat or StoryNodeKind.FlowText)) return null;
+            EdPort? textIn = Node.Inputs.Find(p => p.Type == PortType.Text);
+            if (textIn is null) return null;
+            return StoryLogicRenderer.ResolvePortText(_ProjectState.CurrentProject!, _ProjectState.CurrentLocalization, Logic, textIn.Id);
+        }
+    }
 
     private static string PortName(EdPort port) => string.IsNullOrEmpty(port.Name) ? "(unnamed)" : port.Name;
 
