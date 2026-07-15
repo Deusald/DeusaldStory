@@ -179,14 +179,17 @@ namespace DeusaldStoryCommon
         {
             foreach (StoryLogicNode logic in project.LogicNodes.Values)
             {
-                StoryLogicRenderer.RenderedLogic rendered = StoryLogicRenderer.Render(
-                    project, localization, logic, _EmptyValues, paper: true, StoryRenderTarget.Gamebook);
-                foreach (string error in rendered.Errors)
-                    problems.Add(Node(logic, $"In '{NodeName(logic.Name)}': {error}"));
+                // Validate the node exactly as the Gamebook prints it: one render per generated section, each pinning the
+                // incoming declared-variable constants. Rendering once with empty values would resolve a Prev Exit Variable
+                // to "" and raise false SmartFormat errors (e.g. a {var:choose(…)} that never sees an empty value in print).
+                StoryGamebookPreview.Result gamebook = StoryGamebookPreview.Build(project, localization, logic);
+                HashSet<string>             seen     = new();
+                foreach (StoryGamebookPreview.Section section in gamebook.Sections)
+                    foreach (string error in section.Rendered.Errors)
+                        if (seen.Add(error))
+                            problems.Add(Node(logic, $"In '{NodeName(logic.Name)}': {error}"));
             }
         }
-
-        private static readonly Dictionary<Guid, string> _EmptyValues = new();
 
         private static Guid FromInto(StoryLogicNode logic, Guid toPoint) =>
             logic.ContentConnections.Find(c => c.ToPoint == toPoint)?.FromPoint ?? Guid.Empty;
