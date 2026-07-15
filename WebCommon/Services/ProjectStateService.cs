@@ -597,6 +597,31 @@ public partial class ProjectStateService(
         MarkKeyDirty(logicId);
     }
 
+    /// <summary>Adds a Split-for-App node (breaks the App render into a new "continue" page) to a logic node's inner graph.</summary>
+    public StorySplitForAppNode? AddSplitForAppNode(Guid logicId, double x, double y)
+    {
+        if (!CurrentProject!.LogicNodes.TryGetValue(logicId, out StoryLogicNode? logic)) return null;
+
+        StorySplitForAppNode node = new() { X = x, Y = y };
+        logic.SplitForAppNodes.Add(node);
+        MarkKeyDirty(logicId);
+        return node;
+    }
+
+    /// <summary>Deletes a Split-for-App node and any inner wire that touched its flow ports.</summary>
+    public void DeleteSplitForAppNode(Guid logicId, Guid nodeId)
+    {
+        if (!CurrentProject!.LogicNodes.TryGetValue(logicId, out StoryLogicNode? logic)) return;
+        StorySplitForAppNode? node = logic.SplitForAppNodes.Find(n => n.Id == nodeId);
+        if (node is null) return;
+
+        logic.SplitForAppNodes.Remove(node);
+        logic.ContentConnections.RemoveAll(c =>
+            c.FromPoint == node.FlowOut.Id || c.ToPoint == node.FlowOut.Id ||
+            c.FromPoint == node.FlowIn.Id  || c.ToPoint == node.FlowIn.Id);
+        MarkKeyDirty(logicId);
+    }
+
     // ── Comment notes ──────────────────────────────────────────────────────
     // A comment lives either in a container's graph or in a logic node's inner graph; the owner id resolves to
     // whichever exists. Comments have no ports, so there are never wires to clean up on delete.
@@ -1049,6 +1074,15 @@ public partial class ProjectStateService(
             return;
         }
 
+        StorySplitForAppNode? split = logic.SplitForAppNodes.Find(n => n.Id == movedId);
+        if (split is not null)
+        {
+            split.X = x;
+            split.Y = y;
+            MarkKeyDirty(logicId);
+            return;
+        }
+
         StoryRegisterVariableNode? reg = logic.RegisterVariableNodes.Find(n => n.Id == movedId);
         if (reg is not null)
         {
@@ -1408,6 +1442,11 @@ public partial class ProjectStateService(
         {
             valid.Add(n.FlowIn.Id);
             valid.Add(n.TextIn.Id);
+            valid.Add(n.FlowOut.Id);
+        }
+        foreach (StorySplitForAppNode n in logic.SplitForAppNodes)
+        {
+            valid.Add(n.FlowIn.Id);
             valid.Add(n.FlowOut.Id);
         }
         foreach (StoryRegisterVariableNode n in logic.RegisterVariableNodes)

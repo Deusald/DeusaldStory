@@ -148,6 +148,17 @@
     font-weight: 500;
 }
 
+/* Split-for-App page indicator — shown only when the node breaks into multiple "continue" pages. */
+.lpv-page-tag {
+    align-self: flex-end;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    opacity: .8;
+}
+
 /* Continue buttons — the app's dummy "next" (one per exit branch). */
 .lpv-continue {
     display: flex;

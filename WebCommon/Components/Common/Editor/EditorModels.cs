@@ -84,6 +84,7 @@ namespace DeusaldStoryWeb
         GetVariable,      // inside a logic node: reads a registered storage variable — App value / Gamebook slot tag (teal)
         ConstantVariable, // inside a logic node: a named constant value fed into a SmartFormat/Exit input (teal)
         FlowText,         // inside a logic node: on the LFlow chain, renders a text block then continues (amber)
+        SplitForApp,      // inside a logic node: on the LFlow chain, breaks the App render into a new "continue" page (purple)
         RegisterVariable,   // inside a logic node: on the LFlow chain, claims a storage slot for a new variable (green)
         SetVariable,        // inside a logic node: on the LFlow chain, sets an already-registered variable's value (blue)
         UnregisterVariable, // inside a logic node: on the LFlow chain, releases a registered variable and frees its slot (red)
@@ -515,6 +516,25 @@ namespace DeusaldStoryWeb
                 nodes.Add(node);
             }
 
+            // ── Split-for-App nodes (purple) — on the flow spine, break the App render into a new "continue" page. ──
+            foreach (StorySplitForAppNode split in logic.SplitForAppNodes)
+            {
+                EdNode node = new()
+                {
+                    Id        = split.Id,
+                    Kind      = StoryNodeKind.SplitForApp,
+                    Title     = "Split For App",
+                    Subtitle  = "App page break",
+                    X         = split.X,
+                    Y         = split.Y,
+                    Deletable = true,
+                    Editable  = false
+                };
+                node.Inputs.Add(new EdPort { Id = split.FlowIn.Id, Name = "Flow", Type = PortType.LFlow });
+                node.Outputs.Add(new EdPort { Id = split.FlowOut.Id, Name = "Flow", Type = PortType.LFlow });
+                nodes.Add(node);
+            }
+
             // ── Register-variable nodes (green) — on the flow spine, claim a storage slot for a new variable. ──
             foreach (StoryRegisterVariableNode reg in logic.RegisterVariableNodes)
             {
@@ -725,6 +745,7 @@ namespace DeusaldStoryWeb
             StoryNodeKind.GetVariable      => "GET VARIABLE",
             StoryNodeKind.ConstantVariable => "CONSTANT VARIABLE",
             StoryNodeKind.FlowText         => "FLOW TEXT",
+            StoryNodeKind.SplitForApp      => "SPLIT FOR APP",
             StoryNodeKind.RegisterVariable   => "REGISTER VARIABLE",
             StoryNodeKind.SetVariable        => "SET VARIABLE",
             StoryNodeKind.UnregisterVariable => "UNREGISTER VARIABLE",
@@ -770,6 +791,7 @@ namespace DeusaldStoryWeb
             StoryNodeKind.GetVariable      => "bi-box-arrow-down",
             StoryNodeKind.ConstantVariable => "bi-braces",
             StoryNodeKind.FlowText         => "bi-text-paragraph",
+            StoryNodeKind.SplitForApp      => "bi-scissors",
             StoryNodeKind.RegisterVariable   => "bi-box-seam",
             StoryNodeKind.SetVariable        => "bi-pencil-square",
             StoryNodeKind.UnregisterVariable => "bi-box-arrow-up",
@@ -828,6 +850,7 @@ namespace DeusaldStoryWeb
             StoryNodeKind.GetVariable      => "var(--code-func)",
             StoryNodeKind.ConstantVariable => "var(--code-func)",
             StoryNodeKind.FlowText         => "var(--warning)",
+            StoryNodeKind.SplitForApp      => "var(--purple)",
             StoryNodeKind.RegisterVariable   => "var(--success)",
             StoryNodeKind.SetVariable        => "var(--info)",
             StoryNodeKind.UnregisterVariable => "var(--danger)",

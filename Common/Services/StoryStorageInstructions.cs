@@ -47,18 +47,21 @@ namespace DeusaldStoryCommon
         {
             List<StorageInstruction> list = new();
             foreach (StorageOp op in StoryLogicFlow.StorageOps(project, logic, target, values))
-            {
-                StorageInstruction? entry = op.Kind switch
-                {
-                    StorageOpKind.Register   => RegisterEntry(project, localization, logic, op.Register!, target),
-                    StorageOpKind.Set        => SetEntry(project, localization, logic, op.Set!, target),
-                    StorageOpKind.Unregister => ClearEntry(project, localization, op.Unregister!, target),
-                    _                        => null
-                };
-                if (entry is not null) list.Add(entry);
-            }
+                if (ForOp(project, localization, logic, op, target) is StorageInstruction entry)
+                    list.Add(entry);
             return list;
         }
+
+        /// <summary>The player-facing instruction a single storage operation surfaces (null when it surfaces nothing for the medium).</summary>
+        public static StorageInstruction? ForOp(
+            StoryProject project, LocProject? localization, StoryLogicNode logic, StorageOp op, StoryRenderTarget target) =>
+            op.Kind switch
+            {
+                StorageOpKind.Register   => RegisterEntry(project, localization, logic, op.Register!, target),
+                StorageOpKind.Set        => SetEntry(project, localization, logic, op.Set!, target),
+                StorageOpKind.Unregister => ClearEntry(project, localization, op.Unregister!, target),
+                _                        => null
+            };
 
         private static StorageInstruction? RegisterEntry(
             StoryProject project, LocProject? localization, StoryLogicNode logic, StoryRegisterVariableNode reg, StoryRenderTarget target)

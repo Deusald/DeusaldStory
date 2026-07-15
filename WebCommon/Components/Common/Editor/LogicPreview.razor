@@ -54,23 +54,31 @@
         </div>
 
         @{
-            List<StorageInstruction> aboveFields = _Rendered.Instructions.Where(i => i.IsAppInput && i.Placement == StorageInstructionPlacement.Above).ToList();
-            List<StorageInstruction> belowFields = _Rendered.Instructions.Where(i => i.IsAppInput && i.Placement == StorageInstructionPlacement.Below).ToList();
+            int  pageCount = Math.Max(1, _Rendered.Pages.Count);
+            int  pageIndex = Math.Clamp(_Page, 0, pageCount - 1);
+            bool lastPage  = pageIndex >= pageCount - 1;
+            StoryLogicRenderer.RenderedPage page = pageIndex < _Rendered.Pages.Count ? _Rendered.Pages[pageIndex] : new();
+            bool nodeHasBlocks = _Rendered.Pages.Any(p => p.Blocks.Count > 0);
+        }
+
+        @if (pageCount > 1)
+        {
+            <div class="lpv-page-tag">Page @(pageIndex + 1) / @pageCount</div>
         }
 
         @* Player-input String fields sit above the text when so placed. Number/Dial/specific values store silently. *@
-        @foreach (StorageInstruction field in aboveFields)
+        @foreach (StorageInstruction field in page.Above)
         {
             @InputField(field)
         }
 
-        @if (_Rendered.Blocks.Count == 0)
+        @if (!nodeHasBlocks)
         {
             <div class="lpv-block lpv-placeholder">No text blocks connected — wire the Entry flow into a FlowText node.</div>
         }
         else
         {
-            @foreach (string block in _Rendered.Blocks)
+            @foreach (string block in page.Blocks)
             {
                 @if (string.IsNullOrEmpty(block))
                 {
@@ -83,12 +91,22 @@
             }
         }
 
-        @foreach (StorageInstruction field in belowFields)
+        @foreach (StorageInstruction field in page.Below)
         {
             @InputField(field)
         }
 
-        @if (_Rendered.Choices.Count > 0)
+        @if (!lastPage)
+        {
+            @* A Split-for-App break — advance to the next page of this same node (title/subtitle/icon stay). *@
+            <div class="lpv-continue">
+                <button class="lpv-continue-btn" @onclick="() => _Page = pageIndex + 1">
+                    <span>@_ContinueLabel</span>
+                    <i class="bi bi-arrow-right"></i>
+                </button>
+            </div>
+        }
+        else if (_Rendered.Choices.Count > 0)
         {
             @* Choice buttons — each advances the preview along that choice's continuation. *@
             <div class="lpv-continue">
@@ -147,14 +165,22 @@
     [Parameter] public EventCallback<StoryLogicRenderer.RenderedChoice> OnContinue { get; set; }
 
     private bool _Paper; // false = dark (default), true = paper/light
+    private int  _Page;  // current Split-for-App page shown (reset when the previewed node changes)
 
     private StoryLogicRenderer.RenderedLogic _Rendered = new();
     private string                           _ContinueLabel = "";
+    private Guid                             _RenderedLogicId;
 
     protected override void OnParametersSet()
     {
         _Rendered      = Render();
         _ContinueLabel = StoryCommonLocalizationKeys.Resolve(_ProjectState.CurrentLocalization, StoryCommonLocalizationKeys.AppContinueButton);
+        // Navigating to a different logic node restarts its paging from the top; editing the same node keeps the page.
+        if (Logic.Id != _RenderedLogicId)
+        {
+            _Page            = 0;
+            _RenderedLogicId = Logic.Id;
+        }
     }
 
     private void SetPaper(bool paper)

@@ -452,6 +452,7 @@
                 new NodePaletteItem(StoryNodeKind.GetVariable,      "bi-box-arrow-down",  "Get variable",           "Reads a registered variable: a Value output (App) and a Slot-tag output (Gamebook)."),
                 new NodePaletteItem(StoryNodeKind.ConstantVariable, "bi-braces",          "Constant variable",      "Supplies a named constant value into a SmartFormat / Exit variables input (never splits Gamebook sections)."),
                 new NodePaletteItem(StoryNodeKind.FlowText,         "bi-text-paragraph",  "FlowText node",         "On the logic chain — renders a connected text block, then continues to the next node."),
+                new NodePaletteItem(StoryNodeKind.SplitForApp,      "bi-scissors",        "Split for App",         "On the logic chain — App only: breaks the screen here with a \"Click here to continue…\" button (Gamebook ignores it)."),
                 new NodePaletteItem(StoryNodeKind.RegisterVariable,   "bi-box-seam",        "Register variable",     "On the logic chain — claims a physical storage slot for a new variable."),
                 new NodePaletteItem(StoryNodeKind.SetVariable,        "bi-pencil-square",   "Set variable",          "On the logic chain — assigns a value to an already-registered variable."),
                 new NodePaletteItem(StoryNodeKind.UnregisterVariable, "bi-box-arrow-up",    "Unregister variable",   "On the logic chain — releases a registered variable and frees its slot."),
@@ -494,6 +495,12 @@
                 // No config — create it straight away at the pending position.
                 if (_ProjectState.AddFlowTextNode(_CurrentId, _PendingX, _PendingY) is StoryFlowTextNode ft)
                     _SelectedId = ft.Id;
+                RebuildNodes();
+                break;
+            case StoryNodeKind.SplitForApp:
+                // No config — create it straight away at the pending position.
+                if (_ProjectState.AddSplitForAppNode(_CurrentId, _PendingX, _PendingY) is StorySplitForAppNode split)
+                    _SelectedId = split.Id;
                 RebuildNodes();
                 break;
             case StoryNodeKind.RegisterVariable:   _RegisterVariableModal?.Show(ComputeFreeSlots()); break;
@@ -919,6 +926,7 @@
             case StoryNodeKind.GetVariable:      _ProjectState.DeleteGetVariableNode(_CurrentId, node.Id);      break;
             case StoryNodeKind.ConstantVariable: _ProjectState.DeleteConstantVariableNode(_CurrentId, node.Id); break;
             case StoryNodeKind.FlowText:         _ProjectState.DeleteFlowTextNode(_CurrentId, node.Id);        break;
+            case StoryNodeKind.SplitForApp:      _ProjectState.DeleteSplitForAppNode(_CurrentId, node.Id);     break;
             case StoryNodeKind.RegisterVariable:   _ProjectState.DeleteRegisterVariableNode(_CurrentId, node.Id);   break;
             case StoryNodeKind.SetVariable:        _ProjectState.DeleteSetVariableNode(_CurrentId, node.Id);        break;
             case StoryNodeKind.UnregisterVariable: _ProjectState.DeleteUnregisterVariableNode(_CurrentId, node.Id); break;

@@ -23,7 +23,12 @@ namespace DeusaldStoryCommon
             public string       Title    { get; set; } = "";
             public string       Subtitle { get; set; } = "";
             public string?      IconData { get; set; }
+
+            /// <summary>Every text block in flow order (all App pages concatenated). The Gamebook renders this as one continuous section.</summary>
             public List<string> Blocks   { get; set; } = new();
+
+            /// <summary>The App-only paging of the content — one entry per "Click here to continue…" screen (see <see cref="RenderedPage"/>). Empty for the Gamebook.</summary>
+            public List<RenderedPage> Pages { get; set; } = new();
 
             /// <summary>The continuations offered by the node's Exit node (one per choice; one auto choice in App auto-mode).</summary>
             public List<RenderedChoice> Choices { get; set; } = new();
@@ -33,6 +38,18 @@ namespace DeusaldStoryCommon
 
             /// <summary>SmartFormat render failures encountered while resolving this node's text (e.g. a Variable unavailable in the Gamebook).</summary>
             public List<string> Errors { get; set; } = new();
+        }
+
+        /// <summary>
+        /// One App "page" — the content shown on a single screen, ending in a "Click here to continue…" button (or the
+        /// exit choices on the last page). A Split-for-App node on the flow spine starts a new page; input fields land on
+        /// the page whose flow segment contains them, positioned above or below that page's text by their own placement.
+        /// </summary>
+        public sealed class RenderedPage
+        {
+            public List<StorageInstruction> Above  { get; set; } = new();
+            public List<string>             Blocks { get; set; } = new();
+            public List<StorageInstruction> Below  { get; set; } = new();
         }
 
         /// <summary>One resolved choice — its player-facing text plus how the App/Gamebook continues from it.</summary>
@@ -55,14 +72,31 @@ namespace DeusaldStoryCommon
             StoryProject project, LocProject? localization, StoryLogicNode logic,
             IReadOnlyDictionary<Guid, string> values, bool paper, StoryRenderTarget target = StoryRenderTarget.App)
         {
-            List<string> errors = new();
-            WalkSpine(project, localization, logic, values, target, errors, out List<string> blocks, out List<RenderedChoice> choices);
+            List<string>         errors  = new();
+            List<RenderedChoice> choices = ResolveChoices(project, localization, logic, values, target, errors);
+
+            // The App pages the content into "Click here to continue…" screens at each Split-for-App node; the Gamebook
+            // ignores splits and reads as one continuous block. Blocks (flat) stays populated for both mediums.
+            List<RenderedPage> pages;
+            List<string>       blocks;
+            if (target == StoryRenderTarget.App)
+            {
+                pages  = BuildAppPages(project, localization, logic, values, errors);
+                blocks = pages.SelectMany(p => p.Blocks).ToList();
+            }
+            else
+            {
+                blocks = WalkTextBlocks(project, localization, logic, values, target, errors);
+                pages  = new();
+            }
+
             return new RenderedLogic
             {
                 Title        = ResolveText(project, localization, logic, values, FromPointInto(logic, logic.TitleIn.Id),    target, 0, errors),
                 Subtitle     = ResolveText(project, localization, logic, values, FromPointInto(logic, logic.SubtitleIn.Id), target, 0, errors),
                 IconData     = ResolveIconImage(project, logic, FromPointInto(logic, logic.IconIn.Id), paper, 0),
                 Blocks       = blocks,
+                Pages        = pages,
                 Choices      = choices,
                 Instructions = StoryStorageInstructions.For(project, localization, logic, target, values),
                 Errors       = errors
@@ -72,11 +106,8 @@ namespace DeusaldStoryCommon
         /// <summary>The choices the node's Exit node offers for <paramref name="target"/>.</summary>
         public static List<RenderedChoice> Choices(
             StoryProject project, LocProject? localization, StoryLogicNode logic,
-            IReadOnlyDictionary<Guid, string> values, StoryRenderTarget target = StoryRenderTarget.App)
-        {
-            WalkSpine(project, localization, logic, values, target, new List<string>(), out _, out List<RenderedChoice> choices);
-            return choices;
-        }
+            IReadOnlyDictionary<Guid, string> values, StoryRenderTarget target = StoryRenderTarget.App) =>
+            ResolveChoices(project, localization, logic, values, target, new List<string>());
 
         /// <summary>
         /// Resolves the text wired into <paramref name="toPoint"/> (a Localization / SmartFormat output), for flow-only
@@ -98,19 +129,17 @@ namespace DeusaldStoryCommon
         // ── LFlow chain walk ─────────────────────────────────────────────────────
 
         /// <summary>
-        /// Walks the linear LFlow chain from the Entry, collecting the ordered text <paramref name="blocks"/> rendered
-        /// by FlowText nodes (storage / set-external nodes pass straight through), then resolves the Exit node's
-        /// <paramref name="choices"/>. In the App, when the Exit's Variables input is wired, the choice auto-resolves to
-        /// one button via each choice's condition (Else last); otherwise every choice is a button. The Gamebook always
-        /// lists every choice.
+        /// Walks the linear LFlow chain from the Entry, collecting the ordered text blocks rendered by FlowText nodes
+        /// (storage / set-external / split nodes pass straight through). A block whose FlowText is switched off for
+        /// <paramref name="renderTarget"/> is skipped. Split-for-App nodes have no effect here — they are an App-only
+        /// concern handled by <see cref="BuildAppPages"/>; the Gamebook reads the whole chain as one block list.
         /// </summary>
-        private static void WalkSpine(
-            StoryProject project, LocProject? localization, StoryLogicNode logic, IReadOnlyDictionary<Guid, string> values,
-            StoryRenderTarget renderTarget, List<string> errors, out List<string> blocks, out List<RenderedChoice> choices)
+        private static List<string> WalkTextBlocks(
+            StoryProject project, LocProject? localization, StoryLogicNode logic,
+            IReadOnlyDictionary<Guid, string> values, StoryRenderTarget renderTarget, List<string> errors)
         {
-            blocks  = new();
-            choices = new();
-            Guid target = FlowTargetOf(logic, logic.EntryPoint.Id);
+            List<string> blocks = new();
+            Guid         target = FlowTargetOf(logic, logic.EntryPoint.Id);
 
             for (int guard = 0; guard < 256; ++guard)
             {
@@ -121,6 +150,8 @@ namespace DeusaldStoryCommon
                         blocks.Add(ResolveText(project, localization, logic, values, FromPointInto(logic, ft.TextIn.Id), renderTarget, 0, errors));
                     target = FlowTargetOf(logic, ft.FlowOut.Id);
                 }
+                else if (logic.SplitForAppNodes.Find(n => n.FlowIn.Id == target) is StorySplitForAppNode split)
+                    target = FlowTargetOf(logic, split.FlowOut.Id);
                 else if (logic.SetExternalVariableNodes.Find(n => n.FlowIn.Id == target) is StorySetExternalVariableNode se)
                     target = FlowTargetOf(logic, se.FlowOut.Id);
                 else if (logic.RegisterVariableNodes.Find(n => n.FlowIn.Id == target) is StoryRegisterVariableNode reg)
@@ -133,7 +164,82 @@ namespace DeusaldStoryCommon
                     break; // reached the Exit node's LFlow input or a leaf
             }
 
-            choices = ResolveChoices(project, localization, logic, values, renderTarget, errors);
+            return blocks;
+        }
+
+        /// <summary>
+        /// Builds the App's "Click here to continue…" pages by walking the flow spine once: FlowText blocks and the
+        /// input fields produced by Register / Set nodes are collected in flow order onto the current page, a
+        /// Split-for-App node starts a new page, and each input lands above or below its page's text by its own
+        /// placement. Storage nodes left off the chain still surface their input on the last page. Fully empty pages
+        /// (a split at an edge or back-to-back splits) are dropped; at least one page is always returned.
+        /// </summary>
+        private static List<RenderedPage> BuildAppPages(
+            StoryProject project, LocProject? localization, StoryLogicNode logic,
+            IReadOnlyDictionary<Guid, string> values, List<string> errors)
+        {
+            List<RenderedPage> pages   = new() { new() };
+            HashSet<Guid>      visited = new(); // storage nodes already emitted on the spine
+            Guid               target  = FlowTargetOf(logic, logic.EntryPoint.Id);
+
+            void AddInput(RenderedPage page, StorageInstruction? entry)
+            {
+                if (entry is not { IsAppInput: true }) return; // the App surfaces only player-input fields
+                (entry.Placement == StorageInstructionPlacement.Above ? page.Above : page.Below).Add(entry);
+            }
+
+            for (int guard = 0; guard < 256; ++guard)
+            {
+                RenderedPage page = pages[^1];
+                if (logic.FlowTextNodes.Find(n => n.FlowIn.Id == target) is StoryFlowTextNode ft)
+                {
+                    if (ft.RenderInApp)
+                        page.Blocks.Add(ResolveText(project, localization, logic, values, FromPointInto(logic, ft.TextIn.Id), StoryRenderTarget.App, 0, errors));
+                    target = FlowTargetOf(logic, ft.FlowOut.Id);
+                }
+                else if (logic.SplitForAppNodes.Find(n => n.FlowIn.Id == target) is StorySplitForAppNode split)
+                {
+                    pages.Add(new());
+                    target = FlowTargetOf(logic, split.FlowOut.Id);
+                }
+                else if (logic.RegisterVariableNodes.Find(n => n.FlowIn.Id == target) is StoryRegisterVariableNode reg)
+                {
+                    AddInput(page, StoryStorageInstructions.ForOp(project, localization, logic, new StorageOp { Kind = StorageOpKind.Register, Register = reg }, StoryRenderTarget.App));
+                    visited.Add(reg.Id);
+                    target = FlowTargetOf(logic, reg.FlowOut.Id);
+                }
+                else if (logic.SetVariableNodes.Find(n => n.FlowIn.Id == target) is StorySetVariableNode set)
+                {
+                    AddInput(page, StoryStorageInstructions.ForOp(project, localization, logic, new StorageOp { Kind = StorageOpKind.Set, Set = set }, StoryRenderTarget.App));
+                    visited.Add(set.Id);
+                    target = FlowTargetOf(logic, set.FlowOut.Id);
+                }
+                else if (logic.UnregisterVariableNodes.Find(n => n.FlowIn.Id == target) is StoryUnregisterVariableNode unreg)
+                {
+                    visited.Add(unreg.Id); // the App drops the value silently — no input field
+                    target = FlowTargetOf(logic, unreg.FlowOut.Id);
+                }
+                else if (logic.SetExternalVariableNodes.Find(n => n.FlowIn.Id == target) is StorySetExternalVariableNode se)
+                    target = FlowTargetOf(logic, se.FlowOut.Id);
+                else
+                    break; // reached the Exit node's LFlow input or a leaf
+            }
+
+            // Storage nodes dropped in but left unwired still run when the story visits the node — surface their input
+            // on the last page (they have no flow position of their own). Mirrors StoryLogicFlow's unwired-tail append.
+            RenderedPage last = pages[^1];
+            bool Wired(StoryConnectionPoint flowIn, StoryConnectionPoint flowOut) =>
+                logic.ContentConnections.Exists(c => c.ToPoint == flowIn.Id || c.FromPoint == flowOut.Id);
+            foreach (StoryRegisterVariableNode reg in logic.RegisterVariableNodes)
+                if (!visited.Contains(reg.Id) && !Wired(reg.FlowIn, reg.FlowOut))
+                    AddInput(last, StoryStorageInstructions.ForOp(project, localization, logic, new StorageOp { Kind = StorageOpKind.Register, Register = reg }, StoryRenderTarget.App));
+            foreach (StorySetVariableNode set in logic.SetVariableNodes)
+                if (!visited.Contains(set.Id) && !Wired(set.FlowIn, set.FlowOut))
+                    AddInput(last, StoryStorageInstructions.ForOp(project, localization, logic, new StorageOp { Kind = StorageOpKind.Set, Set = set }, StoryRenderTarget.App));
+
+            pages.RemoveAll(p => p.Above.Count == 0 && p.Blocks.Count == 0 && p.Below.Count == 0);
+            if (pages.Count == 0) pages.Add(new());
+            return pages;
         }
 
         /// <summary>Resolves the Exit node's <see cref="StoryLogicNode.Choices"/> into rendered continuations for the medium.</summary>

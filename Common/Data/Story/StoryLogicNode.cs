@@ -104,6 +104,9 @@ namespace DeusaldStoryCommon
         /// <summary>FlowText nodes placed in the inner graph — the LFlow chain that renders text blocks in order.</summary>
         public List<StoryFlowTextNode> FlowTextNodes { get; } = new();
 
+        /// <summary>Split-for-App nodes on the LFlow chain — each breaks the App render into a new "continue" page (ignored by the Gamebook).</summary>
+        public List<StorySplitForAppNode> SplitForAppNodes { get; } = new();
+
         /// <summary>Register-variable nodes on the LFlow chain — each claims a physical storage slot for a new variable.</summary>
         public List<StoryRegisterVariableNode> RegisterVariableNodes { get; } = new();
 

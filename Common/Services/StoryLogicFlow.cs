@@ -142,6 +142,10 @@ namespace DeusaldStoryCommon
                 {
                     from = ft.FlowOut.Id; // text block — pass through
                 }
+                else if (logic.SplitForAppNodes.Find(n => n.FlowIn.Id == to) is StorySplitForAppNode split)
+                {
+                    from = split.FlowOut.Id; // App page break — not a storage op, pass through
+                }
                 else if (logic.SetExternalVariableNodes.Find(n => n.FlowIn.Id == to) is StorySetExternalVariableNode se)
                 {
                     from = se.FlowOut.Id; // external-variable set — not a storage op, pass through
