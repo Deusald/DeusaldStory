@@ -107,7 +107,7 @@
         List<StoryVariable> ordered = map.Values.OrderBy(v => v.Name, StringComparer.OrdinalIgnoreCase).ToList();
 
         foreach (StoryDeclaredVariable d in StorySelectionResolver.IncomingVariables(_ProjectState.CurrentProject!, Logic))
-            ordered.Add(new StoryVariable { Id = d.Id, Name = string.IsNullOrWhiteSpace(d.Name) ? "(incoming)" : d.Name });
+            ordered.Add(new StoryVariable { Id = d.Id, Name = string.IsNullOrWhiteSpace(d.Name) ? "(incoming)" : d.Name, PossibleValues = d.PossibleValues });
 
         return ordered;
     }
