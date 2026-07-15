@@ -717,20 +717,20 @@
         if (args.EditId != Guid.Empty)
         {
             _ProjectState.UpdateLogicNode(
-                _CurrentId, args.EditId, args.Name, args.Description, args.EntryName,
+                _CurrentId, args.EditId, args.Name, args.Description,
                 args.GamebookInstructions, args.ExitMode, args.AcceptVariables, args.DeclaredVariables);
             RebuildNodes();
             _SelectedId = args.EditId;
             return;
         }
 
-        StoryConnectionPoint entry = new() { Name = args.EntryName };
+        StoryConnectionPoint entry = new() { Name = "In" };
         StoryLogicNode node = _ProjectState.AddLogicNode(
             _CurrentId, args.Name, args.Description, entry, _PendingX, _PendingY,
             args.GamebookInstructions, args.ExitMode, args.AcceptVariables);
         // Declared variables (SinglePath) are reconciled through the update path.
         _ProjectState.UpdateLogicNode(
-            _CurrentId, node.Id, args.Name, args.Description, args.EntryName,
+            _CurrentId, node.Id, args.Name, args.Description,
             args.GamebookInstructions, args.ExitMode, args.AcceptVariables, args.DeclaredVariables);
 
         RebuildNodes();
@@ -781,9 +781,9 @@
             case StoryNodeKind.Logic:
                 if (Project.LogicNodes.TryGetValue(node.Id, out StoryLogicNode? logic))
                     _NewLogicNodeModal?.ShowEdit(
-                        logic.Id, logic.Name, logic.Description, logic.EntryPoint.Name,
+                        logic.Id, logic.Name, logic.Description,
                         logic.GamebookInstructions, logic.ExitMode, logic.AcceptVariables,
-                        logic.DeclaredVariables.Select(d => (d.Id, d.Name)));
+                        logic.DeclaredVariables.Select(d => (d.Id, d.Name, d.PossibleValues)));
                 break;
 
             case StoryNodeKind.Container:
@@ -875,7 +875,12 @@
             return (StoryBuiltInVariables.Find(ev.SelectedVariableId)
                     ?? (Project.Variables.TryGetValue(ev.SelectedVariableId, out StoryVariable? v) ? v : null))?.Name ?? "(variable)";
         if (logic.GetVariableNodes.Find(n => n.OutPoint.Id == fromPoint || n.SlotOutPoint.Id == fromPoint) is StoryGetVariableNode gv)
-            return string.IsNullOrWhiteSpace(gv.NameOverride) ? "(get)" : gv.NameOverride;
+        {
+            if (!string.IsNullOrWhiteSpace(gv.NameOverride)) return gv.NameOverride;
+            string regName = EditorProjection.FindRegister(Project, gv.RegisteredVariableId)?.Name ?? "";
+            bool   slot    = gv.SlotOutPoint.Id == fromPoint;
+            return string.IsNullOrWhiteSpace(regName) ? (slot ? "(slot)" : "(get)") : (slot ? $"{regName} (slot)" : regName);
+        }
         if (logic.ConstantVariableNodes.Find(n => n.OutPoint.Id == fromPoint) is StoryConstantVariableNode cn)
             return string.IsNullOrWhiteSpace(cn.Name) ? "(constant)" : cn.Name;
         return StorySelectionResolver.IncomingVariables(Project, logic).Find(d => d.Id == fromPoint)?.Name ?? "";

@@ -56,14 +56,18 @@
                     @if (_SinglePath && _Declared.Count > 0)
                     {
                         <div class="enm-values">
-                            @foreach ((Guid id, string name) in _Declared)
+                            @foreach (StoryDeclaredVariable d in _Declared)
                             {
-                                Guid vid = id;
+                                Guid vid = d.Id;
                                 <div class="enm-value">
-                                    <label class="enm-value-label">@name</label>
-                                    <input class="modal-input" type="text" placeholder="value"
-                                           value="@row.Value(vid)" @oninput="e => row.SetValue(vid, e.Value?.ToString() ?? string.Empty)"
-                                           maxlength="100"/>
+                                    <label class="enm-value-label">@(string.IsNullOrWhiteSpace(d.Name) ? "(var)" : d.Name)</label>
+                                    <select class="modal-input" value="@row.Value(vid)" @onchange="e => row.SetValue(vid, e.Value?.ToString() ?? string.Empty)">
+                                        <option value="">(unset)</option>
+                                        @foreach (string val in d.PossibleValues)
+                                        {
+                                            <option value="@val">@(string.IsNullOrEmpty(val) ? "(empty)" : val)</option>
+                                        }
+                                    </select>
                                 </div>
                             }
                         </div>
@@ -93,12 +97,12 @@
 @code {
     [Parameter] public EventCallback<ExitNodeArgs> OnConfirm { get; set; }
 
-    private bool                        _Visible;
-    private bool                        _SinglePath;
-    private bool                        _Auto;
-    private List<(Guid Id, string Name)> _Declared     = new();
-    private List<(Guid Id, string Name)> _AvailableVars = new();
-    private List<Row>                    _Rows          = new();
+    private bool                          _Visible;
+    private bool                          _SinglePath;
+    private bool                          _Auto;
+    private List<StoryDeclaredVariable>   _Declared      = new();
+    private List<(Guid Id, string Name)>  _AvailableVars = new();
+    private List<Row>                     _Rows          = new();
 
     private sealed class Row
     {
@@ -119,7 +123,7 @@
         _SinglePath    = logic.ExitMode == StoryLogicExitMode.SinglePath;
         _Auto          = availableVars.Count > 0;
         _AvailableVars = availableVars;
-        _Declared      = logic.DeclaredVariables.Select(d => (d.Id, d.Name)).ToList();
+        _Declared      = logic.DeclaredVariables.ToList();
         _Rows = logic.Choices.Select(c => new Row
         {
             Id        = c.Id,

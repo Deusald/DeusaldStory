@@ -115,8 +115,6 @@ namespace DeusaldStoryCommon
                 foreach (StoryLogicNode logic in project.LogicNodes.Values)
                 {
                     lk.LogicByEntry[logic.EntryPoint.Id] = logic;
-                    // A node that accepts variables is also entered through its VFlow (variables) input.
-                    if (logic.AcceptVariables) lk.LogicByEntry[logic.VariablesIn.Id] = logic;
                     // ManyPaths: each choice has its own outer Flow output. SinglePath: all choices share the one VFlow output.
                     foreach (StoryChoice choice in logic.Choices)
                         lk.LogicByExit[choice.OuterFlowOut.Id] = logic;

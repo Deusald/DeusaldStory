@@ -19,6 +19,9 @@
 }
 .nlm-point + .nlm-point { margin-top: 8px; }
 
+.nlm-var-name { flex: 0 0 6rem; min-width: 0; }
+.nlm-var-vals { flex: 1 1 auto; min-width: 0; }
+
 .nlm-point-dot {
     width: 10px;
     height: 10px;

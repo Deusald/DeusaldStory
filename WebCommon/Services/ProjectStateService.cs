@@ -1288,22 +1288,20 @@ public partial class ProjectStateService(
     /// longer exposes are dropped.
     /// </summary>
     public void UpdateLogicNode(
-        Guid                                  containerId,
-        Guid                                  logicId,
-        string                                name,
-        string                                description,
-        string                                entryName,
-        bool                                  gamebookInstructions,
-        StoryLogicExitMode                    exitMode,
-        bool                                  acceptVariables,
-        IReadOnlyList<(Guid Id, string Name)> declaredVariables)
+        Guid                                                       containerId,
+        Guid                                                       logicId,
+        string                                                     name,
+        string                                                     description,
+        bool                                                       gamebookInstructions,
+        StoryLogicExitMode                                         exitMode,
+        bool                                                       acceptVariables,
+        IReadOnlyList<(Guid Id, string Name, List<string> PossibleValues)> declaredVariables)
     {
         using var _ = Edit(); // node edit + container connection cleanup are one step
         if (!CurrentProject!.LogicNodes.TryGetValue(logicId, out StoryLogicNode? logic)) return;
 
         logic.Name                 = name;
         logic.Description          = description;
-        logic.EntryPoint.Name      = entryName;
         logic.GamebookInstructions = gamebookInstructions;
         logic.ExitMode             = exitMode;
         logic.AcceptVariables      = acceptVariables;
@@ -1317,8 +1315,13 @@ public partial class ProjectStateService(
             goneOuterPorts.AddRange(logic.Choices.Select(c => c.OuterFlowOut.Id)); // per-choice Flow outputs are gone
         else
             goneOuterPorts.Add(logic.VFlowOut.Id);                                 // the shared VFlow output is gone
-        if (!acceptVariables)
-            goneOuterPorts.Add(logic.VariablesIn.Id);                              // the variables input is gone
+
+        // The entry's type (Flow vs VFlow) follows acceptVariables — drop an incoming wire whose source type no longer matches.
+        if (CurrentProject.ContainerNodes.TryGetValue(containerId, out StoryContainerNode? parent)
+            && parent.Connections.Find(c => c.ToPoint == logic.EntryPoint.Id) is StoryConnection entryWire
+            && CurrentProject.LogicNodes.Values.Any(l => l.VFlowOut.Id == entryWire.FromPoint) != acceptVariables)
+            goneOuterPorts.Add(logic.EntryPoint.Id);
+
         RemoveConnectionsFor(containerId, goneOuterPorts);
 
         MarkKeyDirty(logicId);
@@ -1326,13 +1329,14 @@ public partial class ProjectStateService(
     }
 
     /// <summary>Reconciles a logic node's declared variables (SinglePath), keeping matching ids and their per-choice values.</summary>
-    private static void ReconcileDeclaredVariables(StoryLogicNode logic, IReadOnlyList<(Guid Id, string Name)> desired)
+    private static void ReconcileDeclaredVariables(StoryLogicNode logic, IReadOnlyList<(Guid Id, string Name, List<string> PossibleValues)> desired)
     {
         List<StoryDeclaredVariable> rebuilt = new();
-        foreach ((Guid id, string dname) in desired)
+        foreach ((Guid id, string dname, List<string> values) in desired)
         {
             StoryDeclaredVariable dv = (id != Guid.Empty ? logic.DeclaredVariables.Find(d => d.Id == id) : null) ?? new StoryDeclaredVariable();
-            dv.Name = dname;
+            dv.Name           = dname;
+            dv.PossibleValues = values;
             rebuilt.Add(dv);
         }
 

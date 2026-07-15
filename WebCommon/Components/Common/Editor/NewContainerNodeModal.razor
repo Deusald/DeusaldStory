@@ -40,36 +40,6 @@
                           maxlength="500"></textarea>
             </div>
 
-            @* ── Entry points ──────────────────────────────────────────── *@
-            <div class="modal-field">
-                <label class="modal-label">
-                    Entry points
-                    <span class="modal-label-hint">at least one — ways the story can enter this container</span>
-                </label>
-                @for (int i = 0; i < _Entries.Count; i++)
-                {
-                    int index = i;
-                    <div class="ncm-point">
-                        <span class="ncm-point-dot" style="background:var(--success)"></span>
-                        <input class="modal-input"
-                               type="text"
-                               placeholder="In"
-                               value="@_Entries[index].Name"
-                               @oninput="e => _Entries[index].Name = e.Value?.ToString() ?? string.Empty"
-                               maxlength="60"/>
-                        <button class="ncm-point-del"
-                                title="Remove entry"
-                                disabled="@(_Entries.Count <= 1)"
-                                @onclick="() => RemoveEntry(index)">
-                            <i class="bi bi-trash"></i>
-                        </button>
-                    </div>
-                }
-                <button class="ncm-add" @onclick="AddEntry">
-                    <i class="bi bi-plus-lg"></i> Add entry
-                </button>
-            </div>
-
             @* ── Exit points ───────────────────────────────────────────── *@
             <div class="modal-field">
                 <label class="modal-label">
@@ -120,9 +90,9 @@
     private bool           _Visible;
     private bool           _IsEdit;
     private Guid           _EditId;
+    private Guid           _EntryId;   // the single entry's id, preserved across edits so its wire survives
     private string         _Name        = "";
     private string         _Description = "";
-    private List<PointRow> _Entries     = new() { new PointRow { Name = "In" } };
     private List<PointRow> _Exits       = new() { new PointRow { Name = "Out" } };
 
     /// <summary>Opens the modal to create a brand-new container node.</summary>
@@ -130,15 +100,15 @@
     {
         _IsEdit      = false;
         _EditId      = Guid.Empty;
+        _EntryId     = Guid.Empty;
         _Name        = "";
         _Description = "";
-        _Entries     = new List<PointRow> { new PointRow { Name = "In" } };
         _Exits       = new List<PointRow> { new PointRow { Name = "Out" } };
         _Visible     = true;
         StateHasChanged();
     }
 
-    /// <summary>Opens the modal to edit an existing container, preserving entry/exit-point ids so wires survive.</summary>
+    /// <summary>Opens the modal to edit an existing container, preserving the entry/exit-point ids so wires survive.</summary>
     public void ShowEdit(
         Guid                                id,
         string                              name,
@@ -148,29 +118,20 @@
     {
         _IsEdit      = true;
         _EditId      = id;
+        _EntryId     = entries.Select(e => e.Id).FirstOrDefault();
         _Name        = name;
         _Description = description;
-        _Entries     = entries.Select(e => new PointRow { Id = e.Id, Name = e.Name }).ToList();
         _Exits       = exits.Select(e => new PointRow { Id = e.Id, Name = e.Name }).ToList();
-        if (_Entries.Count == 0) _Entries.Add(new PointRow { Name = "In" });
         if (_Exits.Count == 0) _Exits.Add(new PointRow { Name = "Out" });
         _Visible = true;
         StateHasChanged();
     }
 
     private bool _CanConfirm =>
-        !string.IsNullOrWhiteSpace(_Name)                        &&
-        _Entries.Any(n => !string.IsNullOrWhiteSpace(n.Name)) &&
+        !string.IsNullOrWhiteSpace(_Name) &&
         _Exits.Any(n => !string.IsNullOrWhiteSpace(n.Name));
 
-    private void AddEntry() => _Entries.Add(new PointRow { Name = "" });
-    private void AddExit()  => _Exits.Add(new PointRow { Name = "" });
-
-    private void RemoveEntry(int index)
-    {
-        if (_Entries.Count <= 1) return;
-        _Entries.RemoveAt(index);
-    }
+    private void AddExit() => _Exits.Add(new PointRow { Name = "" });
 
     private void RemoveExit(int index)
     {
@@ -187,7 +148,7 @@
             _EditId,
             _Name.Trim(),
             _Description.Trim(),
-            Clean(_Entries),
+            new List<(Guid Id, string Name)> { (_EntryId, "In") },
             Clean(_Exits)));
     }
 

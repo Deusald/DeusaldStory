@@ -22,7 +22,8 @@ namespace DeusaldStoryCommon
             if (!logic.AcceptVariables) return null;
             if (!project.ContainerNodes.TryGetValue(logic.ParentContainer, out StoryContainerNode? parent)) return null;
 
-            StoryConnection? wire = parent.Connections.Find(c => c.ToPoint == logic.VariablesIn.Id);
+            // The VFlow (variables) arrives at the node's single entry when it accepts variables.
+            StoryConnection? wire = parent.Connections.Find(c => c.ToPoint == logic.EntryPoint.Id);
             if (wire is null) return null;
 
             return project.LogicNodes.Values.FirstOrDefault(l =>

@@ -90,22 +90,42 @@ namespace DeusaldStoryCommon
         }
 
         /// <summary>
-        /// The incoming declared variables and the per-section value maps for <paramref name="node"/>: one map per
-        /// upstream choice (each pinning the declared variables) when reached over a Single-path VFlow, else a single
-        /// empty map. <paramref name="total"/> is the un-capped upstream-choice count.
+        /// The incoming declared variables and the per-section value maps for <paramref name="node"/>: the cartesian
+        /// product of the upstream Single-path node's declared-variable possible values (one section per combination),
+        /// or a single empty map when the node isn't reached over a Single-path VFlow. <paramref name="total"/> is the
+        /// un-capped product size.
         /// </summary>
         private static (List<StoryDeclaredVariable> Incoming, List<Dictionary<Guid, string>> ValueMaps, int Total) SectionsData(
             StoryProject project, StoryLogicNode node)
         {
             StoryLogicNode? source = StorySelectionResolver.SourceNode(project, node);
-            if (source is null || source.Choices.Count == 0)
+            if (source is null || source.DeclaredVariables.Count == 0)
                 return (new List<StoryDeclaredVariable>(), new List<Dictionary<Guid, string>> { new() }, 1);
 
-            List<Dictionary<Guid, string>> maps = source.Choices
-                                                        .Take(MAX_SECTIONS)
-                                                        .Select(ch => StorySelectionResolver.ValuesForChoice(source, ch))
-                                                        .ToList();
-            return (source.DeclaredVariables, maps, source.Choices.Count);
+            List<Dictionary<Guid, string>> maps = Combinations(source.DeclaredVariables, out int total);
+            return (source.DeclaredVariables, maps, total);
+        }
+
+        /// <summary>The cartesian product of the declared variables' possible values as declared-var-id → value maps, capped at <see cref="MAX_SECTIONS"/>.</summary>
+        private static List<Dictionary<Guid, string>> Combinations(List<StoryDeclaredVariable> vars, out int total)
+        {
+            List<Dictionary<Guid, string>> combos = new() { new() };
+            total = 1;
+            foreach (StoryDeclaredVariable v in vars)
+            {
+                List<string> possible = v.PossibleValues.Count > 0 ? v.PossibleValues : new List<string> { "" };
+                total *= possible.Count;
+
+                List<Dictionary<Guid, string>> next = new();
+                foreach (Dictionary<Guid, string> baseCombo in combos)
+                    foreach (string value in possible)
+                    {
+                        if (next.Count >= MAX_SECTIONS) break;
+                        next.Add(new Dictionary<Guid, string>(baseCombo) { [v.Id] = value });
+                    }
+                combos = next;
+            }
+            return combos;
         }
 
         // ── Continue instructions ────────────────────────────────────────────────

@@ -206,9 +206,8 @@ namespace DeusaldStoryWeb
                     Y         = logic.Y,
                     Deletable = true
                 };
-                node.Inputs.Add(new EdPort { Id = logic.EntryPoint.Id, Name = "Flow" });
-                if (logic.AcceptVariables)
-                    node.Inputs.Add(new EdPort { Id = logic.VariablesIn.Id, Name = logic.VariablesIn.Name, Type = PortType.VFlow });
+                // Accept-variables makes the single entry a VFlow input (flow that also carries the upstream variables).
+                node.Inputs.Add(new EdPort { Id = logic.EntryPoint.Id, Name = "", Type = logic.AcceptVariables ? PortType.VFlow : PortType.Flow });
 
                 if (logic.ExitMode == StoryLogicExitMode.SinglePath)
                     node.Outputs.Add(new EdPort { Id = logic.VFlowOut.Id, Name = "Out", Type = PortType.VFlow });

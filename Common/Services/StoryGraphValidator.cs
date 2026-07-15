@@ -483,10 +483,7 @@ namespace DeusaldStoryCommon
                 Lookups lk = new();
 
                 foreach (StoryLogicNode logic in project.LogicNodes.Values)
-                {
                     lk.LogicByEntry[logic.EntryPoint.Id] = logic;
-                    if (logic.AcceptVariables) lk.LogicByEntry[logic.VariablesIn.Id] = logic;
-                }
 
                 foreach (StoryContainerNode container in project.ContainerNodes.Values)
                 {

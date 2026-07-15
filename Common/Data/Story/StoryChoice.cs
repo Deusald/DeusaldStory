@@ -8,6 +8,10 @@ namespace DeusaldStoryCommon
     {
         public Guid   Id   { get; set; } = Guid.NewGuid();
         public string Name { get; set; } = string.Empty;
+
+        /// <summary>The values this variable can take. Their cartesian product (across all declared variables) dictates how
+        /// many Gamebook sections the consuming node expands into; each choice picks one value per variable.</summary>
+        public List<string> PossibleValues { get; set; } = new();
     }
 
     /// <summary>One declared variable's value for a specific <see cref="StoryChoice"/> (Single-path mode).</summary>
