@@ -647,6 +647,21 @@ public partial class ProjectStateService(
     }
 
     /// <summary>
+    /// Renames / re-describes the logic portal that owns <paramref name="pointId"/> (its in or any out). The name and
+    /// description are shared by the whole pair, so editing either the in or an out updates them all.
+    /// </summary>
+    public void UpdateLogicPortalNode(Guid logicId, Guid pointId, string name, string description)
+    {
+        if (!CurrentProject!.LogicNodes.TryGetValue(logicId, out StoryLogicNode? logic)) return;
+        StoryLogicPortalNode? portal = FindLogicPortalByPoint(logic, pointId);
+        if (portal is null) return;
+
+        portal.Name        = name;
+        portal.Description = description;
+        MarkKeyDirty(logicId);
+    }
+
+    /// <summary>
     /// Adds another <b>portal out</b> to the logic portal that <paramref name="pointId"/> belongs to (its in or any
     /// out). The new out is stacked below the lowest existing out. Returns the portal, or null when the point does not
     /// belong to any logic portal in <paramref name="logicId"/>.

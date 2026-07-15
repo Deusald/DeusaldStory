@@ -671,7 +671,7 @@ namespace DeusaldStoryWeb
                     X         = portal.InPoint.X,
                     Y         = portal.InPoint.Y,
                     Deletable = true,
-                    Editable  = false
+                    Editable  = true
                 };
                 inNode.Inputs.Add(new EdPort { Id = portal.InPoint.Id, Name = "Data", Type = PortType.Data });
                 nodes.Add(inNode);
@@ -687,7 +687,7 @@ namespace DeusaldStoryWeb
                         X         = outPoint.X,
                         Y         = outPoint.Y,
                         Deletable = true,
-                        Editable  = false
+                        Editable  = true
                     };
                     outNode.Outputs.Add(new EdPort { Id = outPoint.Id, Name = outLabel, Type = outType });
                     nodes.Add(outNode);

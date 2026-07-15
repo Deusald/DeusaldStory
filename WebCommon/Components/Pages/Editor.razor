@@ -146,6 +146,7 @@
 <NewLogicNodeModal         @ref="_NewLogicNodeModal"   OnConfirm="OnNewLogicNodeConfirmed"/>
 <NewContainerNodeModal     @ref="_NewContainerModal"   OnConfirm="OnNewContainerConfirmed"/>
 <NewPortalNodeModal        @ref="_NewPortalModal"      OnConfirm="OnNewPortalConfirmed"/>
+<LogicPortalNodeModal      @ref="_LogicPortalModal"    OnConfirm="OnLogicPortalConfirmed"/>
 <LocalizationKeyPickerModal @ref="_LocalizationPicker" OnConfirm="OnLocalizationPicked"/>
 <IconPickerModal           @ref="_IconPicker"          OnConfirm="OnIconPicked"/>
 <VariablePickerModal       @ref="_VariablePicker"      OnConfirm="OnVariablePicked"/>
@@ -185,6 +186,7 @@
     private NewLogicNodeModal?         _NewLogicNodeModal;
     private NewContainerNodeModal?     _NewContainerModal;
     private NewPortalNodeModal?        _NewPortalModal;
+    private LogicPortalNodeModal?      _LogicPortalModal;
     private LocalizationKeyPickerModal? _LocalizationPicker;
     private IconPickerModal?           _IconPicker;
     private VariablePickerModal?       _VariablePicker;
@@ -488,6 +490,9 @@
     /// <summary>Right-click on empty canvas — open the palette and remember where to drop the node.</summary>
     private void OnCanvasContextMenu(CanvasPoint point)
     {
+        // Reaching the palette means the author chose "Add node" over "Paste" (or the clipboard was already empty), so
+        // drop the clipboard — the next right-click then opens the palette straight away instead of the paste menu.
+        _Clipboard.Clear();
         _PendingX = point.X;
         _PendingY = point.Y;
         _NodePalette?.Show(PaletteItems());
@@ -864,6 +869,12 @@
         RebuildNodes();
     }
 
+    private void OnLogicPortalConfirmed(LogicPortalNodeModal.LogicPortalNodeArgs args)
+    {
+        _ProjectState.UpdateLogicPortalNode(_CurrentId, args.PointId, args.Name, args.Description);
+        RebuildNodes();
+    }
+
     // ── Node context menu (edit / delete / add portal in) ──────────────────
 
     /// <summary>Edit from a node's context menu — reopen its create modal, pre-filled and in edit mode.</summary>
@@ -891,6 +902,13 @@
             case StoryNodeKind.PortalOut:
                 if (_ProjectState.FindPortalByPoint(node.Id) is StoryPortalNode portal)
                     _NewPortalModal?.ShowEdit(portal.Id, portal.Name, portal.Description);
+                break;
+
+            case StoryNodeKind.LogicPortalIn:
+            case StoryNodeKind.LogicPortalOut:
+                if (_CurrentLogicNode is StoryLogicNode portalOwner
+                 && _ProjectState.FindLogicPortalByPoint(portalOwner, node.Id) is StoryLogicPortalNode logicPortal)
+                    _LogicPortalModal?.ShowEdit(node.Id, logicPortal.Name, logicPortal.Description);
                 break;
 
             case StoryNodeKind.Localization:

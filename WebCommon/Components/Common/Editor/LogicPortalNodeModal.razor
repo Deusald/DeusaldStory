@@ -1,0 +1,93 @@
+@namespace DeusaldStoryWeb.Components.Common
+
+@if (_Visible)
+{
+    <div class="modal-backdrop" @onclick="Cancel"></div>
+
+    <div class="modal-box npm-portal-box" @onclick:stopPropagation="true">
+
+        <div class="modal-header">
+            <span class="modal-title">Edit portal</span>
+            <button class="modal-close" @onclick="Cancel" title="Close">
+                <i class="bi bi-x-lg"></i>
+            </button>
+        </div>
+
+        <div class="modal-body">
+
+            <div class="npm-portal-hint">
+                <i class="bi bi-box-arrow-in-right" style="color:var(--orange)"></i>
+                Names this one-in / many-out value relay. The name is shared by the portal's in and every out.
+            </div>
+
+            @* ── Name ──────────────────────────────────────────────────── *@
+            <div class="modal-field">
+                <label class="modal-label">Name</label>
+                <input class="modal-input"
+                       type="text"
+                       placeholder="Player name"
+                       @bind="_Name"
+                       @bind:event="oninput"
+                       maxlength="100"/>
+            </div>
+
+            @* ── Description ───────────────────────────────────────────── *@
+            <div class="modal-field">
+                <label class="modal-label">
+                    Description
+                    <span class="modal-label-hint">optional</span>
+                </label>
+                <textarea class="modal-input npm-portal-textarea"
+                          placeholder="A short note about what this relay carries…"
+                          @bind="_Description"
+                          @bind:event="oninput"
+                          rows="2"
+                          maxlength="500"></textarea>
+            </div>
+
+        </div>
+
+        <div class="modal-footer">
+            <button class="modal-btn modal-btn-ghost" @onclick="Cancel">Cancel</button>
+            <button class="modal-btn modal-btn-primary"
+                    @onclick="Confirm"
+                    disabled="@(!_CanConfirm)">
+                Save changes
+            </button>
+        </div>
+
+    </div>
+}
+
+@code {
+    [Parameter] public EventCallback<LogicPortalNodeArgs> OnConfirm { get; set; }
+
+    private bool   _Visible;
+    private Guid   _PointId;
+    private string _Name        = "";
+    private string _Description = "";
+
+    /// <summary>Opens the modal to rename / re-describe an existing logic portal, keyed by the clicked in/out point id.</summary>
+    public void ShowEdit(Guid pointId, string name, string description)
+    {
+        _PointId     = pointId;
+        _Name        = name;
+        _Description = description;
+        _Visible     = true;
+        StateHasChanged();
+    }
+
+    private bool _CanConfirm => !string.IsNullOrWhiteSpace(_Name);
+
+    private async Task Confirm()
+    {
+        if (!_CanConfirm) return;
+        _Visible = false;
+        await OnConfirm.InvokeAsync(new LogicPortalNodeArgs(_PointId, _Name.Trim(), _Description.Trim()));
+    }
+
+    private void Cancel() => _Visible = false;
+
+    /// <summary>Result passed back to the parent. <see cref="PointId"/> is the clicked in/out point of the portal to rename.</summary>
+    public record LogicPortalNodeArgs(Guid PointId, string Name, string Description);
+}
