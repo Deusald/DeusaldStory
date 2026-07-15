@@ -9,11 +9,12 @@ namespace DeusaldStoryCommon
     /// <see cref="StoryRegisterVariableNode.Id"/> so a rename doesn't break the link; its SmartFormat token name can
     /// be overridden (<see cref="NameOverride"/>) to whatever the format string uses.
     /// <para>
-    /// It exposes <b>two</b> output ports for the two mediums:
+    /// It exposes <b>two</b> output ports for the two mediums, each filling a <i>distinct</i> SmartFormat token so both
+    /// can be wired into one format (e.g. behind an <c>AppGamebook:choose(...)</c>):
     /// <see cref="OutPoint"/> — a <c>Variable</c> port carrying the live value (App only; the preview substitutes
-    /// <see cref="PreviewValue"/>); and <see cref="SlotOutPoint"/> — a <c>CVariable</c> port carrying the variable's
-    /// <c>{slot}</c> tag (e.g. <c>TA</c>/<c>NA</c>/<c>DA</c>), so the Gamebook can print which slot to read. Wire the
-    /// value port for App formatting and the slot port for Gamebook text.
+    /// <see cref="PreviewValue"/>) under the token <c>{Name}</c>; and <see cref="SlotOutPoint"/> — a <c>CVariable</c>
+    /// port carrying the variable's slot tag (e.g. <c>TA</c>/<c>NA</c>/<c>DA</c>) under the token <c>{Name}Slot</c>, so
+    /// the Gamebook can print which slot to read. Wire the value port for App formatting and the slot port for Gamebook text.
     /// </para>
     /// </summary>
     public class StoryGetVariableNode

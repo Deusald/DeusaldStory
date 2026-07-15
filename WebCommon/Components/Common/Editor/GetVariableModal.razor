@@ -59,7 +59,7 @@
                        @bind="_NameOverride"
                        @bind:event="oninput"
                        maxlength="100"/>
-                <span class="modal-label-hint">the <code>{token}</code> name this value fills in the text — blank uses the variable's own name</span>
+                <span class="modal-label-hint">the <code>{token}</code> the <b>Value</b> port fills (App) — blank uses the variable's own name. The <b>Slot</b> port (Gamebook slot tag) fills <code>@_SlotToken</code>.</span>
             </div>
 
             <div class="modal-field">
@@ -100,6 +100,10 @@
     /// <summary>The picked register's name, used as the name-override placeholder ("" when nothing picked).</summary>
     private string _RegisteredName =>
         RegisteredVariables().Find(v => v.Id == _RegisteredVariableId) is { Name: { Length: > 0 } n } ? n : "variable name";
+
+    /// <summary>The <c>{token}</c> the Slot port fills — the Value token plus a <c>Slot</c> suffix (mirrors <c>StoryLogicRenderer.GetVariableSlotName</c>).</summary>
+    private string _SlotToken =>
+        "{" + (string.IsNullOrWhiteSpace(_NameOverride) ? _RegisteredName : _NameOverride) + "Slot}";
 
     /// <summary>Opens the modal to create a new Get Variable node.</summary>
     public void Show()

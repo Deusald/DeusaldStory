@@ -356,7 +356,7 @@ namespace DeusaldStoryCommon
                         else hasOmittedVariable = true; // plain Variable, Gamebook — leave the {token} unresolved
                     }
                     else if (logic.GetVariableNodes.Find(n => n.SlotOutPoint.Id == src) is StoryGetVariableNode gvSlot
-                        && GetVariableName(project, gvSlot) is { Length: > 0 } gvSlotName)
+                        && GetVariableSlotName(project, gvSlot) is { Length: > 0 } gvSlotName)
                         vals[gvSlotName] = GetVariableSlotTag(project, gvSlot); // constant slot tag — resolves in both mediums
                     else if (logic.GetVariableNodes.Find(n => n.OutPoint.Id == src) is StoryGetVariableNode gv
                         && GetVariableName(project, gv) is { Length: > 0 } gvName)
@@ -407,12 +407,16 @@ namespace DeusaldStoryCommon
             StoryBuiltInVariables.Find(id)
             ?? (id != Guid.Empty && project.Variables.TryGetValue(id, out StoryVariable? v) ? v : null);
 
-        /// <summary>The SmartFormat token name a Get Variable node supplies under — its override, else the register's own name (empty when unresolved).</summary>
+        /// <summary>The SmartFormat token name a Get Variable node's Value port supplies under — its override, else the register's own name (empty when unresolved).</summary>
         private static string GetVariableName(StoryProject project, StoryGetVariableNode gv)
         {
             if (!string.IsNullOrWhiteSpace(gv.NameOverride)) return gv.NameOverride;
             return FindRegister(project, gv.RegisteredVariableId)?.Name ?? "";
         }
+
+        /// <summary>The SmartFormat token name a Get Variable node's Slot port supplies under — the Value token plus a <c>Slot</c> suffix, so the two ports never collide in one format (empty when unresolved).</summary>
+        private static string GetVariableSlotName(StoryProject project, StoryGetVariableNode gv) =>
+            GetVariableName(project, gv) is { Length: > 0 } name ? name + "Slot" : "";
 
         /// <summary>The App-preview value for a Get Variable node — its own preview value, falling back to the register's when blank.</summary>
         private static string GetVariablePreviewValue(StoryProject project, StoryGetVariableNode gv) =>
