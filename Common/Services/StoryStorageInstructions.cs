@@ -74,7 +74,7 @@ namespace DeusaldStoryCommon
         {
             if (reg.Type == StorageVariableType.String)
                 return StringEntry(project, localization, logic, reg.SlotIndex, reg.StringMode, reg.StringValue,
-                    reg.StringInputKind, reg.InstructionIn.Id, reg.PlaceholderIn.Id, reg.Placement, target, reg.MaxLength);
+                    reg.StringInputKind, reg.InstructionIn.Id, reg.PlaceholderIn.Id, reg.Placement, target, reg.Name, reg.MaxLength);
 
             // Number/Dial values are stored silently in the App — only the Gamebook prints them.
             if (target == StoryRenderTarget.App) return null;
@@ -90,7 +90,7 @@ namespace DeusaldStoryCommon
 
             if (targetReg.Type == StorageVariableType.String)
                 return StringEntry(project, localization, logic, targetReg.SlotIndex, set.StringMode, set.StringValue,
-                    set.StringInputKind, set.InstructionIn.Id, set.PlaceholderIn.Id, set.Placement, target, set.MaxLength);
+                    set.StringInputKind, set.InstructionIn.Id, set.PlaceholderIn.Id, set.Placement, target, targetReg.Name, set.MaxLength);
 
             if (target == StoryRenderTarget.App) return null;
             string? line = AssignmentLine(localization, targetReg.Type, targetReg.SlotIndex, targetReg.Mode, targetReg.ValueCount, set.Assignment, set.Secret, set.SpecificValue);
@@ -109,7 +109,7 @@ namespace DeusaldStoryCommon
         private static StorageInstruction? StringEntry(
             StoryProject project, LocProject? localization, StoryLogicNode logic, int slotIndex, StringValueMode mode,
             string stringValue, StringInputKind inputKind, Guid instructionPortId, Guid placeholderPortId,
-            StorageInstructionPlacement placement, StoryRenderTarget target, int maxLength = 0)
+            StorageInstructionPlacement placement, StoryRenderTarget target, string variableName, int maxLength = 0)
         {
             string slot = StorageSlots.Label(StorageVariableType.String, slotIndex);
 
@@ -124,9 +124,9 @@ namespace DeusaldStoryCommon
                     return Line(Resolve(localization, StoryCommonLocalizationKeys.StorageStringWriteSpecific, slot, value: stringValue), placement);
 
                 case StringValueMode.PlayerInput:
-                    // The {slot} the instruction injects renders as a styled pill, not the bare label.
+                    // The {<Name>Slot} the instruction injects renders as a styled pill, not the bare label.
                     string slotTag = PreviewHtmlSanitizer.SlotTag(slot);
-                    string prompt   = StoryLogicRenderer.ResolvePortText(project, localization, logic, instructionPortId, target, slotTag);
+                    string prompt   = StoryLogicRenderer.ResolvePortText(project, localization, logic, instructionPortId, target, slotTag, StoryLogicRenderer.SlotTokenName(variableName));
                     if (string.IsNullOrEmpty(prompt))
                         prompt = Resolve(localization, StoryCommonLocalizationKeys.StorageStringWrite, slotTag);
 

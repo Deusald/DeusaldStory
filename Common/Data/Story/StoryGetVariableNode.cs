@@ -35,7 +35,7 @@ namespace DeusaldStoryCommon
         /// <summary>The <c>Variable</c> output carrying the live value (App only) — connects to a SmartFormat / Exit variables input.</summary>
         public StoryConnectionPoint OutPoint { get; set; } = new() { Name = "Value" };
 
-        /// <summary>The <c>CVariable</c> output carrying the variable's <c>{slot}</c> tag (Gamebook) — connects to a SmartFormat / Exit variables input.</summary>
+        /// <summary>The <c>CVariable</c> output carrying the variable's slot tag under the token <c>{Name}Slot</c> (Gamebook) — connects to a SmartFormat / Exit variables input.</summary>
         public StoryConnectionPoint SlotOutPoint { get; set; } = new() { Name = "Slot" };
     }
 }

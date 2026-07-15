@@ -171,6 +171,7 @@
                         <span class="modal-label-hint">
                             App shows an input field. Wire a Localization node into the node's Instruction port to tell
                             the player what to write, and into its Placeholder port to set the hint shown inside the field.
+                            Reference this variable's slot in the instruction text as <code>@_SlotToken</code>.
                         </span>
                     </div>
 
@@ -459,6 +460,9 @@
     }
 
     private bool _CanConfirm => !string.IsNullOrWhiteSpace(_Name);
+
+    /// <summary>The <c>{token}</c> the instruction text uses to inject this variable's slot pill (mirrors <c>StoryLogicRenderer.SlotTokenName</c>).</summary>
+    private string _SlotToken => "{" + (string.IsNullOrWhiteSpace(_Name) ? "<name>" : _Name.Trim()) + "Slot}";
 
     private async Task Confirm()
     {

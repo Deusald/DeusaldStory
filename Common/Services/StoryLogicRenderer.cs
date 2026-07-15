@@ -125,16 +125,22 @@ namespace DeusaldStoryCommon
         /// <summary>
         /// Resolves the text wired into <paramref name="toPoint"/> (a Localization / SmartFormat output), for flow-only
         /// callers that carry no variable values — e.g. the storage-instruction generator reading a Register/Set node's
-        /// Instruction port. When <paramref name="slot"/> is supplied the port's text is SmartFormatted with a
-        /// <c>{slot}</c> placeholder bound to it (the storage slot label / styled pill markup).
+        /// Instruction port. When <paramref name="slot"/> is supplied the port's text is SmartFormatted with the slot
+        /// label / styled pill markup bound to a placeholder named <paramref name="slotToken"/> (typically
+        /// <c>{&lt;Name&gt;Slot}</c>); it falls back to <c>{slot}</c> only when no token name is given (an unnamed variable).
         /// </summary>
         public static string ResolvePortText(
             StoryProject project, LocProject? localization, StoryLogicNode logic, Guid toPoint,
-            StoryRenderTarget target = StoryRenderTarget.App, string? slot = null)
+            StoryRenderTarget target = StoryRenderTarget.App, string? slot = null, string? slotToken = null)
         {
-            Dictionary<string, object>? extra = slot is null
-                ? null
-                : new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase) { ["slot"] = slot };
+            Dictionary<string, object>? extra = null;
+            if (slot is not null)
+            {
+                // A named variable's slot is referenced as {<Name>Slot} (mirrors the Get Variable slot token so the
+                // whole editor references a slot the same way); {slot} only covers an unnamed variable's fallback.
+                string key = string.IsNullOrWhiteSpace(slotToken) ? "slot" : slotToken;
+                extra = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase) { [key] = slot };
+            }
             string text = ResolveText(project, localization, logic, _EmptyValues, FromPointInto(logic, toPoint), target, 0, new List<string>(), extra);
             return extra is null ? text : StoryConditionPreview.Render(text, extra, out _);
         }
@@ -416,7 +422,11 @@ namespace DeusaldStoryCommon
 
         /// <summary>The SmartFormat token name a Get Variable node's Slot port supplies under — the Value token plus a <c>Slot</c> suffix, so the two ports never collide in one format (empty when unresolved).</summary>
         private static string GetVariableSlotName(StoryProject project, StoryGetVariableNode gv) =>
-            GetVariableName(project, gv) is { Length: > 0 } name ? name + "Slot" : "";
+            SlotTokenName(GetVariableName(project, gv));
+
+        /// <summary>The SmartFormat token a storage variable's slot tag fills — its name plus a <c>Slot</c> suffix (empty when unnamed). Shared by the Get Variable slot port and Register/Set instruction text.</summary>
+        public static string SlotTokenName(string variableName) =>
+            string.IsNullOrWhiteSpace(variableName) ? "" : variableName.Trim() + "Slot";
 
         /// <summary>The App-preview value for a Get Variable node — its own preview value, falling back to the register's when blank.</summary>
         private static string GetVariablePreviewValue(StoryProject project, StoryGetVariableNode gv) =>
