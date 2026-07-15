@@ -859,7 +859,8 @@ public partial class ProjectStateService(
         Guid logicId, Guid nodeId, string name, string description, StorageVariableType type, int slotIndex,
         NumberStorageMode mode, NumberValueCount valueCount, bool secret, NumberAssignment assignment,
         int specificValue, Guid conditionKeyId, StorageInstructionPlacement placement, StringValueMode stringMode,
-        string stringValue, StringInputKind stringInputKind, string previewValue)
+        string stringValue, StringInputKind stringInputKind, string previewValue,
+        int minLength, int maxLength, Guid lengthErrorKeyId, StoryConditionExpr? validationRule, Guid validationErrorKeyId)
     {
         if (!CurrentProject!.LogicNodes.TryGetValue(logicId, out StoryLogicNode? logic)) return;
         StoryRegisterVariableNode? node = logic.RegisterVariableNodes.Find(n => n.Id == nodeId);
@@ -880,6 +881,13 @@ public partial class ProjectStateService(
         node.StringValue     = stringValue;
         node.StringInputKind = stringInputKind;
         node.PreviewValue    = previewValue;
+
+        bool playerInput      = type == StorageVariableType.String && stringMode == StringValueMode.PlayerInput;
+        node.MinLength            = minLength;
+        node.MaxLength            = maxLength;
+        node.LengthErrorKeyId     = playerInput ? lengthErrorKeyId : Guid.Empty;
+        node.ValidationRule       = playerInput ? validationRule : null;
+        node.ValidationErrorKeyId = playerInput ? validationErrorKeyId : Guid.Empty;
 
         // The Instruction / Placeholder ports only exist for a player-input String — drop any stale wire when they no longer apply.
         if (type != StorageVariableType.String || stringMode != StringValueMode.PlayerInput)
@@ -916,7 +924,8 @@ public partial class ProjectStateService(
     /// <summary>Updates a Set-variable node's target and value assignment.</summary>
     public void UpdateSetVariableNode(
         Guid logicId, Guid nodeId, Guid registeredVariableId, NumberAssignment assignment, bool secret, int specificValue,
-        StorageInstructionPlacement placement, StringValueMode stringMode, string stringValue, StringInputKind stringInputKind)
+        StorageInstructionPlacement placement, StringValueMode stringMode, string stringValue, StringInputKind stringInputKind,
+        int minLength, int maxLength, Guid lengthErrorKeyId, StoryConditionExpr? validationRule, Guid validationErrorKeyId)
     {
         if (!CurrentProject!.LogicNodes.TryGetValue(logicId, out StoryLogicNode? logic)) return;
         StorySetVariableNode? node = logic.SetVariableNodes.Find(n => n.Id == nodeId);
@@ -933,8 +942,15 @@ public partial class ProjectStateService(
 
         // The Instruction / Placeholder ports only exist for a player-input String target — drop any stale wire when they no longer apply.
         StoryRegisterVariableNode? target = EditorProjection.FindRegister(CurrentProject!, registeredVariableId);
-        if (target is not { Type: StorageVariableType.String } || stringMode != StringValueMode.PlayerInput)
+        bool playerInput = target is { Type: StorageVariableType.String } && stringMode == StringValueMode.PlayerInput;
+        if (!playerInput)
             logic.ContentConnections.RemoveAll(c => c.ToPoint == node.InstructionIn.Id || c.ToPoint == node.PlaceholderIn.Id);
+
+        node.MinLength            = minLength;
+        node.MaxLength            = maxLength;
+        node.LengthErrorKeyId     = playerInput ? lengthErrorKeyId : Guid.Empty;
+        node.ValidationRule       = playerInput ? validationRule : null;
+        node.ValidationErrorKeyId = playerInput ? validationErrorKeyId : Guid.Empty;
         MarkKeyDirty(logicId);
     }
 

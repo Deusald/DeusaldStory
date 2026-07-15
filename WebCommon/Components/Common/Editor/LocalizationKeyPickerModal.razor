@@ -11,9 +11,9 @@
 
 @if (_Visible)
 {
-    <div class="modal-backdrop" @onclick="Cancel"></div>
+    <div class="modal-backdrop" style="@(Elevated ? "z-index:2050" : "")" @onclick="Cancel"></div>
 
-    <div class="modal-box lkp-box" @onclick:stopPropagation="true">
+    <div class="modal-box lkp-box" style="@(Elevated ? "z-index:2060" : "")" @onclick:stopPropagation="true">
 
         <div class="modal-header">
             <span class="modal-title">Pick a localization key</span>
@@ -112,6 +112,9 @@
 
 @code {
     [Parameter] public EventCallback<LocalizationPickResult> OnConfirm { get; set; }
+
+    /// <summary>Raise the picker's z-index so it stacks above another already-open modal (it is opened from inside one).</summary>
+    [Parameter] public bool Elevated { get; set; }
 
     private bool             _Visible;
     private Guid             _EditNodeId;   // empty = creating a new node

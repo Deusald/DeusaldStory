@@ -161,7 +161,7 @@
         <input class="lpv-input-box"
                type="@(field.InputKind == StringInputKind.Number ? "number" : "text")"
                minlength="1"
-               maxlength="30"
+               maxlength="@(field.MaxLength > 0 ? field.MaxLength : 30)"
                placeholder="@(!string.IsNullOrEmpty(field.Placeholder) ? field.Placeholder : field.InputKind == StringInputKind.Number ? "Enter a number…" : "Enter text…")"/>
     </div>;
 

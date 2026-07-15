@@ -47,6 +47,21 @@ namespace DeusaldStoryCommon
         /// <summary>String / <see cref="StringValueMode.PlayerInput"/> — Text input port carrying the App input field's placeholder hint (a Localization output). Empty falls back to a default.</summary>
         public StoryConnectionPoint PlaceholderIn { get; set; } = new() { Name = "Placeholder" };
 
+        /// <summary>String / <see cref="StringValueMode.PlayerInput"/> — smallest accepted entry length in characters (default 1).</summary>
+        public int MinLength { get; set; } = 1;
+
+        /// <summary>String / <see cref="StringValueMode.PlayerInput"/> — largest accepted entry length in characters (default 30).</summary>
+        public int MaxLength { get; set; } = 30;
+
+        /// <summary>String / <see cref="StringValueMode.PlayerInput"/> — localization key for the message shown when the entry is outside <see cref="MinLength"/>…<see cref="MaxLength"/>. Empty = a default message.</summary>
+        public Guid LengthErrorKeyId { get; set; }
+
+        /// <summary>String / <see cref="StringValueMode.PlayerInput"/> — an <b>App-only</b> validation rule the entry must satisfy (a boolean Group tree; null = no rule). Operands reference <see cref="StorageValidation.ThisEntryRef"/> and other register-node ids. The Gamebook cannot enforce it.</summary>
+        public StoryConditionExpr? ValidationRule { get; set; }
+
+        /// <summary>String / <see cref="StringValueMode.PlayerInput"/> — localization key for the message shown when <see cref="ValidationRule"/> is not met. Empty = a default message.</summary>
+        public Guid ValidationErrorKeyId { get; set; }
+
         /// <summary>Flow input — wired from a previous flow node's output.</summary>
         public StoryConnectionPoint FlowIn { get; set; } = new() { Name = "Flow" };
 

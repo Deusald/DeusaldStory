@@ -30,6 +30,9 @@ namespace DeusaldStoryCommon
 
         /// <summary>App input field only — the slot label the value is written to (e.g. <c>TA</c>).</summary>
         public string Slot { get; set; } = "";
+
+        /// <summary>App input field only — largest accepted entry length in characters (0 = no limit).</summary>
+        public int MaxLength { get; set; }
     }
 
     /// <summary>
@@ -71,7 +74,7 @@ namespace DeusaldStoryCommon
         {
             if (reg.Type == StorageVariableType.String)
                 return StringEntry(project, localization, logic, reg.SlotIndex, reg.StringMode, reg.StringValue,
-                    reg.StringInputKind, reg.InstructionIn.Id, reg.PlaceholderIn.Id, reg.Placement, target);
+                    reg.StringInputKind, reg.InstructionIn.Id, reg.PlaceholderIn.Id, reg.Placement, target, reg.MaxLength);
 
             // Number/Dial values are stored silently in the App — only the Gamebook prints them.
             if (target == StoryRenderTarget.App) return null;
@@ -87,7 +90,7 @@ namespace DeusaldStoryCommon
 
             if (targetReg.Type == StorageVariableType.String)
                 return StringEntry(project, localization, logic, targetReg.SlotIndex, set.StringMode, set.StringValue,
-                    set.StringInputKind, set.InstructionIn.Id, set.PlaceholderIn.Id, set.Placement, target);
+                    set.StringInputKind, set.InstructionIn.Id, set.PlaceholderIn.Id, set.Placement, target, set.MaxLength);
 
             if (target == StoryRenderTarget.App) return null;
             string? line = AssignmentLine(localization, targetReg.Type, targetReg.SlotIndex, targetReg.Mode, targetReg.ValueCount, set.Assignment, set.Secret, set.SpecificValue);
@@ -106,7 +109,7 @@ namespace DeusaldStoryCommon
         private static StorageInstruction? StringEntry(
             StoryProject project, LocProject? localization, StoryLogicNode logic, int slotIndex, StringValueMode mode,
             string stringValue, StringInputKind inputKind, Guid instructionPortId, Guid placeholderPortId,
-            StorageInstructionPlacement placement, StoryRenderTarget target)
+            StorageInstructionPlacement placement, StoryRenderTarget target, int maxLength = 0)
         {
             string slot = StorageSlots.Label(StorageVariableType.String, slotIndex);
 
@@ -132,7 +135,7 @@ namespace DeusaldStoryCommon
 
                     // The App draws an input field; an optional Localization-driven placeholder hints inside it (plain text).
                     string placeholder = StoryLogicRenderer.ResolvePortText(project, localization, logic, placeholderPortId, target);
-                    return new StorageInstruction { Text = prompt, Placeholder = placeholder, Placement = placement, IsAppInput = true, InputKind = inputKind, Slot = slot };
+                    return new StorageInstruction { Text = prompt, Placeholder = placeholder, Placement = placement, IsAppInput = true, InputKind = inputKind, Slot = slot, MaxLength = maxLength };
 
                 default:
                     return null;

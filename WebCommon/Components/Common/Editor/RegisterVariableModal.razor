@@ -1,4 +1,5 @@
 @namespace DeusaldStoryWeb.Components.Common
+@inject ProjectStateService _ProjectState
 
 @* ─────────────────────────────────────────────────────────────────────────
    Creates / edits a Register-variable node: defines a storage variable's
@@ -168,11 +169,86 @@
                             <option value="@StringInputKind.Number">Number</option>
                         </select>
                         <span class="modal-label-hint">
-                            App shows an input field (1–30 characters). Wire a Localization node into the node's
-                            Instruction port to tell the player what to write, and into its Placeholder port to
-                            set the hint shown inside the empty field.
+                            App shows an input field. Wire a Localization node into the node's Instruction port to tell
+                            the player what to write, and into its Placeholder port to set the hint shown inside the field.
                         </span>
                     </div>
+
+                    <div class="modal-note">
+                        <i class="bi bi-info-circle"></i>
+                        <span>The checks below are enforced in the <b>App</b> only — the printed Gamebook cannot validate a written entry.</span>
+                    </div>
+
+                    @* ── Character-limit range ──────────────────────────── *@
+                    <div class="rvm-row">
+                        <div class="modal-field rvm-grow">
+                            <label class="modal-label">Min length</label>
+                            <input class="modal-input"
+                                   type="number"
+                                   min="0"
+                                   max="@_MaxLength"
+                                   @bind="_MinLength"
+                                   @bind:event="oninput"/>
+                        </div>
+                        <div class="modal-field rvm-grow">
+                            <label class="modal-label">Max length</label>
+                            <input class="modal-input"
+                                   type="number"
+                                   min="1"
+                                   max="500"
+                                   @bind="_MaxLength"
+                                   @bind:event="oninput"/>
+                        </div>
+                    </div>
+
+                    @* ── Message shown when the entry length is out of range ── *@
+                    <div class="modal-field">
+                        <label class="modal-label">
+                            Length error message
+                            <span class="modal-label-hint">shown when the entry is outside the range</span>
+                        </label>
+                        <div class="rvm-keyrow">
+                            <span class="rvm-keyname @(_LengthErrorKeyId == Guid.Empty ? "rvm-keyname-empty" : "")">@KeyLabel(_LengthErrorKeyId)</span>
+                            <button class="modal-btn modal-btn-ghost rvm-keybtn" @onclick="PickLengthErrorKey">Pick key</button>
+                            @if (_LengthErrorKeyId != Guid.Empty)
+                            {
+                                <button class="modal-btn modal-btn-ghost rvm-keybtn" @onclick="() => _LengthErrorKeyId = Guid.Empty">Clear</button>
+                            }
+                        </div>
+                    </div>
+
+                    @* ── Validation rule (reuses the exit auto-condition builder) ── *@
+                    <div class="modal-field">
+                        <label class="modal-label">
+                            Validation rule
+                            <span class="modal-label-hint">optional — the entry is accepted only when this holds</span>
+                        </label>
+                        <span class="modal-label-hint">
+                            Compare <b>This entry</b> against another variable or a typed value — e.g. <b>This entry ≠ [Name]</b>
+                            to force a value different from another variable. An empty rule accepts anything.
+                        </span>
+                        <div class="rvm-rule">
+                            <ExitConditionEditor Expr="_ValidationRule" Vars="RuleVars()" OnChanged="StateHasChanged"/>
+                        </div>
+                    </div>
+
+                    @if (_ValidationRule.Children.Count > 0)
+                    {
+                        <div class="modal-field">
+                            <label class="modal-label">
+                                Rule error message
+                                <span class="modal-label-hint">shown when the rule is not met</span>
+                            </label>
+                            <div class="rvm-keyrow">
+                                <span class="rvm-keyname @(_ValidationErrorKeyId == Guid.Empty ? "rvm-keyname-empty" : "")">@KeyLabel(_ValidationErrorKeyId)</span>
+                                <button class="modal-btn modal-btn-ghost rvm-keybtn" @onclick="PickValidationErrorKey">Pick key</button>
+                                @if (_ValidationErrorKeyId != Guid.Empty)
+                                {
+                                    <button class="modal-btn modal-btn-ghost rvm-keybtn" @onclick="() => _ValidationErrorKeyId = Guid.Empty">Clear</button>
+                                }
+                            </div>
+                        </div>
+                    }
                 }
             }
 
@@ -215,6 +291,9 @@
     </div>
 }
 
+@* Localization key picker for the validation messages — elevated so it stacks above this modal. *@
+<LocalizationKeyPickerModal @ref="_KeyPicker" Elevated="true" OnConfirm="OnKeyPicked"/>
+
 @code {
     [Parameter] public EventCallback<RegisterVariableArgs> OnConfirm { get; set; }
 
@@ -242,6 +321,16 @@
     private StringInputKind             _StringInputKind;
     private string                      _PreviewValue = "";
 
+    private int                _MinLength = 1;
+    private int                _MaxLength = 30;
+    private Guid               _LengthErrorKeyId;
+    private StoryConditionExpr _ValidationRule = new() { Kind = StoryConditionExprKind.Group };
+    private Guid               _ValidationErrorKeyId;
+
+    private LocalizationKeyPickerModal? _KeyPicker;
+    private KeyPickTarget               _PickTarget; // which validation message the key picker is currently choosing
+    private enum KeyPickTarget { LengthError, ValidationError }
+
     /// <summary>Opens the modal to register a brand-new variable. <paramref name="freeSlots"/> restricts the slot list.</summary>
     public void Show(IReadOnlyDictionary<StorageVariableType, IReadOnlyList<int>>? freeSlots = null)
     {
@@ -263,6 +352,11 @@
         _StringValue     = "";
         _StringInputKind = StringInputKind.Text;
         _PreviewValue    = "";
+        _MinLength            = 1;
+        _MaxLength            = 30;
+        _LengthErrorKeyId     = Guid.Empty;
+        _ValidationRule       = new() { Kind = StoryConditionExprKind.Group };
+        _ValidationErrorKeyId = Guid.Empty;
         _Visible        = true;
         StateHasChanged();
     }
@@ -288,6 +382,11 @@
         _StringValue     = node.StringValue;
         _StringInputKind = node.StringInputKind;
         _PreviewValue    = node.PreviewValue;
+        _MinLength            = node.MinLength;
+        _MaxLength            = node.MaxLength;
+        _LengthErrorKeyId     = node.LengthErrorKeyId;
+        _ValidationRule       = node.ValidationRule?.Clone() ?? new StoryConditionExpr { Kind = StoryConditionExprKind.Group };
+        _ValidationErrorKeyId = node.ValidationErrorKeyId;
         _Visible        = true;
         StateHasChanged();
     }
@@ -319,6 +418,46 @@
     private int ValueMin => _Type == StorageVariableType.Dial ? -7 : 1;
     private int ValueMax => _Type == StorageVariableType.Dial ? 7  : StorageSlots.ToNumber(_ValueCount);
 
+    // ── Player-input String validation helpers ─────────────────────────────
+
+    /// <summary>The operands the validation rule can reference: "This entry" plus every other registered variable.</summary>
+    private List<(Guid Id, string Name)> RuleVars()
+    {
+        List<(Guid, string)> vars = new() { (StorageValidation.ThisEntryRef, "This entry") };
+        if (_ProjectState.CurrentProject is not null)
+            foreach (StoryLogicNode logic in _ProjectState.CurrentProject.LogicNodes.Values)
+                foreach (StoryRegisterVariableNode reg in logic.RegisterVariableNodes.OrderBy(v => v.Name, StringComparer.OrdinalIgnoreCase))
+                    if (reg.Id != _EditNodeId)
+                        vars.Add((reg.Id, $"{(string.IsNullOrWhiteSpace(reg.Name) ? "(unnamed)" : reg.Name)} [{StorageSlots.Label(reg.Type, reg.SlotIndex)}]"));
+        return vars;
+    }
+
+    /// <summary>The localization key's display name, or a placeholder when none is picked.</summary>
+    private string KeyLabel(Guid keyId)
+    {
+        if (keyId == Guid.Empty) return "Default message";
+        return _ProjectState.CurrentLocalization?.Keys.Find(k => k.Id == keyId)?.KeyName ?? "(missing key)";
+    }
+
+    private void PickLengthErrorKey()
+    {
+        _PickTarget = KeyPickTarget.LengthError;
+        _KeyPicker?.Show(Guid.Empty, _LengthErrorKeyId);
+    }
+
+    private void PickValidationErrorKey()
+    {
+        _PickTarget = KeyPickTarget.ValidationError;
+        _KeyPicker?.Show(Guid.Empty, _ValidationErrorKeyId);
+    }
+
+    private void OnKeyPicked(LocalizationKeyPickerModal.LocalizationPickResult result)
+    {
+        if (_PickTarget == KeyPickTarget.LengthError) _LengthErrorKeyId     = result.KeyId;
+        else                                          _ValidationErrorKeyId = result.KeyId;
+        StateHasChanged();
+    }
+
     private bool _CanConfirm => !string.IsNullOrWhiteSpace(_Name);
 
     private async Task Confirm()
@@ -327,6 +466,9 @@
         _Visible = false;
 
         int specific = Math.Clamp(_SpecificValue, ValueMin, ValueMax);
+
+        int maxLen = Math.Clamp(_MaxLength, 1, 500);
+        int minLen = Math.Clamp(_MinLength, 0, maxLen);
 
         await OnConfirm.InvokeAsync(new RegisterVariableArgs(
             _EditNodeId,
@@ -344,7 +486,12 @@
             _StringMode,
             _StringValue.Trim(),
             _StringInputKind,
-            _PreviewValue.Trim()));
+            _PreviewValue.Trim(),
+            minLen,
+            maxLen,
+            _LengthErrorKeyId,
+            _ValidationRule.Children.Count > 0 ? _ValidationRule.Clone() : null,
+            _ValidationErrorKeyId));
     }
 
     private void Cancel() => _Visible = false;
@@ -366,5 +513,10 @@
         StringValueMode             StringMode,
         string                      StringValue,
         StringInputKind             StringInputKind,
-        string                      PreviewValue);
+        string                      PreviewValue,
+        int                         MinLength,
+        int                         MaxLength,
+        Guid                        LengthErrorKeyId,
+        StoryConditionExpr?         ValidationRule,
+        Guid                        ValidationErrorKeyId);
 }

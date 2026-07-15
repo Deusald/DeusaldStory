@@ -627,6 +627,19 @@
 
     private bool IsSelected(EdNode n) => n.Id == SelectedId || _Selected.Contains(n.Id);
 
+    /// <summary>Selects a freshly-pasted group so the user can drag it as one straight away. A single id becomes the
+    /// primary selection (handled by the parent's <see cref="SelectedId"/>); two or more become a multi-selection, matching
+    /// the state a marquee leaves behind.</summary>
+    public void SelectGroup(IReadOnlyList<Guid> ids)
+    {
+        _Selected.Clear();
+        _SelectedEdgeId = null;
+        if (ids.Count > 1)
+            foreach (Guid id in ids)
+                _Selected.Add(id);
+        StateHasChanged();
+    }
+
     // ── Add node at the view centre / minimap navigation ────────────────────
 
     /// <summary>Toolbar "Add node" — drop the palette's node at the centre of the visible canvas, not a far-off default.</summary>

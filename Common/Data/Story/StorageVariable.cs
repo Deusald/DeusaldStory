@@ -42,6 +42,13 @@ namespace DeusaldStoryCommon
         Above
     }
 
+    /// <summary>Well-known operand ids used by a player-input String's App validation rule (a <see cref="StoryConditionExpr"/>).</summary>
+    public static class StorageValidation
+    {
+        /// <summary>The rule operand standing for the value the player is entering right now (the variable being registered/set). Every other operand is a register-node id.</summary>
+        public static readonly Guid ThisEntryRef = new("e0000000-0000-0000-0000-0000000000e1");
+    }
+
     /// <summary>How a String storage variable's value is decided when it is registered or later set.</summary>
     public enum StringValueMode
     {

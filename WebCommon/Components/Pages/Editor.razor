@@ -751,7 +751,8 @@
         _ProjectState.UpdateRegisterVariableNode(
             _CurrentId, nodeId, args.Name, args.Description, args.Type, args.SlotIndex,
             args.Mode, args.ValueCount, args.Secret, args.Assignment, args.SpecificValue, args.ConditionKeyId,
-            args.Placement, args.StringMode, args.StringValue, args.StringInputKind, args.PreviewValue);
+            args.Placement, args.StringMode, args.StringValue, args.StringInputKind, args.PreviewValue,
+            args.MinLength, args.MaxLength, args.LengthErrorKeyId, args.ValidationRule, args.ValidationErrorKeyId);
         RebuildNodes();
     }
 
@@ -766,7 +767,8 @@
         }
         _ProjectState.UpdateSetVariableNode(
             _CurrentId, nodeId, args.RegisteredVariableId, args.Assignment, args.Secret, args.SpecificValue,
-            args.Placement, args.StringMode, args.StringValue, args.StringInputKind);
+            args.Placement, args.StringMode, args.StringValue, args.StringInputKind,
+            args.MinLength, args.MaxLength, args.LengthErrorKeyId, args.ValidationRule, args.ValidationErrorKeyId);
         RebuildNodes();
     }
 
@@ -1105,8 +1107,11 @@
             ? _ProjectState.PasteLogicInnerNodes(_CurrentId, _Clipboard, _PASTE_OFFSET, _PASTE_OFFSET)
             : _ProjectState.PasteContainerNodes(_CurrentId, _Clipboard, _PASTE_OFFSET, _PASTE_OFFSET);
 
-        if (pasted.Count > 0) _SelectedId = pasted[0];
+        // Select every pasted node so the author can drag the whole group at once (a single node stays the primary
+        // selection so the inspector fills in; two or more become a multi-selection like a marquee).
+        _SelectedId = pasted.Count == 1 ? pasted[0] : Guid.Empty;
         RebuildNodes();
+        _GraphRef?.SelectGroup(pasted);
     }
 
     private const double _PASTE_OFFSET = 40;
