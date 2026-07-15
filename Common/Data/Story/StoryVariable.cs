@@ -18,6 +18,14 @@ namespace DeusaldStoryCommon
         public string       Description    { get; set; } = string.Empty;
         public List<string> PossibleValues { get; set; } = new();
 
+        /// <summary>
+        /// When set, this variable is a <b>constant</b> — its value is fixed before any Gamebook section is evaluated
+        /// (e.g. the printed language). An External Variable node referencing it then exposes a <c>CVariable</c> port
+        /// and it may be used in Gamebook text; a non-constant variable is App-only and never reaches the Gamebook.
+        /// Constants never dimension sections (one value is chosen per render).
+        /// </summary>
+        public bool IsConstant { get; set; }
+
         /// <summary>The linked gamebook-condition localization key id (a <c>LocLocalizationKey.Id</c>). Empty = none.</summary>
         public Guid ConditionKeyId { get; set; }
     }

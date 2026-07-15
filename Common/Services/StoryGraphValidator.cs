@@ -38,7 +38,8 @@ namespace DeusaldStoryCommon
             Lookups                               lk       = Lookups.Build(project);
 
             CheckDanglingOutputs(project, problems);
-            CheckChoiceOutputs(project, problems);
+            CheckChoices(project, problems);
+            CheckGamebookText(project, localization, problems);
             CheckVariableBalance(project, lk, regById, localization, problems,
                 out Dictionary<Guid, HashSet<Guid>> entryActive, out HashSet<Guid> endActive);
 
@@ -69,31 +70,31 @@ namespace DeusaldStoryCommon
                 {
                     if (!project.LogicNodes.TryGetValue(logicId, out StoryLogicNode? logic)) continue;
 
-                    // In SingleSelection mode the per-exit points are internal (the Selection values); flow leaves
-                    // through the single SelectionFlowOut, so that — not each exit — is the output to check.
-                    if (logic.ExitMode == StoryLogicExitMode.SingleSelection)
+                    // SinglePath collapses every choice into one VFlow output; ManyPaths draws one Flow output per
+                    // choice. Each drawn output must continue somewhere within this container.
+                    if (logic.ExitMode == StoryLogicExitMode.SinglePath)
                     {
-                        if (!container.Connections.Exists(c => c.FromPoint == logic.SelectionFlowOut.Id))
+                        if (!container.Connections.Exists(c => c.FromPoint == logic.VFlowOut.Id))
                             problems.Add(new StoryProblem
                             {
                                 Severity    = StoryProblemSeverity.Error,
-                                Message     = $"Exit '{PointName(logic.SelectionFlowOut, "Out")}' of logic node '{NodeName(logic.Name)}' is not connected.",
+                                Message     = $"The variables output of logic node '{NodeName(logic.Name)}' is not connected.",
                                 ContainerId = container.Id,
                                 LogicNodeId = logic.Id,
-                                PointId     = logic.SelectionFlowOut.Id
+                                PointId     = logic.VFlowOut.Id
                             });
                         continue;
                     }
 
-                    foreach (StoryConnectionPoint exit in logic.ExitPoints)
-                        if (!container.Connections.Exists(c => c.FromPoint == exit.Id))
+                    foreach (StoryChoice choice in logic.Choices)
+                        if (!container.Connections.Exists(c => c.FromPoint == choice.OuterFlowOut.Id))
                             problems.Add(new StoryProblem
                             {
                                 Severity    = StoryProblemSeverity.Error,
-                                Message     = $"Exit '{PointName(exit, "Out")}' of logic node '{NodeName(logic.Name)}' is not connected.",
+                                Message     = $"Choice '{NodeName(choice.Name)}' of logic node '{NodeName(logic.Name)}' is not connected to a next node.",
                                 ContainerId = container.Id,
                                 LogicNodeId = logic.Id,
-                                PointId     = exit.Id
+                                PointId     = choice.OuterFlowOut.Id
                             });
                 }
 
@@ -128,18 +129,75 @@ namespace DeusaldStoryCommon
             }
         }
 
-        // ── Choice outputs must each reach an exit ─────────────────────────────
+        // ── Choices & auto-resolution ──────────────────────────────────────────
 
-        /// <summary>Flags any Choice option whose flow-out isn't wired — every choice must lead to an exit.</summary>
-        private static void CheckChoiceOutputs(StoryProject project, List<StoryProblem> problems)
+        /// <summary>
+        /// Validates each logic node's Exit-node choices: at least one choice; when App auto-resolution is enabled
+        /// (the Variables input is wired), exactly one locked Else and every non-Else choice carries a condition;
+        /// and in SinglePath mode every choice assigns a value for each declared variable.
+        /// </summary>
+        private static void CheckChoices(StoryProject project, List<StoryProblem> problems)
         {
             foreach (StoryLogicNode logic in project.LogicNodes.Values)
-                foreach (StoryChoiceNode choice in logic.ChoiceNodes)
-                    foreach (StoryChoiceOption option in choice.Options)
-                        if (!logic.ContentConnections.Exists(c => c.FromPoint == option.FlowOut.Id))
-                            problems.Add(Inner(logic, choice.Id,
-                                $"Choice '{NodeName(option.Name)}' in '{NodeName(logic.Name)}' is not connected to an exit."));
+            {
+                if (logic.Choices.Count == 0)
+                {
+                    problems.Add(new StoryProblem
+                    {
+                        Severity    = StoryProblemSeverity.Error,
+                        Message     = $"Logic node '{NodeName(logic.Name)}' has no choices — add at least one continuation on its Exit node.",
+                        ContainerId = logic.ParentContainer,
+                        LogicNodeId = logic.Id
+                    });
+                    continue;
+                }
+
+                bool autoMode = FromInto(logic, logic.ExitVariablesIn.Id) != Guid.Empty;
+                if (autoMode)
+                {
+                    int elseCount = logic.Choices.Count(c => c.IsElse);
+                    if (elseCount != 1)
+                        problems.Add(Node(logic, elseCount == 0
+                            ? $"Auto-resolving node '{NodeName(logic.Name)}' needs exactly one locked 'Else' choice."
+                            : $"Auto-resolving node '{NodeName(logic.Name)}' has more than one 'Else' choice — only one fallback is allowed."));
+
+                    foreach (StoryChoice c in logic.Choices)
+                        if (!c.IsElse && c.Condition is null)
+                            problems.Add(Node(logic, $"Choice '{NodeName(c.Name)}' in '{NodeName(logic.Name)}' has no condition — set one or make it the Else."));
+                }
+
+                if (logic.ExitMode == StoryLogicExitMode.SinglePath)
+                    foreach (StoryChoice c in logic.Choices)
+                        foreach (StoryDeclaredVariable dv in logic.DeclaredVariables)
+                            if (c.VariableValues.Find(v => v.DeclaredVarId == dv.Id) is null)
+                                problems.Add(Node(logic, $"Choice '{NodeName(c.Name)}' in '{NodeName(logic.Name)}' has no value for variable '{NodeName(dv.Name)}'."));
+            }
         }
+
+        /// <summary>Reports SmartFormat render failures in each node's Gamebook text (e.g. a plain Variable unavailable in the Gamebook).</summary>
+        private static void CheckGamebookText(StoryProject project, LocProject? localization, List<StoryProblem> problems)
+        {
+            foreach (StoryLogicNode logic in project.LogicNodes.Values)
+            {
+                StoryLogicRenderer.RenderedLogic rendered = StoryLogicRenderer.Render(
+                    project, localization, logic, _EmptyValues, paper: true, StoryRenderTarget.Gamebook);
+                foreach (string error in rendered.Errors)
+                    problems.Add(Node(logic, $"In '{NodeName(logic.Name)}': {error}"));
+            }
+        }
+
+        private static readonly Dictionary<Guid, string> _EmptyValues = new();
+
+        private static Guid FromInto(StoryLogicNode logic, Guid toPoint) =>
+            logic.ContentConnections.Find(c => c.ToPoint == toPoint)?.FromPoint ?? Guid.Empty;
+
+        private static StoryProblem Node(StoryLogicNode logic, string message) => new()
+        {
+            Severity    = StoryProblemSeverity.Error,
+            Message     = message,
+            ContainerId = logic.ParentContainer,
+            LogicNodeId = logic.Id
+        };
 
         // ── Pass B: register/unregister balance from Start ─────────────────────
 
@@ -183,11 +241,11 @@ namespace DeusaldStoryCommon
                 HashSet<Guid> active = new(incoming);
                 ApplyOps(project, logic, active, regById, problems);
 
-                // SingleSelection collapses every internal exit into one continuation (SelectionFlowOut);
-                // otherwise each exit continues independently. Both carry the same active-variable set.
-                IEnumerable<Guid> continuations = logic.ExitMode == StoryLogicExitMode.SingleSelection
-                    ? new[] { logic.SelectionFlowOut.Id }
-                    : logic.ExitPoints.Select(e => e.Id);
+                // SinglePath collapses every choice into one continuation (VFlowOut); ManyPaths continues each choice
+                // independently. Both carry the same active-variable set.
+                IEnumerable<Guid> continuations = logic.ExitMode == StoryLogicExitMode.SinglePath
+                    ? new[] { logic.VFlowOut.Id }
+                    : logic.Choices.Select(c => c.OuterFlowOut.Id);
 
                 foreach (Guid outPointId in continuations)
                 {
@@ -425,7 +483,10 @@ namespace DeusaldStoryCommon
                 Lookups lk = new();
 
                 foreach (StoryLogicNode logic in project.LogicNodes.Values)
+                {
                     lk.LogicByEntry[logic.EntryPoint.Id] = logic;
+                    if (logic.AcceptVariables) lk.LogicByEntry[logic.VariablesIn.Id] = logic;
+                }
 
                 foreach (StoryContainerNode container in project.ContainerNodes.Values)
                 {

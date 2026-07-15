@@ -4,9 +4,10 @@ using System.Collections.Generic;
 namespace DeusaldStoryCommon
 {
     /// <summary>
-    /// The heart of the system — a stop point in the story that generates content and runs calculations on
-    /// variables. The story is played by moving from one logic node to the next. A logic node has exactly one
-    /// entry point and at least one exit point (a branch the story can take from here).
+    /// The heart of the system — a stop point in the story that generates content and runs calculations on variables.
+    /// The story is played by moving from one logic node to the next. A logic node has exactly one entry point and a
+    /// single <b>Exit</b> node carrying its list of <see cref="Choices"/> (the continuations). Its inner render graph
+    /// is a linear <c>LFlow</c> chain from the Entry to the Exit node.
     /// </summary>
     public class StoryLogicNode : IFileWithId
     {
@@ -20,51 +21,46 @@ namespace DeusaldStoryCommon
         /// <summary>
         /// When set, this node holds only variable calculations / randomizations — no story-facing screen. In the
         /// app it runs automatically and the player never stops here; in the printed Gamebook it becomes a section
-        /// whose body is <b>generated instructions</b> telling players to perform those operations by hand
-        /// (roll a die, note a value, jump to a section). Today the only operation source is the node's External
-        /// Variables and their Gamebook condition keys; future interaction blocks contribute their own baked keys.
+        /// whose body is <b>generated instructions</b> telling players to perform those operations by hand.
         /// </summary>
         public bool GamebookInstructions { get; set; }
 
         /// <summary>
-        /// How this node exposes its exits on its card. <see cref="StoryLogicExitMode.SeparatePaths"/> (the default)
-        /// draws one output port per <see cref="ExitPoints"/> entry; <see cref="StoryLogicExitMode.SingleSelection"/>
-        /// draws one <see cref="SelectionFlowOut"/> flow port plus one <see cref="SelectionVarOut"/> variable port.
-        /// Either way the named exit points are kept — in SingleSelection mode they are the possible Selection values.
+        /// How this node hands its continuations to the next node(s): <see cref="StoryLogicExitMode.ManyPaths"/>
+        /// (one outer Flow output per choice) or <see cref="StoryLogicExitMode.SinglePath"/> (one outer VFlow output
+        /// carrying the <see cref="DeclaredVariables"/>, each choice pinning their values).
         /// </summary>
         public StoryLogicExitMode ExitMode { get; set; }
 
-        /// <summary>SingleSelection only — the single flow output all exits collapse into. Kept stable across mode toggles.</summary>
-        public StoryConnectionPoint SelectionFlowOut { get; set; } = new() { Name = "Out" };
+        /// <summary>The continuations offered by this node's single Exit node (replaces the old per-exit points + Choice node).</summary>
+        public List<StoryChoice> Choices { get; } = new();
 
-        /// <summary>SingleSelection only — the variable output carrying the name of whichever exit the flow reached.</summary>
-        public StoryConnectionPoint SelectionVarOut { get; set; } = new() { Name = "Selection" };
+        /// <summary>SinglePath only — the variables this node declares and hands to the next node over its VFlow output.</summary>
+        public List<StoryDeclaredVariable> DeclaredVariables { get; } = new();
 
-        /// <summary>
-        /// When set, this node gains a second (variable) input port, <see cref="ExitVariableIn"/>, that accepts an
-        /// upstream node's Selection variable. Wiring it in surfaces the <see cref="PrevExitVariable"/> node inside
-        /// this node's inner graph.
-        /// </summary>
-        public bool AcceptExitVariable { get; set; }
-
-        /// <summary>The second (variable) input port — accepts an upstream Selection variable. Shown when <see cref="AcceptExitVariable"/>.</summary>
-        public StoryConnectionPoint ExitVariableIn { get; set; } = new() { Name = "Selection" };
+        /// <summary>SinglePath only — the single outer VFlow output all choices share. Kept stable across mode toggles.</summary>
+        public StoryConnectionPoint VFlowOut { get; set; } = new() { Name = "Out" };
 
         /// <summary>
-        /// The always-present "Prev Exit Variable" node, drawn inside the inner graph only when
-        /// <see cref="AcceptExitVariable"/> is set and <see cref="ExitVariableIn"/> is wired to an upstream Selection.
+        /// When set, this node gains a second (VFlow) input port, <see cref="VariablesIn"/>, that accepts an upstream
+        /// SinglePath node's declared variables. Wiring it in surfaces the <see cref="PrevExitVariable"/> node inside
+        /// this node's inner graph, exposing those variables as constants.
         /// </summary>
+        public bool AcceptVariables { get; set; }
+
+        /// <summary>The second (VFlow) input port — accepts an upstream node's declared variables. Shown when <see cref="AcceptVariables"/>.</summary>
+        public StoryConnectionPoint VariablesIn { get; set; } = new() { Name = "Variables" };
+
+        /// <summary>The always-present Prev Exit Variable node, drawn inside the inner graph when <see cref="AcceptVariables"/> is set and <see cref="VariablesIn"/> is wired.</summary>
         public StoryPrevExitVariableNode PrevExitVariable { get; set; } = new();
 
-        public StoryConnectionPoint       EntryPoint { get; set; } = new() { Name = "In" };
-        public List<StoryConnectionPoint> ExitPoints { get; }      = new();
+        public StoryConnectionPoint EntryPoint { get; set; } = new() { Name = "In" };
 
         // ── Inner content graph ────────────────────────────────────────────────
-        // The logic node opens into its own graph. The single EntryPoint (above) is drawn there as the Entry
-        // node — with three extra config inputs, Title, Subtitle and Icon — and each ExitPoint is drawn as its
-        // own Exit node, reusing their X/Y as inner canvas positions and their ids as the inner flow-port ids
-        // (exactly how a container reuses its boundary points inside itself). Localization/Icon nodes and their
-        // wiring live here too and are serialized as part of this logic node's file.
+        // The logic node opens into its own linear LFlow graph. The single EntryPoint (above) is the Entry node — with
+        // three extra config inputs, Title, Subtitle and Icon — and the single Exit node terminates the chain, carrying
+        // one Text input per choice plus the auto-resolution inputs. Content nodes (Localization/Icon/SmartFormat/…)
+        // and their wiring live here too and are serialized as part of this logic node's file.
 
         /// <summary>The Entry node's Title input port — accepts a Localization node's output.</summary>
         public StoryConnectionPoint TitleIn { get; set; } = new() { Name = "Title" };
@@ -75,7 +71,16 @@ namespace DeusaldStoryCommon
         /// <summary>The Entry node's Icon input port — accepts an Icon node's output.</summary>
         public StoryConnectionPoint IconIn { get; set; } = new() { Name = "Icon" };
 
-        /// <summary>Localization nodes placed in the inner graph (each feeds a Title input).</summary>
+        /// <summary>The Exit node's LFlow input port — the render chain terminates here.</summary>
+        public StoryConnectionPoint ExitLFlowIn { get; set; } = new() { Name = "Flow" };
+
+        /// <summary>The Exit node's Variables input (many-in) — wire variables here to enable App auto-resolution of the choice.</summary>
+        public StoryConnectionPoint ExitVariablesIn { get; set; } = new() { Name = "Variables" };
+
+        /// <summary>The Exit node's single Auto-text input — overrides the default "Click here to continue…" button label in auto mode.</summary>
+        public StoryConnectionPoint ExitAutoTextIn { get; set; } = new() { Name = "Text" };
+
+        /// <summary>Localization nodes placed in the inner graph (each feeds a Title/Text input).</summary>
         public List<StoryLocalizationNode> LocalizationNodes { get; } = new();
 
         /// <summary>Icon nodes placed in the inner graph (each feeds an Icon input).</summary>
@@ -87,41 +92,29 @@ namespace DeusaldStoryCommon
         /// <summary>SmartFormat nodes placed in the inner graph (each formats a text with connected variable values).</summary>
         public List<StorySmartFormatNode> SmartFormatNodes { get; } = new();
 
-        /// <summary>External Variable nodes placed in the inner graph (each feeds a variable value into a SmartFormat node).</summary>
+        /// <summary>External Variable nodes placed in the inner graph (each feeds a variable value into a SmartFormat/Exit input).</summary>
         public List<StoryExternalVariableNode> ExternalVariableNodes { get; } = new();
 
-        /// <summary>Get Variable nodes placed in the inner graph (each reads a registered storage variable's value — App value / Gamebook slot tag).</summary>
+        /// <summary>Get Variable nodes placed in the inner graph (each reads a registered storage variable — App value / Gamebook slot tag).</summary>
         public List<StoryGetVariableNode> GetVariableNodes { get; } = new();
 
-        /// <summary>Local Variable nodes placed in the inner graph (each supplies a named constant value into a SmartFormat or Condition input).</summary>
-        public List<StoryLocalVariableNode> LocalVariableNodes { get; } = new();
+        /// <summary>Constant Variable nodes placed in the inner graph (each supplies a named constant value into a SmartFormat/Exit input).</summary>
+        public List<StoryConstantVariableNode> ConstantVariableNodes { get; } = new();
 
-        /// <summary>FlowText nodes placed in the inner graph — the flow spine that renders text blocks in order.</summary>
+        /// <summary>FlowText nodes placed in the inner graph — the LFlow chain that renders text blocks in order.</summary>
         public List<StoryFlowTextNode> FlowTextNodes { get; } = new();
 
-        /// <summary>Register-variable nodes on the flow spine — each claims a physical storage slot for a new variable.</summary>
+        /// <summary>Register-variable nodes on the LFlow chain — each claims a physical storage slot for a new variable.</summary>
         public List<StoryRegisterVariableNode> RegisterVariableNodes { get; } = new();
 
-        /// <summary>Set-variable nodes on the flow spine — each assigns a value to an already-registered variable.</summary>
+        /// <summary>Set-variable nodes on the LFlow chain — each assigns a value to an already-registered variable.</summary>
         public List<StorySetVariableNode> SetVariableNodes { get; } = new();
 
-        /// <summary>Unregister-variable nodes on the flow spine — each releases a registered variable and frees its slot.</summary>
+        /// <summary>Unregister-variable nodes on the LFlow chain — each releases a registered variable and frees its slot.</summary>
         public List<StoryUnregisterVariableNode> UnregisterVariableNodes { get; } = new();
 
-        /// <summary>Set-external-variable nodes on the flow spine — each assigns a value to a story-wide external variable.</summary>
+        /// <summary>Set-external-variable nodes on the LFlow chain — each assigns a value to a story-wide external variable.</summary>
         public List<StorySetExternalVariableNode> SetExternalVariableNodes { get; } = new();
-
-        /// <summary>Choice nodes on the flow spine — each presents the player with a set of branches (one exit per choice).</summary>
-        public List<StoryChoiceNode> ChoiceNodes { get; } = new();
-
-        /// <summary>Condition nodes on the flow spine — each branches the flow (True/False) by testing a variable.</summary>
-        public List<StoryConditionNode> ConditionNodes { get; } = new();
-
-        /// <summary>App/Gamebook text-splitter nodes — each emits one of two texts depending on the render target.</summary>
-        public List<StoryAppGamebookTextSplitterNode> AppGamebookTextSplitterNodes { get; } = new();
-
-        /// <summary>App/Gamebook flow-splitter nodes on the flow spine — each routes the spine by the render target.</summary>
-        public List<StoryAppGamebookFlowSplitterNode> AppGamebookFlowSplitterNodes { get; } = new();
 
         /// <summary>Free-text comment notes placed in this logic node's inner graph (no ports; documentation only).</summary>
         public List<StoryCommentNode> CommentNodes { get; } = new();

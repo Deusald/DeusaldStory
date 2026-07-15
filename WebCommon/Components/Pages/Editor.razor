@@ -142,15 +142,13 @@
 <IconPickerModal           @ref="_IconPicker"          OnConfirm="OnIconPicked"/>
 <VariablePickerModal       @ref="_VariablePicker"      OnConfirm="OnVariablePicked"/>
 <GetVariableModal          @ref="_GetVariableModal"    OnConfirm="OnGetVariableConfirmed"/>
-<LocalVariableModal        @ref="_LocalVariableModal"  OnConfirm="OnLocalVariableConfirmed"/>
+<ConstantVariableModal     @ref="_ConstantVariableModal" OnConfirm="OnConstantVariableConfirmed"/>
 <RegisterVariableModal     @ref="_RegisterVariableModal" OnConfirm="OnRegisterVariableConfirmed"/>
 <SetVariableModal          @ref="_SetVariableModal"      OnConfirm="OnSetVariableConfirmed"/>
 <UnregisterVariablePickerModal @ref="_UnregisterPicker"  OnConfirm="OnUnregisterPicked"/>
 <SetExternalVariableModal  @ref="_SetExternalVariableModal" OnConfirm="OnSetExternalVariableConfirmed"/>
-<NewChoiceNodeModal        @ref="_NewChoiceNodeModal"       OnConfirm="OnChoiceConfirmed"/>
-<NewConditionNodeModal     @ref="_NewConditionNodeModal"    OnConfirm="OnConditionConfirmed"/>
+<ExitNodeModal             @ref="_ExitNodeModal"            OnConfirm="OnExitNodeConfirmed"/>
 <NewCommentNodeModal       @ref="_NewCommentNodeModal"      OnConfirm="OnCommentConfirmed"/>
-<PrevExitVariableModal     @ref="_PrevExitVariableModal"    OnConfirm="OnPrevExitVariableConfirmed"/>
 
 @code {
     private EditorMode        _Mode = EditorMode.Edit;
@@ -168,15 +166,13 @@
     private IconPickerModal?           _IconPicker;
     private VariablePickerModal?       _VariablePicker;
     private GetVariableModal?          _GetVariableModal;
-    private LocalVariableModal?        _LocalVariableModal;
+    private ConstantVariableModal?     _ConstantVariableModal;
     private RegisterVariableModal?     _RegisterVariableModal;
     private SetVariableModal?          _SetVariableModal;
     private UnregisterVariablePickerModal? _UnregisterPicker;
     private SetExternalVariableModal?  _SetExternalVariableModal;
-    private NewChoiceNodeModal?        _NewChoiceNodeModal;
-    private NewConditionNodeModal?     _NewConditionNodeModal;
+    private ExitNodeModal?             _ExitNodeModal;
     private NewCommentNodeModal?       _NewCommentNodeModal;
-    private PrevExitVariableModal?     _PrevExitVariableModal;
 
     // Where the next created node is placed — the right-clicked canvas point (or a staggered default).
     private double _PendingX;
@@ -307,23 +303,22 @@
     /// App-preview "continue" — follow the clicked exit to the next logic node and preview it. Reaching the story
     /// End or an unwired exit shows a transient notice instead of navigating.
     /// </summary>
-    private void OnPreviewContinue(Guid exitPointId)
+    private void OnPreviewContinue(StoryLogicRenderer.RenderedChoice choice)
     {
-        // A single-selection node funnels every branch through its one Selection flow-out; follow that instead of the
-        // internal exit, and carry the chosen exit's (remapped) value so the receiver reads it as its Selection.
-        StoryLogicNode? owner = Project.LogicNodes.Values.FirstOrDefault(l => l.ExitPoints.Any(e => e.Id == exitPointId));
-        bool singleSelect     = owner is { ExitMode: StoryLogicExitMode.SingleSelection };
-        Guid followId         = singleSelect ? owner!.SelectionFlowOut.Id : exitPointId;
+        // The owner is the node whose choice was clicked; follow that choice's outer flow-out to the next node.
+        StoryLogicNode? owner = Project.LogicNodes.Values.FirstOrDefault(l => l.Choices.Any(c => c.Id == choice.ChoiceId));
 
-        StoryFlowNavigator.NextLogicResult result = StoryFlowNavigator.ResolveNextLogic(Project, followId);
+        StoryFlowNavigator.NextLogicResult result = StoryFlowNavigator.ResolveNextLogic(Project, choice.OuterFlowOut);
         switch (result.Kind)
         {
             case StoryFlowNavigator.NextKind.Logic when result.Logic is not null:
                 _Crumbs[^1]    = new EditorCrumb(result.Logic.Id, result.Logic.Name, EditorScope.Logic);
                 _PreviewVars   = new Dictionary<Guid, string>();
-                if (singleSelect && result.Logic.AcceptExitVariable
-                    && owner!.ExitPoints.Find(e => e.Id == exitPointId) is StoryConnectionPoint chosenExit)
-                    _PreviewVars[result.Logic.PrevExitVariable.Id] = StorySelectionResolver.ValueFor(result.Logic.PrevExitVariable, chosenExit);
+                // If the next node reads this SinglePath node's variables, pin this choice's values for the preview.
+                if (owner is { ExitMode: StoryLogicExitMode.SinglePath }
+                    && StorySelectionResolver.SourceNode(Project, result.Logic) is StoryLogicNode src && src.Id == owner.Id
+                    && owner.Choices.Find(c => c.Id == choice.ChoiceId) is StoryChoice picked)
+                    _PreviewVars = StorySelectionResolver.ValuesForChoice(owner, picked);
                 _PreviewNotice = null;
                 RebuildNodes();
                 break;
@@ -452,17 +447,13 @@
                 new NodePaletteItem(StoryNodeKind.LightDarkSwitch,  "bi-circle-half",     "Light/Dark switch",     "Outputs one of two icons depending on the render theme (dark or paper/light)."),
                 new NodePaletteItem(StoryNodeKind.SmartFormat,      "bi-braces-asterisk", "SmartFormat node",      "Formats a text with SmartFormat, substituting connected External Variable values."),
                 new NodePaletteItem(StoryNodeKind.ExternalVariable, "bi-braces",          "External Variable node", "Feeds a story variable's value into a SmartFormat node."),
-                new NodePaletteItem(StoryNodeKind.GetVariable,      "bi-box-arrow-down",  "Get variable",           "Reads a registered variable's value into a SmartFormat/Condition input — the App value, or the slot tag in the Gamebook."),
-                new NodePaletteItem(StoryNodeKind.LocalVariable,    "bi-braces",          "Local variable",         "Supplies a named constant value into a SmartFormat/Condition input (formats text; never splits Gamebook sections)."),
-                new NodePaletteItem(StoryNodeKind.FlowText,         "bi-text-paragraph",  "FlowText node",         "On the flow spine — renders a connected text block, then continues to the next flow node."),
-                new NodePaletteItem(StoryNodeKind.RegisterVariable,   "bi-box-seam",        "Register variable",     "On the flow spine — claims a physical storage slot for a new variable."),
-                new NodePaletteItem(StoryNodeKind.SetVariable,        "bi-pencil-square",   "Set variable",          "On the flow spine — assigns a value to an already-registered variable."),
-                new NodePaletteItem(StoryNodeKind.UnregisterVariable, "bi-box-arrow-up",    "Unregister variable",   "On the flow spine — releases a registered variable and frees its slot."),
-                new NodePaletteItem(StoryNodeKind.SetExternalVariable, "bi-sliders",        "Set external variable", "On the flow spine — assigns a value to a story-wide external variable (App only; no Gamebook instruction)."),
-                new NodePaletteItem(StoryNodeKind.Choice,             "bi-signpost-split",  "Choice node",           "On the flow spine — offers the player a set of choices, each branching out to an exit."),
-                new NodePaletteItem(StoryNodeKind.AppGamebookTextSplitter, "bi-fonts",       "App/Gamebook text splitter", "Emits its App text when rendering the app and its Gamebook text when rendering the printed gamebook (either may be empty)."),
-                new NodePaletteItem(StoryNodeKind.AppGamebookFlowSplitter, "bi-signpost-2",  "App/Gamebook flow splitter", "On the flow spine — routes flow down its App branch for the app and its Gamebook branch for the printed gamebook."),
-                new NodePaletteItem(StoryNodeKind.Condition,              "bi-diamond",     "Condition node",             "On the flow spine — tests a connected variable and branches flow down its True or False output."),
+                new NodePaletteItem(StoryNodeKind.GetVariable,      "bi-box-arrow-down",  "Get variable",           "Reads a registered variable: a Value output (App) and a Slot-tag output (Gamebook)."),
+                new NodePaletteItem(StoryNodeKind.ConstantVariable, "bi-braces",          "Constant variable",      "Supplies a named constant value into a SmartFormat / Exit variables input (never splits Gamebook sections)."),
+                new NodePaletteItem(StoryNodeKind.FlowText,         "bi-text-paragraph",  "FlowText node",         "On the logic chain — renders a connected text block, then continues to the next node."),
+                new NodePaletteItem(StoryNodeKind.RegisterVariable,   "bi-box-seam",        "Register variable",     "On the logic chain — claims a physical storage slot for a new variable."),
+                new NodePaletteItem(StoryNodeKind.SetVariable,        "bi-pencil-square",   "Set variable",          "On the logic chain — assigns a value to an already-registered variable."),
+                new NodePaletteItem(StoryNodeKind.UnregisterVariable, "bi-box-arrow-up",    "Unregister variable",   "On the logic chain — releases a registered variable and frees its slot."),
+                new NodePaletteItem(StoryNodeKind.SetExternalVariable, "bi-sliders",        "Set external variable", "On the logic chain — assigns a value to a story-wide external variable (App only; no Gamebook instruction)."),
                 new NodePaletteItem(StoryNodeKind.Comment,                "bi-chat-left-text", "Comment",                 "A free-text note explaining how nodes connect. No ports; ignored during playback.")
             ]
             :
@@ -495,8 +486,8 @@
                 RebuildNodes();
                 break;
             case StoryNodeKind.ExternalVariable: _VariablePicker?.Show(Guid.Empty, Guid.Empty); break;
-            case StoryNodeKind.GetVariable:   _GetVariableModal?.Show();   break;
-            case StoryNodeKind.LocalVariable: _LocalVariableModal?.Show(); break;
+            case StoryNodeKind.GetVariable:      _GetVariableModal?.Show();      break;
+            case StoryNodeKind.ConstantVariable: _ConstantVariableModal?.Show(); break;
             case StoryNodeKind.FlowText:
                 // No config — create it straight away at the pending position.
                 if (_ProjectState.AddFlowTextNode(_CurrentId, _PendingX, _PendingY) is StoryFlowTextNode ft)
@@ -507,20 +498,6 @@
             case StoryNodeKind.SetVariable:        _SetVariableModal?.Show();                break;
             case StoryNodeKind.UnregisterVariable: _UnregisterPicker?.Show(Guid.Empty, Guid.Empty); break;
             case StoryNodeKind.SetExternalVariable: _SetExternalVariableModal?.Show();        break;
-            case StoryNodeKind.Choice:              _NewChoiceNodeModal?.Show();              break;
-            case StoryNodeKind.AppGamebookTextSplitter:
-                // No config — the branch is chosen by the render target, so create it straight away.
-                if (_ProjectState.AddAppGamebookTextSplitterNode(_CurrentId, _PendingX, _PendingY) is StoryAppGamebookTextSplitterNode ags)
-                    _SelectedId = ags.Id;
-                RebuildNodes();
-                break;
-            case StoryNodeKind.AppGamebookFlowSplitter:
-                // No config — the branch is chosen by the render target, so create it straight away.
-                if (_ProjectState.AddAppGamebookFlowSplitterNode(_CurrentId, _PendingX, _PendingY) is StoryAppGamebookFlowSplitterNode agf)
-                    _SelectedId = agf.Id;
-                RebuildNodes();
-                break;
-            case StoryNodeKind.Condition: _NewConditionNodeModal?.Show(); break;
             case StoryNodeKind.Comment:   _NewCommentNodeModal?.Show();   break;
         }
     }
@@ -599,13 +576,13 @@
         RebuildNodes();
     }
 
-    private void OnLocalVariableConfirmed(LocalVariableModal.LocalVariableArgs args)
+    private void OnConstantVariableConfirmed(ConstantVariableModal.ConstantVariableArgs args)
     {
         if (args.EditNodeId != Guid.Empty)
         {
-            _ProjectState.UpdateLocalVariableNode(_CurrentId, args.EditNodeId, args.Name, args.Value);
+            _ProjectState.UpdateConstantVariableNode(_CurrentId, args.EditNodeId, args.Name, args.Value);
         }
-        else if (_ProjectState.AddLocalVariableNode(_CurrentId, args.Name, args.Value, _PendingX, _PendingY) is StoryLocalVariableNode node)
+        else if (_ProjectState.AddConstantVariableNode(_CurrentId, args.Name, args.Value, _PendingX, _PendingY) is StoryConstantVariableNode node)
         {
             _SelectedId = node.Id;
         }
@@ -714,30 +691,10 @@
         RebuildNodes();
     }
 
-    private void OnChoiceConfirmed(NewChoiceNodeModal.ChoiceArgs args)
+    private void OnExitNodeConfirmed(ExitNodeModal.ExitNodeArgs args)
     {
-        Guid nodeId = args.EditNodeId;
-        if (nodeId == Guid.Empty)
-        {
-            if (_ProjectState.AddChoiceNode(_CurrentId, _PendingX, _PendingY) is not StoryChoiceNode created) return;
-            nodeId      = created.Id;
-            _SelectedId = created.Id;
-        }
-        _ProjectState.UpdateChoiceNode(_CurrentId, nodeId,
-            args.Options.Select(o => (o.Id, o.Name)).ToList());
-        RebuildNodes();
-    }
-
-    private void OnConditionConfirmed(NewConditionNodeModal.ConditionArgs args)
-    {
-        Guid nodeId = args.EditNodeId;
-        if (nodeId == Guid.Empty)
-        {
-            if (_ProjectState.AddConditionNode(_CurrentId, _PendingX, _PendingY) is not StoryConditionNode created) return;
-            nodeId      = created.Id;
-            _SelectedId = created.Id;
-        }
-        _ProjectState.UpdateConditionNode(_CurrentId, nodeId, args.Operator, args.CompareValue);
+        _ProjectState.UpdateExitNode(_CurrentId,
+            args.Choices.Select(c => (c.Id, c.Name, c.IsElse, c.Condition, c.Values)).ToList());
         RebuildNodes();
     }
 
@@ -760,21 +717,21 @@
         if (args.EditId != Guid.Empty)
         {
             _ProjectState.UpdateLogicNode(
-                _CurrentId, args.EditId, args.Name, args.Description, args.EntryName, args.Exits,
-                args.GamebookInstructions, args.ExitMode, args.AcceptExitVariable);
+                _CurrentId, args.EditId, args.Name, args.Description, args.EntryName,
+                args.GamebookInstructions, args.ExitMode, args.AcceptVariables, args.DeclaredVariables);
             RebuildNodes();
             _SelectedId = args.EditId;
             return;
         }
 
         StoryConnectionPoint entry = new() { Name = args.EntryName };
-        List<StoryConnectionPoint> exits = args.Exits
-                                               .Select(e => new StoryConnectionPoint { Name = e.Name })
-                                               .ToList();
-
         StoryLogicNode node = _ProjectState.AddLogicNode(
-            _CurrentId, args.Name, args.Description, entry, exits, _PendingX, _PendingY,
-            args.GamebookInstructions, args.ExitMode, args.AcceptExitVariable);
+            _CurrentId, args.Name, args.Description, entry, _PendingX, _PendingY,
+            args.GamebookInstructions, args.ExitMode, args.AcceptVariables);
+        // Declared variables (SinglePath) are reconciled through the update path.
+        _ProjectState.UpdateLogicNode(
+            _CurrentId, node.Id, args.Name, args.Description, args.EntryName,
+            args.GamebookInstructions, args.ExitMode, args.AcceptVariables, args.DeclaredVariables);
 
         RebuildNodes();
         _SelectedId = node.Id;
@@ -825,8 +782,8 @@
                 if (Project.LogicNodes.TryGetValue(node.Id, out StoryLogicNode? logic))
                     _NewLogicNodeModal?.ShowEdit(
                         logic.Id, logic.Name, logic.Description, logic.EntryPoint.Name,
-                        logic.ExitPoints.Select(p => (p.Id, p.Name)), logic.GamebookInstructions,
-                        logic.ExitMode, logic.AcceptExitVariable);
+                        logic.GamebookInstructions, logic.ExitMode, logic.AcceptVariables,
+                        logic.DeclaredVariables.Select(d => (d.Id, d.Name)));
                 break;
 
             case StoryNodeKind.Container:
@@ -863,9 +820,9 @@
                     _GetVariableModal?.ShowEdit(gv);
                 break;
 
-            case StoryNodeKind.LocalVariable:
-                if (_CurrentLogicNode?.LocalVariableNodes.Find(n => n.Id == node.Id) is StoryLocalVariableNode lv)
-                    _LocalVariableModal?.ShowEdit(lv);
+            case StoryNodeKind.ConstantVariable:
+                if (_CurrentLogicNode?.ConstantVariableNodes.Find(n => n.Id == node.Id) is StoryConstantVariableNode cv)
+                    _ConstantVariableModal?.ShowEdit(cv);
                 break;
 
             case StoryNodeKind.RegisterVariable:
@@ -888,39 +845,40 @@
                     _SetExternalVariableModal?.ShowEdit(setExt);
                 break;
 
-            case StoryNodeKind.Choice:
-                if (_CurrentLogicNode?.ChoiceNodes.Find(n => n.Id == node.Id) is StoryChoiceNode choice)
-                    _NewChoiceNodeModal?.ShowEdit(choice);
-                break;
-
-            case StoryNodeKind.Condition:
-                if (_CurrentLogicNode?.ConditionNodes.Find(n => n.Id == node.Id) is StoryConditionNode cond)
-                    _NewConditionNodeModal?.ShowEdit(cond);
+            case StoryNodeKind.LogicExit:
+                if (_CurrentLogicNode is StoryLogicNode exitOwner)
+                    _ExitNodeModal?.ShowEdit(exitOwner, AvailableExitVariables(exitOwner));
                 break;
 
             case StoryNodeKind.Comment:
                 if (FindComment(node.Id) is StoryCommentNode comment)
                     _NewCommentNodeModal?.ShowEdit(comment.Id, comment.Text);
                 break;
-
-            case StoryNodeKind.PrevExitVariable:
-                if (_CurrentLogicNode is StoryLogicNode owner)
-                {
-                    List<StoryConnectionPoint>? sourceExits = EditorProjection.ResolveExitVariableSource(Project, owner);
-                    _PrevExitVariableModal?.ShowEdit(
-                        owner.PrevExitVariable,
-                        (sourceExits ?? new List<StoryConnectionPoint>()).Select(p => (p.Id, p.Name)));
-                }
-                break;
         }
     }
 
-    private void OnPrevExitVariableConfirmed(PrevExitVariableModal.PrevExitVariableArgs args)
+    /// <summary>The variables wired into a node's Exit-node Variables input, as (output id, display name) for the auto-resolution condition builder.</summary>
+    private List<(Guid Id, string Name)> AvailableExitVariables(StoryLogicNode logic)
     {
-        if (_CurrentLogicNode is not StoryLogicNode owner) return;
-        _ProjectState.UpdatePrevExitVariableNode(owner.Id, args.VariableName, args.RemapEnabled, args.Remaps);
-        RebuildNodes();
-        _SelectedId = owner.PrevExitVariable.Id;
+        List<(Guid, string)> result = new();
+        foreach (StoryConnection c in logic.ContentConnections.Where(c => c.ToPoint == logic.ExitVariablesIn.Id))
+        {
+            string name = ExitVariableName(logic, c.FromPoint);
+            if (!string.IsNullOrWhiteSpace(name)) result.Add((c.FromPoint, name));
+        }
+        return result;
+    }
+
+    private string ExitVariableName(StoryLogicNode logic, Guid fromPoint)
+    {
+        if (logic.ExternalVariableNodes.Find(n => n.OutPoint.Id == fromPoint) is StoryExternalVariableNode ev)
+            return (StoryBuiltInVariables.Find(ev.SelectedVariableId)
+                    ?? (Project.Variables.TryGetValue(ev.SelectedVariableId, out StoryVariable? v) ? v : null))?.Name ?? "(variable)";
+        if (logic.GetVariableNodes.Find(n => n.OutPoint.Id == fromPoint || n.SlotOutPoint.Id == fromPoint) is StoryGetVariableNode gv)
+            return string.IsNullOrWhiteSpace(gv.NameOverride) ? "(get)" : gv.NameOverride;
+        if (logic.ConstantVariableNodes.Find(n => n.OutPoint.Id == fromPoint) is StoryConstantVariableNode cn)
+            return string.IsNullOrWhiteSpace(cn.Name) ? "(constant)" : cn.Name;
+        return StorySelectionResolver.IncomingVariables(Project, logic).Find(d => d.Id == fromPoint)?.Name ?? "";
     }
 
     /// <summary>Delete from a node's context menu. Deleting a container removes everything nested inside it.</summary>
@@ -941,16 +899,12 @@
             case StoryNodeKind.SmartFormat:     _ProjectState.DeleteSmartFormatNode(_CurrentId, node.Id);     break;
             case StoryNodeKind.ExternalVariable: _ProjectState.DeleteExternalVariableNode(_CurrentId, node.Id); break;
             case StoryNodeKind.GetVariable:      _ProjectState.DeleteGetVariableNode(_CurrentId, node.Id);      break;
-            case StoryNodeKind.LocalVariable:    _ProjectState.DeleteLocalVariableNode(_CurrentId, node.Id);    break;
+            case StoryNodeKind.ConstantVariable: _ProjectState.DeleteConstantVariableNode(_CurrentId, node.Id); break;
             case StoryNodeKind.FlowText:         _ProjectState.DeleteFlowTextNode(_CurrentId, node.Id);        break;
             case StoryNodeKind.RegisterVariable:   _ProjectState.DeleteRegisterVariableNode(_CurrentId, node.Id);   break;
             case StoryNodeKind.SetVariable:        _ProjectState.DeleteSetVariableNode(_CurrentId, node.Id);        break;
             case StoryNodeKind.UnregisterVariable: _ProjectState.DeleteUnregisterVariableNode(_CurrentId, node.Id); break;
             case StoryNodeKind.SetExternalVariable: _ProjectState.DeleteSetExternalVariableNode(_CurrentId, node.Id); break;
-            case StoryNodeKind.Choice:              _ProjectState.DeleteChoiceNode(_CurrentId, node.Id);             break;
-            case StoryNodeKind.AppGamebookTextSplitter: _ProjectState.DeleteAppGamebookTextSplitterNode(_CurrentId, node.Id); break;
-            case StoryNodeKind.AppGamebookFlowSplitter: _ProjectState.DeleteAppGamebookFlowSplitterNode(_CurrentId, node.Id); break;
-            case StoryNodeKind.Condition:               _ProjectState.DeleteConditionNode(_CurrentId, node.Id);             break;
             case StoryNodeKind.Comment:                 _ProjectState.DeleteCommentNode(_CurrentId, node.Id);               break;
             default: return;
         }

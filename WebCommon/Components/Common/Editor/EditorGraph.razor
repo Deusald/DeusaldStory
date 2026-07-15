@@ -378,9 +378,8 @@
     private bool IsCompatibleTarget(EdPort input) =>
         _ConnFrom is Guid from
         && _Anchors.TryGetValue(from, out PortAnchor src)
-        && _Anchors.TryGetValue(input.Id, out PortAnchor tgt)
-        && src.Type == input.Type
-        && (src.OwnerKind != StoryNodeKind.Choice || tgt.OwnerKind == StoryNodeKind.LogicExit);
+        && _Anchors.TryGetValue(input.Id, out _)
+        && StoryStyle.IsCompatible(src.Type, input.Type);
 
     // ── Pan / drag ─────────────────────────────────────────────────────────
 
@@ -598,15 +597,12 @@
         bool     haveSrc     = _Anchors.TryGetValue(fromPoint, out PortAnchor src);
         Guid     sourceNode  = haveSrc ? src.NodeId   : Guid.Empty;
         PortType sourceType  = haveSrc ? src.Type     : PortType.Flow;
-        bool     fromChoice  = haveSrc && src.OwnerKind == StoryNodeKind.Choice;
         Guid?    best        = null;
         double   bestDist    = SNAP_RADIUS * SNAP_RADIUS;
 
         foreach ((Guid pointId, PortAnchor a) in _Anchors)
         {
-            if (a.IsOutput || a.NodeId == sourceNode || a.Type != sourceType) continue;
-            // A Choice option's flow-out may land only on an Exit node.
-            if (fromChoice && a.OwnerKind != StoryNodeKind.LogicExit) continue;
+            if (a.IsOutput || a.NodeId == sourceNode || !StoryStyle.IsCompatible(sourceType, a.Type)) continue;
             double dx = a.X - _ConnX, dy = a.Y - _ConnY;
             double d2 = dx * dx + dy * dy;
             if (d2 <= bestDist)
@@ -663,11 +659,9 @@
         StoryNodeKind.ExternalVariable => "external variable node",
         StoryNodeKind.FlowText         => "flow text node",
         StoryNodeKind.SetExternalVariable => "set external variable node",
-        StoryNodeKind.Choice              => "choice node",
-        StoryNodeKind.AppGamebookTextSplitter => "App/Gamebook text splitter",
-        StoryNodeKind.AppGamebookFlowSplitter => "App/Gamebook flow splitter",
-        StoryNodeKind.PrevExitVariable        => "selection variable",
-        StoryNodeKind.Condition               => "condition node",
+        StoryNodeKind.ConstantVariable        => "constant variable node",
+        StoryNodeKind.GetVariable             => "get variable node",
+        StoryNodeKind.PrevExitVariable        => "prev exit variables",
         StoryNodeKind.Comment                 => "comment",
         _                       => "node"
     };

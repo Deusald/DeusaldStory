@@ -6,62 +6,40 @@ using JetBrains.Annotations;
 namespace DeusaldStoryCommon
 {
     /// <summary>
-    /// Resolves the <b>Selection</b> exit-variable that a <see cref="StoryLogicNode.AcceptExitVariable">receiving</see>
-    /// logic node reads from an upstream <see cref="StoryLogicExitMode.SingleSelection"/> node. It follows the
-    /// container wire arriving at the receiver's <see cref="StoryLogicNode.ExitVariableIn"/> back to the upstream
-    /// node's <see cref="StoryLogicNode.SelectionVarOut"/> and exposes the upstream exits, the value each exit emits
-    /// (honouring the receiver's remap), and a synthetic <see cref="StoryVariable"/> the Gamebook uses to expand the
-    /// receiver into one section per exit value. Shared by the renderer/preview (this project) and the editor.
+    /// Resolves the variables a <see cref="StoryLogicNode.AcceptVariables">receiving</see> logic node reads from an
+    /// upstream <see cref="StoryLogicExitMode.SinglePath"/> node over its VFlow output. It follows the container wire
+    /// arriving at the receiver's <see cref="StoryLogicNode.VariablesIn"/> back to the upstream node's
+    /// <see cref="StoryLogicNode.VFlowOut"/> and exposes that node's declared variables (surfaced by the receiver's
+    /// Prev Exit Variable node as constants) and the value each upstream choice pins — the Gamebook expands the
+    /// receiver into one section per upstream choice.
     /// </summary>
     [PublicAPI]
     public static class StorySelectionResolver
     {
-        /// <summary>
-        /// The upstream node's exit points feeding <paramref name="logic"/>'s exit-variable input — the possible
-        /// incoming Selection values — or null when the node doesn't accept a variable or nothing is wired in.
-        /// </summary>
-        public static List<StoryConnectionPoint>? SourceExits(StoryProject project, StoryLogicNode logic)
+        /// <summary>The upstream SinglePath node feeding <paramref name="logic"/>'s Variables input, or null when none is wired.</summary>
+        public static StoryLogicNode? SourceNode(StoryProject project, StoryLogicNode logic)
         {
-            if (!logic.AcceptExitVariable) return null;
+            if (!logic.AcceptVariables) return null;
             if (!project.ContainerNodes.TryGetValue(logic.ParentContainer, out StoryContainerNode? parent)) return null;
 
-            StoryConnection? wire = parent.Connections.Find(c => c.ToPoint == logic.ExitVariableIn.Id);
+            StoryConnection? wire = parent.Connections.Find(c => c.ToPoint == logic.VariablesIn.Id);
             if (wire is null) return null;
 
-            StoryLogicNode? source = project.LogicNodes.Values.FirstOrDefault(l => l.SelectionVarOut.Id == wire.FromPoint);
-            return source?.ExitPoints;
+            return project.LogicNodes.Values.FirstOrDefault(l =>
+                l.ExitMode == StoryLogicExitMode.SinglePath && l.VFlowOut.Id == wire.FromPoint);
         }
 
-        /// <summary>The value the receiver emits for an upstream <paramref name="exit"/> — its remap when enabled and set, else the exit name.</summary>
-        public static string ValueFor(StoryPrevExitVariableNode prev, StoryConnectionPoint exit)
+        /// <summary>The declared variables the upstream node hands <paramref name="logic"/> (empty when nothing is wired in).</summary>
+        public static List<StoryDeclaredVariable> IncomingVariables(StoryProject project, StoryLogicNode logic) =>
+            SourceNode(project, logic)?.DeclaredVariables ?? new List<StoryDeclaredVariable>();
+
+        /// <summary>The value each of <paramref name="source"/>'s declared variables takes for one of its <paramref name="choice"/>s, keyed by declared-variable id.</summary>
+        public static Dictionary<Guid, string> ValuesForChoice(StoryLogicNode source, StoryChoice choice)
         {
-            if (prev.RemapEnabled)
-            {
-                StoryPrevExitRemap? remap = prev.Remaps.Find(r => r.SourceExitId == exit.Id);
-                if (remap is not null && !string.IsNullOrWhiteSpace(remap.Value)) return remap.Value;
-            }
-            return string.IsNullOrWhiteSpace(exit.Name) ? "" : exit.Name;
-        }
-
-        /// <summary>
-        /// A synthetic story variable representing <paramref name="logic"/>'s Selection dimension: id =
-        /// <see cref="StoryPrevExitVariableNode.Id"/>, name = the local variable name, possible values = the (remapped,
-        /// de-duplicated) upstream exit values. Null when the node doesn't accept a wired-in Selection.
-        /// </summary>
-        public static StoryVariable? SelectionVariable(StoryProject project, StoryLogicNode logic)
-        {
-            List<StoryConnectionPoint>? exits = SourceExits(project, logic);
-            if (exits is null) return null;
-
-            StoryPrevExitVariableNode prev = logic.PrevExitVariable;
-            List<string> values = exits.Select(e => ValueFor(prev, e)).Distinct().ToList();
-
-            return new StoryVariable
-            {
-                Id             = prev.Id,
-                Name           = string.IsNullOrWhiteSpace(prev.VariableName) ? "Selection" : prev.VariableName,
-                PossibleValues = values
-            };
+            Dictionary<Guid, string> map = new();
+            foreach (StoryDeclaredVariable dv in source.DeclaredVariables)
+                map[dv.Id] = choice.VariableValues.Find(v => v.DeclaredVarId == dv.Id)?.Value ?? "";
+            return map;
         }
     }
 }

@@ -9,10 +9,11 @@ namespace DeusaldStoryCommon
     /// <see cref="StoryRegisterVariableNode.Id"/> so a rename doesn't break the link; its SmartFormat token name can
     /// be overridden (<see cref="NameOverride"/>) to whatever the format string uses.
     /// <para>
-    /// Its value is medium-dependent: in the <b>App</b> the live value is tracked as the story is played, so the
-    /// editor preview substitutes the author-entered <see cref="PreviewValue"/>; in the <b>Gamebook</b> the value is
-    /// unknown at print time, so its slot tag (e.g. <c>TA</c>/<c>NA</c>/<c>DA</c>) is emitted instead of a value —
-    /// which also keeps it out of the section product (only story-wide External Variables dimension sections).
+    /// It exposes <b>two</b> output ports for the two mediums:
+    /// <see cref="OutPoint"/> — a <c>Variable</c> port carrying the live value (App only; the preview substitutes
+    /// <see cref="PreviewValue"/>); and <see cref="SlotOutPoint"/> — a <c>CVariable</c> port carrying the variable's
+    /// <c>{slot}</c> tag (e.g. <c>TA</c>/<c>NA</c>/<c>DA</c>), so the Gamebook can print which slot to read. Wire the
+    /// value port for App formatting and the slot port for Gamebook text.
     /// </para>
     /// </summary>
     public class StoryGetVariableNode
@@ -27,10 +28,13 @@ namespace DeusaldStoryCommon
         /// <summary>Optional SmartFormat token name override; empty falls back to the register node's own name.</summary>
         public string NameOverride { get; set; } = string.Empty;
 
-        /// <summary>The value used in the App preview (the App tracks the live value at runtime); also used to evaluate Conditions in the preview.</summary>
+        /// <summary>The value used in the App preview (the App tracks the live value at runtime); also used to evaluate conditions in the preview.</summary>
         public string PreviewValue { get; set; } = string.Empty;
 
-        /// <summary>The single output port carrying the variable's value (connects to a SmartFormat variables input or a Condition variable input).</summary>
+        /// <summary>The <c>Variable</c> output carrying the live value (App only) — connects to a SmartFormat / Exit variables input.</summary>
         public StoryConnectionPoint OutPoint { get; set; } = new() { Name = "Value" };
+
+        /// <summary>The <c>CVariable</c> output carrying the variable's <c>{slot}</c> tag (Gamebook) — connects to a SmartFormat / Exit variables input.</summary>
+        public StoryConnectionPoint SlotOutPoint { get; set; } = new() { Name = "Slot" };
     }
 }

@@ -1,0 +1,82 @@
+.ece-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    padding: 0.4rem;
+    border: 1px dashed var(--border);
+    border-radius: 0.4rem;
+    margin-left: 0.4rem;
+}
+
+.ece-group-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+}
+
+.ece-conn {
+    display: inline-flex;
+    border: 1px solid var(--border);
+    border-radius: 0.4rem;
+    overflow: hidden;
+}
+
+.ece-conn-opt {
+    padding: 0.15rem 0.55rem;
+    border: 0;
+    background: transparent;
+    color: var(--text-dim);
+    cursor: pointer;
+    font-size: 0.75rem;
+}
+
+.ece-conn-opt.active {
+    background: var(--accent);
+    color: #fff;
+}
+
+.ece-cmp {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+.ece-var {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.ece-op {
+    flex: 0 0 3.5rem;
+}
+
+.ece-val {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.ece-rhs,
+.ece-del,
+.ece-add-btn {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    border: 1px solid var(--border);
+    border-radius: 0.4rem;
+    background: var(--surface);
+    color: var(--text-dim);
+    cursor: pointer;
+    padding: 0.25rem 0.4rem;
+    font-size: 0.8rem;
+}
+
+.ece-del:hover { border-color: var(--danger); color: var(--danger); }
+.ece-rhs:hover,
+.ece-add-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+.ece-add {
+    display: inline-flex;
+    gap: 0.4rem;
+}

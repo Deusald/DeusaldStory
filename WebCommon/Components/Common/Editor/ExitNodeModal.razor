@@ -1,0 +1,171 @@
+@namespace DeusaldStoryWeb.Components.Common
+
+@* ─────────────────────────────────────────────────────────────────────────
+   Edits a logic node's Exit node: the list of choices (continuations). Each
+   choice has a name and — in Single-path mode — a value per declared variable.
+   When a variable is wired into the Exit node's Variables input, the App
+   auto-resolves to one button and each choice carries a condition (the locked
+   Else is the fallback).
+   ───────────────────────────────────────────────────────────────────────── *@
+
+@if (_Visible)
+{
+    <div class="modal-backdrop" @onclick="Cancel"></div>
+
+    <div class="modal-box enm-box" @onclick:stopPropagation="true">
+
+        <div class="modal-header">
+            <span class="modal-title">Exit — choices</span>
+            <button class="modal-close" @onclick="Cancel" title="Close">
+                <i class="bi bi-x-lg"></i>
+            </button>
+        </div>
+
+        <div class="modal-body enm-body">
+
+            @if (_Auto)
+            {
+                <div class="modal-note">
+                    <i class="bi bi-info-circle"></i>
+                    <span>A variable is wired in — the App shows one button and picks the choice by these conditions.
+                          Exactly one choice must be the locked <b>Else</b> fallback.</span>
+                </div>
+            }
+
+            @for (int i = 0; i < _Rows.Count; i++)
+            {
+                int index = i;
+                Row row   = _Rows[i];
+                <div class="enm-choice">
+                    <div class="enm-choice-head">
+                        <span class="enm-num">@(index + 1)</span>
+                        <input class="modal-input enm-name" type="text" placeholder="Choice name…"
+                               @bind="row.Name" @bind:event="oninput"/>
+                        @if (_Auto)
+                        {
+                            <label class="enm-else" title="The fallback taken when no earlier choice matched">
+                                <input type="checkbox" checked="@row.IsElse" @onchange="e => SetElse(index, (bool)(e.Value ?? false))"/>
+                                <span>Else</span>
+                            </label>
+                        }
+                        <button class="enm-del" title="Remove choice" disabled="@(_Rows.Count <= 1)" @onclick="() => RemoveRow(index)">
+                            <i class="bi bi-x-lg"></i>
+                        </button>
+                    </div>
+
+                    @if (_SinglePath && _Declared.Count > 0)
+                    {
+                        <div class="enm-values">
+                            @foreach ((Guid id, string name) in _Declared)
+                            {
+                                Guid vid = id;
+                                <div class="enm-value">
+                                    <label class="enm-value-label">@name</label>
+                                    <input class="modal-input" type="text" placeholder="value"
+                                           value="@row.Value(vid)" @oninput="e => row.SetValue(vid, e.Value?.ToString() ?? string.Empty)"
+                                           maxlength="100"/>
+                                </div>
+                            }
+                        </div>
+                    }
+
+                    @if (_Auto && !row.IsElse)
+                    {
+                        <ExitConditionEditor Expr="row.Condition" Vars="_AvailableVars" OnChanged="StateHasChanged"/>
+                    }
+                </div>
+            }
+
+            <button class="enm-add" @onclick="AddRow">
+                <i class="bi bi-plus-lg"></i> Add choice
+            </button>
+
+        </div>
+
+        <div class="modal-footer">
+            <button class="modal-btn modal-btn-ghost" @onclick="Cancel">Cancel</button>
+            <button class="modal-btn modal-btn-primary" @onclick="Confirm" disabled="@(_Rows.Count == 0)">Save changes</button>
+        </div>
+
+    </div>
+}
+
+@code {
+    [Parameter] public EventCallback<ExitNodeArgs> OnConfirm { get; set; }
+
+    private bool                        _Visible;
+    private bool                        _SinglePath;
+    private bool                        _Auto;
+    private List<(Guid Id, string Name)> _Declared     = new();
+    private List<(Guid Id, string Name)> _AvailableVars = new();
+    private List<Row>                    _Rows          = new();
+
+    private sealed class Row
+    {
+        public Guid                     Id        { get; init; }
+        public string                   Name      { get; set; } = "";
+        public bool                     IsElse    { get; set; }
+        public StoryConditionExpr       Condition { get; set; } = new() { Kind = StoryConditionExprKind.Group };
+        public Dictionary<Guid, string> Values    { get; init; } = new();
+
+        public string Value(Guid id) => Values.TryGetValue(id, out string? v) ? v : "";
+        public void   SetValue(Guid id, string v) => Values[id] = v;
+    }
+
+    /// <summary>Opens the modal to edit <paramref name="logic"/>'s choices. <paramref name="availableVars"/> are the variables
+    /// wired into the Exit node's Variables input (empty when the node isn't auto-resolving).</summary>
+    public void ShowEdit(StoryLogicNode logic, List<(Guid Id, string Name)> availableVars)
+    {
+        _SinglePath    = logic.ExitMode == StoryLogicExitMode.SinglePath;
+        _Auto          = availableVars.Count > 0;
+        _AvailableVars = availableVars;
+        _Declared      = logic.DeclaredVariables.Select(d => (d.Id, d.Name)).ToList();
+        _Rows = logic.Choices.Select(c => new Row
+        {
+            Id        = c.Id,
+            Name      = c.Name,
+            IsElse    = c.IsElse,
+            Condition = c.Condition?.Clone() ?? new StoryConditionExpr { Kind = StoryConditionExprKind.Group },
+            Values    = _Declared.ToDictionary(d => d.Id, d => c.VariableValues.Find(v => v.DeclaredVarId == d.Id)?.Value ?? "")
+        }).ToList();
+        if (_Rows.Count == 0) _Rows.Add(new Row { Name = "Continue" });
+        _Visible = true;
+        StateHasChanged();
+    }
+
+    private void AddRow() => _Rows.Add(new Row { Name = "" });
+
+    private void RemoveRow(int index)
+    {
+        if (_Rows.Count > 1) _Rows.RemoveAt(index);
+    }
+
+    private void SetElse(int index, bool value)
+    {
+        // At most one Else — turning one on clears the others.
+        for (int x = 0; x < _Rows.Count; x++) _Rows[x].IsElse = value && x == index;
+    }
+
+    private async Task Confirm()
+    {
+        if (_Rows.Count == 0) return;
+        _Visible = false;
+
+        List<ChoiceSpec> specs = _Rows.Select(r => new ChoiceSpec(
+            r.Id,
+            r.Name.Trim(),
+            r.IsElse,
+            (_Auto && !r.IsElse) ? r.Condition : null,
+            _SinglePath
+                ? _Declared.Select(d => new StoryChoiceVarValue { DeclaredVarId = d.Id, Value = r.Value(d.Id).Trim() }).ToList()
+                : new List<StoryChoiceVarValue>())).ToList();
+
+        await OnConfirm.InvokeAsync(new ExitNodeArgs(specs));
+    }
+
+    private void Cancel() => _Visible = false;
+
+    public record ChoiceSpec(Guid Id, string Name, bool IsElse, StoryConditionExpr? Condition, List<StoryChoiceVarValue> Values);
+
+    public record ExitNodeArgs(List<ChoiceSpec> Choices);
+}

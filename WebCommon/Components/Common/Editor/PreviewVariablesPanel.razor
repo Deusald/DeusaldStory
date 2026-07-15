@@ -31,7 +31,7 @@
         {
             <div class="pvp-empty">
                 <i class="bi bi-book"></i>
-                <span>All Gamebook sections are pre-generated for every value combination, so there are no live inputs to change.</span>
+                <span>Gamebook sections are generated from the previous node's choices, so there are no live inputs to change here.</span>
             </div>
         }
         else if (vars.Count == 0)
@@ -93,8 +93,9 @@
     }
 
     /// <summary>
-    /// The variables this logic node previews: those its External Variable nodes reference, plus — when it accepts a
-    /// wired-in exit variable — the Selection variable, so the reader can pick a value and it never renders as null.
+    /// The variables this logic node previews: those its External Variable nodes reference (constants included, so the
+    /// author picks a value), plus the incoming declared variables handed in by an upstream Single-path node, so the
+    /// reader can pick a value and the text never renders as null.
     /// </summary>
     private List<StoryVariable> ReferencedVariables()
     {
@@ -105,8 +106,8 @@
 
         List<StoryVariable> ordered = map.Values.OrderBy(v => v.Name, StringComparer.OrdinalIgnoreCase).ToList();
 
-        if (StorySelectionResolver.SelectionVariable(_ProjectState.CurrentProject!, Logic) is StoryVariable selection)
-            ordered.Add(selection);
+        foreach (StoryDeclaredVariable d in StorySelectionResolver.IncomingVariables(_ProjectState.CurrentProject!, Logic))
+            ordered.Add(new StoryVariable { Id = d.Id, Name = string.IsNullOrWhiteSpace(d.Name) ? "(incoming)" : d.Name });
 
         return ordered;
     }

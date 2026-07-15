@@ -1,0 +1,124 @@
+@namespace DeusaldStoryWeb.Components.Common
+
+@* ─────────────────────────────────────────────────────────────────────────
+   Recursive editor for one App auto-resolution condition node (a Comparison or
+   a boolean Group of children). Nest groups to mix && / || — e.g. (a && b) || c.
+   ───────────────────────────────────────────────────────────────────────── *@
+
+@if (Expr.Kind == StoryConditionExprKind.Group)
+{
+    <div class="ece-group">
+        <div class="ece-group-head">
+            <div class="ece-conn">
+                <button type="button" class="ece-conn-opt @(Expr.Connector == StoryBoolConnector.And ? "active" : "")"
+                        @onclick="() => SetConnector(StoryBoolConnector.And)">AND</button>
+                <button type="button" class="ece-conn-opt @(Expr.Connector == StoryBoolConnector.Or ? "active" : "")"
+                        @onclick="() => SetConnector(StoryBoolConnector.Or)">OR</button>
+            </div>
+            @if (OnRemove.HasDelegate)
+            {
+                <button type="button" class="ece-del" title="Remove group" @onclick="() => OnRemove.InvokeAsync()">
+                    <i class="bi bi-x-lg"></i>
+                </button>
+            }
+        </div>
+
+        @for (int i = 0; i < Expr.Children.Count; i++)
+        {
+            int index = i;
+            <ExitConditionEditor Expr="Expr.Children[index]" Vars="Vars"
+                                 OnRemove="() => RemoveChild(index)" OnChanged="Changed"/>
+        }
+
+        <div class="ece-add">
+            <button type="button" class="ece-add-btn" @onclick="AddComparison"><i class="bi bi-plus-lg"></i> clause</button>
+            <button type="button" class="ece-add-btn" @onclick="AddGroup"><i class="bi bi-plus-lg"></i> group</button>
+        </div>
+    </div>
+}
+else
+{
+    <div class="ece-cmp">
+        <select class="modal-input ece-var" value="@Expr.LeftVariableRef" @onchange="e => SetLeft(e.Value?.ToString())">
+            <option value="@Guid.Empty">(variable)</option>
+            @foreach ((Guid id, string name) in Vars)
+            {
+                <option value="@id">@name</option>
+            }
+        </select>
+        <select class="modal-input ece-op" value="@Expr.Operator" @onchange="e => SetOp(e.Value?.ToString())">
+            <option value="@StoryConditionOperator.Equal">=</option>
+            <option value="@StoryConditionOperator.NotEqual">≠</option>
+            <option value="@StoryConditionOperator.LessThan">&lt;</option>
+            <option value="@StoryConditionOperator.GreaterThan">&gt;</option>
+            <option value="@StoryConditionOperator.LessOrEqual">≤</option>
+            <option value="@StoryConditionOperator.GreaterOrEqual">≥</option>
+        </select>
+        @if (Expr.RightKind == StoryConditionOperandKind.Variable)
+        {
+            <select class="modal-input ece-var" value="@Expr.RightVariableRef" @onchange="e => SetRightVar(e.Value?.ToString())">
+                <option value="@Guid.Empty">(variable)</option>
+                @foreach ((Guid id, string name) in Vars)
+                {
+                    <option value="@id">@name</option>
+                }
+            </select>
+        }
+        else
+        {
+            <input class="modal-input ece-val" type="text" placeholder="value"
+                   value="@Expr.RightConstant" @oninput="e => SetRightConst(e.Value?.ToString())" maxlength="100"/>
+        }
+        <button type="button" class="ece-rhs" title="Toggle constant / variable" @onclick="ToggleRhs">
+            <i class="bi @(Expr.RightKind == StoryConditionOperandKind.Variable ? "bi-braces" : "bi-123")"></i>
+        </button>
+        @if (OnRemove.HasDelegate)
+        {
+            <button type="button" class="ece-del" title="Remove" @onclick="() => OnRemove.InvokeAsync()">
+                <i class="bi bi-x-lg"></i>
+            </button>
+        }
+    </div>
+}
+
+@code {
+    [Parameter] public StoryConditionExpr Expr { get; set; } = default!;
+    [Parameter] public List<(Guid Id, string Name)> Vars { get; set; } = new();
+    [Parameter] public EventCallback OnRemove { get; set; }
+    [Parameter] public EventCallback OnChanged { get; set; }
+
+    private Task Changed() => OnChanged.HasDelegate ? OnChanged.InvokeAsync() : Task.CompletedTask;
+
+    private void SetConnector(StoryBoolConnector c) { Expr.Connector = c; Changed(); }
+
+    private void AddComparison()
+    {
+        Expr.Children.Add(new StoryConditionExpr { Kind = StoryConditionExprKind.Comparison });
+        Changed();
+    }
+
+    private void AddGroup()
+    {
+        Expr.Children.Add(new StoryConditionExpr { Kind = StoryConditionExprKind.Group });
+        Changed();
+    }
+
+    private void RemoveChild(int index)
+    {
+        if (index >= 0 && index < Expr.Children.Count) Expr.Children.RemoveAt(index);
+        Changed();
+    }
+
+    private void SetLeft(string? id)      { if (Guid.TryParse(id, out Guid g)) Expr.LeftVariableRef  = g; Changed(); }
+    private void SetRightVar(string? id)  { if (Guid.TryParse(id, out Guid g)) Expr.RightVariableRef = g; Changed(); }
+    private void SetRightConst(string? v) { Expr.RightConstant = v ?? ""; Changed(); }
+    private void SetOp(string? op)        { if (Enum.TryParse(op, out StoryConditionOperator o)) Expr.Operator = o; Changed(); }
+
+    private void ToggleRhs()
+    {
+        Expr.RightKind = Expr.RightKind == StoryConditionOperandKind.Variable
+            ? StoryConditionOperandKind.Constant
+            : StoryConditionOperandKind.Variable;
+        Changed();
+    }
+}

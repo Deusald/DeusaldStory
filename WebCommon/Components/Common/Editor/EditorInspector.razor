@@ -79,9 +79,12 @@
 
     private static string PortTypeLabel(PortType type) => type switch
     {
-        PortType.Text     => "text",
-        PortType.Icon     => "icon",
-        PortType.Variable => "variable",
-        _                 => "flow"
+        PortType.VFlow     => "Variable Flow",
+        PortType.LFlow     => "Logic Flow",
+        PortType.Text      => "Text",
+        PortType.Icon      => "Icon",
+        PortType.Variable  => "Variable",
+        PortType.CVariable => "Constant Variable",
+        _                  => "Flow"
     };
 }

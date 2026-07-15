@@ -25,17 +25,28 @@ namespace DeusaldStoryWeb
     }
 
     /// <summary>
-    /// What a connection port carries, so wiring only joins compatible ports. Ordinary story flow is
-    /// <see cref="Flow"/> (all container/logic-boundary ports, and the FlowText spine); resolved localization /
-    /// SmartFormat text uses <see cref="Text"/>; icons use <see cref="Icon"/>; variable values use
-    /// <see cref="Variable"/>.
+    /// What a connection port carries, so wiring only joins compatible ports.
+    /// <list type="bullet">
+    /// <item><see cref="Flow"/> — plain container-level story flow (go to the next node). Many-in, one-out.</item>
+    /// <item><see cref="VFlow"/> — variable-flow: a single container-level path that carries a set of named variables
+    /// to a consuming node's "accept variables" input. Many-in, one-out.</item>
+    /// <item><see cref="LFlow"/> — the inner logic-render chain inside a logic node. One-in, one-out (a linear chain).</item>
+    /// <item><see cref="Text"/> — resolved localization / SmartFormat text.</item>
+    /// <item><see cref="Icon"/> — a project image.</item>
+    /// <item><see cref="Variable"/> — an App-only variable value (unknown when the Gamebook is printed).</item>
+    /// <item><see cref="CVariable"/> — a constant variable, known before any section is evaluated. A CVariable output
+    /// may feed a Variable input, but a Variable output may not feed a CVariable input.</item>
+    /// </list>
     /// </summary>
     public enum PortType
     {
         Flow,
+        VFlow,
+        LFlow,
         Text,
         Icon,
-        Variable
+        Variable,
+        CVariable
     }
 
     /// <summary>
@@ -63,25 +74,21 @@ namespace DeusaldStoryWeb
         Container,  // a child container node (blue)
         PortalIn,   // a portal's entry node — flow arriving here teleports to the paired portal out (orange)
         PortalOut,  // a portal's exit node — flow re-emerges here and continues on (orange)
-        LogicEntry, // inside a logic node: the single Entry node (Title/Icon inputs + flow output) (green)
-        LogicExit,  // inside a logic node: one Exit node per exit branch (flow input) (red)
+        LogicEntry, // inside a logic node: the single Entry node (Title/Icon inputs + LFlow output) (green)
+        LogicExit,  // inside a logic node: the single Exit node carrying the node's choices (LFlow input) (red)
         Localization, // inside a logic node: picks a localization key, emits its text (accent)
         Icon,       // inside a logic node: picks a project icon, feeds an Icon input (orange)
         LightDarkSwitch, // inside a logic node: picks between two icons by render theme (info)
         SmartFormat,     // inside a logic node: formats a text with connected variable values (purple)
-        ExternalVariable, // inside a logic node: picks a story variable, feeds a SmartFormat variables input (teal)
+        ExternalVariable, // inside a logic node: picks a story variable, feeds a SmartFormat/Exit variables input (teal)
         GetVariable,      // inside a logic node: reads a registered storage variable — App value / Gamebook slot tag (teal)
-        LocalVariable,    // inside a logic node: a named constant value fed into a SmartFormat/Condition input (teal)
-        FlowText,         // inside a logic node: on the flow spine, renders a text block then continues flow (amber)
-        RegisterVariable,   // inside a logic node: on the flow spine, claims a storage slot for a new variable (green)
-        SetVariable,        // inside a logic node: on the flow spine, sets an already-registered variable's value (blue)
-        UnregisterVariable, // inside a logic node: on the flow spine, releases a registered variable and frees its slot (red)
-        SetExternalVariable, // inside a logic node: on the flow spine, assigns a value to a story-wide external variable (blue)
-        Choice,             // inside a logic node: on the flow spine, offers the player a set of branches (one exit each) (accent)
-        AppGamebookTextSplitter, // inside a logic node: emits one of two texts depending on the render target (App/Gamebook) (purple)
-        AppGamebookFlowSplitter, // inside a logic node: on the flow spine, routes flow by the render target (App/Gamebook) (amber)
-        PrevExitVariable,        // inside a logic node: exposes the upstream node's Selection variable, optionally remapped (teal)
-        Condition,               // inside a logic node: on the flow spine, branches flow True/False by testing a variable (info)
+        ConstantVariable, // inside a logic node: a named constant value fed into a SmartFormat/Exit input (teal)
+        FlowText,         // inside a logic node: on the LFlow chain, renders a text block then continues (amber)
+        RegisterVariable,   // inside a logic node: on the LFlow chain, claims a storage slot for a new variable (green)
+        SetVariable,        // inside a logic node: on the LFlow chain, sets an already-registered variable's value (blue)
+        UnregisterVariable, // inside a logic node: on the LFlow chain, releases a registered variable and frees its slot (red)
+        SetExternalVariable, // inside a logic node: on the LFlow chain, assigns a value to a story-wide external variable (blue)
+        PrevExitVariable,        // inside a logic node: exposes the upstream node's declared variables as constants (teal)
         Comment                  // in a container's graph or a logic node's inner graph: a free-text author note, no ports (dim)
     }
 
@@ -200,18 +207,14 @@ namespace DeusaldStoryWeb
                     Deletable = true
                 };
                 node.Inputs.Add(new EdPort { Id = logic.EntryPoint.Id, Name = "Flow" });
-                if (logic.AcceptExitVariable)
-                    node.Inputs.Add(new EdPort { Id = logic.ExitVariableIn.Id, Name = logic.ExitVariableIn.Name, Type = PortType.Variable });
+                if (logic.AcceptVariables)
+                    node.Inputs.Add(new EdPort { Id = logic.VariablesIn.Id, Name = logic.VariablesIn.Name, Type = PortType.VFlow });
 
-                if (logic.ExitMode == StoryLogicExitMode.SingleSelection)
-                {
-                    node.Outputs.Add(new EdPort { Id = logic.SelectionFlowOut.Id, Name = "Flow", Type = PortType.Flow });
-                    node.Outputs.Add(new EdPort { Id = logic.SelectionVarOut.Id,  Name = logic.SelectionVarOut.Name,  Type = PortType.Variable });
-                }
+                if (logic.ExitMode == StoryLogicExitMode.SinglePath)
+                    node.Outputs.Add(new EdPort { Id = logic.VFlowOut.Id, Name = "Out", Type = PortType.VFlow });
                 else
-                {
-                    node.Outputs.AddRange(logic.ExitPoints.Select(p => new EdPort { Id = p.Id, Name = p.Name }));
-                }
+                    node.Outputs.AddRange(logic.Choices.Select(c =>
+                        new EdPort { Id = c.OuterFlowOut.Id, Name = string.IsNullOrWhiteSpace(c.Name) ? "Choice" : c.Name, Type = PortType.Flow }));
                 nodes.Add(node);
             }
 
@@ -328,27 +331,35 @@ namespace DeusaldStoryWeb
             entry.Inputs.Add(new EdPort { Id = logic.TitleIn.Id,    Name = "Title",    Type = PortType.Text });
             entry.Inputs.Add(new EdPort { Id = logic.SubtitleIn.Id, Name = "Subtitle", Type = PortType.Text });
             entry.Inputs.Add(new EdPort { Id = logic.IconIn.Id,     Name = "Icon",     Type = PortType.Icon });
-            entry.Outputs.Add(new EdPort { Id = logic.EntryPoint.Id, Name = "Flow", Type = PortType.Flow });
+            entry.Outputs.Add(new EdPort { Id = logic.EntryPoint.Id, Name = "Flow", Type = PortType.LFlow });
             nodes.Add(entry);
 
-            // ── Exit nodes (red) — one per branch. ──
-            for (int i = 0; i < logic.ExitPoints.Count; ++i)
+            // ── Exit node (red) — the single terminator carrying the node's choices. One LFlow input, one Text input
+            //    per choice, one Variables input (wire it to auto-resolve the choice in the App), and — in auto mode —
+            //    a single Auto-text input overriding the default "Click here to continue…" label. ──
+            bool autoMode = logic.ContentConnections.Exists(c => c.ToPoint == logic.ExitVariablesIn.Id);
+            (double xx, double xy) = PointPos(logic.ExitLFlowIn, _LOGIC_EXIT_X, _LOGIC_EXIT_Y0);
+            EdNode exit = new()
             {
-                StoryConnectionPoint xp = logic.ExitPoints[i];
-                (double xx, double xy) = PointPos(xp, _LOGIC_EXIT_X, _LOGIC_EXIT_Y0 + i * _LOGIC_EXIT_DY);
-                EdNode exit = new()
-                {
-                    Id        = xp.Id,
-                    Kind      = StoryNodeKind.LogicExit,
-                    Title     = xp.Name,
-                    X         = xx,
-                    Y         = xy,
-                    Deletable = false,
-                    Editable  = false
-                };
-                exit.Inputs.Add(new EdPort { Id = xp.Id, Name = "Flow", Type = PortType.Flow });
-                nodes.Add(exit);
+                Id        = logic.ExitLFlowIn.Id,
+                Kind      = StoryNodeKind.LogicExit,
+                Title     = "Exit",
+                Subtitle  = autoMode ? "Auto" : "",
+                X         = xx,
+                Y         = xy,
+                Deletable = false,
+                Editable  = true
+            };
+            exit.Inputs.Add(new EdPort { Id = logic.ExitLFlowIn.Id,     Name = "Flow",      Type = PortType.LFlow });
+            exit.Inputs.Add(new EdPort { Id = logic.ExitVariablesIn.Id, Name = "Variables", Type = PortType.Variable });
+            if (autoMode)
+                exit.Inputs.Add(new EdPort { Id = logic.ExitAutoTextIn.Id, Name = "Text", Type = PortType.Text });
+            foreach (StoryChoice choice in logic.Choices)
+            {
+                string label = string.IsNullOrWhiteSpace(choice.Name) ? "Choice" : choice.Name;
+                exit.Inputs.Add(new EdPort { Id = choice.TextIn.Id, Name = $"{label} text", Type = PortType.Text });
             }
+            nodes.Add(exit);
 
             // ── Localization nodes (accent) — show the full category/key path + preview text. ──
             foreach (StoryLocalizationNode loc in logic.LocalizationNodes)
@@ -440,11 +451,12 @@ namespace DeusaldStoryWeb
                     Y         = ev.Y,
                     Deletable = true
                 };
-                node.Outputs.Add(new EdPort { Id = ev.OutPoint.Id, Name = "Variable", Type = PortType.Variable });
+                bool constant = variable is not null && (variable.IsConstant || StoryBuiltInVariables.IsBuiltIn(variable.Id));
+                node.Outputs.Add(new EdPort { Id = ev.OutPoint.Id, Name = "Variable", Type = constant ? PortType.CVariable : PortType.Variable });
                 nodes.Add(node);
             }
 
-            // ── Get Variable nodes (teal) — read a registered storage variable's value into a SmartFormat/Condition input. ──
+            // ── Get Variable nodes (teal) — read a registered storage variable: a Value (App) and a Slot tag (Gamebook). ──
             foreach (StoryGetVariableNode gv in logic.GetVariableNodes)
             {
                 StoryRegisterVariableNode? reg = FindRegister(project, gv.RegisteredVariableId);
@@ -461,24 +473,25 @@ namespace DeusaldStoryWeb
                     Y         = gv.Y,
                     Deletable = true
                 };
-                node.Outputs.Add(new EdPort { Id = gv.OutPoint.Id, Name = "Value", Type = PortType.Variable });
+                node.Outputs.Add(new EdPort { Id = gv.OutPoint.Id,     Name = "Value", Type = PortType.Variable });
+                node.Outputs.Add(new EdPort { Id = gv.SlotOutPoint.Id, Name = "Slot",  Type = PortType.CVariable });
                 nodes.Add(node);
             }
 
-            // ── Local Variable nodes (teal) — a named constant value fed into a SmartFormat/Condition input. ──
-            foreach (StoryLocalVariableNode lv in logic.LocalVariableNodes)
+            // ── Constant Variable nodes (teal) — a named constant value fed into a SmartFormat/Exit input. ──
+            foreach (StoryConstantVariableNode cv in logic.ConstantVariableNodes)
             {
                 EdNode node = new()
                 {
-                    Id        = lv.Id,
-                    Kind      = StoryNodeKind.LocalVariable,
-                    Title     = string.IsNullOrWhiteSpace(lv.Name) ? "(unnamed)" : lv.Name,
-                    Subtitle  = lv.Value,
-                    X         = lv.X,
-                    Y         = lv.Y,
+                    Id        = cv.Id,
+                    Kind      = StoryNodeKind.ConstantVariable,
+                    Title     = string.IsNullOrWhiteSpace(cv.Name) ? "(unnamed)" : cv.Name,
+                    Subtitle  = cv.Value,
+                    X         = cv.X,
+                    Y         = cv.Y,
                     Deletable = true
                 };
-                node.Outputs.Add(new EdPort { Id = lv.OutPoint.Id, Name = "Value", Type = PortType.Variable });
+                node.Outputs.Add(new EdPort { Id = cv.OutPoint.Id, Name = "Value", Type = PortType.CVariable });
                 nodes.Add(node);
             }
 
@@ -495,9 +508,9 @@ namespace DeusaldStoryWeb
                     Deletable = true,
                     Editable  = false
                 };
-                node.Inputs.Add(new EdPort { Id = ft.FlowIn.Id, Name = "Flow", Type = PortType.Flow });
+                node.Inputs.Add(new EdPort { Id = ft.FlowIn.Id, Name = "Flow", Type = PortType.LFlow });
                 node.Inputs.Add(new EdPort { Id = ft.TextIn.Id, Name = "Text", Type = PortType.Text });
-                node.Outputs.Add(new EdPort { Id = ft.FlowOut.Id, Name = "Flow", Type = PortType.Flow });
+                node.Outputs.Add(new EdPort { Id = ft.FlowOut.Id, Name = "Flow", Type = PortType.LFlow });
                 nodes.Add(node);
             }
 
@@ -514,10 +527,10 @@ namespace DeusaldStoryWeb
                     Y         = reg.Y,
                     Deletable = true
                 };
-                node.Inputs.Add(new EdPort { Id = reg.FlowIn.Id, Name = "Flow", Type = PortType.Flow });
+                node.Inputs.Add(new EdPort { Id = reg.FlowIn.Id, Name = "Flow", Type = PortType.LFlow });
                 if (reg.Type == StorageVariableType.String && reg.StringMode == StringValueMode.PlayerInput)
                     node.Inputs.Add(new EdPort { Id = reg.InstructionIn.Id, Name = "Instruction", Type = PortType.Text });
-                node.Outputs.Add(new EdPort { Id = reg.FlowOut.Id, Name = "Flow", Type = PortType.Flow });
+                node.Outputs.Add(new EdPort { Id = reg.FlowOut.Id, Name = "Flow", Type = PortType.LFlow });
                 nodes.Add(node);
             }
 
@@ -535,10 +548,10 @@ namespace DeusaldStoryWeb
                     Y         = set.Y,
                     Deletable = true
                 };
-                node.Inputs.Add(new EdPort { Id = set.FlowIn.Id, Name = "Flow", Type = PortType.Flow });
+                node.Inputs.Add(new EdPort { Id = set.FlowIn.Id, Name = "Flow", Type = PortType.LFlow });
                 if (target is { Type: StorageVariableType.String } && set.StringMode == StringValueMode.PlayerInput)
                     node.Inputs.Add(new EdPort { Id = set.InstructionIn.Id, Name = "Instruction", Type = PortType.Text });
-                node.Outputs.Add(new EdPort { Id = set.FlowOut.Id, Name = "Flow", Type = PortType.Flow });
+                node.Outputs.Add(new EdPort { Id = set.FlowOut.Id, Name = "Flow", Type = PortType.LFlow });
                 nodes.Add(node);
             }
 
@@ -556,8 +569,8 @@ namespace DeusaldStoryWeb
                     Y         = unreg.Y,
                     Deletable = true
                 };
-                node.Inputs.Add(new EdPort { Id = unreg.FlowIn.Id, Name = "Flow", Type = PortType.Flow });
-                node.Outputs.Add(new EdPort { Id = unreg.FlowOut.Id, Name = "Flow", Type = PortType.Flow });
+                node.Inputs.Add(new EdPort { Id = unreg.FlowIn.Id, Name = "Flow", Type = PortType.LFlow });
+                node.Outputs.Add(new EdPort { Id = unreg.FlowOut.Id, Name = "Flow", Type = PortType.LFlow });
                 nodes.Add(node);
             }
 
@@ -576,76 +589,19 @@ namespace DeusaldStoryWeb
                     Y         = se.Y,
                     Deletable = true
                 };
-                node.Inputs.Add(new EdPort { Id = se.FlowIn.Id, Name = "Flow", Type = PortType.Flow });
+                node.Inputs.Add(new EdPort { Id = se.FlowIn.Id, Name = "Flow", Type = PortType.LFlow });
                 if (mapped) node.Inputs.Add(new EdPort { Id = se.ValueIn.Id, Name = "Value", Type = PortType.Variable });
-                node.Outputs.Add(new EdPort { Id = se.FlowOut.Id, Name = "Flow", Type = PortType.Flow });
+                node.Outputs.Add(new EdPort { Id = se.FlowOut.Id, Name = "Flow", Type = PortType.LFlow });
                 nodes.Add(node);
             }
 
-            // ── Choice nodes (accent) — one flow input; per option a Text input and a Flow output wired to an Exit. ──
-            foreach (StoryChoiceNode choice in logic.ChoiceNodes)
-            {
-                EdNode node = new()
-                {
-                    Id        = choice.Id,
-                    Kind      = StoryNodeKind.Choice,
-                    Title     = "Choice",
-                    X         = choice.X,
-                    Y         = choice.Y,
-                    Deletable = true
-                };
-                node.Inputs.Add(new EdPort { Id = choice.FlowIn.Id, Name = "Flow", Type = PortType.Flow });
-                foreach (StoryChoiceOption option in choice.Options)
-                {
-                    string label = string.IsNullOrWhiteSpace(option.Name) ? "Choice" : option.Name;
-                    node.Inputs.Add(new EdPort  { Id = option.TextIn.Id,  Name = $"{label} text", Type = PortType.Text });
-                    node.Outputs.Add(new EdPort { Id = option.FlowOut.Id, Name = label,            Type = PortType.Flow });
-                }
-                nodes.Add(node);
-            }
-
-            // ── App/Gamebook text-splitter nodes (purple) — two text inputs, one text output selected by render target. ──
-            foreach (StoryAppGamebookTextSplitterNode ts in logic.AppGamebookTextSplitterNodes)
-            {
-                EdNode node = new()
-                {
-                    Id        = ts.Id,
-                    Kind      = StoryNodeKind.AppGamebookTextSplitter,
-                    Title     = "App / Gamebook Text",
-                    X         = ts.X,
-                    Y         = ts.Y,
-                    Deletable = true,
-                    Editable  = false
-                };
-                node.Inputs.Add(new EdPort  { Id = ts.AppTextIn.Id,      Name = "App",      Type = PortType.Text });
-                node.Inputs.Add(new EdPort  { Id = ts.GamebookTextIn.Id, Name = "Gamebook", Type = PortType.Text });
-                node.Outputs.Add(new EdPort { Id = ts.OutPoint.Id,       Name = "Text",     Type = PortType.Text });
-                nodes.Add(node);
-            }
-
-            // ── App/Gamebook flow-splitter nodes (amber) — one flow input, two flow outputs routed by render target. ──
-            foreach (StoryAppGamebookFlowSplitterNode fs in logic.AppGamebookFlowSplitterNodes)
-            {
-                EdNode node = new()
-                {
-                    Id        = fs.Id,
-                    Kind      = StoryNodeKind.AppGamebookFlowSplitter,
-                    Title     = "App / Gamebook Flow",
-                    X         = fs.X,
-                    Y         = fs.Y,
-                    Deletable = true,
-                    Editable  = false
-                };
-                node.Inputs.Add(new EdPort  { Id = fs.FlowIn.Id,          Name = "Flow",     Type = PortType.Flow });
-                node.Outputs.Add(new EdPort { Id = fs.AppFlowOut.Id,      Name = "App",      Type = PortType.Flow });
-                node.Outputs.Add(new EdPort { Id = fs.GamebookFlowOut.Id, Name = "Gamebook", Type = PortType.Flow });
-                nodes.Add(node);
-            }
-
-            // ── Prev Exit Variable node (teal, non-deletable) — appears when this node accepts an exit variable
-            //    and its second input is wired to an upstream node's Selection output. ──
-            List<StoryConnectionPoint>? sourceExits = ResolveExitVariableSource(project, logic);
-            if (logic.AcceptExitVariable && sourceExits is not null)
+            // ── Prev Exit Variable node (teal, non-deletable) — appears when this node accepts variables and its
+            //    Variables input is wired to an upstream Single-path node. Exposes each incoming declared variable as a
+            //    Constant (CVariable) output, keyed by the upstream declared-variable id. ──
+            List<StoryDeclaredVariable> incoming = logic.AcceptVariables
+                ? StorySelectionResolver.IncomingVariables(project, logic)
+                : new List<StoryDeclaredVariable>();
+            if (incoming.Count > 0)
             {
                 StoryPrevExitVariableNode prev = logic.PrevExitVariable;
                 double px = prev.X == 0 && prev.Y == 0 ? _LOGIC_ENTRY_X : prev.X;
@@ -654,34 +610,15 @@ namespace DeusaldStoryWeb
                 {
                     Id        = prev.Id,
                     Kind      = StoryNodeKind.PrevExitVariable,
-                    Title     = string.IsNullOrWhiteSpace(prev.VariableName) ? "Selection" : prev.VariableName,
-                    Subtitle  = string.Join(", ", sourceExits.Select(e => e.Name)),
+                    Title     = "Prev Exit Variables",
+                    Subtitle  = string.Join(", ", incoming.Select(d => d.Name)),
                     X         = px,
                     Y         = py,
                     Deletable = false,
-                    Editable  = true
+                    Editable  = false
                 };
-                node.Outputs.Add(new EdPort { Id = prev.OutPoint.Id, Name = "Variable", Type = PortType.Variable });
-                nodes.Add(node);
-            }
-
-            // ── Condition nodes (info) — flow + variable inputs, two flow outputs (True/False) routed by the test. ──
-            foreach (StoryConditionNode cond in logic.ConditionNodes)
-            {
-                EdNode node = new()
-                {
-                    Id        = cond.Id,
-                    Kind      = StoryNodeKind.Condition,
-                    Title     = "Condition",
-                    Subtitle  = $"{ConditionSymbol(cond.Operator)} {(string.IsNullOrEmpty(cond.CompareValue) ? "?" : cond.CompareValue)}",
-                    X         = cond.X,
-                    Y         = cond.Y,
-                    Deletable = true
-                };
-                node.Inputs.Add(new EdPort  { Id = cond.FlowIn.Id,     Name = "Flow",     Type = PortType.Flow });
-                node.Inputs.Add(new EdPort  { Id = cond.VariableIn.Id, Name = "Variable", Type = PortType.Variable });
-                node.Outputs.Add(new EdPort { Id = cond.FlowTrue.Id,   Name = "True",     Type = PortType.Flow });
-                node.Outputs.Add(new EdPort { Id = cond.FlowFalse.Id,  Name = "False",    Type = PortType.Flow });
+                foreach (StoryDeclaredVariable dv in incoming)
+                    node.Outputs.Add(new EdPort { Id = dv.Id, Name = string.IsNullOrWhiteSpace(dv.Name) ? "(var)" : dv.Name, Type = PortType.CVariable });
                 nodes.Add(node);
             }
 
@@ -692,7 +629,7 @@ namespace DeusaldStoryWeb
             return nodes;
         }
 
-        /// <summary>A compact symbol for a condition operator, used in a Condition node's subtitle.</summary>
+        /// <summary>A compact symbol for a condition operator (used in the Exit-node auto-resolution editor).</summary>
         public static string ConditionSymbol(StoryConditionOperator op) => op switch
         {
             StoryConditionOperator.Equal          => "=",
@@ -703,15 +640,6 @@ namespace DeusaldStoryWeb
             StoryConditionOperator.GreaterOrEqual => "≥",
             _                                     => "?"
         };
-
-        /// <summary>
-        /// Resolves the upstream exit points feeding <paramref name="logic"/>'s Exit Variable input: follows the
-        /// container wire arriving at <see cref="StoryLogicNode.ExitVariableIn"/> back to the upstream logic node's
-        /// <see cref="StoryLogicNode.SelectionVarOut"/> and returns that node's <see cref="StoryLogicNode.ExitPoints"/>
-        /// (the possible Selection values). Returns null when nothing is wired in.
-        /// </summary>
-        public static List<StoryConnectionPoint>? ResolveExitVariableSource(StoryProject project, StoryLogicNode logic) =>
-            StorySelectionResolver.SourceExits(project, logic);
 
         /// <summary>Finds the Register-variable node with <paramref name="id"/> anywhere in the project's logic nodes.</summary>
         public static StoryRegisterVariableNode? FindRegister(StoryProject project, Guid id)
@@ -783,17 +711,13 @@ namespace DeusaldStoryWeb
             StoryNodeKind.SmartFormat      => "SMART FORMAT",
             StoryNodeKind.ExternalVariable => "EXTERNAL VARIABLE",
             StoryNodeKind.GetVariable      => "GET VARIABLE",
-            StoryNodeKind.LocalVariable    => "LOCAL VARIABLE",
+            StoryNodeKind.ConstantVariable => "CONSTANT VARIABLE",
             StoryNodeKind.FlowText         => "FLOW TEXT",
             StoryNodeKind.RegisterVariable   => "REGISTER VARIABLE",
             StoryNodeKind.SetVariable        => "SET VARIABLE",
             StoryNodeKind.UnregisterVariable => "UNREGISTER VARIABLE",
             StoryNodeKind.SetExternalVariable => "SET EXTERNAL VARIABLE",
-            StoryNodeKind.Choice              => "CHOICE",
-            StoryNodeKind.AppGamebookTextSplitter => "APP / GAMEBOOK TEXT",
-            StoryNodeKind.AppGamebookFlowSplitter => "APP / GAMEBOOK FLOW",
-            StoryNodeKind.PrevExitVariable        => "PREV EXIT VARIABLE",
-            StoryNodeKind.Condition               => "CONDITION",
+            StoryNodeKind.PrevExitVariable        => "PREV EXIT VARIABLES",
             StoryNodeKind.Comment                 => "COMMENT",
             _                       => ""
         };
@@ -821,32 +745,44 @@ namespace DeusaldStoryWeb
             StoryNodeKind.SmartFormat      => "bi-braces-asterisk",
             StoryNodeKind.ExternalVariable => "bi-braces",
             StoryNodeKind.GetVariable      => "bi-box-arrow-down",
-            StoryNodeKind.LocalVariable    => "bi-braces",
+            StoryNodeKind.ConstantVariable => "bi-braces",
             StoryNodeKind.FlowText         => "bi-text-paragraph",
             StoryNodeKind.RegisterVariable   => "bi-box-seam",
             StoryNodeKind.SetVariable        => "bi-pencil-square",
             StoryNodeKind.UnregisterVariable => "bi-box-arrow-up",
             StoryNodeKind.SetExternalVariable => "bi-sliders",
-            StoryNodeKind.Choice              => "bi-signpost-split",
-            StoryNodeKind.AppGamebookTextSplitter => "bi-fonts",
-            StoryNodeKind.AppGamebookFlowSplitter => "bi-signpost-2",
             StoryNodeKind.PrevExitVariable        => "bi-braces",
-            StoryNodeKind.Condition               => "bi-diamond",
             StoryNodeKind.Comment                 => "bi-chat-left-text",
             _                       => "bi-circle"
         };
 
         /// <summary>
-        /// The colour of a port's connection dot, keyed by what the port carries so a wire's signal type is
-        /// readable at a glance: flow (blue), variable (red), text (green), icon (orange).
+        /// The colour of a port's connection dot, keyed by what the port carries so a wire's signal type is readable
+        /// at a glance: flow (blue), variable-flow (purple), logic-flow (amber), variable (red), constant (teal),
+        /// text (green), icon (orange).
         /// </summary>
         public static string PortColor(PortType t) => t switch
         {
-            PortType.Flow     => "var(--info)",
-            PortType.Variable => "var(--danger)",
-            PortType.Text     => "var(--success)",
-            PortType.Icon     => "var(--orange)",
-            _                 => "var(--text-dim)"
+            PortType.Flow      => "var(--info)",
+            PortType.VFlow     => "var(--purple)",
+            PortType.LFlow     => "var(--warning)",
+            PortType.Variable  => "var(--danger)",
+            PortType.CVariable => "var(--code-func)",
+            PortType.Text      => "var(--success)",
+            PortType.Icon      => "var(--orange)",
+            _                  => "var(--text-dim)"
+        };
+
+        /// <summary>
+        /// Whether an output of type <paramref name="src"/> may wire into an input of type <paramref name="dst"/>.
+        /// A <see cref="PortType.Variable"/> input accepts a Variable or a Constant (CVariable) source; a
+        /// <see cref="PortType.CVariable"/> input accepts only a Constant source; every other type joins its own kind.
+        /// </summary>
+        public static bool IsCompatible(PortType src, PortType dst) => dst switch
+        {
+            PortType.Variable  => src is PortType.Variable or PortType.CVariable,
+            PortType.CVariable => src is PortType.CVariable,
+            _                  => src == dst
         };
 
         public static string NodeColor(StoryNodeKind k) => k switch
@@ -867,17 +803,13 @@ namespace DeusaldStoryWeb
             StoryNodeKind.SmartFormat      => "var(--purple)",
             StoryNodeKind.ExternalVariable => "var(--code-func)",
             StoryNodeKind.GetVariable      => "var(--code-func)",
-            StoryNodeKind.LocalVariable    => "var(--code-func)",
+            StoryNodeKind.ConstantVariable => "var(--code-func)",
             StoryNodeKind.FlowText         => "var(--warning)",
             StoryNodeKind.RegisterVariable   => "var(--success)",
             StoryNodeKind.SetVariable        => "var(--info)",
             StoryNodeKind.UnregisterVariable => "var(--danger)",
             StoryNodeKind.SetExternalVariable => "var(--info)",
-            StoryNodeKind.Choice              => "var(--accent)",
-            StoryNodeKind.AppGamebookTextSplitter => "var(--purple)",
-            StoryNodeKind.AppGamebookFlowSplitter => "var(--warning)",
             StoryNodeKind.PrevExitVariable        => "var(--code-func)",
-            StoryNodeKind.Condition               => "var(--info)",
             StoryNodeKind.Comment                 => "var(--text-dim)",
             _                       => "var(--text-dim)"
         };

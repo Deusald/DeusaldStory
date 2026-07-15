@@ -150,6 +150,17 @@
                                   @oninput="e => OnDescriptionInput(sel, e)"></textarea>
                     </div>
 
+                    @* Constant *@
+                    <div class="modal-field">
+                        <label class="var-check">
+                            <input type="checkbox" checked="@sel.IsConstant" @onchange="e => OnConstantChanged(sel, e)"/>
+                            <span>
+                                Constant
+                                <span class="modal-label-hint">known before any section is evaluated (e.g. the printed language) — exposes a Constant port and may be used in Gamebook text</span>
+                            </span>
+                        </label>
+                    </div>
+
                     @* Possible values *@
                     <div class="modal-field">
                         <label class="modal-label">Possible values</label>
@@ -351,6 +362,12 @@
     private void OnDescriptionInput(StoryVariable v, ChangeEventArgs e)
     {
         v.Description = e.Value?.ToString() ?? "";
+        _ProjectState.MarkKeyDirty(v.Id);
+    }
+
+    private void OnConstantChanged(StoryVariable v, ChangeEventArgs e)
+    {
+        v.IsConstant = (bool)(e.Value ?? false);
         _ProjectState.MarkKeyDirty(v.Id);
     }
 

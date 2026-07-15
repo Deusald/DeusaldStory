@@ -90,15 +90,15 @@
 
         @if (_Rendered.Choices.Count > 0)
         {
-            @* Choice buttons — each advances the preview along that choice's branch (its wired exit). *@
+            @* Choice buttons — each advances the preview along that choice's continuation. *@
             <div class="lpv-continue">
                 @foreach (StoryLogicRenderer.RenderedChoice c in _Rendered.Choices)
                 {
                     StoryLogicRenderer.RenderedChoice choice = c;
                     <button class="lpv-continue-btn"
-                            disabled="@(choice.ExitPointId == Guid.Empty)"
-                            @onclick="() => OnContinue.InvokeAsync(choice.ExitPointId)">
-                        <span>@(string.IsNullOrEmpty(choice.Text) ? "(choice)" : SafeHtml(choice.Text))</span>
+                            disabled="@(choice.OuterFlowOut == Guid.Empty)"
+                            @onclick="() => OnContinue.InvokeAsync(choice)">
+                        <span>@(string.IsNullOrEmpty(choice.Text) ? _ContinueLabel : SafeHtml(choice.Text))</span>
                         <i class="bi bi-arrow-right"></i>
                     </button>
                 }
@@ -106,20 +106,11 @@
         }
         else
         {
-            @* Continue button per exit — the app's dummy "next" that jumps the preview to the next logic node. *@
+            @* No choices — the Exit node needs at least one continuation. *@
             <div class="lpv-continue">
-                @foreach (StoryConnectionPoint exit in _ContinueExits)
-                {
-                    StoryConnectionPoint branch = exit;
-                    <button class="lpv-continue-btn" @onclick="() => OnContinue.InvokeAsync(branch.Id)">
-                        <span>@_ContinueLabel</span>
-                        @if (_ContinueExits.Count > 1 && !string.IsNullOrWhiteSpace(branch.Name))
-                        {
-                            <span class="lpv-continue-branch">@branch.Name</span>
-                        }
-                        <i class="bi bi-arrow-right"></i>
-                    </button>
-                }
+                <button class="lpv-continue-btn" disabled>
+                    <span class="lpv-placeholder">Add a choice on the Exit node</span>
+                </button>
             </div>
         }
 
@@ -152,34 +143,18 @@
     /// <summary>External Variable values driving SmartFormat blocks (variable id → value); owned by the parent.</summary>
     [Parameter] public Dictionary<Guid, string> Values { get; set; } = new();
 
-    /// <summary>Raised when a continue button is clicked; carries the exit point id to follow to the next node.</summary>
-    [Parameter] public EventCallback<Guid> OnContinue { get; set; }
+    /// <summary>Raised when a continue button is clicked; carries the chosen continuation to follow to the next node.</summary>
+    [Parameter] public EventCallback<StoryLogicRenderer.RenderedChoice> OnContinue { get; set; }
 
     private bool _Paper; // false = dark (default), true = paper/light
 
     private StoryLogicRenderer.RenderedLogic _Rendered = new();
     private string                           _ContinueLabel = "";
-    private List<StoryConnectionPoint>       _ContinueExits = new();
 
     protected override void OnParametersSet()
     {
         _Rendered      = Render();
-        _ContinueExits = ContinueExits();
         _ContinueLabel = StoryCommonLocalizationKeys.Resolve(_ProjectState.CurrentLocalization, StoryCommonLocalizationKeys.AppContinueButton);
-    }
-
-    /// <summary>
-    /// The exits the App offers a "continue" button for: for a SeparatePaths node only those the flow spine actually
-    /// reaches for the App medium (so a node whose App/Gamebook flow splitter routes the two mediums to different
-    /// exits doesn't offer the Gamebook-only exit here); for a SingleSelection node every exit — they are the player's
-    /// selectable branches, all funnelling through the one Selection flow-out.
-    /// </summary>
-    private List<StoryConnectionPoint> ContinueExits()
-    {
-        if (Logic.ExitMode != StoryLogicExitMode.SeparatePaths)
-            return Logic.ExitPoints;
-        List<Guid> reached = StoryLogicRenderer.ReachedExits(_ProjectState.CurrentProject!, Logic, StoryRenderTarget.App);
-        return Logic.ExitPoints.Where(e => reached.Contains(e.Id)).ToList();
     }
 
     private void SetPaper(bool paper)
