@@ -28,5 +28,8 @@ namespace DeusaldStoryCommon
 
         /// <summary>When <c>false</c>, this block's text is skipped while rendering the printed <b>Gamebook</b> (flow still passes through). Default <c>true</c>.</summary>
         public bool RenderInGamebook { get; set; } = true;
+
+        /// <summary>The visual style of the frame this block's text is drawn in (normal / success / danger / …). Default <see cref="StoryTextFrameStyle.Normal"/>.</summary>
+        public StoryTextFrameStyle FrameStyle { get; set; } = StoryTextFrameStyle.Normal;
     }
 }

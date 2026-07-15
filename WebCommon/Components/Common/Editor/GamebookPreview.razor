@@ -109,9 +109,9 @@
             }
             else
             {
-                @foreach (string block in sec.Rendered.Blocks)
+                @foreach (StoryLogicRenderer.RenderedBlock block in sec.Rendered.Blocks)
                 {
-                    <div class="gbp-block">@SafeHtml(block)</div>
+                    <div class="gbp-block @FrameClass(block.FrameStyle)">@SafeHtml(block.Text)</div>
                 }
             }
 
@@ -205,6 +205,13 @@
         StoryGamebookPreview.Build(_ProjectState.CurrentProject!, _ProjectState.CurrentLocalization, Logic);
 
     private MarkupString SafeHtml(string text) => (MarkupString)PreviewHtmlSanitizer.ToSafeHtml(text, ResolveImageTag, ResolveVariableTag);
+
+    /// <summary>The frame-style modifier class for a block (e.g. <c>gbp-block-success</c>); empty for the plain Normal frame.</summary>
+    private static string FrameClass(StoryTextFrameStyle style)
+    {
+        string suffix = StoryStyle.FrameSuffix(style);
+        return suffix.Length == 0 ? "" : $"gbp-block-{suffix}";
+    }
 
     private StoryImage? ResolveImageTag(string tag, string name)
     {

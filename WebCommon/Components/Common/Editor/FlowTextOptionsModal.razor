@@ -22,6 +22,17 @@
         <div class="modal-body">
 
             <div class="modal-field">
+                <label class="modal-label">Frame style</label>
+                <select class="modal-input" @bind="_FrameStyle">
+                    @foreach (StoryTextFrameStyle style in Enum.GetValues<StoryTextFrameStyle>())
+                    {
+                        <option value="@style">@StoryStyle.FrameLabel(style)</option>
+                    }
+                </select>
+                <span class="modal-label-hint">the coloured frame this block's text is drawn in (normal / success / danger / …)</span>
+            </div>
+
+            <div class="modal-field">
                 <label class="fto-check">
                     <input type="checkbox"
                            checked="@_RenderInApp"
@@ -63,17 +74,19 @@
 @code {
     [Parameter] public EventCallback<FlowTextArgs> OnConfirm { get; set; }
 
-    private bool _Visible;
-    private Guid _EditNodeId;
-    private bool _RenderInApp      = true;
-    private bool _RenderInGamebook = true;
+    private bool                _Visible;
+    private Guid                _EditNodeId;
+    private bool                _RenderInApp      = true;
+    private bool                _RenderInGamebook = true;
+    private StoryTextFrameStyle _FrameStyle       = StoryTextFrameStyle.Normal;
 
-    /// <summary>Opens the modal to edit an existing FlowText node's render flags.</summary>
+    /// <summary>Opens the modal to edit an existing FlowText node's render flags and frame style.</summary>
     public void ShowEdit(StoryFlowTextNode node)
     {
         _EditNodeId       = node.Id;
         _RenderInApp      = node.RenderInApp;
         _RenderInGamebook = node.RenderInGamebook;
+        _FrameStyle       = node.FrameStyle;
         _Visible          = true;
         StateHasChanged();
     }
@@ -81,11 +94,11 @@
     private async Task Confirm()
     {
         _Visible = false;
-        await OnConfirm.InvokeAsync(new FlowTextArgs(_EditNodeId, _RenderInApp, _RenderInGamebook));
+        await OnConfirm.InvokeAsync(new FlowTextArgs(_EditNodeId, _RenderInApp, _RenderInGamebook, _FrameStyle));
     }
 
     private void Cancel() => _Visible = false;
 
-    /// <summary>Result passed back to the parent — the edited node id plus its new per-medium render flags.</summary>
-    public record FlowTextArgs(Guid EditNodeId, bool RenderInApp, bool RenderInGamebook);
+    /// <summary>Result passed back to the parent — the edited node id plus its new per-medium render flags and frame style.</summary>
+    public record FlowTextArgs(Guid EditNodeId, bool RenderInApp, bool RenderInGamebook, StoryTextFrameStyle FrameStyle);
 }

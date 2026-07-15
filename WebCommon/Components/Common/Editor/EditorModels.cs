@@ -737,15 +737,28 @@ namespace DeusaldStoryWeb
         private static string NameOf(StoryRegisterVariableNode reg) =>
             string.IsNullOrWhiteSpace(reg.Name) ? "(unnamed variable)" : reg.Name;
 
-        /// <summary>Subtitle flagging a FlowText block that is limited to one medium (or renders in neither); null when it renders in both.</summary>
-        private static string? FlowTextMediumLabel(StoryFlowTextNode ft) =>
-            (ft.RenderInApp, ft.RenderInGamebook) switch
+        /// <summary>
+        /// Subtitle for a FlowText node — the non-Normal frame style and/or a medium restriction, joined with " · ".
+        /// Null when the block renders in both mediums with the plain Normal frame (nothing worth flagging).
+        /// </summary>
+        private static string? FlowTextMediumLabel(StoryFlowTextNode ft)
+        {
+            string? medium = (ft.RenderInApp, ft.RenderInGamebook) switch
             {
                 (true,  true)  => null,
                 (true,  false) => "App only",
                 (false, true)  => "Gamebook only",
                 (false, false) => "Not rendered"
             };
+            string? frame = ft.FrameStyle == StoryTextFrameStyle.Normal ? null : StoryStyle.FrameLabel(ft.FrameStyle);
+            return (frame, medium) switch
+            {
+                (null, null) => null,
+                (null, _)    => medium,
+                (_,    null) => frame,
+                _            => $"{frame} · {medium}"
+            };
+        }
 
         /// <summary>Projects a logic node's inner content connections into canvas edges.</summary>
         public static List<EdEdge> BuildLogicEdges(StoryLogicNode logic) =>
@@ -922,6 +935,26 @@ namespace DeusaldStoryWeb
             StoryNodeKind.LogicPortalOut          => "var(--orange)",
             StoryNodeKind.Comment                 => "var(--text-dim)",
             _                       => "var(--text-dim)"
+        };
+
+        /// <summary>The CSS-modifier suffix for a text-block frame style ("success", "danger", …); empty for <see cref="StoryTextFrameStyle.Normal"/>.</summary>
+        public static string FrameSuffix(StoryTextFrameStyle s) => s switch
+        {
+            StoryTextFrameStyle.Info    => "info",
+            StoryTextFrameStyle.Success => "success",
+            StoryTextFrameStyle.Warning => "warning",
+            StoryTextFrameStyle.Danger  => "danger",
+            _                           => ""
+        };
+
+        /// <summary>The human label for a text-block frame style, shown in the FlowText options dropdown and on the canvas node.</summary>
+        public static string FrameLabel(StoryTextFrameStyle s) => s switch
+        {
+            StoryTextFrameStyle.Info    => "Info",
+            StoryTextFrameStyle.Success => "Success",
+            StoryTextFrameStyle.Warning => "Warning",
+            StoryTextFrameStyle.Danger  => "Danger",
+            _                           => "Normal"
         };
     }
 }

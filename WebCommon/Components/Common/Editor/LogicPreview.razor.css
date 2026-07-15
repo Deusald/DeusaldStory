@@ -142,6 +142,12 @@
     white-space: pre-wrap;
 }
 
+/* Frame styles — a coloured left accent + tinted background echoing the semantic colour. */
+.lpv-block-info    { border-color: var(--info);    border-left: 3px solid var(--info);    background: color-mix(in srgb, var(--info)    12%, var(--lpv-frame-bg)); }
+.lpv-block-success { border-color: var(--success); border-left: 3px solid var(--success); background: color-mix(in srgb, var(--success) 12%, var(--lpv-frame-bg)); }
+.lpv-block-warning { border-color: var(--warning); border-left: 3px solid var(--warning); background: color-mix(in srgb, var(--warning) 12%, var(--lpv-frame-bg)); }
+.lpv-block-danger  { border-color: var(--danger);  border-left: 3px solid var(--danger);  background: color-mix(in srgb, var(--danger)  12%, var(--lpv-frame-bg)); }
+
 .lpv-placeholder {
     color: var(--text-faint);
     font-style: italic;

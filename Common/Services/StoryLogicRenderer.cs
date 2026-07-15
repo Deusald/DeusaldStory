@@ -25,7 +25,7 @@ namespace DeusaldStoryCommon
             public string?      IconData { get; set; }
 
             /// <summary>Every text block in flow order (all App pages concatenated). The Gamebook renders this as one continuous section.</summary>
-            public List<string> Blocks   { get; set; } = new();
+            public List<RenderedBlock> Blocks   { get; set; } = new();
 
             /// <summary>The App-only paging of the content — one entry per "Click here to continue…" screen (see <see cref="RenderedPage"/>). Empty for the Gamebook.</summary>
             public List<RenderedPage> Pages { get; set; } = new();
@@ -48,9 +48,12 @@ namespace DeusaldStoryCommon
         public sealed class RenderedPage
         {
             public List<StorageInstruction> Above  { get; set; } = new();
-            public List<string>             Blocks { get; set; } = new();
+            public List<RenderedBlock>      Blocks { get; set; } = new();
             public List<StorageInstruction> Below  { get; set; } = new();
         }
+
+        /// <summary>One rendered text block — the resolved (sanitizable) text plus the frame style it is drawn in.</summary>
+        public sealed record RenderedBlock(string Text, StoryTextFrameStyle FrameStyle);
 
         /// <summary>One resolved choice — its player-facing text plus how the App/Gamebook continues from it.</summary>
         public sealed class RenderedChoice
@@ -77,8 +80,8 @@ namespace DeusaldStoryCommon
 
             // The App pages the content into "Click here to continue…" screens at each Split-for-App node; the Gamebook
             // ignores splits and reads as one continuous block. Blocks (flat) stays populated for both mediums.
-            List<RenderedPage> pages;
-            List<string>       blocks;
+            List<RenderedPage>  pages;
+            List<RenderedBlock> blocks;
             if (target == StoryRenderTarget.App)
             {
                 pages  = BuildAppPages(project, localization, logic, values, errors);
@@ -134,12 +137,12 @@ namespace DeusaldStoryCommon
         /// <paramref name="renderTarget"/> is skipped. Split-for-App nodes have no effect here — they are an App-only
         /// concern handled by <see cref="BuildAppPages"/>; the Gamebook reads the whole chain as one block list.
         /// </summary>
-        private static List<string> WalkTextBlocks(
+        private static List<RenderedBlock> WalkTextBlocks(
             StoryProject project, LocProject? localization, StoryLogicNode logic,
             IReadOnlyDictionary<Guid, string> values, StoryRenderTarget renderTarget, List<string> errors)
         {
-            List<string> blocks = new();
-            Guid         target = FlowTargetOf(logic, logic.EntryPoint.Id);
+            List<RenderedBlock> blocks = new();
+            Guid                target = FlowTargetOf(logic, logic.EntryPoint.Id);
 
             for (int guard = 0; guard < 256; ++guard)
             {
@@ -147,7 +150,7 @@ namespace DeusaldStoryCommon
                 {
                     bool renderHere = renderTarget == StoryRenderTarget.App ? ft.RenderInApp : ft.RenderInGamebook;
                     if (renderHere)
-                        blocks.Add(ResolveText(project, localization, logic, values, FromPointInto(logic, ft.TextIn.Id), renderTarget, 0, errors));
+                        blocks.Add(new RenderedBlock(ResolveText(project, localization, logic, values, FromPointInto(logic, ft.TextIn.Id), renderTarget, 0, errors), ft.FrameStyle));
                     target = FlowTargetOf(logic, ft.FlowOut.Id);
                 }
                 else if (logic.SplitForAppNodes.Find(n => n.FlowIn.Id == target) is StorySplitForAppNode split)
@@ -194,7 +197,7 @@ namespace DeusaldStoryCommon
                 if (logic.FlowTextNodes.Find(n => n.FlowIn.Id == target) is StoryFlowTextNode ft)
                 {
                     if (ft.RenderInApp)
-                        page.Blocks.Add(ResolveText(project, localization, logic, values, FromPointInto(logic, ft.TextIn.Id), StoryRenderTarget.App, 0, errors));
+                        page.Blocks.Add(new RenderedBlock(ResolveText(project, localization, logic, values, FromPointInto(logic, ft.TextIn.Id), StoryRenderTarget.App, 0, errors), ft.FrameStyle));
                     target = FlowTargetOf(logic, ft.FlowOut.Id);
                 }
                 else if (logic.SplitForAppNodes.Find(n => n.FlowIn.Id == target) is StorySplitForAppNode split)

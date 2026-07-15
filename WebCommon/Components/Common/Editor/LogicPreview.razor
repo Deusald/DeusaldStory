@@ -78,15 +78,15 @@
         }
         else
         {
-            @foreach (string block in page.Blocks)
+            @foreach (StoryLogicRenderer.RenderedBlock block in page.Blocks)
             {
-                @if (string.IsNullOrEmpty(block))
+                @if (string.IsNullOrEmpty(block.Text))
                 {
                     <div class="lpv-block lpv-placeholder">(empty text)</div>
                 }
                 else
                 {
-                    <div class="lpv-block">@SafeHtml(block)</div>
+                    <div class="lpv-block @FrameClass(block.FrameStyle)">@SafeHtml(block.Text)</div>
                 }
             }
         }
@@ -197,6 +197,13 @@
     /// <c>&lt;icon=Name&gt;</c> (inline) and <c>&lt;sprite=Name&gt;</c> (standalone picture); everything else escaped.
     /// </summary>
     private MarkupString SafeHtml(string text) => (MarkupString)PreviewHtmlSanitizer.ToSafeHtml(text, ResolveImageTag, ResolveVariableTag);
+
+    /// <summary>The frame-style modifier class for a block (e.g. <c>lpv-block-success</c>); empty for the plain Normal frame.</summary>
+    private static string FrameClass(StoryTextFrameStyle style)
+    {
+        string suffix = StoryStyle.FrameSuffix(style);
+        return suffix.Length == 0 ? "" : $"lpv-block-{suffix}";
+    }
 
     /// <summary>Resolves a <c>&lt;var=Name&gt;</c> tag to a registered storage variable (case-insensitive name match),
     /// so it renders as that variable's slot label. Returns null when nothing matches so the tag stays visible.</summary>

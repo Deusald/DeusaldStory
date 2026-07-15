@@ -540,7 +540,7 @@
 
     private void OnFlowTextConfirmed(FlowTextOptionsModal.FlowTextArgs args)
     {
-        _ProjectState.UpdateFlowTextNode(_CurrentId, args.EditNodeId, args.RenderInApp, args.RenderInGamebook);
+        _ProjectState.UpdateFlowTextNode(_CurrentId, args.EditNodeId, args.RenderInApp, args.RenderInGamebook, args.FrameStyle);
         RebuildNodes();
     }
 

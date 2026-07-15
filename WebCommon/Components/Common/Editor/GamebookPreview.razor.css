@@ -153,6 +153,13 @@
     border-radius: var(--r-md);
     white-space: pre-wrap;
 }
+
+/* Frame styles — a coloured left accent + faint tint over the paper background. */
+.gbp-block-info    { border-color: var(--info);    border-left: 3px solid var(--info);    background: color-mix(in srgb, var(--info)    10%, var(--gbp-frame-bg)); }
+.gbp-block-success { border-color: var(--success); border-left: 3px solid var(--success); background: color-mix(in srgb, var(--success) 10%, var(--gbp-frame-bg)); }
+.gbp-block-warning { border-color: var(--warning); border-left: 3px solid var(--warning); background: color-mix(in srgb, var(--warning) 10%, var(--gbp-frame-bg)); }
+.gbp-block-danger  { border-color: var(--danger);  border-left: 3px solid var(--danger);  background: color-mix(in srgb, var(--danger)  10%, var(--gbp-frame-bg)); }
+
 .gbp-instructions {
     display: flex;
     flex-direction: column;

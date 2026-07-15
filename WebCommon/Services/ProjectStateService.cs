@@ -570,8 +570,8 @@ public partial class ProjectStateService(
         return node;
     }
 
-    /// <summary>Updates a FlowText node's per-medium render flags (whether its text renders in the App / Gamebook).</summary>
-    public void UpdateFlowTextNode(Guid logicId, Guid nodeId, bool renderInApp, bool renderInGamebook)
+    /// <summary>Updates a FlowText node's per-medium render flags (whether its text renders in the App / Gamebook) and its frame style.</summary>
+    public void UpdateFlowTextNode(Guid logicId, Guid nodeId, bool renderInApp, bool renderInGamebook, StoryTextFrameStyle frameStyle)
     {
         if (!CurrentProject!.LogicNodes.TryGetValue(logicId, out StoryLogicNode? logic)) return;
         StoryFlowTextNode? node = logic.FlowTextNodes.Find(n => n.Id == nodeId);
@@ -579,6 +579,7 @@ public partial class ProjectStateService(
 
         node.RenderInApp      = renderInApp;
         node.RenderInGamebook = renderInGamebook;
+        node.FrameStyle       = frameStyle;
         MarkKeyDirty(logicId);
     }
 
