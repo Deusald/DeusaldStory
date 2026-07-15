@@ -205,40 +205,74 @@
              @oncontextmenu="CloseMenu" @oncontextmenu:preventDefault="true" @oncontextmenu:stopPropagation="true"></div>
         <div class="edg-menu" style="left:@F(_MenuX)px; top:@F(_MenuY)px;"
              @oncontextmenu:preventDefault="true" @oncontextmenu:stopPropagation="true">
-            @if (menu.Editable)
+            @if (IsMultiSelected(menu))
             {
-                <button class="edg-menu-item" @onclick="() => MenuInvoke(OnNodeEdit, menu)">
-                    <i class="bi bi-pencil"></i> Edit @MenuNoun(menu)
+                @* Right-clicked a node that is part of a multi-selection — act on the whole group (only copyable/deletable ones). *@
+                int count = SelectedNodes().Count(n => n.Deletable);
+                <button class="edg-menu-item" @onclick="MenuCopySelected">
+                    <i class="bi bi-clipboard"></i> Copy @count nodes
+                </button>
+                <div class="edg-menu-sep"></div>
+                <button class="edg-menu-item edg-menu-danger" @onclick="MenuDeleteSelected">
+                    <i class="bi bi-trash"></i> Delete @count nodes
                 </button>
             }
-            @if (menu.Kind is StoryNodeKind.PortalIn or StoryNodeKind.PortalOut)
+            else
             {
-                <button class="edg-menu-item" @onclick="() => MenuInvoke(OnNodeAddPortalIn, menu)">
-                    <i class="bi bi-box-arrow-in-right"></i> Add portal in
-                </button>
-            }
-            @if (menu.Kind is StoryNodeKind.LogicPortalIn or StoryNodeKind.LogicPortalOut)
-            {
-                <button class="edg-menu-item" @onclick="() => MenuInvoke(OnNodeAddPortalOut, menu)">
-                    <i class="bi bi-box-arrow-right"></i> Add portal out
-                </button>
-            }
-            @if (CanMoveToParent && menu.Kind is StoryNodeKind.Logic or StoryNodeKind.Container)
-            {
-                <button class="edg-menu-item" @onclick="() => MenuInvoke(OnNodeMoveToParent, menu)">
-                    <i class="bi bi-box-arrow-up-left"></i> Move to parent
-                </button>
-            }
-            @if (menu.Deletable)
-            {
-                @if (menu.Editable || menu.Kind is StoryNodeKind.PortalIn or StoryNodeKind.PortalOut
-                                                or StoryNodeKind.LogicPortalIn or StoryNodeKind.LogicPortalOut
-                                   || (CanMoveToParent && menu.Kind is StoryNodeKind.Logic or StoryNodeKind.Container))
+                @if (menu.Editable)
                 {
-                    <div class="edg-menu-sep"></div>
+                    <button class="edg-menu-item" @onclick="() => MenuInvoke(OnNodeEdit, menu)">
+                        <i class="bi bi-pencil"></i> Edit @MenuNoun(menu)
+                    </button>
                 }
-                <button class="edg-menu-item edg-menu-danger" @onclick="() => MenuInvoke(OnNodeDelete, menu)">
-                    <i class="bi bi-trash"></i> Delete @MenuNoun(menu)
+                @if (menu.Kind is StoryNodeKind.PortalIn or StoryNodeKind.PortalOut)
+                {
+                    <button class="edg-menu-item" @onclick="() => MenuInvoke(OnNodeAddPortalIn, menu)">
+                        <i class="bi bi-box-arrow-in-right"></i> Add portal in
+                    </button>
+                }
+                @if (menu.Kind is StoryNodeKind.LogicPortalIn or StoryNodeKind.LogicPortalOut)
+                {
+                    <button class="edg-menu-item" @onclick="() => MenuInvoke(OnNodeAddPortalOut, menu)">
+                        <i class="bi bi-box-arrow-right"></i> Add portal out
+                    </button>
+                }
+                @if (CanMoveToParent && menu.Kind is StoryNodeKind.Logic or StoryNodeKind.Container)
+                {
+                    <button class="edg-menu-item" @onclick="() => MenuInvoke(OnNodeMoveToParent, menu)">
+                        <i class="bi bi-box-arrow-up-left"></i> Move to parent
+                    </button>
+                }
+                @if (menu.Deletable)
+                {
+                    <button class="edg-menu-item" @onclick="() => MenuCopyOne(menu)">
+                        <i class="bi bi-clipboard"></i> Copy @MenuNoun(menu)
+                    </button>
+                    <div class="edg-menu-sep"></div>
+                    <button class="edg-menu-item edg-menu-danger" @onclick="() => MenuInvoke(OnNodeDelete, menu)">
+                        <i class="bi bi-trash"></i> Delete @MenuNoun(menu)
+                    </button>
+                }
+            }
+        </div>
+    }
+
+    @* ── Canvas context menu (empty canvas) — add a node, or paste the clipboard ── *@
+    @if (_CanvasMenu)
+    {
+        <div class="edg-menu-backdrop"
+             @onpointerdown="CloseCanvasMenu" @onpointerdown:stopPropagation="true"
+             @oncontextmenu="CloseCanvasMenu" @oncontextmenu:preventDefault="true" @oncontextmenu:stopPropagation="true"></div>
+        <div class="edg-menu" style="left:@F(_CanvasMenuX)px; top:@F(_CanvasMenuY)px;"
+             @oncontextmenu:preventDefault="true" @oncontextmenu:stopPropagation="true">
+            <button class="edg-menu-item" @onclick="CanvasMenuAddNode">
+                <i class="bi bi-plus-lg"></i> Add node
+            </button>
+            @if (CanPaste)
+            {
+                <div class="edg-menu-sep"></div>
+                <button class="edg-menu-item" @onclick="CanvasMenuPaste">
+                    <i class="bi bi-clipboard-check"></i> Paste
                 </button>
             }
         </div>
@@ -270,6 +304,9 @@
 
     /// <summary>Whether the current graph's nodes can be pushed up a level (false in the Root container).</summary>
     [Parameter] public bool CanMoveToParent { get; set; }
+
+    /// <summary>Whether the editor's clipboard holds something pasteable into this graph — drives the canvas menu's Paste item.</summary>
+    [Parameter] public bool CanPaste { get; set; }
 
     // ── Node layout constants (must match the absolute positions in EditorGraph.razor.css) ──
     private const double NODE_W       = 216; // fixed card width
@@ -324,6 +361,11 @@
     private EdNode? _MenuNode; // node whose right-click context menu is open (null when closed)
     private double  _MenuX;    // menu position, viewport coordinates (position: fixed)
     private double  _MenuY;
+
+    private bool        _CanvasMenu;      // empty-canvas right-click menu open (add node / paste)
+    private double      _CanvasMenuX;     // menu position, viewport coordinates
+    private double      _CanvasMenuY;
+    private CanvasPoint _CanvasMenuWorld; // world point the menu was opened at (where a new / pasted node lands)
 
     // ── Node geometry ──────────────────────────────────────────────────────
 
@@ -647,7 +689,10 @@
 
     // ── Context menu ───────────────────────────────────────────────────────
 
-    /// <summary>Right-click on empty canvas — convert the cursor to world coordinates and ask to open the palette.</summary>
+    /// <summary>
+    /// Right-click on empty canvas — convert the cursor to world coordinates. With something on the clipboard, open a
+    /// small menu (Add node / Paste); otherwise open the palette straight away (the common, uncopied case).
+    /// </summary>
     private async Task CanvasContextMenu(MouseEventArgs e)
     {
         _MenuNode = null;
@@ -655,19 +700,75 @@
         double[] r = await RectAsync();
         double wx = (e.ClientX - r[0] - _PanX) / _Scale;
         double wy = (e.ClientY - r[1] - _PanY) / _Scale;
-        await OnCanvasContextMenu.InvokeAsync(new CanvasPoint(wx, wy));
+        CanvasPoint world = new(wx, wy);
+
+        if (CanPaste)
+        {
+            _CanvasMenuWorld = world;
+            _CanvasMenuX     = e.ClientX;
+            _CanvasMenuY     = e.ClientY;
+            _CanvasMenu      = true;
+        }
+        else
+        {
+            await OnCanvasContextMenu.InvokeAsync(world);
+        }
     }
 
-    /// <summary>Right-click on a node — open its edit/delete menu at the cursor. Built-in boundary nodes have none.</summary>
+    /// <summary>Right-click on a node — open its context menu at the cursor. Built-in boundary nodes get one only when part of a multi-selection.</summary>
     private void NodeContextMenu(MouseEventArgs e, EdNode node)
     {
-        if (!node.Deletable && !node.Editable) { _MenuNode = null; return; }
-        _MenuNode = node;
-        _MenuX    = e.ClientX;
-        _MenuY    = e.ClientY;
+        if (!IsMultiSelected(node) && !node.Deletable && !node.Editable) { _MenuNode = null; return; }
+        _CanvasMenu = false;
+        _MenuNode   = node;
+        _MenuX      = e.ClientX;
+        _MenuY      = e.ClientY;
     }
 
     private void CloseMenu() => _MenuNode = null;
+    private void CloseCanvasMenu() => _CanvasMenu = false;
+
+    // ── Canvas menu actions ──────────────────────────────────────────────────
+
+    private async Task CanvasMenuAddNode()
+    {
+        _CanvasMenu = false;
+        await OnCanvasContextMenu.InvokeAsync(_CanvasMenuWorld);
+    }
+
+    private async Task CanvasMenuPaste()
+    {
+        _CanvasMenu = false;
+        await OnPaste.InvokeAsync();
+    }
+
+    // ── Multi-selection / copy menu helpers ──────────────────────────────────
+
+    /// <summary>True when <paramref name="n"/> is one node of an active multi-selection (so menu actions target the whole group).</summary>
+    private bool IsMultiSelected(EdNode n) => _Selected.Count > 1 && _Selected.Contains(n.Id);
+
+    /// <summary>The nodes of the current multi-selection.</summary>
+    private List<EdNode> SelectedNodes() => Nodes.Where(n => _Selected.Contains(n.Id)).ToList();
+
+    private async Task MenuCopyOne(EdNode node)
+    {
+        _MenuNode = null;
+        await OnNodesCopy.InvokeAsync(new List<EdNode> { node });
+    }
+
+    private async Task MenuCopySelected()
+    {
+        _MenuNode = null;
+        await OnNodesCopy.InvokeAsync(SelectedNodes());
+    }
+
+    private async Task MenuDeleteSelected()
+    {
+        _MenuNode = null;
+        List<EdNode> nodes = SelectedNodes().Where(n => n.Deletable).ToList();
+        _Selected.Clear();
+        if (nodes.Count > 0) await OnNodesDelete.InvokeAsync(nodes);
+    }
 
     private async Task MenuInvoke(EventCallback<EdNode> callback, EdNode node)
     {

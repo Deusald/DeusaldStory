@@ -626,18 +626,17 @@ public partial class ProjectStateService(
     // ── Logic portals (inner-graph value relays: one-in / many-out) ──────────
 
     /// <summary>
-    /// Adds a logic portal (a Text/Icon/Variable value relay) to a logic node's inner graph: one <b>portal in</b> at
-    /// (<paramref name="x"/>, <paramref name="y"/>) and one paired <b>portal out</b> offset to the right. Value that
-    /// reaches the in re-emerges at every out. Returns the created portal, or null when the logic node is unknown.
+    /// Adds a logic portal (a one-in / many-out value relay) to a logic node's inner graph: one <b>portal in</b> at
+    /// (<paramref name="x"/>, <paramref name="y"/>) and one paired <b>portal out</b> offset to the right. The in accepts
+    /// any value signal; each out adopts its type once connected. Returns the created portal, or null when unknown.
     /// </summary>
-    public StoryLogicPortalNode? AddLogicPortalNode(Guid logicId, StoryPortalSignal signal, double x, double y)
+    public StoryLogicPortalNode? AddLogicPortalNode(Guid logicId, double x, double y)
     {
         if (!CurrentProject!.LogicNodes.TryGetValue(logicId, out StoryLogicNode? logic)) return null;
 
         StoryLogicPortalNode portal = new()
         {
             Name    = $"Portal {logic.LogicPortalNodes.Count + 1}",
-            Signal  = signal,
             InPoint = new StoryConnectionPoint { Name = "In", X = x, Y = y }
         };
         portal.OutPoints.Add(new StoryConnectionPoint { Name = "Out", X = x + _PORTAL_PAIR_GAP, Y = y });

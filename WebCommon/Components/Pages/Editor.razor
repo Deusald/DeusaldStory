@@ -69,7 +69,8 @@
                                  OnNodeMoveToParent="OnNodeMoveToParent"
                                  OnUndo="OnUndo"
                                  OnRedo="OnRedo"
-                                 CanMoveToParent="@(!_InLogic && !IsRootContainer)"/>
+                                 CanMoveToParent="@(!_InLogic && !IsRootContainer)"
+                                 CanPaste="@CanPaste"/>
                 }
                 else if (_Mode == EditorMode.Preview && _CurrentLogicNode is StoryLogicNode previewLogic)
                 {
@@ -461,9 +462,7 @@
                 new NodePaletteItem(StoryNodeKind.SetVariable,        "bi-pencil-square",   "Set variable",          "On the logic chain — assigns a value to an already-registered variable."),
                 new NodePaletteItem(StoryNodeKind.UnregisterVariable, "bi-box-arrow-up",    "Unregister variable",   "On the logic chain — releases a registered variable and frees its slot."),
                 new NodePaletteItem(StoryNodeKind.SetExternalVariable, "bi-sliders",        "Set external variable", "On the logic chain — assigns a value to a story-wide external variable (App only; no Gamebook instruction)."),
-                new NodePaletteItem(StoryNodeKind.LogicPortalIn,      "bi-box-arrow-in-right", "Text portal",           "A one-in / many-out relay for Text — feed a text output into the in, read it from every out.",     StoryPortalSignal.Text),
-                new NodePaletteItem(StoryNodeKind.LogicPortalIn,      "bi-box-arrow-in-right", "Icon portal",           "A one-in / many-out relay for an Icon — feed an icon output into the in, read it from every out.",  StoryPortalSignal.Icon),
-                new NodePaletteItem(StoryNodeKind.LogicPortalIn,      "bi-box-arrow-in-right", "Variable portal",       "A one-in / many-out relay for a Variable — feed a variable output into the in, read it from every out.", StoryPortalSignal.Variable),
+                new NodePaletteItem(StoryNodeKind.LogicPortalIn,      "bi-box-arrow-in-right", "Portal",                "A one-in / many-out relay — feed any Text/Icon/Variable output into the in, read it from every out."),
                 new NodePaletteItem(StoryNodeKind.Comment,                "bi-chat-left-text", "Comment",                 "A free-text note explaining how nodes connect. No ports; ignored during playback.")
             ]
             :
@@ -516,7 +515,7 @@
             case StoryNodeKind.SetExternalVariable: _SetExternalVariableModal?.Show();        break;
             case StoryNodeKind.LogicPortalIn:
                 // No config — create the portal (in + one out) straight away at the pending position.
-                if (_ProjectState.AddLogicPortalNode(_CurrentId, item.PortalSignal ?? StoryPortalSignal.Variable, _PendingX, _PendingY) is StoryLogicPortalNode portal)
+                if (_ProjectState.AddLogicPortalNode(_CurrentId, _PendingX, _PendingY) is StoryLogicPortalNode portal)
                     _SelectedId = portal.InPoint.Id;
                 RebuildNodes();
                 break;
@@ -978,6 +977,9 @@
     // paste time, so a copy carries no snapshot — deleting the originals before pasting simply yields nothing.
     private List<Guid>  _Clipboard      = [];
     private EditorScope _ClipboardScope = EditorScope.Container;
+
+    /// <summary>Whether the clipboard holds something that can be pasted into the current graph (same scope) — drives the canvas Paste option.</summary>
+    private bool CanPaste => _Clipboard.Count > 0 && _ClipboardScope == _Scope;
 
     /// <summary>Copy the selected nodes to the clipboard (Ctrl/Cmd+C).</summary>
     private void OnNodesCopy(IReadOnlyList<EdNode> nodes)

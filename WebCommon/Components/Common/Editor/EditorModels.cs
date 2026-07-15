@@ -46,7 +46,11 @@ namespace DeusaldStoryWeb
         Text,
         Icon,
         Variable,
-        CVariable
+        CVariable,
+
+        /// <summary>A logic portal's <b>in</b> port — accepts any value signal (Text / Icon / Variable / Constant). A
+        /// portal <b>out</b> adopts the concrete type of whatever is wired into the in; it stays <c>Data</c> until then.</summary>
+        Data
     }
 
     /// <summary>
@@ -102,7 +106,7 @@ namespace DeusaldStoryWeb
     /// One selectable entry in the right-click node palette. <see cref="Kind"/> tells the editor which kind of
     /// node to create; the rest is presentation. The available set is context-dependent (see the palette).
     /// </summary>
-    public sealed record NodePaletteItem(StoryNodeKind Kind, string Icon, string Label, string Description, StoryPortalSignal? PortalSignal = null);
+    public sealed record NodePaletteItem(StoryNodeKind Kind, string Icon, string Label, string Description);
 
     /// <summary>An input or output connection port drawn on a node card.</summary>
     public sealed class EdPort
@@ -646,24 +650,25 @@ namespace DeusaldStoryWeb
                 nodes.Add(node);
             }
 
-            // ── Logic portals (orange) — one-in / many-out value relays. The in accepts the value; each out re-emits it. ──
+            // ── Logic portals (orange) — one-in / many-out value relays. The in accepts any value (Data); each out
+            //    adopts the concrete type (Text/Icon/Variable/Constant) of whatever is wired into the in. ──
             foreach (StoryLogicPortalNode portal in logic.LogicPortalNodes)
             {
-                PortType portType = PortalPortType(portal.Signal);
-                string   signal   = PortalSignalLabel(portal.Signal);
+                PortType outType    = ResolvedPortalType(project, logic, portal);
+                string   outLabel   = PortTypeLabel(outType);
 
                 EdNode inNode = new()
                 {
                     Id        = portal.InPoint.Id,
                     Kind      = StoryNodeKind.LogicPortalIn,
                     Title     = portal.Name,
-                    Subtitle  = signal,
+                    Subtitle  = outType == PortType.Data ? "any" : outLabel,
                     X         = portal.InPoint.X,
                     Y         = portal.InPoint.Y,
                     Deletable = true,
                     Editable  = false
                 };
-                inNode.Inputs.Add(new EdPort { Id = portal.InPoint.Id, Name = signal, Type = portType });
+                inNode.Inputs.Add(new EdPort { Id = portal.InPoint.Id, Name = "Data", Type = PortType.Data });
                 nodes.Add(inNode);
 
                 foreach (StoryConnectionPoint outPoint in portal.OutPoints)
@@ -673,13 +678,13 @@ namespace DeusaldStoryWeb
                         Id        = outPoint.Id,
                         Kind      = StoryNodeKind.LogicPortalOut,
                         Title     = portal.Name,
-                        Subtitle  = signal,
+                        Subtitle  = outLabel,
                         X         = outPoint.X,
                         Y         = outPoint.Y,
                         Deletable = true,
                         Editable  = false
                     };
-                    outNode.Outputs.Add(new EdPort { Id = outPoint.Id, Name = signal, Type = portType });
+                    outNode.Outputs.Add(new EdPort { Id = outPoint.Id, Name = outLabel, Type = outType });
                     nodes.Add(outNode);
                 }
             }
@@ -691,22 +696,54 @@ namespace DeusaldStoryWeb
             return nodes;
         }
 
-        /// <summary>The editor port type a logic portal's <paramref name="signal"/> exposes on its in/out points.</summary>
-        public static PortType PortalPortType(StoryPortalSignal signal) => signal switch
+        /// <summary>
+        /// The concrete port type a logic portal carries — the type of the output wired into its in (following any
+        /// chained portals), or <see cref="PortType.Data"/> when the in is unconnected (so the out accepts nothing yet).
+        /// </summary>
+        public static PortType ResolvedPortalType(StoryProject project, StoryLogicNode logic, StoryLogicPortalNode portal)
         {
-            StoryPortalSignal.Text     => PortType.Text,
-            StoryPortalSignal.Icon     => PortType.Icon,
-            StoryPortalSignal.Variable => PortType.Variable,
-            _                          => PortType.Variable
-        };
+            Guid feed = logic.ContentConnections.Find(c => c.ToPoint == portal.InPoint.Id)?.FromPoint ?? Guid.Empty;
+            Guid src  = logic.ResolvePortalSource(feed);
+            return PortTypeOfOutput(project, logic, src) ?? PortType.Data;
+        }
 
-        /// <summary>A short human label for a logic portal's carried signal (shown as the node subtitle).</summary>
-        public static string PortalSignalLabel(StoryPortalSignal signal) => signal switch
+        /// <summary>The port type of an inner-graph output point (Text/Icon/Variable/Constant), or null when it names no known output.</summary>
+        private static PortType? PortTypeOfOutput(StoryProject project, StoryLogicNode logic, Guid outputId)
         {
-            StoryPortalSignal.Text     => "Text",
-            StoryPortalSignal.Icon     => "Icon",
-            StoryPortalSignal.Variable => "Variable",
-            _                          => ""
+            if (outputId == Guid.Empty) return null;
+
+            if (logic.LocalizationNodes.Exists(n => n.OutPoint.Id == outputId)
+             || logic.SmartFormatNodes.Exists(n => n.OutPoint.Id == outputId))
+                return PortType.Text;
+
+            if (logic.IconNodes.Exists(n => n.OutPoint.Id == outputId)
+             || logic.LightDarkSwitchNodes.Exists(n => n.OutPoint.Id == outputId))
+                return PortType.Icon;
+
+            if (logic.ExternalVariableNodes.Find(n => n.OutPoint.Id == outputId) is StoryExternalVariableNode ev)
+            {
+                StoryVariable? v = StoryBuiltInVariables.Find(ev.SelectedVariableId)
+                    ?? (project.Variables.TryGetValue(ev.SelectedVariableId, out StoryVariable? stored) ? stored : null);
+                bool constant = v is not null && (v.IsConstant || StoryBuiltInVariables.IsBuiltIn(v.Id));
+                return constant ? PortType.CVariable : PortType.Variable;
+            }
+
+            if (logic.GetVariableNodes.Exists(n => n.OutPoint.Id == outputId))     return PortType.Variable;
+            if (logic.GetVariableNodes.Exists(n => n.SlotOutPoint.Id == outputId)) return PortType.CVariable;
+            if (logic.ConstantVariableNodes.Exists(n => n.OutPoint.Id == outputId)) return PortType.CVariable;
+            if (StorySelectionResolver.IncomingVariables(project, logic).Exists(d => d.Id == outputId)) return PortType.CVariable;
+
+            return null;
+        }
+
+        /// <summary>A short human label for a resolved port type (shown as a portal node's subtitle / port name).</summary>
+        public static string PortTypeLabel(PortType t) => t switch
+        {
+            PortType.Text      => "Text",
+            PortType.Icon      => "Icon",
+            PortType.Variable  => "Variable",
+            PortType.CVariable => "Constant",
+            _                  => "Data"
         };
 
         /// <summary>A compact symbol for a condition operator (used in the Exit-node auto-resolution editor).</summary>
@@ -890,6 +927,7 @@ namespace DeusaldStoryWeb
             PortType.CVariable => "var(--code-func)",
             PortType.Text      => "var(--success)",
             PortType.Icon      => "var(--orange)",
+            PortType.Data      => "var(--text-dim)",
             _                  => "var(--text-dim)"
         };
 
@@ -902,6 +940,8 @@ namespace DeusaldStoryWeb
         {
             PortType.Variable  => src is PortType.Variable or PortType.CVariable,
             PortType.CVariable => src is PortType.CVariable,
+            // A portal's Data input accepts any value signal; two portals may also chain (Data → Data).
+            PortType.Data      => src is PortType.Text or PortType.Icon or PortType.Variable or PortType.CVariable or PortType.Data,
             _                  => src == dst
         };
 
