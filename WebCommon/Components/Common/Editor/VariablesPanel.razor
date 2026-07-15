@@ -6,8 +6,7 @@
    Story-wide variables editor, shown from the rail's Variables tool. Two
    columns: the list of variables on the left (searchable, with Add), and the
    editor for the selected variable on the right — its name, description and
-   possible values, plus a linked "gamebook condition" localization key with a
-   live SmartFormat preview the author can render against any chosen value.
+   possible values.
    ───────────────────────────────────────────────────────────────────────── *@
 
 <div class="var-root">
@@ -192,88 +191,6 @@
                         </button>
                     </div>
 
-                    @* Condition localization key *@
-                    <div class="modal-field">
-                        <label class="modal-label">Gamebook condition key</label>
-                        <div class="var-cond">
-                            @{
-                                LocLocalizationKey? condKey = ConditionKey(sel);
-                            }
-                            @if (condKey is not null)
-                            {
-                                <div class="var-cond-name">
-                                    <i class="bi bi-translate"></i>
-                                    <span>@condKey.KeyName</span>
-                                </div>
-                            }
-                            else if (sel.ConditionKeyId != Guid.Empty)
-                            {
-                                <div class="var-cond-name var-cond-missing">
-                                    <i class="bi bi-exclamation-triangle"></i>
-                                    <span>Linked key not found</span>
-                                </div>
-                            }
-                            else
-                            {
-                                <div class="var-cond-name var-cond-none">No key linked.</div>
-                            }
-                            <div class="var-cond-actions">
-                                <button class="var-cond-btn" @onclick="() => PickKey(sel)">
-                                    <i class="bi bi-search"></i>
-                                    <span>@(sel.ConditionKeyId == Guid.Empty ? "Choose" : "Change")</span>
-                                </button>
-                                @if (sel.ConditionKeyId != Guid.Empty)
-                                {
-                                    <button class="var-cond-btn var-cond-btn-ghost" @onclick="() => ClearKey(sel)">
-                                        <i class="bi bi-x-lg"></i>
-                                        <span>Clear</span>
-                                    </button>
-                                }
-                            </div>
-                        </div>
-                    </div>
-
-                    @* SmartFormat preview *@
-                    @if (condKey is not null)
-                    {
-                        <div class="modal-field">
-                            <label class="modal-label">Preview</label>
-
-                            @if (sel.PossibleValues.Count > 0)
-                            {
-                                <div class="var-preview-pick">
-                                    <span class="var-preview-pick-label">@ValueLabel(sel) =</span>
-                                    <select class="modal-input var-preview-select"
-                                            value="@EffectivePreviewValue(sel)"
-                                            @onchange="OnPreviewSelect">
-                                        @foreach (string val in sel.PossibleValues)
-                                        {
-                                            <option value="@val">@(string.IsNullOrEmpty(val) ? "(empty)" : val)</option>
-                                        }
-                                    </select>
-                                </div>
-                            }
-                            else
-                            {
-                                <div class="var-preview-hint">Add a value above to preview against it.</div>
-                            }
-
-                            @{
-                                string template = MainText(condKey);
-                                string rendered = RenderPreview(sel, template, out string? previewError);
-                            }
-                            <div class="var-preview-template" title="Condition template (main language)">@template</div>
-                            <div class="var-preview-result">@rendered</div>
-                            @if (previewError is not null)
-                            {
-                                <div class="var-preview-error">
-                                    <i class="bi bi-exclamation-triangle"></i>
-                                    <span>@previewError</span>
-                                </div>
-                            }
-                        </div>
-                    }
-
                 </div>
             }
         </div>
@@ -282,18 +199,12 @@
 
 </div>
 
-<LocalizationKeyPickerModal @ref="_KeyPicker" OnConfirm="OnKeyPicked"/>
-
 @code {
     private string _Search = "";
     private Guid   _SelectedId;
-    private string _PreviewValue = "";
     private string? _NameError;
 
-    private LocalizationKeyPickerModal? _KeyPicker;
-
     private StoryProject   Project  => _ProjectState.CurrentProject!;
-    private LocProject?    Loc      => _ProjectState.CurrentLocalization;
     private StoryVariable? Selected =>
         StoryBuiltInVariables.Find(_SelectedId)
         ?? (Project.Variables.TryGetValue(_SelectedId, out StoryVariable? v) ? v : null);
@@ -319,9 +230,8 @@
 
     private void Select(Guid id)
     {
-        _SelectedId   = id;
-        _NameError    = null;
-        _PreviewValue = Selected?.PossibleValues.FirstOrDefault() ?? "";
+        _SelectedId = id;
+        _NameError  = null;
     }
 
     private void AddVariable()
@@ -389,62 +299,6 @@
         if (index < 0 || index >= v.PossibleValues.Count) return;
         v.PossibleValues.RemoveAt(index);
         _ProjectState.MarkKeyDirty(v.Id);
-    }
-
-    // ── Condition key ────────────────────────────────────────────────────────
-
-    private LocLocalizationKey? ConditionKey(StoryVariable v) =>
-        v.ConditionKeyId == Guid.Empty ? null : Loc?.Keys.Find(k => k.Id == v.ConditionKeyId);
-
-    private void PickKey(StoryVariable v) => _KeyPicker?.Show(v.Id, v.ConditionKeyId);
-
-    private void ClearKey(StoryVariable v)
-    {
-        v.ConditionKeyId = Guid.Empty;
-        _ProjectState.MarkKeyDirty(v.Id);
-    }
-
-    private void OnKeyPicked(LocalizationKeyPickerModal.LocalizationPickResult result)
-    {
-        if (!Project.Variables.TryGetValue(result.EditNodeId, out StoryVariable? v)) return;
-        v.ConditionKeyId = result.KeyId;
-        _ProjectState.MarkKeyDirty(v.Id);
-    }
-
-    // ── Preview ──────────────────────────────────────────────────────────────
-
-    private void OnPreviewSelect(ChangeEventArgs e) => _PreviewValue = e.Value?.ToString() ?? "";
-
-    private string ValueLabel(StoryVariable v) => string.IsNullOrWhiteSpace(v.Name) ? "value" : v.Name;
-
-    /// <summary>The preview value actually used — the picked one if it's still a valid value, else the first.</summary>
-    private string EffectivePreviewValue(StoryVariable v) =>
-        v.PossibleValues.Contains(_PreviewValue) ? _PreviewValue : v.PossibleValues.FirstOrDefault() ?? "";
-
-    /// <summary>
-    /// Renders <paramref name="template"/> with every variable resolved: this variable to the chosen preview value,
-    /// the rest to their first possible value (so a condition that references several still renders).
-    /// </summary>
-    private string RenderPreview(StoryVariable v, string template, out string? error)
-    {
-        Dictionary<string, object> values = new(StringComparer.OrdinalIgnoreCase);
-        foreach (StoryVariable other in Project.Variables.Values)
-        {
-            if (string.IsNullOrWhiteSpace(other.Name)) continue;
-            values[other.Name] = other.PossibleValues.FirstOrDefault() ?? "";
-        }
-        if (!string.IsNullOrWhiteSpace(v.Name))
-            values[v.Name] = EffectivePreviewValue(v);
-
-        return StoryConditionPreview.Render(template, values, out error);
-    }
-
-    /// <summary>The key's main-language text (empty when it has no source translation).</summary>
-    private string MainText(LocLocalizationKey key)
-    {
-        string? main = Loc?.Metadata.MainLanguageId;
-        if (string.IsNullOrEmpty(main)) return "";
-        return key.Translations.Find(t => t.LanguageId == main)?.Text ?? "";
     }
 
     private void OnDataChanged() => InvokeAsync(StateHasChanged);

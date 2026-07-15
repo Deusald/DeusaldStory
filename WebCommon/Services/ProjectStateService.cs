@@ -1125,19 +1125,17 @@ public partial class ProjectStateService(
         return variable;
     }
 
-    /// <summary>Applies an edit to a variable: name, description, possible values and the linked condition key.</summary>
+    /// <summary>Applies an edit to a variable: name, description and possible values.</summary>
     public void UpdateVariable(
         Guid                id,
         string              name,
         string              description,
-        IEnumerable<string> possibleValues,
-        Guid                conditionKeyId)
+        IEnumerable<string> possibleValues)
     {
         if (!CurrentProject!.Variables.TryGetValue(id, out StoryVariable? variable)) return;
         variable.Name           = name;
         variable.Description    = description;
         variable.PossibleValues = possibleValues.ToList();
-        variable.ConditionKeyId = conditionKeyId;
         MarkKeyDirty(id);
     }
 

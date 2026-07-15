@@ -35,8 +35,7 @@ namespace DeusaldStoryCommon
             Id             = AppGamebookId,
             Name           = "AppGamebook",
             Description    = "Built-in: the medium being rendered — \"App\" in the app, \"Gamebook\" in the printed book. Read-only; its value follows the preview mode.",
-            PossibleValues = new List<string> { AppValue, GamebookValue },
-            ConditionKeyId = Guid.Empty
+            PossibleValues = new List<string> { AppValue, GamebookValue }
         };
 
         /// <summary>All built-in variables, in display order.</summary>
