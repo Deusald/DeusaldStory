@@ -122,6 +122,9 @@ namespace DeusaldStoryCommon
         /// <summary>Portal pairs on the inner graph — one-in / many-out relays that carry a Text/Icon/Variable value across the graph.</summary>
         public List<StoryLogicPortalNode> LogicPortalNodes { get; } = new();
 
+        /// <summary>Condition-flow pairs on the LFlow chain — each injects an optional block of flow gated by a constant-variable condition.</summary>
+        public List<StoryConditionFlowNode> ConditionFlowNodes { get; } = new();
+
         /// <summary>Free-text comment notes placed in this logic node's inner graph (no ports; documentation only).</summary>
         public List<StoryCommentNode> CommentNodes { get; } = new();
 

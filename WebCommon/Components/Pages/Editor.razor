@@ -156,6 +156,7 @@
 <UnregisterVariablePickerModal @ref="_UnregisterPicker"  OnConfirm="OnUnregisterPicked"/>
 <SetExternalVariableModal  @ref="_SetExternalVariableModal" OnConfirm="OnSetExternalVariableConfirmed"/>
 <ExitNodeModal             @ref="_ExitNodeModal"            OnConfirm="OnExitNodeConfirmed"/>
+<ConditionFlowModal        @ref="_ConditionFlowModal"       OnConfirm="OnConditionFlowConfirmed"/>
 <NewCommentNodeModal       @ref="_NewCommentNodeModal"      OnConfirm="OnCommentConfirmed"/>
 <FlowTextOptionsModal      @ref="_FlowTextOptionsModal"     OnConfirm="OnFlowTextConfirmed"/>
 
@@ -194,6 +195,7 @@
     private UnregisterVariablePickerModal? _UnregisterPicker;
     private SetExternalVariableModal?  _SetExternalVariableModal;
     private ExitNodeModal?             _ExitNodeModal;
+    private ConditionFlowModal?        _ConditionFlowModal;
     private NewCommentNodeModal?       _NewCommentNodeModal;
     private FlowTextOptionsModal?      _FlowTextOptionsModal;
 
@@ -513,6 +515,7 @@
                 new NodePaletteItem(StoryNodeKind.UnregisterVariable, "bi-box-arrow-up",    "Unregister variable",   "On the logic chain — releases a registered variable and frees its slot."),
                 new NodePaletteItem(StoryNodeKind.SetExternalVariable, "bi-sliders",        "Set external variable", "On the logic chain — assigns a value to a story-wide external variable (App only; no Gamebook instruction)."),
                 new NodePaletteItem(StoryNodeKind.LogicPortalIn,      "bi-box-arrow-in-right", "Portal",                "A one-in / many-out relay — feed any Text/Icon/Variable output into the in, read it from every out."),
+                new NodePaletteItem(StoryNodeKind.ConditionFlow,      "bi-signpost-split",  "Condition",             "On the logic chain — injects the block wired from its \"Condition true\" output (up to the paired End condition) when a constant-variable condition holds, then continues."),
                 new NodePaletteItem(StoryNodeKind.Comment,                "bi-chat-left-text", "Comment",                 "A free-text note explaining how nodes connect. No ports; ignored during playback.")
             ]
             :
@@ -567,6 +570,13 @@
                 // No config — create the portal (in + one out) straight away at the pending position.
                 if (_ProjectState.AddLogicPortalNode(_CurrentId, _PendingX, _PendingY) is StoryLogicPortalNode portal)
                     _SelectedId = portal.InPoint.Id;
+                RebuildNodes();
+                break;
+            case StoryNodeKind.ConditionFlow:
+                // Create the pair (Condition + End condition) straight away; the condition is authored via Edit
+                // once the constant operands have been wired into its Variables input.
+                if (_ProjectState.AddConditionFlowNode(_CurrentId, _PendingX, _PendingY) is StoryConditionFlowNode cond)
+                    _SelectedId = cond.Id;
                 RebuildNodes();
                 break;
             case StoryNodeKind.Comment:   _NewCommentNodeModal?.Show();   break;
@@ -775,6 +785,12 @@
         RebuildNodes();
     }
 
+    private void OnConditionFlowConfirmed(ConditionFlowModal.ConditionFlowArgs args)
+    {
+        _ProjectState.UpdateConditionFlowNode(_CurrentId, args.NodeId, args.Name, args.Condition, args.Negate);
+        RebuildNodes();
+    }
+
     private void OnUnregisterPicked(UnregisterVariablePickerModal.UnregisterPickResult result)
     {
         if (result.EditNodeId != Guid.Empty)
@@ -932,11 +948,32 @@
                     _FlowTextOptionsModal?.ShowEdit(ftEdit);
                 break;
 
+            case StoryNodeKind.ConditionFlow:
+                if (_CurrentLogicNode?.ConditionFlowNodes.Find(n => n.Id == node.Id) is StoryConditionFlowNode cf)
+                    _ConditionFlowModal?.ShowEdit(cf, AvailableConditionVariables(_CurrentLogicNode, cf));
+                break;
+
             case StoryNodeKind.Comment:
                 if (FindComment(node.Id) is StoryCommentNode comment)
                     _NewCommentNodeModal?.ShowEdit(comment.Id, comment.Text);
                 break;
         }
+    }
+
+    /// <summary>
+    /// The <b>constant</b> variables wired into a Condition node's Variables input, as (output id, display name) for its
+    /// condition builder. Only constant-typed sources are offered so the condition stays deterministically renderable.
+    /// </summary>
+    private List<(Guid Id, string Name)> AvailableConditionVariables(StoryLogicNode logic, StoryConditionFlowNode cf)
+    {
+        List<(Guid, string)> result = new();
+        foreach (StoryConnection c in logic.ContentConnections.Where(c => c.ToPoint == cf.VariablesIn.Id))
+        {
+            if (EditorProjection.PortTypeOfOutput(Project, logic, logic.ResolvePortalSource(c.FromPoint)) != PortType.CVariable) continue;
+            string name = ExitVariableName(logic, c.FromPoint);
+            if (!string.IsNullOrWhiteSpace(name)) result.Add((c.FromPoint, name));
+        }
+        return result;
     }
 
     /// <summary>The variables wired into a node's Exit-node Variables input, as (output id, display name) for the auto-resolution condition builder.</summary>
@@ -1016,6 +1053,8 @@
             case StoryNodeKind.SetVariable:        _ProjectState.DeleteSetVariableNode(_CurrentId, node.Id);        break;
             case StoryNodeKind.UnregisterVariable: _ProjectState.DeleteUnregisterVariableNode(_CurrentId, node.Id); break;
             case StoryNodeKind.SetExternalVariable: _ProjectState.DeleteSetExternalVariableNode(_CurrentId, node.Id); break;
+            case StoryNodeKind.ConditionFlow:
+            case StoryNodeKind.EndConditionFlow:    _ProjectState.DeleteConditionFlowNode(_CurrentId, node.Id);  break;
             case StoryNodeKind.Comment:                 _ProjectState.DeleteCommentNode(_CurrentId, node.Id);               break;
         }
     }

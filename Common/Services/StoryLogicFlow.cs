@@ -92,6 +92,21 @@ namespace DeusaldStoryCommon
             return values.TryGetValue(fromPoint, out string? sel) ? sel : "";
         }
 
+        /// <summary>
+        /// Evaluates a condition-flow node's <see cref="StoryConditionFlowNode.Condition"/> against the (constant)
+        /// variables wired into its Variables input, applying its <see cref="StoryConditionFlowNode.Negate"/> flag.
+        /// The flow walkers call this to decide whether to enter the injected "condition true" block. Because only
+        /// constants feed the condition, the result is the same for the App and the Gamebook.
+        /// </summary>
+        public static bool EvaluateConditionFlow(
+            StoryProject project, StoryLogicNode logic, StoryConditionFlowNode cf,
+            IReadOnlyDictionary<Guid, string> values, StoryRenderTarget target)
+        {
+            string Resolve(Guid varOut) => ResolveVariableValue(project, logic, varOut, values, target);
+            bool   result = cf.Condition.Evaluate(Resolve);
+            return cf.Negate ? !result : result;
+        }
+
         private static Guid FromInto(StoryLogicNode logic, Guid toPoint) =>
             logic.ContentConnections.Find(c => c.ToPoint == toPoint)?.FromPoint ?? Guid.Empty;
 
@@ -112,52 +127,63 @@ namespace DeusaldStoryCommon
             values ??= _EmptyValues;
             List<StorageOp> ops     = new();
             HashSet<Guid>   visited = new(); // node ids already emitted (so we don't duplicate them below)
-            HashSet<Guid>   hops    = new(); // to-points already followed (inner cycle guard)
-            Guid            from    = logic.EntryPoint.Id;
+            HashSet<Guid>   hops    = new(); // to-points already followed (inner cycle guard; also bounds condition recursion)
 
-            // Walk the linear LFlow chain so operations placed on it keep their reading order.
-            for (int guard = 0; guard < _GUARD; ++guard)
+            // Walk the linear LFlow chain so operations placed on it keep their reading order. A Condition node detours
+            // into its "condition true" block (up to the paired End node) when the condition holds, then continues.
+            void Walk(Guid from)
             {
-                StoryConnection? conn = logic.ContentConnections.Find(c => c.FromPoint == from);
-                if (conn is null) break;
-                Guid to = conn.ToPoint;
-                if (!hops.Add(to)) break; // inner cycle guard
+                for (int guard = 0; guard < _GUARD; ++guard)
+                {
+                    StoryConnection? conn = logic.ContentConnections.Find(c => c.FromPoint == from);
+                    if (conn is null) break;
+                    Guid to = conn.ToPoint;
+                    if (!hops.Add(to)) break; // inner cycle guard
 
-                if (logic.RegisterVariableNodes.Find(n => n.FlowIn.Id == to) is StoryRegisterVariableNode reg)
-                {
-                    ops.Add(new StorageOp { Kind = StorageOpKind.Register, Register = reg });
-                    visited.Add(reg.Id);
-                    from = reg.FlowOut.Id;
-                }
-                else if (logic.SetVariableNodes.Find(n => n.FlowIn.Id == to) is StorySetVariableNode set)
-                {
-                    ops.Add(new StorageOp { Kind = StorageOpKind.Set, Set = set });
-                    visited.Add(set.Id);
-                    from = set.FlowOut.Id;
-                }
-                else if (logic.UnregisterVariableNodes.Find(n => n.FlowIn.Id == to) is StoryUnregisterVariableNode unreg)
-                {
-                    ops.Add(new StorageOp { Kind = StorageOpKind.Unregister, Unregister = unreg });
-                    visited.Add(unreg.Id);
-                    from = unreg.FlowOut.Id;
-                }
-                else if (logic.FlowTextNodes.Find(n => n.FlowIn.Id == to) is StoryFlowTextNode ft)
-                {
-                    from = ft.FlowOut.Id; // text block — pass through
-                }
-                else if (logic.SplitForAppNodes.Find(n => n.FlowIn.Id == to) is StorySplitForAppNode split)
-                {
-                    from = split.FlowOut.Id; // App page break — not a storage op, pass through
-                }
-                else if (logic.SetExternalVariableNodes.Find(n => n.FlowIn.Id == to) is StorySetExternalVariableNode se)
-                {
-                    from = se.FlowOut.Id; // external-variable set — not a storage op, pass through
-                }
-                else
-                {
-                    break; // reached the Exit node or a leaf input
+                    if (logic.RegisterVariableNodes.Find(n => n.FlowIn.Id == to) is StoryRegisterVariableNode reg)
+                    {
+                        ops.Add(new StorageOp { Kind = StorageOpKind.Register, Register = reg });
+                        visited.Add(reg.Id);
+                        from = reg.FlowOut.Id;
+                    }
+                    else if (logic.SetVariableNodes.Find(n => n.FlowIn.Id == to) is StorySetVariableNode set)
+                    {
+                        ops.Add(new StorageOp { Kind = StorageOpKind.Set, Set = set });
+                        visited.Add(set.Id);
+                        from = set.FlowOut.Id;
+                    }
+                    else if (logic.UnregisterVariableNodes.Find(n => n.FlowIn.Id == to) is StoryUnregisterVariableNode unreg)
+                    {
+                        ops.Add(new StorageOp { Kind = StorageOpKind.Unregister, Unregister = unreg });
+                        visited.Add(unreg.Id);
+                        from = unreg.FlowOut.Id;
+                    }
+                    else if (logic.FlowTextNodes.Find(n => n.FlowIn.Id == to) is StoryFlowTextNode ft)
+                    {
+                        from = ft.FlowOut.Id; // text block — pass through
+                    }
+                    else if (logic.SplitForAppNodes.Find(n => n.FlowIn.Id == to) is StorySplitForAppNode split)
+                    {
+                        from = split.FlowOut.Id; // App page break — not a storage op, pass through
+                    }
+                    else if (logic.SetExternalVariableNodes.Find(n => n.FlowIn.Id == to) is StorySetExternalVariableNode se)
+                    {
+                        from = se.FlowOut.Id; // external-variable set — not a storage op, pass through
+                    }
+                    else if (logic.ConditionFlowNodes.Find(n => n.FlowIn.Id == to) is StoryConditionFlowNode cf)
+                    {
+                        if (EvaluateConditionFlow(project, logic, cf, values, target))
+                            Walk(cf.ConditionTrueOut.Id); // inject the block; it ends at the paired End node
+                        from = cf.ContinueOut.Id;         // then always continue
+                    }
+                    else
+                    {
+                        break; // reached the Exit node, an End-condition node, or a leaf input
+                    }
                 }
             }
+
+            Walk(logic.EntryPoint.Id);
 
             // Then append storage nodes that aren't wired onto the chain at all — a node dropped inside a logic node
             // but left unwired still performs its operation when the story visits the node.

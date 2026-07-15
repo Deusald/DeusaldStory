@@ -151,32 +151,45 @@ namespace DeusaldStoryCommon
             StoryProject project, LocProject? localization, StoryLogicNode logic,
             IReadOnlyDictionary<Guid, string> values, StoryRenderTarget renderTarget, List<string> errors)
         {
-            List<RenderedBlock> blocks = new();
-            Guid                target = FlowTargetOf(logic, logic.EntryPoint.Id);
+            List<RenderedBlock> blocks  = new();
+            HashSet<Guid>       visited = new(); // flow-in points already walked (cycle guard; also bounds condition recursion)
 
-            for (int guard = 0; guard < 256; ++guard)
+            // A Condition node detours into its "condition true" block (up to the paired End node) when the condition
+            // holds, then continues from its "continue" output. Recursion handles nesting; the shared visited set stops cycles.
+            void Walk(Guid target)
             {
-                if (logic.FlowTextNodes.Find(n => n.FlowIn.Id == target) is StoryFlowTextNode ft)
+                for (int guard = 0; guard < 256; ++guard)
                 {
-                    bool renderHere = renderTarget == StoryRenderTarget.App ? ft.RenderInApp : ft.RenderInGamebook;
-                    if (renderHere)
-                        blocks.Add(new RenderedBlock(ResolveText(project, localization, logic, values, FromPointInto(logic, ft.TextIn.Id), renderTarget, 0, errors), ft.FrameStyle));
-                    target = FlowTargetOf(logic, ft.FlowOut.Id);
+                    if (target == Guid.Empty || !visited.Add(target)) break;
+                    if (logic.FlowTextNodes.Find(n => n.FlowIn.Id == target) is StoryFlowTextNode ft)
+                    {
+                        bool renderHere = renderTarget == StoryRenderTarget.App ? ft.RenderInApp : ft.RenderInGamebook;
+                        if (renderHere)
+                            blocks.Add(new RenderedBlock(ResolveText(project, localization, logic, values, FromPointInto(logic, ft.TextIn.Id), renderTarget, 0, errors), ft.FrameStyle));
+                        target = FlowTargetOf(logic, ft.FlowOut.Id);
+                    }
+                    else if (logic.SplitForAppNodes.Find(n => n.FlowIn.Id == target) is StorySplitForAppNode split)
+                        target = FlowTargetOf(logic, split.FlowOut.Id);
+                    else if (logic.SetExternalVariableNodes.Find(n => n.FlowIn.Id == target) is StorySetExternalVariableNode se)
+                        target = FlowTargetOf(logic, se.FlowOut.Id);
+                    else if (logic.RegisterVariableNodes.Find(n => n.FlowIn.Id == target) is StoryRegisterVariableNode reg)
+                        target = FlowTargetOf(logic, reg.FlowOut.Id);
+                    else if (logic.SetVariableNodes.Find(n => n.FlowIn.Id == target) is StorySetVariableNode set)
+                        target = FlowTargetOf(logic, set.FlowOut.Id);
+                    else if (logic.UnregisterVariableNodes.Find(n => n.FlowIn.Id == target) is StoryUnregisterVariableNode unreg)
+                        target = FlowTargetOf(logic, unreg.FlowOut.Id);
+                    else if (logic.ConditionFlowNodes.Find(n => n.FlowIn.Id == target) is StoryConditionFlowNode cf)
+                    {
+                        if (StoryLogicFlow.EvaluateConditionFlow(project, logic, cf, values, renderTarget))
+                            Walk(FlowTargetOf(logic, cf.ConditionTrueOut.Id));
+                        target = FlowTargetOf(logic, cf.ContinueOut.Id);
+                    }
+                    else
+                        break; // reached the Exit node's LFlow input, an End-condition node, or a leaf
                 }
-                else if (logic.SplitForAppNodes.Find(n => n.FlowIn.Id == target) is StorySplitForAppNode split)
-                    target = FlowTargetOf(logic, split.FlowOut.Id);
-                else if (logic.SetExternalVariableNodes.Find(n => n.FlowIn.Id == target) is StorySetExternalVariableNode se)
-                    target = FlowTargetOf(logic, se.FlowOut.Id);
-                else if (logic.RegisterVariableNodes.Find(n => n.FlowIn.Id == target) is StoryRegisterVariableNode reg)
-                    target = FlowTargetOf(logic, reg.FlowOut.Id);
-                else if (logic.SetVariableNodes.Find(n => n.FlowIn.Id == target) is StorySetVariableNode set)
-                    target = FlowTargetOf(logic, set.FlowOut.Id);
-                else if (logic.UnregisterVariableNodes.Find(n => n.FlowIn.Id == target) is StoryUnregisterVariableNode unreg)
-                    target = FlowTargetOf(logic, unreg.FlowOut.Id);
-                else
-                    break; // reached the Exit node's LFlow input or a leaf
             }
 
+            Walk(FlowTargetOf(logic, logic.EntryPoint.Id));
             return blocks;
         }
 
@@ -193,7 +206,7 @@ namespace DeusaldStoryCommon
         {
             List<RenderedPage> pages   = new() { new() };
             HashSet<Guid>      visited = new(); // storage nodes already emitted on the spine
-            Guid               target  = FlowTargetOf(logic, logic.EntryPoint.Id);
+            HashSet<Guid>      seen    = new(); // flow-in points already walked (cycle guard; also bounds condition recursion)
 
             void AddInput(RenderedPage page, StorageInstruction? entry)
             {
@@ -201,42 +214,56 @@ namespace DeusaldStoryCommon
                 (entry.Placement == StorageInstructionPlacement.Above ? page.Above : page.Below).Add(entry);
             }
 
-            for (int guard = 0; guard < 256; ++guard)
+            // A Condition node detours into its "condition true" block (up to the paired End node) when the condition
+            // holds, then continues from its "continue" output; a Split inside the block still breaks the App into pages.
+            void Walk(Guid target)
             {
-                RenderedPage page = pages[^1];
-                if (logic.FlowTextNodes.Find(n => n.FlowIn.Id == target) is StoryFlowTextNode ft)
+                for (int guard = 0; guard < 256; ++guard)
                 {
-                    if (ft.RenderInApp)
-                        page.Blocks.Add(new RenderedBlock(ResolveText(project, localization, logic, values, FromPointInto(logic, ft.TextIn.Id), StoryRenderTarget.App, 0, errors), ft.FrameStyle));
-                    target = FlowTargetOf(logic, ft.FlowOut.Id);
+                    if (target == Guid.Empty || !seen.Add(target)) break;
+                    RenderedPage page = pages[^1];
+                    if (logic.FlowTextNodes.Find(n => n.FlowIn.Id == target) is StoryFlowTextNode ft)
+                    {
+                        if (ft.RenderInApp)
+                            page.Blocks.Add(new RenderedBlock(ResolveText(project, localization, logic, values, FromPointInto(logic, ft.TextIn.Id), StoryRenderTarget.App, 0, errors), ft.FrameStyle));
+                        target = FlowTargetOf(logic, ft.FlowOut.Id);
+                    }
+                    else if (logic.SplitForAppNodes.Find(n => n.FlowIn.Id == target) is StorySplitForAppNode split)
+                    {
+                        pages.Add(new());
+                        target = FlowTargetOf(logic, split.FlowOut.Id);
+                    }
+                    else if (logic.RegisterVariableNodes.Find(n => n.FlowIn.Id == target) is StoryRegisterVariableNode reg)
+                    {
+                        AddInput(page, StoryStorageInstructions.ForOp(project, localization, logic, new StorageOp { Kind = StorageOpKind.Register, Register = reg }, StoryRenderTarget.App));
+                        visited.Add(reg.Id);
+                        target = FlowTargetOf(logic, reg.FlowOut.Id);
+                    }
+                    else if (logic.SetVariableNodes.Find(n => n.FlowIn.Id == target) is StorySetVariableNode set)
+                    {
+                        AddInput(page, StoryStorageInstructions.ForOp(project, localization, logic, new StorageOp { Kind = StorageOpKind.Set, Set = set }, StoryRenderTarget.App));
+                        visited.Add(set.Id);
+                        target = FlowTargetOf(logic, set.FlowOut.Id);
+                    }
+                    else if (logic.UnregisterVariableNodes.Find(n => n.FlowIn.Id == target) is StoryUnregisterVariableNode unreg)
+                    {
+                        visited.Add(unreg.Id); // the App drops the value silently — no input field
+                        target = FlowTargetOf(logic, unreg.FlowOut.Id);
+                    }
+                    else if (logic.SetExternalVariableNodes.Find(n => n.FlowIn.Id == target) is StorySetExternalVariableNode se)
+                        target = FlowTargetOf(logic, se.FlowOut.Id);
+                    else if (logic.ConditionFlowNodes.Find(n => n.FlowIn.Id == target) is StoryConditionFlowNode cf)
+                    {
+                        if (StoryLogicFlow.EvaluateConditionFlow(project, logic, cf, values, StoryRenderTarget.App))
+                            Walk(FlowTargetOf(logic, cf.ConditionTrueOut.Id));
+                        target = FlowTargetOf(logic, cf.ContinueOut.Id);
+                    }
+                    else
+                        break; // reached the Exit node's LFlow input, an End-condition node, or a leaf
                 }
-                else if (logic.SplitForAppNodes.Find(n => n.FlowIn.Id == target) is StorySplitForAppNode split)
-                {
-                    pages.Add(new());
-                    target = FlowTargetOf(logic, split.FlowOut.Id);
-                }
-                else if (logic.RegisterVariableNodes.Find(n => n.FlowIn.Id == target) is StoryRegisterVariableNode reg)
-                {
-                    AddInput(page, StoryStorageInstructions.ForOp(project, localization, logic, new StorageOp { Kind = StorageOpKind.Register, Register = reg }, StoryRenderTarget.App));
-                    visited.Add(reg.Id);
-                    target = FlowTargetOf(logic, reg.FlowOut.Id);
-                }
-                else if (logic.SetVariableNodes.Find(n => n.FlowIn.Id == target) is StorySetVariableNode set)
-                {
-                    AddInput(page, StoryStorageInstructions.ForOp(project, localization, logic, new StorageOp { Kind = StorageOpKind.Set, Set = set }, StoryRenderTarget.App));
-                    visited.Add(set.Id);
-                    target = FlowTargetOf(logic, set.FlowOut.Id);
-                }
-                else if (logic.UnregisterVariableNodes.Find(n => n.FlowIn.Id == target) is StoryUnregisterVariableNode unreg)
-                {
-                    visited.Add(unreg.Id); // the App drops the value silently — no input field
-                    target = FlowTargetOf(logic, unreg.FlowOut.Id);
-                }
-                else if (logic.SetExternalVariableNodes.Find(n => n.FlowIn.Id == target) is StorySetExternalVariableNode se)
-                    target = FlowTargetOf(logic, se.FlowOut.Id);
-                else
-                    break; // reached the Exit node's LFlow input or a leaf
             }
+
+            Walk(FlowTargetOf(logic, logic.EntryPoint.Id));
 
             // Storage nodes dropped in but left unwired still run when the story visits the node — surface their input
             // on the last page (they have no flow position of their own). Mirrors StoryLogicFlow's unwired-tail append.

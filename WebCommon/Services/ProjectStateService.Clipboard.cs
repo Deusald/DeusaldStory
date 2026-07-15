@@ -111,6 +111,17 @@ public partial class ProjectStateService
                 continue;
             }
 
+            if (model is StoryConditionFlowNode cflow)
+            {
+                StoryConditionFlowNode clone = CloneEntity(cflow);
+                clone.EndId = Guid.NewGuid(); // the End card's id isn't an "Id" property, so mint it fresh to avoid a collision
+                clone.X    += dx; clone.Y    += dy;
+                clone.EndX += dx; clone.EndY += dy;
+                logic.ConditionFlowNodes.Add(clone);
+                pasted.Add(clone.Id);
+                continue;
+            }
+
             object cloneObj = CloneEntity(model);
             OffsetXY(cloneObj, dx, dy);
             AddCloneToLogic(logic, cloneObj);
@@ -151,6 +162,7 @@ public partial class ProjectStateService
             ?? logic.SetVariableNodes.Find(n => n.Id == edId)
             ?? logic.UnregisterVariableNodes.Find(n => n.Id == edId)
             ?? logic.SetExternalVariableNodes.Find(n => n.Id == edId)
+            ?? logic.ConditionFlowNodes.Find(n => n.Id == edId || n.EndId == edId)
             ?? (object?)logic.CommentNodes.Find(n => n.Id == edId);
         return found ?? FindLogicPortalByPoint(logic, edId);
     }

@@ -39,6 +39,7 @@ namespace DeusaldStoryCommon
 
             CheckDanglingOutputs(project, problems);
             CheckChoices(project, problems);
+            CheckConditionFlows(project, problems);
             CheckGamebookText(project, localization, problems);
             CheckVariableBalance(project, lk, regById, localization, problems,
                 out Dictionary<Guid, HashSet<Guid>> entryActive, out HashSet<Guid> endActive);
@@ -172,6 +173,38 @@ namespace DeusaldStoryCommon
                             if (c.VariableValues.Find(v => v.DeclaredVarId == dv.Id) is null)
                                 problems.Add(Node(logic, $"Choice '{NodeName(c.Name)}' in '{NodeName(logic.Name)}' has no value for variable '{NodeName(dv.Name)}'."));
             }
+        }
+
+        /// <summary>
+        /// Validates each logic node's Condition nodes: every variable wired into a Condition's Variables input must be
+        /// a <b>constant</b> source, so the branch resolves the same in the App and the printed Gamebook (a live
+        /// variable would be unknown in print / would dimension sections). The condition's structure is edited via the
+        /// modal and needs no further check here.
+        /// </summary>
+        private static void CheckConditionFlows(StoryProject project, List<StoryProblem> problems)
+        {
+            foreach (StoryLogicNode logic in project.LogicNodes.Values)
+                foreach (StoryConditionFlowNode cf in logic.ConditionFlowNodes)
+                    foreach (StoryConnection c in logic.ContentConnections.Where(c => c.ToPoint == cf.VariablesIn.Id))
+                        if (!IsConstantSource(project, logic, c.FromPoint))
+                            problems.Add(Inner(logic, cf.Id,
+                                $"Condition '{NodeName(cf.Name)}' in '{NodeName(logic.Name)}' uses a non-constant variable — only constant variables are allowed so the block renders the same in the App and the Gamebook."));
+        }
+
+        /// <summary>Whether the output wired at <paramref name="fromPoint"/> (resolved through any portal) is a constant value source.</summary>
+        private static bool IsConstantSource(StoryProject project, StoryLogicNode logic, Guid fromPoint)
+        {
+            Guid src = logic.ResolvePortalSource(fromPoint);
+            if (logic.ConstantVariableNodes.Exists(n => n.OutPoint.Id == src)) return true;
+            if (logic.GetVariableNodes.Exists(n => n.SlotOutPoint.Id == src)) return true; // Gamebook slot tag — constant
+            if (logic.ExternalVariableNodes.Find(n => n.OutPoint.Id == src) is StoryExternalVariableNode ev)
+            {
+                StoryVariable? v = StoryBuiltInVariables.Find(ev.SelectedVariableId)
+                    ?? (project.Variables.TryGetValue(ev.SelectedVariableId, out StoryVariable? found) ? found : null);
+                return v is not null && (v.IsConstant || StoryBuiltInVariables.IsBuiltIn(v.Id));
+            }
+            // Prev Exit / incoming declared variables are exposed as constants inside the node.
+            return StorySelectionResolver.IncomingVariables(project, logic).Exists(d => d.Id == src);
         }
 
         /// <summary>Reports SmartFormat render failures in each node's Gamebook text (e.g. a plain Variable unavailable in the Gamebook).</summary>

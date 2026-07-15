@@ -96,6 +96,8 @@ namespace DeusaldStoryWeb
         PrevExitVariable,        // inside a logic node: exposes the upstream node's declared variables as constants (teal)
         LogicPortalIn,           // inside a logic node: a value portal's single input node (Text/Icon/Variable arrives here) (orange)
         LogicPortalOut,          // inside a logic node: a value portal's output node (the value re-emerges here) (orange)
+        ConditionFlow,           // inside a logic node: on the LFlow chain, injects an optional block of flow gated by a constant condition (pink)
+        EndConditionFlow,        // inside a logic node: the paired terminator that closes a Condition node's injected block (pink)
         Comment                  // in a container's graph or a logic node's inner graph: a free-text author note, no ports (dim)
     }
 
@@ -692,6 +694,43 @@ namespace DeusaldStoryWeb
                 }
             }
 
+            // ── Condition-flow pairs (pink) — one object → two cards. The Condition card sits on the flow spine
+            //    (Flow in → Continue out) and injects an optional block out its "Condition true" output up to the
+            //    paired End condition card (Flow in only), which terminates the injected block. ──
+            foreach (StoryConditionFlowNode cf in logic.ConditionFlowNodes)
+            {
+                EdNode condition = new()
+                {
+                    Id        = cf.Id,
+                    Kind      = StoryNodeKind.ConditionFlow,
+                    Title     = string.IsNullOrWhiteSpace(cf.Name) ? "Condition" : cf.Name,
+                    Subtitle  = cf.Negate ? "negated" : "",
+                    X         = cf.X,
+                    Y         = cf.Y,
+                    Deletable = true,
+                    Editable  = true
+                };
+                condition.Inputs.Add(new EdPort { Id = cf.FlowIn.Id, Name = "Flow", Type = PortType.LFlow });
+                condition.Inputs.Add(new EdPort { Id = cf.VariablesIn.Id, Name = "Variables", Type = PortType.Variable });
+                condition.Outputs.Add(new EdPort { Id = cf.ContinueOut.Id, Name = "Continue", Type = PortType.LFlow });
+                condition.Outputs.Add(new EdPort { Id = cf.ConditionTrueOut.Id, Name = "Condition true", Type = PortType.LFlow });
+                nodes.Add(condition);
+
+                EdNode end = new()
+                {
+                    Id        = cf.EndId,
+                    Kind      = StoryNodeKind.EndConditionFlow,
+                    Title     = string.IsNullOrWhiteSpace(cf.Name) ? "End condition" : cf.Name,
+                    Subtitle  = "",
+                    X         = cf.EndX,
+                    Y         = cf.EndY,
+                    Deletable = true,
+                    Editable  = false
+                };
+                end.Inputs.Add(new EdPort { Id = cf.EndFlowIn.Id, Name = "Flow", Type = PortType.LFlow });
+                nodes.Add(end);
+            }
+
             // ── Comment notes (dim, portless) — free-text author notes; ignored during playback. ──
             foreach (StoryCommentNode comment in logic.CommentNodes)
                 nodes.Add(BuildCommentNode(comment));
@@ -711,7 +750,7 @@ namespace DeusaldStoryWeb
         }
 
         /// <summary>The port type of an inner-graph output point (Text/Icon/Variable/Constant), or null when it names no known output.</summary>
-        private static PortType? PortTypeOfOutput(StoryProject project, StoryLogicNode logic, Guid outputId)
+        public static PortType? PortTypeOfOutput(StoryProject project, StoryLogicNode logic, Guid outputId)
         {
             if (outputId == Guid.Empty) return null;
 
@@ -864,6 +903,8 @@ namespace DeusaldStoryWeb
             StoryNodeKind.PrevExitVariable        => "PREV EXIT VARIABLES",
             StoryNodeKind.LogicPortalIn           => "PORTAL IN",
             StoryNodeKind.LogicPortalOut          => "PORTAL OUT",
+            StoryNodeKind.ConditionFlow           => "CONDITION",
+            StoryNodeKind.EndConditionFlow        => "END CONDITION",
             StoryNodeKind.Comment                 => "COMMENT",
             _                       => ""
         };
@@ -912,6 +953,8 @@ namespace DeusaldStoryWeb
             StoryNodeKind.PrevExitVariable        => "bi-braces",
             StoryNodeKind.LogicPortalIn           => "bi-box-arrow-in-right",
             StoryNodeKind.LogicPortalOut          => "bi-box-arrow-right",
+            StoryNodeKind.ConditionFlow           => "bi-signpost-split",
+            StoryNodeKind.EndConditionFlow        => "bi-sign-merge-left",
             StoryNodeKind.Comment                 => "bi-chat-left-text",
             _                       => "bi-circle"
         };
@@ -976,6 +1019,8 @@ namespace DeusaldStoryWeb
             StoryNodeKind.PrevExitVariable        => "var(--code-func)",
             StoryNodeKind.LogicPortalIn           => "var(--orange)",
             StoryNodeKind.LogicPortalOut          => "var(--orange)",
+            StoryNodeKind.ConditionFlow           => "var(--pink)",
+            StoryNodeKind.EndConditionFlow        => "var(--pink)",
             StoryNodeKind.Comment                 => "var(--text-dim)",
             _                       => "var(--text-dim)"
         };

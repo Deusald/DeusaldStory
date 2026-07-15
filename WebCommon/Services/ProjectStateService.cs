@@ -711,6 +711,66 @@ public partial class ProjectStateService(
     public StoryLogicPortalNode? FindLogicPortalByPoint(StoryLogicNode logic, Guid pointId) =>
         logic.LogicPortalNodes.Find(p => p.InPoint.Id == pointId || p.OutPoints.Exists(o => o.Id == pointId));
 
+    // ── Condition-flow pairs (inner-graph optional flow blocks) ──────────────
+
+    /// <summary>
+    /// Adds a condition-flow pair to a logic node's inner graph: a <b>Condition</b> card at
+    /// (<paramref name="x"/>, <paramref name="y"/>) and its paired <b>End condition</b> card offset to the right. The
+    /// Condition card sits on the flow spine and injects the block wired from its "condition true" output (up to the
+    /// End card) whenever its condition holds. Returns the created pair, or null when the logic node is unknown.
+    /// </summary>
+    public StoryConditionFlowNode? AddConditionFlowNode(Guid logicId, double x, double y)
+    {
+        if (!CurrentProject!.LogicNodes.TryGetValue(logicId, out StoryLogicNode? logic)) return null;
+
+        StoryConditionFlowNode node = new()
+        {
+            Name = $"Condition {logic.ConditionFlowNodes.Count + 1}",
+            X    = x,
+            Y    = y,
+            EndX = x + _PORTAL_PAIR_GAP,
+            EndY = y
+        };
+        logic.ConditionFlowNodes.Add(node);
+        MarkKeyDirty(logicId);
+        return node;
+    }
+
+    /// <summary>Updates a condition-flow node's name, condition expression and negate flag (its point ids are preserved so wires survive).</summary>
+    public void UpdateConditionFlowNode(Guid logicId, Guid nodeId, string name, StoryConditionExpr condition, bool negate)
+    {
+        if (!CurrentProject!.LogicNodes.TryGetValue(logicId, out StoryLogicNode? logic)) return;
+        StoryConditionFlowNode? node = logic.ConditionFlowNodes.Find(n => n.Id == nodeId);
+        if (node is null) return;
+        node.Name      = name;
+        node.Condition = condition;
+        node.Negate    = negate;
+        MarkKeyDirty(logicId);
+    }
+
+    /// <summary>
+    /// Deletes a whole condition-flow pair (identified by either card's id — its <see cref="StoryConditionFlowNode.Id"/>
+    /// or <see cref="StoryConditionFlowNode.EndId"/>) and every inner wire that touched any of its five ports.
+    /// </summary>
+    public void DeleteConditionFlowNode(Guid logicId, Guid anyId)
+    {
+        if (!CurrentProject!.LogicNodes.TryGetValue(logicId, out StoryLogicNode? logic)) return;
+        StoryConditionFlowNode? node = FindConditionFlowByAnyId(logic, anyId);
+        if (node is null) return;
+
+        HashSet<Guid> points = new()
+        {
+            node.FlowIn.Id, node.VariablesIn.Id, node.ContinueOut.Id, node.ConditionTrueOut.Id, node.EndFlowIn.Id
+        };
+        logic.ConditionFlowNodes.Remove(node);
+        logic.ContentConnections.RemoveAll(c => points.Contains(c.FromPoint) || points.Contains(c.ToPoint));
+        MarkKeyDirty(logicId);
+    }
+
+    /// <summary>The condition-flow pair in <paramref name="logic"/> whose Condition or End card carries <paramref name="anyId"/>, or null.</summary>
+    public StoryConditionFlowNode? FindConditionFlowByAnyId(StoryLogicNode logic, Guid anyId) =>
+        logic.ConditionFlowNodes.Find(n => n.Id == anyId || n.EndId == anyId);
+
     // ── Comment notes ──────────────────────────────────────────────────────
     // A comment lives either in a container's graph or in a logic node's inner graph; the owner id resolves to
     // whichever exists. Comments have no ports, so there are never wires to clean up on delete.
@@ -1027,9 +1087,10 @@ public partial class ProjectStateService(
         if (!CurrentProject!.LogicNodes.TryGetValue(logicId, out StoryLogicNode? logic)) return null;
         if (logic.ContentConnections.Exists(c => c.FromPoint == fromPoint && c.ToPoint == toPoint)) return null;
 
-        // The variables inputs (SmartFormat, the Exit node's auto-resolution) aggregate many variable outputs.
+        // The variables inputs (SmartFormat, the Exit node's auto-resolution, a Condition node's operands) aggregate many variable outputs.
         bool multiInput  = logic.SmartFormatNodes.Exists(sf => sf.VariablesIn.Id == toPoint)
-                        || logic.ExitVariablesIn.Id == toPoint;
+                        || logic.ExitVariablesIn.Id == toPoint
+                        || logic.ConditionFlowNodes.Exists(cf => cf.VariablesIn.Id == toPoint);
         // Every non-flow content output is one-in-many-out — it keeps all its wires:
         //   Text  : Localization / SmartFormat
         //   Icon  : Icon / LightDarkSwitch
@@ -1222,6 +1283,16 @@ public partial class ProjectStateService(
                 MarkKeyDirty(logicId);
                 return;
             }
+        }
+
+        // A condition-flow card moved — the Condition card lives on X/Y, the paired End card on EndX/EndY.
+        StoryConditionFlowNode? cf = logic.ConditionFlowNodes.Find(n => n.Id == movedId || n.EndId == movedId);
+        if (cf is not null)
+        {
+            if (cf.Id == movedId) { cf.X    = x; cf.Y    = y; }
+            else                  { cf.EndX = x; cf.EndY = y; }
+            MarkKeyDirty(logicId);
+            return;
         }
     }
 
@@ -1582,6 +1653,14 @@ public partial class ProjectStateService(
         {
             valid.Add(n.InPoint.Id);
             foreach (StoryConnectionPoint o in n.OutPoints) valid.Add(o.Id);
+        }
+        foreach (StoryConditionFlowNode n in logic.ConditionFlowNodes)
+        {
+            valid.Add(n.FlowIn.Id);
+            valid.Add(n.VariablesIn.Id);
+            valid.Add(n.ContinueOut.Id);
+            valid.Add(n.ConditionTrueOut.Id);
+            valid.Add(n.EndFlowIn.Id);
         }
 
         logic.ContentConnections.RemoveAll(c => !valid.Contains(c.FromPoint) || !valid.Contains(c.ToPoint));
