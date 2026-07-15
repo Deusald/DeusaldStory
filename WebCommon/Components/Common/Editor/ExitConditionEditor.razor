@@ -40,7 +40,6 @@ else
 {
     <div class="ece-cmp">
         <select class="modal-input ece-var" value="@Expr.LeftVariableRef" @onchange="e => SetLeft(e.Value?.ToString())">
-            <option value="@Guid.Empty">(variable)</option>
             @foreach ((Guid id, string name) in Vars)
             {
                 <option value="@id">@name</option>
@@ -57,7 +56,6 @@ else
         @if (Expr.RightKind == StoryConditionOperandKind.Variable)
         {
             <select class="modal-input ece-var" value="@Expr.RightVariableRef" @onchange="e => SetRightVar(e.Value?.ToString())">
-                <option value="@Guid.Empty">(variable)</option>
                 @foreach ((Guid id, string name) in Vars)
                 {
                     <option value="@id">@name</option>
@@ -91,9 +89,11 @@ else
 
     private void SetConnector(StoryBoolConnector c) { Expr.Connector = c; Changed(); }
 
+    private Guid FirstVar => Vars.Count > 0 ? Vars[0].Id : Guid.Empty;
+
     private void AddComparison()
     {
-        Expr.Children.Add(new StoryConditionExpr { Kind = StoryConditionExprKind.Comparison });
+        Expr.Children.Add(new StoryConditionExpr { Kind = StoryConditionExprKind.Comparison, LeftVariableRef = FirstVar });
         Changed();
     }
 
@@ -116,9 +116,13 @@ else
 
     private void ToggleRhs()
     {
-        Expr.RightKind = Expr.RightKind == StoryConditionOperandKind.Variable
-            ? StoryConditionOperandKind.Constant
-            : StoryConditionOperandKind.Variable;
+        if (Expr.RightKind == StoryConditionOperandKind.Variable)
+            Expr.RightKind = StoryConditionOperandKind.Constant;
+        else
+        {
+            Expr.RightKind = StoryConditionOperandKind.Variable;
+            if (Expr.RightVariableRef == Guid.Empty) Expr.RightVariableRef = FirstVar;
+        }
         Changed();
     }
 }

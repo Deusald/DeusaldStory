@@ -40,13 +40,17 @@
     min-width: 0;
 }
 
-.enm-else {
+.enm-else-tag {
     flex: 0 0 auto;
     display: inline-flex;
     align-items: center;
-    gap: 0.3rem;
-    font-size: 0.85rem;
-    cursor: pointer;
+    padding: 0.1rem 0.45rem;
+    border-radius: 0.35rem;
+    background: var(--accent);
+    color: #fff;
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.03em;
 }
 
 .enm-del {
