@@ -22,5 +22,11 @@ namespace DeusaldStoryCommon
 
         /// <summary>Flow output — wired to the next FlowText's <see cref="FlowIn"/> or an Exit.</summary>
         public StoryConnectionPoint FlowOut { get; set; } = new() { Name = "Flow" };
+
+        /// <summary>When <c>false</c>, this block's text is skipped while rendering the interactive <b>App</b> (flow still passes through). Default <c>true</c>.</summary>
+        public bool RenderInApp { get; set; } = true;
+
+        /// <summary>When <c>false</c>, this block's text is skipped while rendering the printed <b>Gamebook</b> (flow still passes through). Default <c>true</c>.</summary>
+        public bool RenderInGamebook { get; set; } = true;
     }
 }

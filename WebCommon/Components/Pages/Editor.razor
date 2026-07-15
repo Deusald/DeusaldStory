@@ -149,6 +149,7 @@
 <SetExternalVariableModal  @ref="_SetExternalVariableModal" OnConfirm="OnSetExternalVariableConfirmed"/>
 <ExitNodeModal             @ref="_ExitNodeModal"            OnConfirm="OnExitNodeConfirmed"/>
 <NewCommentNodeModal       @ref="_NewCommentNodeModal"      OnConfirm="OnCommentConfirmed"/>
+<FlowTextOptionsModal      @ref="_FlowTextOptionsModal"     OnConfirm="OnFlowTextConfirmed"/>
 
 @code {
     private EditorMode        _Mode = EditorMode.Edit;
@@ -173,6 +174,7 @@
     private SetExternalVariableModal?  _SetExternalVariableModal;
     private ExitNodeModal?             _ExitNodeModal;
     private NewCommentNodeModal?       _NewCommentNodeModal;
+    private FlowTextOptionsModal?      _FlowTextOptionsModal;
 
     // Where the next created node is placed — the right-clicked canvas point (or a staggered default).
     private double _PendingX;
@@ -516,6 +518,12 @@
         RebuildNodes();
     }
 
+    private void OnFlowTextConfirmed(FlowTextOptionsModal.FlowTextArgs args)
+    {
+        _ProjectState.UpdateFlowTextNode(_CurrentId, args.EditNodeId, args.RenderInApp, args.RenderInGamebook);
+        RebuildNodes();
+    }
+
     /// <summary>The comment note with <paramref name="id"/> in the current graph (container graph or logic inner graph).</summary>
     private StoryCommentNode? FindComment(Guid id) =>
         _InLogic
@@ -848,6 +856,11 @@
             case StoryNodeKind.LogicExit:
                 if (_CurrentLogicNode is StoryLogicNode exitOwner)
                     _ExitNodeModal?.ShowEdit(exitOwner, AvailableExitVariables(exitOwner));
+                break;
+
+            case StoryNodeKind.FlowText:
+                if (_CurrentLogicNode?.FlowTextNodes.Find(n => n.Id == node.Id) is StoryFlowTextNode ftEdit)
+                    _FlowTextOptionsModal?.ShowEdit(ftEdit);
                 break;
 
             case StoryNodeKind.Comment:

@@ -116,7 +116,9 @@ namespace DeusaldStoryCommon
             {
                 if (logic.FlowTextNodes.Find(n => n.FlowIn.Id == target) is StoryFlowTextNode ft)
                 {
-                    blocks.Add(ResolveText(project, localization, logic, values, FromPointInto(logic, ft.TextIn.Id), renderTarget, 0, errors));
+                    bool renderHere = renderTarget == StoryRenderTarget.App ? ft.RenderInApp : ft.RenderInGamebook;
+                    if (renderHere)
+                        blocks.Add(ResolveText(project, localization, logic, values, FromPointInto(logic, ft.TextIn.Id), renderTarget, 0, errors));
                     target = FlowTargetOf(logic, ft.FlowOut.Id);
                 }
                 else if (logic.SetExternalVariableNodes.Find(n => n.FlowIn.Id == target) is StorySetExternalVariableNode se)

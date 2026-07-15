@@ -503,10 +503,11 @@ namespace DeusaldStoryWeb
                     Id        = ft.Id,
                     Kind      = StoryNodeKind.FlowText,
                     Title     = "FlowText",
+                    Subtitle  = FlowTextMediumLabel(ft),
                     X         = ft.X,
                     Y         = ft.Y,
                     Deletable = true,
-                    Editable  = false
+                    Editable  = true
                 };
                 node.Inputs.Add(new EdPort { Id = ft.FlowIn.Id, Name = "Flow", Type = PortType.LFlow });
                 node.Inputs.Add(new EdPort { Id = ft.TextIn.Id, Name = "Text", Type = PortType.Text });
@@ -657,6 +658,16 @@ namespace DeusaldStoryWeb
         /// <summary>A registered variable's display name, falling back to a placeholder when unnamed.</summary>
         private static string NameOf(StoryRegisterVariableNode reg) =>
             string.IsNullOrWhiteSpace(reg.Name) ? "(unnamed variable)" : reg.Name;
+
+        /// <summary>Subtitle flagging a FlowText block that is limited to one medium (or renders in neither); null when it renders in both.</summary>
+        private static string? FlowTextMediumLabel(StoryFlowTextNode ft) =>
+            (ft.RenderInApp, ft.RenderInGamebook) switch
+            {
+                (true,  true)  => null,
+                (true,  false) => "App only",
+                (false, true)  => "Gamebook only",
+                (false, false) => "Not rendered"
+            };
 
         /// <summary>Projects a logic node's inner content connections into canvas edges.</summary>
         public static List<EdEdge> BuildLogicEdges(StoryLogicNode logic) =>

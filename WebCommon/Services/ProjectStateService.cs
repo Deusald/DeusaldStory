@@ -570,6 +570,18 @@ public partial class ProjectStateService(
         return node;
     }
 
+    /// <summary>Updates a FlowText node's per-medium render flags (whether its text renders in the App / Gamebook).</summary>
+    public void UpdateFlowTextNode(Guid logicId, Guid nodeId, bool renderInApp, bool renderInGamebook)
+    {
+        if (!CurrentProject!.LogicNodes.TryGetValue(logicId, out StoryLogicNode? logic)) return;
+        StoryFlowTextNode? node = logic.FlowTextNodes.Find(n => n.Id == nodeId);
+        if (node is null) return;
+
+        node.RenderInApp      = renderInApp;
+        node.RenderInGamebook = renderInGamebook;
+        MarkKeyDirty(logicId);
+    }
+
     /// <summary>Deletes a FlowText node and any inner wire that touched its flow or text ports.</summary>
     public void DeleteFlowTextNode(Guid logicId, Guid nodeId)
     {
