@@ -226,12 +226,14 @@ public partial class ProjectStateService
     }
 
     /// <summary>Serialises <paramref name="entity"/> and rewrites every mapped id, returning a fresh deserialized copy.</summary>
-    private static T RemapClone<T>(T entity, IReadOnlyDictionary<Guid, Guid> map)
+    private static T RemapClone<T>(T entity, IReadOnlyDictionary<Guid, Guid> map) where T : notnull
     {
         string json = JsonConvert.SerializeObject(entity, _HistoryJson);
         foreach (KeyValuePair<Guid, Guid> kv in map)
             json = json.Replace(kv.Key.ToString(), kv.Value.ToString());
-        return JsonConvert.DeserializeObject<T>(json, _HistoryJson)!;
+        // Deserialize to the entity's runtime type, not T: inner-node paste clones through a static `object`, and
+        // JsonConvert.DeserializeObject<object> would hand back a JObject instead of the concrete node.
+        return (T)JsonConvert.DeserializeObject(json, entity.GetType(), _HistoryJson)!;
     }
 
     /// <summary>

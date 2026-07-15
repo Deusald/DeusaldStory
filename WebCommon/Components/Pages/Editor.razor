@@ -51,7 +51,8 @@
                     <EditorGraph @ref="_GraphRef"
                                  Nodes="_Nodes"
                                  Edges="_Edges"
-                                 InitialViewport="ViewportForCurrentGraph"
+                                 GraphId="_CurrentId"
+                                 InitialViewport="_ViewCurrent"
                                  SelectedId="_SelectedId"
                                  SelectedChanged="OnSelect"
                                  OnAddNode="OnAddNode"
@@ -163,12 +164,18 @@
     private EditorRail.Tool   _ActiveTool = EditorRail.Tool.Graph;
     private Guid              _SelectedId;
 
-    private EditorGraph?   _GraphRef;           // the live graph (present only in Edit mode)
-    private GraphViewport? _SavedViewport;      // its pan/zoom, kept across a preview round-trip so returning reopens where it was left
-    private Guid           _SavedViewportGraphId; // which graph the saved viewport belongs to (preview can navigate elsewhere)
+    private EditorGraph? _GraphRef; // the live graph (present only in Edit mode)
 
-    /// <summary>The pan/zoom to reopen the graph at — only when it's the same graph the viewport was captured from.</summary>
-    private GraphViewport? ViewportForCurrentGraph => _SavedViewportGraphId == _CurrentId ? _SavedViewport : null;
+    // Viewport memory. We remember the pan/zoom of the graph currently shown (_ViewCurrent) and of exactly one
+    // graph before it (_ViewPrev). So toggling between two graphs (or Edit/Preview of the same graph) restores each,
+    // but stepping to a third graph and back to the older one reopens it at the default view — only the last-opened
+    // graph is remembered. A brand-new graph opens at DefaultViewport.
+    private static readonly GraphViewport DefaultViewport = new(24, 28, 1);
+
+    private Guid           _ViewGraphId = Guid.Empty;  // graph _ViewCurrent belongs to
+    private GraphViewport  _ViewCurrent = DefaultViewport;
+    private Guid           _ViewPrevId  = Guid.Empty;   // the one remembered previous graph
+    private GraphViewport? _ViewPrev;
     private List<EditorCrumb> _Crumbs = [];
     private List<EdNode>      _Nodes  = [];
     private List<EdEdge>      _Edges  = [];
@@ -269,6 +276,8 @@
     /// <summary>Re-projects the current location (a container's graph or a logic node's inner graph) into view models.</summary>
     private void RebuildNodes()
     {
+        SyncViewportOnNavigation();
+
         if (_Scope == EditorScope.Logic)
         {
             if (Project.LogicNodes.TryGetValue(_CurrentId, out StoryLogicNode? logic))
@@ -377,12 +386,28 @@
         _ActiveTool = tool;
     }
 
-    /// <summary>Snapshots the live graph's pan/zoom (and which graph it is) so a later re-mount can reopen where it was left.</summary>
+    /// <summary>Snapshots the live graph's pan/zoom so a later re-mount of the same graph (e.g. an Edit/Preview round-trip) reopens where it was left.</summary>
     private void CaptureViewport()
     {
-        if (_GraphRef is null) return;
-        _SavedViewport        = _GraphRef.CurrentViewport;
-        _SavedViewportGraphId = _CurrentId;
+        if (_GraphRef is not null) _ViewCurrent = _GraphRef.CurrentViewport;
+    }
+
+    /// <summary>
+    /// Called after a navigation may have changed which graph is shown. If it did, remember the graph we just left as
+    /// the single "previous" slot, then open the new graph where it was last left (only if it is that previous graph)
+    /// or at the default view. Reading <see cref="EditorGraph.CurrentViewport"/> first captures the outgoing graph's
+    /// latest pan (the graph card is still mounted at this point — the re-render happens after this returns).
+    /// </summary>
+    private void SyncViewportOnNavigation()
+    {
+        if (_CurrentId == _ViewGraphId) return; // same graph (an edit, not a navigation) — keep its viewport
+        if (_GraphRef is not null) _ViewCurrent = _GraphRef.CurrentViewport;
+
+        GraphViewport incoming = _CurrentId == _ViewPrevId && _ViewPrev is { } prev ? prev : DefaultViewport;
+        _ViewPrevId  = _ViewGraphId;
+        _ViewPrev    = _ViewCurrent;
+        _ViewGraphId = _CurrentId;
+        _ViewCurrent = incoming;
     }
 
     private void OnSelect(Guid id) => _SelectedId = id;

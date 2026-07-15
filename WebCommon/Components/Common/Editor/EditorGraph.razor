@@ -308,11 +308,16 @@
     /// <summary>Whether the editor's clipboard holds something pasteable into this graph — drives the canvas menu's Paste item.</summary>
     [Parameter] public bool CanPaste { get; set; }
 
-    /// <summary>The pan/zoom to open this graph at — set by the parent so a re-created graph (e.g. returning from preview) reopens where it was left. Null keeps the default view.</summary>
+    /// <summary>The id of the graph currently shown. When it changes, the card re-seeds its pan/zoom from <see cref="InitialViewport"/> (this same card is reused across drill-down / breadcrumb navigation).</summary>
+    [Parameter] public Guid GraphId { get; set; }
+
+    /// <summary>The pan/zoom to open the current <see cref="GraphId"/> at — set by the parent so each graph reopens where it was last left. Null keeps the default view.</summary>
     [Parameter] public GraphViewport? InitialViewport { get; set; }
 
     /// <summary>The graph's current pan/zoom — read by the parent before it swaps this graph out, so it can be restored later via <see cref="InitialViewport"/>.</summary>
     public GraphViewport CurrentViewport => new(_PanX, _PanY, _Scale);
+
+    private Guid _SeededGraphId; // the GraphId whose viewport we've applied; re-seed only when the shown graph actually changes
 
     // ── Node layout constants (must match the absolute positions in EditorGraph.razor.css) ──
     private const double NODE_W       = 216; // fixed card width
@@ -336,9 +341,12 @@
     private double _PanX  = 24;
     private double _PanY  = 28;
 
-    protected override void OnInitialized()
+    protected override void OnParametersSet()
     {
-        // Reopen where the parent last left this graph (survives an edit → preview → edit round-trip); default view otherwise.
+        // Seed pan/zoom when the shown graph changes (or on first mount) — not on ordinary re-renders, so the user's
+        // live panning is never clobbered. The parent supplies the viewport this graph was last left at.
+        if (GraphId == _SeededGraphId) return;
+        _SeededGraphId = GraphId;
         if (InitialViewport is { } v)
         {
             _PanX  = v.PanX;
