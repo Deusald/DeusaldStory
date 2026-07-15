@@ -6,12 +6,15 @@ using Newtonsoft.Json;
 namespace DeusaldStoryWeb;
 
 /// <summary>
-/// Copy / paste support: deep-clones story nodes with fresh identity ids so a pasted copy collides with nothing and
-/// carries no wires to the surrounding graph. Cloning re-serialises an entity, mints a new Guid for every <b>owned</b>
-/// id it holds (its own <c>Id</c> and every connection point / choice / declared-variable / inner-node / connection id
-/// reachable inside it) and textually rewrites those ids in the JSON — so intrinsic internal wiring (a logic node's
-/// content graph, a container's whole subtree) is preserved and remapped consistently, while <b>reference</b> ids
-/// (selected localization key / image / variable, registered-variable target, …) are left pointing at the originals.
+/// Copy / paste support: deep-clones story nodes with fresh identity ids so a pasted copy collides with nothing.
+/// Cloning re-serialises an entity, mints a new Guid for every <b>owned</b> id it holds (its own <c>Id</c> and every
+/// connection point / choice / declared-variable / inner-node / connection id reachable inside it) and textually
+/// rewrites those ids in the JSON — so intrinsic internal wiring (a logic node's content graph, a container's whole
+/// subtree) is preserved and remapped consistently. A group paste shares <b>one</b> id map across all copied entities,
+/// so wires between copied nodes are re-created (<see cref="ReplicateWires"/> / the inner <c>ContentConnections</c>
+/// pass) and a <b>reference</b> id pointing at another copied node repoints to that node's clone; references to
+/// entities outside the copied set (selected localization key / image / variable, a non-copied register target, …)
+/// are left pointing at the originals. Copied portal points attach to the same portal rather than cloning a new pair.
 /// </summary>
 public partial class ProjectStateService
 {
@@ -28,19 +31,49 @@ public partial class ProjectStateService
         if (!CurrentProject!.ContainerNodes.TryGetValue(containerId, out StoryContainerNode? target)) return new();
 
         using var _ = Edit();
-        List<Guid>      pasted = new();
-        HashSet<object> seen   = new();
+        List<Guid>             pasted            = new();
+        HashSet<object>        seen              = new();
+        Dictionary<Guid, Guid> map               = new(); // old owned point/node id → its fresh clone id (shared across the whole paste)
+        List<object>           clones            = new(); // non-portal entities to deep-clone
+        Guid                   sourceContainerId = Guid.Empty;
 
         foreach (Guid sourceId in sourceEdIds)
         {
+            // A portal point attaches to the *same* portal instead of cloning a whole new pair, so the copy stays wired
+            // to the portal's shared out. A container portal is many-in / one-out: only an *in* (the many side) may be
+            // duplicated; copying the single out is illegal and is skipped.
+            if (FindPortalByPoint(sourceId) is StoryPortalNode portal)
+            {
+                if (portal.ParentContainer != containerId) continue; // the pair lives elsewhere — can't attach across containers
+                StoryConnectionPoint? inPoint = portal.InPoints.Find(p => p.Id == sourceId);
+                if (inPoint is null) continue;                       // the single out — nothing legal to paste
+                StoryConnectionPoint newIn = new() { Name = "In", X = inPoint.X + dx, Y = inPoint.Y + dy };
+                portal.InPoints.Add(newIn);
+                map[inPoint.Id]  = newIn.Id;
+                if (sourceContainerId == Guid.Empty) sourceContainerId = portal.ParentContainer;
+                MarkKeyDirty(portal.Id);
+                pasted.Add(newIn.Id);
+                continue;
+            }
+
             object? entity = ResolveContainerEntity(containerId, sourceId);
             if (entity is null || !seen.Add(entity)) continue;
+            clones.Add(entity);
+            if (sourceContainerId == Guid.Empty) sourceContainerId = ParentContainerOf(entity);
+        }
 
+        // One shared id map over every clone entity, so wires between copied nodes (and references among them) remap
+        // consistently. Portal-attach entries are already seeded above.
+        HashSet<object> collectSeen = new();
+        foreach (object e in clones) CollectOwnedIds(e, map, collectSeen);
+
+        foreach (object entity in clones)
+        {
             switch (entity)
             {
                 case StoryLogicNode logic:
                 {
-                    StoryLogicNode clone = CloneEntity(logic);
+                    StoryLogicNode clone = RemapClone(logic, map);
                     clone.ParentContainer = containerId;
                     clone.X += dx;
                     clone.Y += dy;
@@ -50,22 +83,9 @@ public partial class ProjectStateService
                     pasted.Add(clone.Id);
                     break;
                 }
-                case StoryPortalNode portal:
-                {
-                    StoryPortalNode clone = CloneEntity(portal);
-                    clone.ParentContainer = containerId;
-                    clone.OutPoint.X += dx;
-                    clone.OutPoint.Y += dy;
-                    foreach (StoryConnectionPoint ip in clone.InPoints) { ip.X += dx; ip.Y += dy; }
-                    CurrentProject.PortalNodes.Add(clone.Id, clone);
-                    target.Portals.Add(clone.Id);
-                    MarkKeyDirty(clone.Id);
-                    pasted.Add(clone.InPoints.Count > 0 ? clone.InPoints[0].Id : clone.OutPoint.Id);
-                    break;
-                }
                 case StoryCommentNode comment:
                 {
-                    StoryCommentNode clone = CloneEntity(comment);
+                    StoryCommentNode clone = RemapClone(comment, map);
                     clone.X += dx;
                     clone.Y += dy;
                     target.Comments.Add(clone);
@@ -73,47 +93,86 @@ public partial class ProjectStateService
                     break;
                 }
                 case StoryContainerNode container:
-                    pasted.Add(PasteContainerSubtree(container, containerId, target, dx, dy));
+                    pasted.Add(PasteContainerSubtree(container, containerId, target, dx, dy, map));
                     break;
             }
         }
+
+        ReplicateWires(sourceContainerId, target, map);
 
         if (pasted.Count > 0) MarkKeyDirty(containerId);
         return pasted;
     }
 
+    /// <summary>The container a copyable top-level entity lives in (portals are handled separately), or empty for comments.</summary>
+    private static Guid ParentContainerOf(object entity) => entity switch
+    {
+        StoryLogicNode     l => l.ParentContainer,
+        StoryContainerNode c => c.ParentContainer,
+        _                    => Guid.Empty
+    };
+
+    /// <summary>
+    /// Re-creates, on <paramref name="target"/>, every wire of the source container whose <b>both</b> endpoints were
+    /// copied (their ids appear in <paramref name="map"/>) — so a pasted sub-graph keeps its internal connections.
+    /// Wires that touch a non-copied node (or a portal's shared side) are intentionally not duplicated.
+    /// </summary>
+    private void ReplicateWires(Guid sourceContainerId, StoryContainerNode target, IReadOnlyDictionary<Guid, Guid> map)
+    {
+        if (sourceContainerId == Guid.Empty
+            || !CurrentProject!.ContainerNodes.TryGetValue(sourceContainerId, out StoryContainerNode? source)) return;
+
+        List<StoryConnection> add = new(); // buffer: source may be the same list as target
+        foreach (StoryConnection c in source.Connections)
+            if (map.TryGetValue(c.FromPoint, out Guid from) && map.TryGetValue(c.ToPoint, out Guid to))
+                add.Add(new StoryConnection { FromPoint = from, ToPoint = to });
+        target.Connections.AddRange(add);
+    }
+
     /// <summary>
     /// Pastes copies of <paramref name="sourceEdIds"/> (inner content nodes of a logic graph, identified by the canvas
     /// node ids the editor selected) into logic node <paramref name="logicId"/>, offset by
-    /// (<paramref name="dx"/>, <paramref name="dy"/>). Copies carry no wires. Returns the new canvas node ids. One step.
+    /// (<paramref name="dx"/>, <paramref name="dy"/>). Wires between copied nodes are re-created; a copied logic-portal
+    /// out attaches to the same portal. Returns the new canvas node ids. One step.
     /// </summary>
     public List<Guid> PasteLogicInnerNodes(Guid logicId, IReadOnlyList<Guid> sourceEdIds, double dx, double dy)
     {
         if (!CurrentProject!.LogicNodes.TryGetValue(logicId, out StoryLogicNode? logic)) return new();
 
         using var _ = Edit();
-        List<Guid>      pasted = new();
-        HashSet<object> seen   = new();
+        List<Guid>             pasted = new();
+        HashSet<object>        seen   = new();
+        Dictionary<Guid, Guid> map    = new(); // shared old→new id map across the whole paste
+        List<object>           clones = new();
 
         foreach (Guid sourceId in sourceEdIds)
         {
-            object? model = FindInnerModel(logic, sourceId);
-            if (model is null || !seen.Add(model)) continue;
-
-            if (model is StoryLogicPortalNode portal)
+            // A logic portal is one-in / many-out: a copied *out* (the many side) attaches as another out on the same
+            // portal, so it re-emits the same source; copying the single in is illegal and is skipped.
+            if (FindLogicPortalByPoint(logic, sourceId) is StoryLogicPortalNode portal)
             {
-                StoryLogicPortalNode clone = CloneEntity(portal);
-                clone.InPoint.X += dx;
-                clone.InPoint.Y += dy;
-                foreach (StoryConnectionPoint o in clone.OutPoints) { o.X += dx; o.Y += dy; }
-                logic.LogicPortalNodes.Add(clone);
-                pasted.Add(clone.InPoint.Id);
+                StoryConnectionPoint? outPoint = portal.OutPoints.Find(p => p.Id == sourceId);
+                if (outPoint is null) continue; // the single in — nothing legal to paste
+                StoryConnectionPoint newOut = new() { Name = "Out", X = outPoint.X + dx, Y = outPoint.Y + dy };
+                portal.OutPoints.Add(newOut);
+                map[outPoint.Id] = newOut.Id;
+                pasted.Add(newOut.Id);
                 continue;
             }
 
+            object? model = FindInnerModel(logic, sourceId);
+            if (model is null || !seen.Add(model)) continue;
+            clones.Add(model);
+        }
+
+        HashSet<object> collectSeen = new();
+        foreach (object m in clones) CollectOwnedIds(m, map, collectSeen);
+
+        foreach (object model in clones)
+        {
             if (model is StoryConditionFlowNode cflow)
             {
-                StoryConditionFlowNode clone = CloneEntity(cflow);
+                StoryConditionFlowNode clone = RemapClone(cflow, map);
                 clone.EndId = Guid.NewGuid(); // the End card's id isn't an "Id" property, so mint it fresh to avoid a collision
                 clone.X    += dx; clone.Y    += dy;
                 clone.EndX += dx; clone.EndY += dy;
@@ -122,11 +181,18 @@ public partial class ProjectStateService
                 continue;
             }
 
-            object cloneObj = CloneEntity(model);
+            object cloneObj = RemapClone(model, map);
             OffsetXY(cloneObj, dx, dy);
             AddCloneToLogic(logic, cloneObj);
             if (cloneObj.GetType().GetProperty("Id")?.GetValue(cloneObj) is Guid id) pasted.Add(id);
         }
+
+        // Re-create every inner wire whose both endpoints were copied (buffer first — we mutate the list we read).
+        List<StoryConnection> add = new();
+        foreach (StoryConnection c in logic.ContentConnections)
+            if (map.TryGetValue(c.FromPoint, out Guid from) && map.TryGetValue(c.ToPoint, out Guid to))
+                add.Add(new StoryConnection { FromPoint = from, ToPoint = to });
+        logic.ContentConnections.AddRange(add);
 
         if (pasted.Count > 0) MarkKeyDirty(logicId);
         return pasted;
@@ -167,13 +233,16 @@ public partial class ProjectStateService
         return found ?? FindLogicPortalByPoint(logic, edId);
     }
 
-    /// <summary>Deep-clones a container together with every entity nested beneath it, registering the clones and returning the new top-level container id.</summary>
-    private Guid PasteContainerSubtree(StoryContainerNode source, Guid parentId, StoryContainerNode parent, double dx, double dy)
+    /// <summary>
+    /// Deep-clones a container together with every entity nested beneath it, registering the clones and returning the
+    /// new top-level container id. Uses the caller's shared <paramref name="map"/> so the container's boundary points
+    /// keep the same fresh ids the top-level wire replication expects; the subtree's own descendant ids are added to it.
+    /// </summary>
+    private Guid PasteContainerSubtree(StoryContainerNode source, Guid parentId, StoryContainerNode parent, double dx, double dy, Dictionary<Guid, Guid> map)
     {
         List<object> entities = new();
         CollectSubtreeEntities(source, entities);
 
-        Dictionary<Guid, Guid> map = new();
         foreach (object e in entities) CollectOwnedIds(e, map, new HashSet<object>());
 
         Guid newTopId = Guid.Empty;
@@ -228,14 +297,6 @@ public partial class ProjectStateService
     }
 
     // ── Cloning primitives ─────────────────────────────────────────────────────
-
-    /// <summary>Clones a single entity with all its owned ids freshly minted (references left intact).</summary>
-    private static T CloneEntity<T>(T entity) where T : notnull
-    {
-        Dictionary<Guid, Guid> map = new();
-        CollectOwnedIds(entity, map, new HashSet<object>());
-        return RemapClone(entity, map);
-    }
 
     /// <summary>Serialises <paramref name="entity"/> and rewrites every mapped id, returning a fresh deserialized copy.</summary>
     private static T RemapClone<T>(T entity, IReadOnlyDictionary<Guid, Guid> map) where T : notnull

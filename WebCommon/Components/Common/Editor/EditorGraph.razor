@@ -675,10 +675,30 @@
         return await module.InvokeAsync<double[]>("rect", _CanvasEl);
     }
 
-    private void OnWheel(WheelEventArgs e)
+    /// <summary>
+    /// The world-space rectangle currently visible in the canvas, as <c>[x, y, width, height]</c>. Callers use it to
+    /// keep freshly created / pasted nodes inside the view (see <see cref="Editor"/>'s drop clamping).
+    /// </summary>
+    public async Task<double[]> VisibleWorldRectAsync()
     {
-        double factor = e.DeltaY < 0 ? 1.1 : 1 / 1.1;
-        _Scale = Math.Clamp(_Scale * factor, 0.35, 2.2);
+        double[] r = await RectAsync(); // [left, top, width, height] in screen px
+        return [-_PanX / _Scale, -_PanY / _Scale, r[2] / _Scale, r[3] / _Scale];
+    }
+
+    private async Task OnWheel(WheelEventArgs e)
+    {
+        // Zoom toward the cursor: keep the world point under the pointer fixed across the scale change.
+        // The world transform is translate(Pan) scale(Scale), so screen = world * Scale + Pan.
+        double[] r  = await RectAsync();
+        double   cx = e.ClientX - r[0]; // cursor, canvas-relative px
+        double   cy = e.ClientY - r[1];
+        double   wx = (cx - _PanX) / _Scale;
+        double   wy = (cy - _PanY) / _Scale;
+        double   factor   = e.DeltaY < 0 ? 1.1 : 1 / 1.1;
+        double   newScale = Math.Clamp(_Scale * factor, 0.35, 2.2);
+        _PanX  = cx - wx * newScale;
+        _PanY  = cy - wy * newScale;
+        _Scale = newScale;
     }
 
     // ── Connecting ports ───────────────────────────────────────────────────

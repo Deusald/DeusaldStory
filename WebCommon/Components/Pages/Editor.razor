@@ -480,22 +480,41 @@
     // ── Add node (palette → detail modal) ──────────────────────────────────
 
     /// <summary>Toolbar "Add node" — the graph supplies the current view centre; drop the node there.</summary>
-    private void OnAddNode(CanvasPoint point)
+    private async Task OnAddNode(CanvasPoint point)
     {
-        _PendingX = point.X;
-        _PendingY = point.Y;
+        (_PendingX, _PendingY) = await ClampDrop(point.X, point.Y, _DROP_FOOTPRINT_W, _DROP_FOOTPRINT_H);
         _NodePalette?.Show(PaletteItems());
     }
 
     /// <summary>Right-click on empty canvas — open the palette and remember where to drop the node.</summary>
-    private void OnCanvasContextMenu(CanvasPoint point)
+    private async Task OnCanvasContextMenu(CanvasPoint point)
     {
         // Reaching the palette means the author chose "Add node" over "Paste" (or the clipboard was already empty), so
         // drop the clipboard — the next right-click then opens the palette straight away instead of the paste menu.
         _Clipboard.Clear();
-        _PendingX = point.X;
-        _PendingY = point.Y;
+        (_PendingX, _PendingY) = await ClampDrop(point.X, point.Y, _DROP_FOOTPRINT_W, _DROP_FOOTPRINT_H);
         _NodePalette?.Show(PaletteItems());
+    }
+
+    // Footprint used when clamping a new node into view. Wide/tall enough to also contain a portal *pair* (in + out,
+    // separated by the portal gap) so a created portal's far point can never fall off-screen.
+    private const double _DROP_FOOTPRINT_W = 540;
+    private const double _DROP_FOOTPRINT_H = 120;
+
+    /// <summary>
+    /// Keeps a freshly created / pasted node inside the current view: returns (<paramref name="x"/>, <paramref name="y"/>)
+    /// when a node of the given footprint dropped there fits fully in the visible canvas, otherwise the view centre
+    /// (footprint-adjusted). Prevents nodes / portals from landing off-screen when the view is panned far away.
+    /// </summary>
+    private async Task<(double X, double Y)> ClampDrop(double x, double y, double footprintW, double footprintH)
+    {
+        if (_GraphRef is null) return (x, y);
+        double[] v = await _GraphRef.VisibleWorldRectAsync(); // [x, y, width, height] in world coords
+        const double margin = 20;
+        bool fits = x >= v[0] + margin && x + footprintW <= v[0] + v[2] - margin
+                 && y >= v[1] + margin && y + footprintH <= v[1] + v[3] - margin;
+        if (fits) return (x, y);
+        return (v[0] + (v[2] - footprintW) / 2, v[1] + (v[3] - footprintH) / 2);
     }
 
     /// <summary>
@@ -1117,20 +1136,25 @@
     private const double _PASTE_OFFSET = 40;
 
     /// <summary>Add another portal-in to the pair the right-clicked portal node belongs to.</summary>
-    private void OnNodeAddPortalIn(EdNode node)
+    private async Task OnNodeAddPortalIn(EdNode node)
     {
         if (node.Kind is not (StoryNodeKind.PortalIn or StoryNodeKind.PortalOut)) return;
-        _ProjectState.AddPortalIn(node.Id);
+        (double x, double y) = await ClampDrop(node.X, node.Y + 90, _NODE_W_APPROX, _NODE_H_APPROX);
+        _ProjectState.AddPortalIn(node.Id, x, y);
         RebuildNodes();
     }
 
     /// <summary>Add another portal-out to the logic portal the right-clicked node belongs to.</summary>
-    private void OnNodeAddPortalOut(EdNode node)
+    private async Task OnNodeAddPortalOut(EdNode node)
     {
         if (node.Kind is not (StoryNodeKind.LogicPortalIn or StoryNodeKind.LogicPortalOut)) return;
-        _ProjectState.AddLogicPortalOut(_CurrentId, node.Id);
+        (double x, double y) = await ClampDrop(node.X, node.Y + 90, _NODE_W_APPROX, _NODE_H_APPROX);
+        _ProjectState.AddLogicPortalOut(_CurrentId, node.Id, x, y);
         RebuildNodes();
     }
+
+    private const double _NODE_W_APPROX = 216;
+    private const double _NODE_H_APPROX = 82;
 
     // ── Reparent (drag onto a container / push up to parent) ────────────────
 

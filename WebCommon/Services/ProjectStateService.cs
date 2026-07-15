@@ -297,6 +297,14 @@ public partial class ProjectStateService(
 
         double x = portal.InPoints.Count > 0 ? portal.InPoints.Min(p => p.X)     : portal.OutPoint.X - _PORTAL_PAIR_GAP;
         double y = portal.InPoints.Count > 0 ? portal.InPoints.Max(p => p.Y) + 90 : portal.OutPoint.Y;
+        return AddPortalIn(pointId, x, y);
+    }
+
+    /// <summary>Adds another <b>portal in</b> to the pair that owns <paramref name="pointId"/> at the explicit canvas position (<paramref name="x"/>, <paramref name="y"/>). Returns the portal, or null when the point belongs to no portal.</summary>
+    public StoryPortalNode? AddPortalIn(Guid pointId, double x, double y)
+    {
+        StoryPortalNode? portal = FindPortalByPoint(pointId);
+        if (portal is null) return null;
 
         portal.InPoints.Add(new StoryConnectionPoint { Name = "In", X = x, Y = y });
         MarkKeyDirty(portal.Id);
@@ -674,6 +682,15 @@ public partial class ProjectStateService(
 
         double x = portal.OutPoints.Count > 0 ? portal.OutPoints.Min(p => p.X)      : portal.InPoint.X + _PORTAL_PAIR_GAP;
         double y = portal.OutPoints.Count > 0 ? portal.OutPoints.Max(p => p.Y) + 90 : portal.InPoint.Y;
+        return AddLogicPortalOut(logicId, pointId, x, y);
+    }
+
+    /// <summary>Adds another <b>portal out</b> to the logic portal that owns <paramref name="pointId"/> at the explicit canvas position (<paramref name="x"/>, <paramref name="y"/>). Returns the portal, or null when unknown.</summary>
+    public StoryLogicPortalNode? AddLogicPortalOut(Guid logicId, Guid pointId, double x, double y)
+    {
+        if (!CurrentProject!.LogicNodes.TryGetValue(logicId, out StoryLogicNode? logic)) return null;
+        StoryLogicPortalNode? portal = FindLogicPortalByPoint(logic, pointId);
+        if (portal is null) return null;
 
         portal.OutPoints.Add(new StoryConnectionPoint { Name = "Out", X = x, Y = y });
         MarkKeyDirty(logicId);
