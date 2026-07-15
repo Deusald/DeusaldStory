@@ -60,7 +60,11 @@
                                  OnCanvasContextMenu="OnCanvasContextMenu"
                                  OnNodeEdit="OnNodeEdit"
                                  OnNodeDelete="OnNodeDelete"
+                                 OnNodesDelete="OnNodesDelete"
+                                 OnNodesCopy="OnNodesCopy"
+                                 OnPaste="OnPaste"
                                  OnNodeAddPortalIn="OnNodeAddPortalIn"
+                                 OnNodeAddPortalOut="OnNodeAddPortalOut"
                                  OnNodeReparent="OnNodeReparent"
                                  OnNodeMoveToParent="OnNodeMoveToParent"
                                  OnUndo="OnUndo"
@@ -457,6 +461,9 @@
                 new NodePaletteItem(StoryNodeKind.SetVariable,        "bi-pencil-square",   "Set variable",          "On the logic chain — assigns a value to an already-registered variable."),
                 new NodePaletteItem(StoryNodeKind.UnregisterVariable, "bi-box-arrow-up",    "Unregister variable",   "On the logic chain — releases a registered variable and frees its slot."),
                 new NodePaletteItem(StoryNodeKind.SetExternalVariable, "bi-sliders",        "Set external variable", "On the logic chain — assigns a value to a story-wide external variable (App only; no Gamebook instruction)."),
+                new NodePaletteItem(StoryNodeKind.LogicPortalIn,      "bi-box-arrow-in-right", "Text portal",           "A one-in / many-out relay for Text — feed a text output into the in, read it from every out.",     StoryPortalSignal.Text),
+                new NodePaletteItem(StoryNodeKind.LogicPortalIn,      "bi-box-arrow-in-right", "Icon portal",           "A one-in / many-out relay for an Icon — feed an icon output into the in, read it from every out.",  StoryPortalSignal.Icon),
+                new NodePaletteItem(StoryNodeKind.LogicPortalIn,      "bi-box-arrow-in-right", "Variable portal",       "A one-in / many-out relay for a Variable — feed a variable output into the in, read it from every out.", StoryPortalSignal.Variable),
                 new NodePaletteItem(StoryNodeKind.Comment,                "bi-chat-left-text", "Comment",                 "A free-text note explaining how nodes connect. No ports; ignored during playback.")
             ]
             :
@@ -507,6 +514,12 @@
             case StoryNodeKind.SetVariable:        _SetVariableModal?.Show();                break;
             case StoryNodeKind.UnregisterVariable: _UnregisterPicker?.Show(Guid.Empty, Guid.Empty); break;
             case StoryNodeKind.SetExternalVariable: _SetExternalVariableModal?.Show();        break;
+            case StoryNodeKind.LogicPortalIn:
+                // No config — create the portal (in + one out) straight away at the pending position.
+                if (_ProjectState.AddLogicPortalNode(_CurrentId, item.PortalSignal ?? StoryPortalSignal.Variable, _PendingX, _PendingY) is StoryLogicPortalNode portal)
+                    _SelectedId = portal.InPoint.Id;
+                RebuildNodes();
+                break;
             case StoryNodeKind.Comment:   _NewCommentNodeModal?.Show();   break;
         }
     }
@@ -891,6 +904,8 @@
 
     private string ExitVariableName(StoryLogicNode logic, Guid fromPoint)
     {
+        // A variable may reach the Exit through a portal — resolve to the real source so its name shows in the condition builder.
+        fromPoint = logic.ResolvePortalSource(fromPoint);
         if (logic.ExternalVariableNodes.Find(n => n.OutPoint.Id == fromPoint) is StoryExternalVariableNode ev)
             return (StoryBuiltInVariables.Find(ev.SelectedVariableId)
                     ?? (Project.Variables.TryGetValue(ev.SelectedVariableId, out StoryVariable? v) ? v : null))?.Name ?? "(variable)";
@@ -909,6 +924,25 @@
     /// <summary>Delete from a node's context menu. Deleting a container removes everything nested inside it.</summary>
     private void OnNodeDelete(EdNode node)
     {
+        DeleteOne(node);
+        if (_SelectedId == node.Id) _SelectedId = Guid.Empty;
+        RebuildNodes();
+    }
+
+    /// <summary>Delete every node in <paramref name="nodes"/> (a multi-selection) as one atomic, undoable step.</summary>
+    private void OnNodesDelete(IReadOnlyList<EdNode> nodes)
+    {
+        using (_ProjectState.BeginBatch())
+            foreach (EdNode node in nodes)
+                DeleteOne(node);
+
+        if (nodes.Any(n => n.Id == _SelectedId)) _SelectedId = Guid.Empty;
+        RebuildNodes();
+    }
+
+    /// <summary>Removes one node from the model, dispatched by kind. Does not touch selection / rebuild (the caller does).</summary>
+    private void DeleteOne(EdNode node)
+    {
         switch (node.Kind)
         {
             case StoryNodeKind.Logic:        _ProjectState.DeleteLogicNode(_CurrentId, node.Id);         break;
@@ -918,6 +952,8 @@
                 if (_ProjectState.FindPortalByPoint(node.Id) is StoryPortalNode portal)
                     _ProjectState.DeletePortal(_CurrentId, portal.Id);
                 break;
+            case StoryNodeKind.LogicPortalIn:  _ProjectState.DeleteLogicPortalByPoint(_CurrentId, node.Id); break;
+            case StoryNodeKind.LogicPortalOut: _ProjectState.DeleteLogicPortalOut(_CurrentId, node.Id);      break;
             case StoryNodeKind.Localization: _ProjectState.DeleteLocalizationNode(_CurrentId, node.Id);  break;
             case StoryNodeKind.Icon:         _ProjectState.DeleteIconNode(_CurrentId, node.Id);          break;
             case StoryNodeKind.LightDarkSwitch: _ProjectState.DeleteLightDarkSwitchNode(_CurrentId, node.Id); break;
@@ -932,18 +968,53 @@
             case StoryNodeKind.UnregisterVariable: _ProjectState.DeleteUnregisterVariableNode(_CurrentId, node.Id); break;
             case StoryNodeKind.SetExternalVariable: _ProjectState.DeleteSetExternalVariableNode(_CurrentId, node.Id); break;
             case StoryNodeKind.Comment:                 _ProjectState.DeleteCommentNode(_CurrentId, node.Id);               break;
-            default: return;
         }
+    }
 
-        if (_SelectedId == node.Id) _SelectedId = Guid.Empty;
+    // ── Copy / paste ────────────────────────────────────────────────────────
+
+    // The copy buffer: the canvas node ids that were copied, and the scope they came from (a container's graph or a
+    // logic node's inner graph). Paste only pastes into a matching scope. Ids are resolved against the live project at
+    // paste time, so a copy carries no snapshot — deleting the originals before pasting simply yields nothing.
+    private List<Guid>  _Clipboard      = [];
+    private EditorScope _ClipboardScope = EditorScope.Container;
+
+    /// <summary>Copy the selected nodes to the clipboard (Ctrl/Cmd+C).</summary>
+    private void OnNodesCopy(IReadOnlyList<EdNode> nodes)
+    {
+        // Boundary/built-in nodes (Start/End/Entry/Exit, logic Entry/Exit, Prev Exit) can't be copied — skip them.
+        _Clipboard      = nodes.Where(n => n.Deletable).Select(n => n.Id).ToList();
+        _ClipboardScope = _Scope;
+    }
+
+    /// <summary>Paste the clipboard into the current graph, offset from the originals (Ctrl/Cmd+V).</summary>
+    private void OnPaste()
+    {
+        if (_Clipboard.Count == 0 || _ClipboardScope != _Scope) return;
+
+        List<Guid> pasted = _InLogic
+            ? _ProjectState.PasteLogicInnerNodes(_CurrentId, _Clipboard, _PASTE_OFFSET, _PASTE_OFFSET)
+            : _ProjectState.PasteContainerNodes(_CurrentId, _Clipboard, _PASTE_OFFSET, _PASTE_OFFSET);
+
+        if (pasted.Count > 0) _SelectedId = pasted[0];
         RebuildNodes();
     }
+
+    private const double _PASTE_OFFSET = 40;
 
     /// <summary>Add another portal-in to the pair the right-clicked portal node belongs to.</summary>
     private void OnNodeAddPortalIn(EdNode node)
     {
         if (node.Kind is not (StoryNodeKind.PortalIn or StoryNodeKind.PortalOut)) return;
         _ProjectState.AddPortalIn(node.Id);
+        RebuildNodes();
+    }
+
+    /// <summary>Add another portal-out to the logic portal the right-clicked node belongs to.</summary>
+    private void OnNodeAddPortalOut(EdNode node)
+    {
+        if (node.Kind is not (StoryNodeKind.LogicPortalIn or StoryNodeKind.LogicPortalOut)) return;
+        _ProjectState.AddLogicPortalOut(_CurrentId, node.Id);
         RebuildNodes();
     }
 

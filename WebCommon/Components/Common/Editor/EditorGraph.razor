@@ -217,6 +217,12 @@
                     <i class="bi bi-box-arrow-in-right"></i> Add portal in
                 </button>
             }
+            @if (menu.Kind is StoryNodeKind.LogicPortalIn or StoryNodeKind.LogicPortalOut)
+            {
+                <button class="edg-menu-item" @onclick="() => MenuInvoke(OnNodeAddPortalOut, menu)">
+                    <i class="bi bi-box-arrow-right"></i> Add portal out
+                </button>
+            }
             @if (CanMoveToParent && menu.Kind is StoryNodeKind.Logic or StoryNodeKind.Container)
             {
                 <button class="edg-menu-item" @onclick="() => MenuInvoke(OnNodeMoveToParent, menu)">
@@ -226,6 +232,7 @@
             @if (menu.Deletable)
             {
                 @if (menu.Editable || menu.Kind is StoryNodeKind.PortalIn or StoryNodeKind.PortalOut
+                                                or StoryNodeKind.LogicPortalIn or StoryNodeKind.LogicPortalOut
                                    || (CanMoveToParent && menu.Kind is StoryNodeKind.Logic or StoryNodeKind.Container))
                 {
                     <div class="edg-menu-sep"></div>
@@ -252,8 +259,12 @@
     [Parameter] public EventCallback<EdNode>     OnNodeEdit          { get; set; }
     [Parameter] public EventCallback<EdNode>     OnNodeDelete        { get; set; }
     [Parameter] public EventCallback<EdNode>     OnNodeAddPortalIn   { get; set; }
+    [Parameter] public EventCallback<EdNode>     OnNodeAddPortalOut  { get; set; }
     [Parameter] public EventCallback<EdNodeReparent> OnNodeReparent  { get; set; }
     [Parameter] public EventCallback<EdNode>     OnNodeMoveToParent  { get; set; }
+    [Parameter] public EventCallback<IReadOnlyList<EdNode>> OnNodesDelete { get; set; }
+    [Parameter] public EventCallback<IReadOnlyList<EdNode>> OnNodesCopy   { get; set; }
+    [Parameter] public EventCallback             OnPaste             { get; set; }
     [Parameter] public EventCallback             OnUndo              { get; set; }
     [Parameter] public EventCallback             OnRedo              { get; set; }
 
@@ -670,6 +681,8 @@
         StoryNodeKind.Container    => "container",
         StoryNodeKind.PortalIn     => "portal in",
         StoryNodeKind.PortalOut    => "portal",
+        StoryNodeKind.LogicPortalIn  => "portal",
+        StoryNodeKind.LogicPortalOut => "portal out",
         StoryNodeKind.Localization    => "localization node",
         StoryNodeKind.Icon            => "icon node",
         StoryNodeKind.LightDarkSwitch => "light/dark switch",
@@ -713,6 +726,39 @@
     {
         _SpaceHeld = held;
     }
+
+    /// <summary>The currently selected node ids — the primary selection plus any marquee multi-selection.</summary>
+    private HashSet<Guid> SelectedIds()
+    {
+        HashSet<Guid> ids = new(_Selected);
+        if (SelectedId != Guid.Empty) ids.Add(SelectedId);
+        return ids;
+    }
+
+    /// <summary>Called from JS on Delete/Backspace — deletes every selected (deletable) node in one step.</summary>
+    [JSInvokable]
+    public async Task DeleteSelected()
+    {
+        HashSet<Guid> ids   = SelectedIds();
+        List<EdNode>  nodes = Nodes.Where(n => ids.Contains(n.Id) && n.Deletable).ToList();
+        if (nodes.Count == 0) return;
+        _Selected.Clear();
+        await OnNodesDelete.InvokeAsync(nodes);
+    }
+
+    /// <summary>Called from JS on Ctrl/Cmd+C — copies the selected nodes to the editor's clipboard.</summary>
+    [JSInvokable]
+    public async Task CopySelected()
+    {
+        HashSet<Guid> ids   = SelectedIds();
+        List<EdNode>  nodes = Nodes.Where(n => ids.Contains(n.Id)).ToList();
+        if (nodes.Count == 0) return;
+        await OnNodesCopy.InvokeAsync(nodes);
+    }
+
+    /// <summary>Called from JS on Ctrl/Cmd+V — pastes the editor's clipboard into the current graph.</summary>
+    [JSInvokable]
+    public Task Paste() => OnPaste.InvokeAsync();
 
     /// <summary>Called from JS on Ctrl/Cmd+Z — bubbles up to the editor to undo the last action.</summary>
     [JSInvokable]

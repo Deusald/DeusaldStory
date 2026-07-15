@@ -119,10 +119,30 @@ namespace DeusaldStoryCommon
         /// <summary>Set-external-variable nodes on the LFlow chain — each assigns a value to a story-wide external variable.</summary>
         public List<StorySetExternalVariableNode> SetExternalVariableNodes { get; } = new();
 
+        /// <summary>Portal pairs on the inner graph — one-in / many-out relays that carry a Text/Icon/Variable value across the graph.</summary>
+        public List<StoryLogicPortalNode> LogicPortalNodes { get; } = new();
+
         /// <summary>Free-text comment notes placed in this logic node's inner graph (no ports; documentation only).</summary>
         public List<StoryCommentNode> CommentNodes { get; } = new();
 
         /// <summary>Wires between the inner graph's connection points (Entry/Exit ports and content-node ports).</summary>
         public List<StoryConnection> ContentConnections { get; } = new();
+
+        /// <summary>
+        /// Resolves <paramref name="fromPoint"/> through any logic portal it belongs to: when it is a portal-out output,
+        /// follows the portal back to whatever output feeds the portal's in (transitively). Any non-portal point — and a
+        /// portal whose in is unwired — is returned unchanged, so callers can treat every output source uniformly.
+        /// </summary>
+        public Guid ResolvePortalSource(Guid fromPoint, int depth = 0)
+        {
+            if (fromPoint == Guid.Empty || depth > 32) return fromPoint;
+            foreach (StoryLogicPortalNode portal in LogicPortalNodes)
+                if (portal.OutPoints.Exists(o => o.Id == fromPoint))
+                {
+                    Guid feed = ContentConnections.Find(c => c.ToPoint == portal.InPoint.Id)?.FromPoint ?? Guid.Empty;
+                    return ResolvePortalSource(feed, depth + 1);
+                }
+            return fromPoint;
+        }
     }
 }

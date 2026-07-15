@@ -13,7 +13,7 @@ function inEditable() {
 function onKeyDown(e) {
     if (inEditable()) return; // never hijack keys while typing in an input / textarea
 
-    // Undo / Redo — Ctrl+Z, Ctrl+Y, Ctrl+Shift+Z (Cmd on macOS).
+    // Undo / Redo — Ctrl+Z, Ctrl+Y, Ctrl+Shift+Z (Cmd on macOS) — and Copy / Paste (Ctrl+C / Ctrl+V).
     if (e.ctrlKey || e.metaKey) {
         const key = e.key.toLowerCase();
         if (key === 'z' && !e.shiftKey) {
@@ -22,7 +22,20 @@ function onKeyDown(e) {
         } else if (key === 'y' || (key === 'z' && e.shiftKey)) {
             e.preventDefault();
             _dotnet && _dotnet.invokeMethodAsync('Redo');
+        } else if (key === 'c') {
+            e.preventDefault();
+            _dotnet && _dotnet.invokeMethodAsync('CopySelected');
+        } else if (key === 'v') {
+            e.preventDefault();
+            _dotnet && _dotnet.invokeMethodAsync('Paste');
         }
+        return;
+    }
+
+    // Delete / Backspace — remove the selected node(s).
+    if (e.key === 'Delete' || e.key === 'Backspace') {
+        e.preventDefault();
+        _dotnet && _dotnet.invokeMethodAsync('DeleteSelected');
         return;
     }
 

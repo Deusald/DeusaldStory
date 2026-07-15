@@ -622,6 +622,95 @@ public partial class ProjectStateService(
         MarkKeyDirty(logicId);
     }
 
+    // ── Logic portals (inner-graph value relays: one-in / many-out) ──────────
+
+    /// <summary>
+    /// Adds a logic portal (a Text/Icon/Variable value relay) to a logic node's inner graph: one <b>portal in</b> at
+    /// (<paramref name="x"/>, <paramref name="y"/>) and one paired <b>portal out</b> offset to the right. Value that
+    /// reaches the in re-emerges at every out. Returns the created portal, or null when the logic node is unknown.
+    /// </summary>
+    public StoryLogicPortalNode? AddLogicPortalNode(Guid logicId, StoryPortalSignal signal, double x, double y)
+    {
+        if (!CurrentProject!.LogicNodes.TryGetValue(logicId, out StoryLogicNode? logic)) return null;
+
+        StoryLogicPortalNode portal = new()
+        {
+            Name    = $"Portal {logic.LogicPortalNodes.Count + 1}",
+            Signal  = signal,
+            InPoint = new StoryConnectionPoint { Name = "In", X = x, Y = y }
+        };
+        portal.OutPoints.Add(new StoryConnectionPoint { Name = "Out", X = x + _PORTAL_PAIR_GAP, Y = y });
+
+        logic.LogicPortalNodes.Add(portal);
+        MarkKeyDirty(logicId);
+        return portal;
+    }
+
+    /// <summary>
+    /// Adds another <b>portal out</b> to the logic portal that <paramref name="pointId"/> belongs to (its in or any
+    /// out). The new out is stacked below the lowest existing out. Returns the portal, or null when the point does not
+    /// belong to any logic portal in <paramref name="logicId"/>.
+    /// </summary>
+    public StoryLogicPortalNode? AddLogicPortalOut(Guid logicId, Guid pointId)
+    {
+        if (!CurrentProject!.LogicNodes.TryGetValue(logicId, out StoryLogicNode? logic)) return null;
+        StoryLogicPortalNode? portal = FindLogicPortalByPoint(logic, pointId);
+        if (portal is null) return null;
+
+        double x = portal.OutPoints.Count > 0 ? portal.OutPoints.Min(p => p.X)      : portal.InPoint.X + _PORTAL_PAIR_GAP;
+        double y = portal.OutPoints.Count > 0 ? portal.OutPoints.Max(p => p.Y) + 90 : portal.InPoint.Y;
+
+        portal.OutPoints.Add(new StoryConnectionPoint { Name = "Out", X = x, Y = y });
+        MarkKeyDirty(logicId);
+        return portal;
+    }
+
+    /// <summary>
+    /// Deletes a single logic portal <b>out</b> point (identified by <paramref name="outPointId"/>). Deleting the
+    /// portal's last out deletes the whole portal. Prunes inner wires that touch the removed point(s).
+    /// </summary>
+    public void DeleteLogicPortalOut(Guid logicId, Guid outPointId)
+    {
+        if (!CurrentProject!.LogicNodes.TryGetValue(logicId, out StoryLogicNode? logic)) return;
+        StoryLogicPortalNode? portal = FindLogicPortalByPoint(logic, outPointId);
+        if (portal is null || !portal.OutPoints.Exists(p => p.Id == outPointId)) return;
+
+        if (portal.OutPoints.Count <= 1)
+        {
+            DeleteLogicPortal(logicId, portal.Id);
+            return;
+        }
+
+        portal.OutPoints.RemoveAll(p => p.Id == outPointId);
+        logic.ContentConnections.RemoveAll(c => c.FromPoint == outPointId || c.ToPoint == outPointId);
+        MarkKeyDirty(logicId);
+    }
+
+    /// <summary>Deletes a whole logic portal (its in point and every out point) and any inner wire that touched them.</summary>
+    public void DeleteLogicPortal(Guid logicId, Guid portalId)
+    {
+        if (!CurrentProject!.LogicNodes.TryGetValue(logicId, out StoryLogicNode? logic)) return;
+        StoryLogicPortalNode? portal = logic.LogicPortalNodes.Find(p => p.Id == portalId);
+        if (portal is null) return;
+
+        HashSet<Guid> points = new(portal.OutPoints.Select(p => p.Id)) { portal.InPoint.Id };
+        logic.LogicPortalNodes.Remove(portal);
+        logic.ContentConnections.RemoveAll(c => points.Contains(c.FromPoint) || points.Contains(c.ToPoint));
+        MarkKeyDirty(logicId);
+    }
+
+    /// <summary>Deletes the whole logic portal that owns <paramref name="pointId"/> (used when its in point is deleted).</summary>
+    public void DeleteLogicPortalByPoint(Guid logicId, Guid pointId)
+    {
+        if (!CurrentProject!.LogicNodes.TryGetValue(logicId, out StoryLogicNode? logic)) return;
+        if (FindLogicPortalByPoint(logic, pointId) is StoryLogicPortalNode portal)
+            DeleteLogicPortal(logicId, portal.Id);
+    }
+
+    /// <summary>The logic portal in <paramref name="logic"/> that owns <paramref name="pointId"/> (its in or any out), or null.</summary>
+    public StoryLogicPortalNode? FindLogicPortalByPoint(StoryLogicNode logic, Guid pointId) =>
+        logic.LogicPortalNodes.Find(p => p.InPoint.Id == pointId || p.OutPoints.Exists(o => o.Id == pointId));
+
     // ── Comment notes ──────────────────────────────────────────────────────
     // A comment lives either in a container's graph or in a logic node's inner graph; the owner id resolves to
     // whichever exists. Comments have no ports, so there are never wires to clean up on delete.
@@ -953,6 +1042,7 @@ public partial class ProjectStateService(
                         || logic.ExternalVariableNodes.Exists(ev => ev.OutPoint.Id == fromPoint)
                         || logic.GetVariableNodes.Exists(gv => gv.OutPoint.Id == fromPoint || gv.SlotOutPoint.Id == fromPoint)
                         || logic.ConstantVariableNodes.Exists(cv => cv.OutPoint.Id == fromPoint)
+                        || logic.LogicPortalNodes.Exists(p => p.OutPoints.Exists(o => o.Id == fromPoint))
                         || StorySelectionResolver.IncomingVariables(CurrentProject, logic).Exists(d => d.Id == fromPoint);
         logic.ContentConnections.RemoveAll(c => (!multiOutput && c.FromPoint == fromPoint) || (!multiInput && c.ToPoint == toPoint));
 
@@ -1116,6 +1206,22 @@ public partial class ProjectStateService(
             setExt.X = x;
             setExt.Y = y;
             MarkKeyDirty(logicId);
+            return;
+        }
+
+        // A logic portal in/out node moved (its position lives on the portal's connection point).
+        foreach (StoryLogicPortalNode portal in logic.LogicPortalNodes)
+        {
+            StoryConnectionPoint? point = portal.InPoint.Id == movedId
+                ? portal.InPoint
+                : portal.OutPoints.Find(p => p.Id == movedId);
+            if (point is not null)
+            {
+                point.X = x;
+                point.Y = y;
+                MarkKeyDirty(logicId);
+                return;
+            }
         }
     }
 
@@ -1471,6 +1577,11 @@ public partial class ProjectStateService(
             valid.Add(n.FlowIn.Id);
             valid.Add(n.FlowOut.Id);
             valid.Add(n.ValueIn.Id);
+        }
+        foreach (StoryLogicPortalNode n in logic.LogicPortalNodes)
+        {
+            valid.Add(n.InPoint.Id);
+            foreach (StoryConnectionPoint o in n.OutPoints) valid.Add(o.Id);
         }
 
         logic.ContentConnections.RemoveAll(c => !valid.Contains(c.FromPoint) || !valid.Contains(c.ToPoint));

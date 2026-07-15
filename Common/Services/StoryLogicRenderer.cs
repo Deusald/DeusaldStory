@@ -305,7 +305,9 @@ namespace DeusaldStoryCommon
                 bool hasOmittedVariable = false; // a plain Variable dropped in the Gamebook (probable SmartFormat-error cause)
                 foreach (StoryConnection c in logic.ContentConnections.Where(c => c.ToPoint == sf.VariablesIn.Id))
                 {
-                    if (logic.ExternalVariableNodes.Find(n => n.OutPoint.Id == c.FromPoint) is StoryExternalVariableNode ev
+                    // A variable may reach the format via a portal — resolve the wire back to the real value source first.
+                    Guid src = logic.ResolvePortalSource(c.FromPoint);
+                    if (logic.ExternalVariableNodes.Find(n => n.OutPoint.Id == src) is StoryExternalVariableNode ev
                         && Variable(project, ev.SelectedVariableId) is StoryVariable v && !string.IsNullOrWhiteSpace(v.Name))
                     {
                         bool constant = StoryBuiltInVariables.IsBuiltIn(v.Id) || v.IsConstant;
@@ -313,20 +315,20 @@ namespace DeusaldStoryCommon
                         else if (constant || target == StoryRenderTarget.App) vals[v.Name] = PreviewValue(v, values);
                         else hasOmittedVariable = true; // plain Variable, Gamebook — leave the {token} unresolved
                     }
-                    else if (logic.GetVariableNodes.Find(n => n.SlotOutPoint.Id == c.FromPoint) is StoryGetVariableNode gvSlot
+                    else if (logic.GetVariableNodes.Find(n => n.SlotOutPoint.Id == src) is StoryGetVariableNode gvSlot
                         && GetVariableName(project, gvSlot) is { Length: > 0 } gvSlotName)
                         vals[gvSlotName] = GetVariableSlotTag(project, gvSlot); // constant slot tag — resolves in both mediums
-                    else if (logic.GetVariableNodes.Find(n => n.OutPoint.Id == c.FromPoint) is StoryGetVariableNode gv
+                    else if (logic.GetVariableNodes.Find(n => n.OutPoint.Id == src) is StoryGetVariableNode gv
                         && GetVariableName(project, gv) is { Length: > 0 } gvName)
                     {
                         if (target == StoryRenderTarget.App) vals[gvName] = GetVariablePreviewValue(project, gv);
                         else hasOmittedVariable = true; // live value, unknown in the Gamebook
                     }
-                    else if (logic.ConstantVariableNodes.Find(n => n.OutPoint.Id == c.FromPoint) is StoryConstantVariableNode cv
+                    else if (logic.ConstantVariableNodes.Find(n => n.OutPoint.Id == src) is StoryConstantVariableNode cv
                         && !string.IsNullOrWhiteSpace(cv.Name))
                         vals[cv.Name] = cv.Value;
-                    else if (IncomingVariable(project, logic, c.FromPoint) is StoryDeclaredVariable dv && !string.IsNullOrWhiteSpace(dv.Name))
-                        vals[dv.Name] = values.TryGetValue(c.FromPoint, out string? sel) ? sel : "";
+                    else if (IncomingVariable(project, logic, src) is StoryDeclaredVariable dv && !string.IsNullOrWhiteSpace(dv.Name))
+                        vals[dv.Name] = values.TryGetValue(src, out string? sel) ? sel : "";
                 }
 
                 string rendered = StoryConditionPreview.Render(format, vals, out string? error);
@@ -416,8 +418,8 @@ namespace DeusaldStoryCommon
             return null;
         }
 
-        /// <summary>The output point wired into <paramref name="toPoint"/>, or empty when nothing is connected.</summary>
+        /// <summary>The output point wired into <paramref name="toPoint"/> (resolved through any logic portal), or empty when nothing is connected.</summary>
         private static Guid FromPointInto(StoryLogicNode logic, Guid toPoint) =>
-            logic.ContentConnections.Find(c => c.ToPoint == toPoint)?.FromPoint ?? Guid.Empty;
+            logic.ResolvePortalSource(logic.ContentConnections.Find(c => c.ToPoint == toPoint)?.FromPoint ?? Guid.Empty);
     }
 }

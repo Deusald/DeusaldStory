@@ -66,6 +66,9 @@ namespace DeusaldStoryCommon
         {
             if (fromPoint == Guid.Empty) return "";
 
+            // A variable may be routed through a logic portal — follow it back to the real value source.
+            fromPoint = logic.ResolvePortalSource(fromPoint);
+
             if (logic.ExternalVariableNodes.Find(n => n.OutPoint.Id == fromPoint) is StoryExternalVariableNode ev)
             {
                 StoryVariable? v = StoryBuiltInVariables.Find(ev.SelectedVariableId)

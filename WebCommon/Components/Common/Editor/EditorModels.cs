@@ -90,6 +90,8 @@ namespace DeusaldStoryWeb
         UnregisterVariable, // inside a logic node: on the LFlow chain, releases a registered variable and frees its slot (red)
         SetExternalVariable, // inside a logic node: on the LFlow chain, assigns a value to a story-wide external variable (blue)
         PrevExitVariable,        // inside a logic node: exposes the upstream node's declared variables as constants (teal)
+        LogicPortalIn,           // inside a logic node: a value portal's single input node (Text/Icon/Variable arrives here) (orange)
+        LogicPortalOut,          // inside a logic node: a value portal's output node (the value re-emerges here) (orange)
         Comment                  // in a container's graph or a logic node's inner graph: a free-text author note, no ports (dim)
     }
 
@@ -100,7 +102,7 @@ namespace DeusaldStoryWeb
     /// One selectable entry in the right-click node palette. <see cref="Kind"/> tells the editor which kind of
     /// node to create; the rest is presentation. The available set is context-dependent (see the palette).
     /// </summary>
-    public sealed record NodePaletteItem(StoryNodeKind Kind, string Icon, string Label, string Description);
+    public sealed record NodePaletteItem(StoryNodeKind Kind, string Icon, string Label, string Description, StoryPortalSignal? PortalSignal = null);
 
     /// <summary>An input or output connection port drawn on a node card.</summary>
     public sealed class EdPort
@@ -644,12 +646,68 @@ namespace DeusaldStoryWeb
                 nodes.Add(node);
             }
 
+            // ── Logic portals (orange) — one-in / many-out value relays. The in accepts the value; each out re-emits it. ──
+            foreach (StoryLogicPortalNode portal in logic.LogicPortalNodes)
+            {
+                PortType portType = PortalPortType(portal.Signal);
+                string   signal   = PortalSignalLabel(portal.Signal);
+
+                EdNode inNode = new()
+                {
+                    Id        = portal.InPoint.Id,
+                    Kind      = StoryNodeKind.LogicPortalIn,
+                    Title     = portal.Name,
+                    Subtitle  = signal,
+                    X         = portal.InPoint.X,
+                    Y         = portal.InPoint.Y,
+                    Deletable = true,
+                    Editable  = false
+                };
+                inNode.Inputs.Add(new EdPort { Id = portal.InPoint.Id, Name = signal, Type = portType });
+                nodes.Add(inNode);
+
+                foreach (StoryConnectionPoint outPoint in portal.OutPoints)
+                {
+                    EdNode outNode = new()
+                    {
+                        Id        = outPoint.Id,
+                        Kind      = StoryNodeKind.LogicPortalOut,
+                        Title     = portal.Name,
+                        Subtitle  = signal,
+                        X         = outPoint.X,
+                        Y         = outPoint.Y,
+                        Deletable = true,
+                        Editable  = false
+                    };
+                    outNode.Outputs.Add(new EdPort { Id = outPoint.Id, Name = signal, Type = portType });
+                    nodes.Add(outNode);
+                }
+            }
+
             // ── Comment notes (dim, portless) — free-text author notes; ignored during playback. ──
             foreach (StoryCommentNode comment in logic.CommentNodes)
                 nodes.Add(BuildCommentNode(comment));
 
             return nodes;
         }
+
+        /// <summary>The editor port type a logic portal's <paramref name="signal"/> exposes on its in/out points.</summary>
+        public static PortType PortalPortType(StoryPortalSignal signal) => signal switch
+        {
+            StoryPortalSignal.Text     => PortType.Text,
+            StoryPortalSignal.Icon     => PortType.Icon,
+            StoryPortalSignal.Variable => PortType.Variable,
+            _                          => PortType.Variable
+        };
+
+        /// <summary>A short human label for a logic portal's carried signal (shown as the node subtitle).</summary>
+        public static string PortalSignalLabel(StoryPortalSignal signal) => signal switch
+        {
+            StoryPortalSignal.Text     => "Text",
+            StoryPortalSignal.Icon     => "Icon",
+            StoryPortalSignal.Variable => "Variable",
+            _                          => ""
+        };
 
         /// <summary>A compact symbol for a condition operator (used in the Exit-node auto-resolution editor).</summary>
         public static string ConditionSymbol(StoryConditionOperator op) => op switch
@@ -751,6 +809,8 @@ namespace DeusaldStoryWeb
             StoryNodeKind.UnregisterVariable => "UNREGISTER VARIABLE",
             StoryNodeKind.SetExternalVariable => "SET EXTERNAL VARIABLE",
             StoryNodeKind.PrevExitVariable        => "PREV EXIT VARIABLES",
+            StoryNodeKind.LogicPortalIn           => "PORTAL IN",
+            StoryNodeKind.LogicPortalOut          => "PORTAL OUT",
             StoryNodeKind.Comment                 => "COMMENT",
             _                       => ""
         };
@@ -797,6 +857,8 @@ namespace DeusaldStoryWeb
             StoryNodeKind.UnregisterVariable => "bi-box-arrow-up",
             StoryNodeKind.SetExternalVariable => "bi-sliders",
             StoryNodeKind.PrevExitVariable        => "bi-braces",
+            StoryNodeKind.LogicPortalIn           => "bi-box-arrow-in-right",
+            StoryNodeKind.LogicPortalOut          => "bi-box-arrow-right",
             StoryNodeKind.Comment                 => "bi-chat-left-text",
             _                       => "bi-circle"
         };
@@ -856,6 +918,8 @@ namespace DeusaldStoryWeb
             StoryNodeKind.UnregisterVariable => "var(--danger)",
             StoryNodeKind.SetExternalVariable => "var(--info)",
             StoryNodeKind.PrevExitVariable        => "var(--code-func)",
+            StoryNodeKind.LogicPortalIn           => "var(--orange)",
+            StoryNodeKind.LogicPortalOut          => "var(--orange)",
             StoryNodeKind.Comment                 => "var(--text-dim)",
             _                       => "var(--text-dim)"
         };
