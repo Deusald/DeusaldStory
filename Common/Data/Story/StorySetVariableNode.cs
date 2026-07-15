@@ -44,6 +44,9 @@ namespace DeusaldStoryCommon
         /// <summary>String / <see cref="StringValueMode.PlayerInput"/> — Text input port carrying the "what to write" instruction (a Localization output).</summary>
         public StoryConnectionPoint InstructionIn { get; set; } = new() { Name = "Instruction" };
 
+        /// <summary>String / <see cref="StringValueMode.PlayerInput"/> — Text input port carrying the App input field's placeholder hint (a Localization output). Empty falls back to a default.</summary>
+        public StoryConnectionPoint PlaceholderIn { get; set; } = new() { Name = "Placeholder" };
+
         /// <summary>Flow input — wired from a previous flow node's output.</summary>
         public StoryConnectionPoint FlowIn { get; set; } = new() { Name = "Flow" };
 

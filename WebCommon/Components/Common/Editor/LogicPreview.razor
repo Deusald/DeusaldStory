@@ -162,7 +162,7 @@
                type="@(field.InputKind == StringInputKind.Number ? "number" : "text")"
                minlength="1"
                maxlength="30"
-               placeholder="@(field.InputKind == StringInputKind.Number ? "Enter a number…" : "Enter text…")"/>
+               placeholder="@(!string.IsNullOrEmpty(field.Placeholder) ? field.Placeholder : field.InputKind == StringInputKind.Number ? "Enter a number…" : "Enter text…")"/>
     </div>;
 
     /// <summary>External Variable values driving SmartFormat blocks (variable id → value); owned by the parent.</summary>

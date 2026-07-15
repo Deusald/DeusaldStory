@@ -561,7 +561,10 @@ namespace DeusaldStoryWeb
                 };
                 node.Inputs.Add(new EdPort { Id = reg.FlowIn.Id, Name = "Flow", Type = PortType.LFlow });
                 if (reg.Type == StorageVariableType.String && reg.StringMode == StringValueMode.PlayerInput)
+                {
                     node.Inputs.Add(new EdPort { Id = reg.InstructionIn.Id, Name = "Instruction", Type = PortType.Text });
+                    node.Inputs.Add(new EdPort { Id = reg.PlaceholderIn.Id, Name = "Placeholder", Type = PortType.Text });
+                }
                 node.Outputs.Add(new EdPort { Id = reg.FlowOut.Id, Name = "Flow", Type = PortType.LFlow });
                 nodes.Add(node);
             }
@@ -582,7 +585,10 @@ namespace DeusaldStoryWeb
                 };
                 node.Inputs.Add(new EdPort { Id = set.FlowIn.Id, Name = "Flow", Type = PortType.LFlow });
                 if (target is { Type: StorageVariableType.String } && set.StringMode == StringValueMode.PlayerInput)
+                {
                     node.Inputs.Add(new EdPort { Id = set.InstructionIn.Id, Name = "Instruction", Type = PortType.Text });
+                    node.Inputs.Add(new EdPort { Id = set.PlaceholderIn.Id, Name = "Placeholder", Type = PortType.Text });
+                }
                 node.Outputs.Add(new EdPort { Id = set.FlowOut.Id, Name = "Flow", Type = PortType.LFlow });
                 nodes.Add(node);
             }

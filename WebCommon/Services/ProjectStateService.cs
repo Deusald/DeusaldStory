@@ -881,9 +881,9 @@ public partial class ProjectStateService(
         node.StringInputKind = stringInputKind;
         node.PreviewValue    = previewValue;
 
-        // The Instruction port only exists for a player-input String — drop any stale wire when it no longer applies.
+        // The Instruction / Placeholder ports only exist for a player-input String — drop any stale wire when they no longer apply.
         if (type != StorageVariableType.String || stringMode != StringValueMode.PlayerInput)
-            logic.ContentConnections.RemoveAll(c => c.ToPoint == node.InstructionIn.Id);
+            logic.ContentConnections.RemoveAll(c => c.ToPoint == node.InstructionIn.Id || c.ToPoint == node.PlaceholderIn.Id);
         MarkKeyDirty(logicId);
     }
 
@@ -898,7 +898,7 @@ public partial class ProjectStateService(
         logic.ContentConnections.RemoveAll(c =>
             c.FromPoint == node.FlowOut.Id || c.ToPoint == node.FlowOut.Id ||
             c.FromPoint == node.FlowIn.Id  || c.ToPoint == node.FlowIn.Id  ||
-            c.ToPoint   == node.InstructionIn.Id);
+            c.ToPoint   == node.InstructionIn.Id || c.ToPoint == node.PlaceholderIn.Id);
         MarkKeyDirty(logicId);
     }
 
@@ -931,10 +931,10 @@ public partial class ProjectStateService(
         node.StringValue          = stringValue;
         node.StringInputKind      = stringInputKind;
 
-        // The Instruction port only exists for a player-input String target — drop any stale wire when it no longer applies.
+        // The Instruction / Placeholder ports only exist for a player-input String target — drop any stale wire when they no longer apply.
         StoryRegisterVariableNode? target = EditorProjection.FindRegister(CurrentProject!, registeredVariableId);
         if (target is not { Type: StorageVariableType.String } || stringMode != StringValueMode.PlayerInput)
-            logic.ContentConnections.RemoveAll(c => c.ToPoint == node.InstructionIn.Id);
+            logic.ContentConnections.RemoveAll(c => c.ToPoint == node.InstructionIn.Id || c.ToPoint == node.PlaceholderIn.Id);
         MarkKeyDirty(logicId);
     }
 
@@ -949,7 +949,7 @@ public partial class ProjectStateService(
         logic.ContentConnections.RemoveAll(c =>
             c.FromPoint == node.FlowOut.Id || c.ToPoint == node.FlowOut.Id ||
             c.FromPoint == node.FlowIn.Id  || c.ToPoint == node.FlowIn.Id  ||
-            c.ToPoint   == node.InstructionIn.Id);
+            c.ToPoint   == node.InstructionIn.Id || c.ToPoint == node.PlaceholderIn.Id);
         MarkKeyDirty(logicId);
     }
 
@@ -1646,12 +1646,14 @@ public partial class ProjectStateService(
             valid.Add(n.FlowIn.Id);
             valid.Add(n.FlowOut.Id);
             valid.Add(n.InstructionIn.Id);
+            valid.Add(n.PlaceholderIn.Id);
         }
         foreach (StorySetVariableNode n in logic.SetVariableNodes)
         {
             valid.Add(n.FlowIn.Id);
             valid.Add(n.FlowOut.Id);
             valid.Add(n.InstructionIn.Id);
+            valid.Add(n.PlaceholderIn.Id);
         }
         foreach (StoryUnregisterVariableNode n in logic.UnregisterVariableNodes)
         {
