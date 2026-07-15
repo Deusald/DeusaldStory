@@ -39,7 +39,7 @@ namespace DeusaldStoryCommon
         public List<StoryDeclaredVariable> DeclaredVariables { get; } = new();
 
         /// <summary>SinglePath only — the single outer VFlow output all choices share. Kept stable across mode toggles.</summary>
-        public StoryConnectionPoint VFlowOut { get; set; } = new() { Name = "Out" };
+        public StoryConnectionPoint VFlowOut { get; set; } = new() { Name = "Continue" };
 
         /// <summary>
         /// When set, this node gains a second (VFlow) input port, <see cref="VariablesIn"/>, that accepts an upstream

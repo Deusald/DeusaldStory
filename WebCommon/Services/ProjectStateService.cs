@@ -884,11 +884,12 @@ public partial class ProjectStateService(
 
     /// <summary>
     /// Wires an output (<paramref name="fromPoint"/>) to an input (<paramref name="toPoint"/>) inside a logic node's
-    /// content graph. An LFlow / Text / Icon output leads to one place, so any existing wire leaving
-    /// <paramref name="fromPoint"/> is replaced — except a variable-supplying output (External / Get / Constant /
-    /// Prev Exit), which may fan out to many inputs and keeps them all. An input takes a single source (its previous
-    /// wire is replaced) — except a SmartFormat / Exit-node <b>variables</b> input, which accepts many variable
-    /// outputs and keeps them all. A no-op (returns null) if the exact wire already exists.
+    /// content graph. Only a flow output (LFlow / VFlow) leads to a single place, so any existing wire leaving
+    /// <paramref name="fromPoint"/> is replaced. Every content output — Text (Localization / SmartFormat), Icon
+    /// (Icon / LightDarkSwitch) and variable-supplying (External / Get / Constant / Prev Exit) — may fan out to
+    /// many inputs and keeps them all. An input takes a single source (its previous wire is replaced) — except a
+    /// SmartFormat / Exit-node <b>variables</b> input, which accepts many variable outputs and keeps them all.
+    /// A no-op (returns null) if the exact wire already exists.
     /// </summary>
     public StoryConnection? ConnectContent(Guid logicId, Guid fromPoint, Guid toPoint)
     {
@@ -898,8 +899,16 @@ public partial class ProjectStateService(
         // The variables inputs (SmartFormat, the Exit node's auto-resolution) aggregate many variable outputs.
         bool multiInput  = logic.SmartFormatNodes.Exists(sf => sf.VariablesIn.Id == toPoint)
                         || logic.ExitVariablesIn.Id == toPoint;
-        // Variable-supplying outputs fan out to many inputs: External / Get (value + slot) / Constant / Prev Exit.
-        bool multiOutput = logic.ExternalVariableNodes.Exists(ev => ev.OutPoint.Id == fromPoint)
+        // Every non-flow content output is one-in-many-out — it keeps all its wires:
+        //   Text  : Localization / SmartFormat
+        //   Icon  : Icon / LightDarkSwitch
+        //   Value : External / Get (value + slot) / Constant / Prev Exit
+        // Only flow outputs (LFlow / VFlow) lead to a single place and get their previous wire replaced below.
+        bool multiOutput = logic.LocalizationNodes.Exists(l => l.OutPoint.Id == fromPoint)
+                        || logic.SmartFormatNodes.Exists(sf => sf.OutPoint.Id == fromPoint)
+                        || logic.IconNodes.Exists(ic => ic.OutPoint.Id == fromPoint)
+                        || logic.LightDarkSwitchNodes.Exists(ld => ld.OutPoint.Id == fromPoint)
+                        || logic.ExternalVariableNodes.Exists(ev => ev.OutPoint.Id == fromPoint)
                         || logic.GetVariableNodes.Exists(gv => gv.OutPoint.Id == fromPoint || gv.SlotOutPoint.Id == fromPoint)
                         || logic.ConstantVariableNodes.Exists(cv => cv.OutPoint.Id == fromPoint)
                         || StorySelectionResolver.IncomingVariables(CurrentProject, logic).Exists(d => d.Id == fromPoint);

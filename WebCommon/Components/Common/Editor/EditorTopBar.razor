@@ -126,6 +126,36 @@
 
 </div>
 
+@* ── Unsaved-changes guard shown when leaving to the projects list ─────── *@
+@if (_ConfirmLeaveOpen)
+{
+    <div class="modal-backdrop" @onclick="CancelLeave"></div>
+
+    <div class="modal-box etb-leave-box" @onclick:stopPropagation="true">
+
+        <div class="modal-header">
+            <span class="modal-title">Unsaved changes</span>
+            <button class="modal-close" @onclick="CancelLeave" title="Close">
+                <i class="bi bi-x-lg"></i>
+            </button>
+        </div>
+
+        <div class="modal-body">
+            <div class="modal-note">
+                <i class="bi bi-exclamation-triangle"></i>
+                <span>This project has unsaved changes. Do you want to save them before returning to your projects?</span>
+            </div>
+        </div>
+
+        <div class="modal-footer">
+            <button class="modal-btn modal-btn-ghost" @onclick="CancelLeave">Cancel</button>
+            <button class="modal-btn modal-btn-ghost" @onclick="DiscardAndLeave">Discard changes</button>
+            <button class="modal-btn modal-btn-primary" @onclick="SaveAndLeave">Save and leave</button>
+        </div>
+
+    </div>
+}
+
 @code {
     [Parameter] public EditorMode                   Mode                 { get; set; }
     [Parameter] public EventCallback<EditorMode>    ModeChanged          { get; set; }
@@ -135,6 +165,7 @@
     [Parameter] public EventCallback                OnRefreshLocalization { get; set; }
 
     private bool _ExportOpen;
+    private bool _ConfirmLeaveOpen;
 
     protected override void OnInitialized()
     {
@@ -168,7 +199,33 @@
 
     private void GoHome()
     {
-        // NOTE: no confirm-on-unsaved yet — a leave-guard modal can come later.
+        // Guard against losing unsaved work — prompt to save/discard first.
+        if (_ProjectState.IsDirty)
+        {
+            _ConfirmLeaveOpen = true;
+            StateHasChanged();
+            return;
+        }
+        LeaveToHome();
+    }
+
+    private void CancelLeave() => _ConfirmLeaveOpen = false;
+
+    private void DiscardAndLeave()
+    {
+        _ConfirmLeaveOpen = false;
+        LeaveToHome();
+    }
+
+    private async Task SaveAndLeave()
+    {
+        _ConfirmLeaveOpen = false;
+        await _ProjectState.SaveAsync();
+        LeaveToHome();
+    }
+
+    private void LeaveToHome()
+    {
         _ProjectState.CloseProject();
         // BaseUri (not "/" or "") so this works both in the MAUI WebView and under the web app's rewritten base href.
         _Nav.NavigateTo(_Nav.BaseUri);
