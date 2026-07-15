@@ -53,7 +53,17 @@ namespace DeusaldStoryCommon
         }
 
         /// <summary>One rendered text block — the resolved (sanitizable) text plus the frame style it is drawn in.</summary>
-        public sealed record RenderedBlock(string Text, StoryTextFrameStyle FrameStyle);
+        public sealed class RenderedBlock
+        {
+            public RenderedBlock() { }
+            public RenderedBlock(string text, StoryTextFrameStyle frameStyle)
+            {
+                Text       = text;
+                FrameStyle = frameStyle;
+            }
+            public string              Text       { get; set; } = "";
+            public StoryTextFrameStyle FrameStyle { get; set; } = StoryTextFrameStyle.Normal;
+        }
 
         /// <summary>One resolved choice — its player-facing text plus how the App/Gamebook continues from it.</summary>
         public sealed class RenderedChoice

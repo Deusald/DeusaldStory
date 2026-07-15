@@ -48,8 +48,10 @@
             <div class="ed-stage">
                 @if (_Mode == EditorMode.Edit)
                 {
-                    <EditorGraph Nodes="_Nodes"
+                    <EditorGraph @ref="_GraphRef"
+                                 Nodes="_Nodes"
                                  Edges="_Edges"
+                                 InitialViewport="ViewportForCurrentGraph"
                                  SelectedId="_SelectedId"
                                  SelectedChanged="OnSelect"
                                  OnAddNode="OnAddNode"
@@ -160,6 +162,13 @@
     private EditorMode        _Mode = EditorMode.Edit;
     private EditorRail.Tool   _ActiveTool = EditorRail.Tool.Graph;
     private Guid              _SelectedId;
+
+    private EditorGraph?   _GraphRef;           // the live graph (present only in Edit mode)
+    private GraphViewport? _SavedViewport;      // its pan/zoom, kept across a preview round-trip so returning reopens where it was left
+    private Guid           _SavedViewportGraphId; // which graph the saved viewport belongs to (preview can navigate elsewhere)
+
+    /// <summary>The pan/zoom to reopen the graph at — only when it's the same graph the viewport was captured from.</summary>
+    private GraphViewport? ViewportForCurrentGraph => _SavedViewportGraphId == _CurrentId ? _SavedViewport : null;
     private List<EditorCrumb> _Crumbs = [];
     private List<EdNode>      _Nodes  = [];
     private List<EdEdge>      _Edges  = [];
@@ -287,6 +296,9 @@
 
     private void OnModeChanged(EditorMode mode)
     {
+        // Remember where the graph was panned/zoomed before it is swapped out, so returning to Edit reopens there.
+        CaptureViewport();
+
         // Entering preview starts the External Variable tweaks fresh (panel re-seeds them to the defaults).
         if (mode == EditorMode.Preview)
         {
@@ -358,7 +370,20 @@
     }
 
     /// <summary>Rail tool picked — swap the centre panel. Only Media has its own panel; the rest keep the graph.</summary>
-    private void OnToolSelected(EditorRail.Tool tool) => _ActiveTool = tool;
+    private void OnToolSelected(EditorRail.Tool tool)
+    {
+        // Some rail tools take over the whole centre and unmount the graph — save its viewport first.
+        CaptureViewport();
+        _ActiveTool = tool;
+    }
+
+    /// <summary>Snapshots the live graph's pan/zoom (and which graph it is) so a later re-mount can reopen where it was left.</summary>
+    private void CaptureViewport()
+    {
+        if (_GraphRef is null) return;
+        _SavedViewport        = _GraphRef.CurrentViewport;
+        _SavedViewportGraphId = _CurrentId;
+    }
 
     private void OnSelect(Guid id) => _SelectedId = id;
 

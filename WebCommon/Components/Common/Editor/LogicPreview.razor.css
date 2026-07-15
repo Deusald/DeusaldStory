@@ -132,6 +132,9 @@
 
 /* A rendered text block (one FlowText node). */
 .lpv-block {
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
     font-size: 15px;
     line-height: 1.6;
     color: var(--lpv-text);
@@ -139,14 +142,20 @@
     background: var(--lpv-frame-bg);
     border: 1px solid var(--lpv-frame-border);
     border-radius: var(--r-md);
-    white-space: pre-wrap;
 }
+.lpv-block-text { flex: 1; min-width: 0; white-space: pre-wrap; }
+/* The frame's leading status icon — coloured by its frame modifier below, nudged to sit on the first text line. */
+.lpv-block-icon { flex: none; font-size: 17px; line-height: 1.6; }
 
-/* Frame styles — a coloured left accent + tinted background echoing the semantic colour. */
+/* Frame styles — a coloured left accent + tinted background + matching icon echoing the semantic colour. */
 .lpv-block-info    { border-color: var(--info);    border-left: 3px solid var(--info);    background: color-mix(in srgb, var(--info)    12%, var(--lpv-frame-bg)); }
 .lpv-block-success { border-color: var(--success); border-left: 3px solid var(--success); background: color-mix(in srgb, var(--success) 12%, var(--lpv-frame-bg)); }
 .lpv-block-warning { border-color: var(--warning); border-left: 3px solid var(--warning); background: color-mix(in srgb, var(--warning) 12%, var(--lpv-frame-bg)); }
 .lpv-block-danger  { border-color: var(--danger);  border-left: 3px solid var(--danger);  background: color-mix(in srgb, var(--danger)  12%, var(--lpv-frame-bg)); }
+.lpv-block-info    .lpv-block-icon { color: var(--info); }
+.lpv-block-success .lpv-block-icon { color: var(--success); }
+.lpv-block-warning .lpv-block-icon { color: var(--warning); }
+.lpv-block-danger  .lpv-block-icon { color: var(--danger); }
 
 .lpv-placeholder {
     color: var(--text-faint);

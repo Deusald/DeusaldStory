@@ -153,12 +153,20 @@
     border-radius: var(--r-md);
     white-space: pre-wrap;
 }
+/* When a frame carries a status icon the block becomes a row: icon left, text flowing. */
+.gbp-block:has(.gbp-block-icon) { display: flex; gap: 12px; align-items: flex-start; white-space: normal; }
+.gbp-block-text { flex: 1; min-width: 0; white-space: pre-wrap; }
+.gbp-block-icon { flex: none; font-size: 17px; line-height: 1.6; }
 
-/* Frame styles — a coloured left accent + faint tint over the paper background. */
+/* Frame styles — a coloured left accent + faint tint over the paper background + matching icon. */
 .gbp-block-info    { border-color: var(--info);    border-left: 3px solid var(--info);    background: color-mix(in srgb, var(--info)    10%, var(--gbp-frame-bg)); }
 .gbp-block-success { border-color: var(--success); border-left: 3px solid var(--success); background: color-mix(in srgb, var(--success) 10%, var(--gbp-frame-bg)); }
 .gbp-block-warning { border-color: var(--warning); border-left: 3px solid var(--warning); background: color-mix(in srgb, var(--warning) 10%, var(--gbp-frame-bg)); }
 .gbp-block-danger  { border-color: var(--danger);  border-left: 3px solid var(--danger);  background: color-mix(in srgb, var(--danger)  10%, var(--gbp-frame-bg)); }
+.gbp-block-info    .gbp-block-icon { color: var(--info); }
+.gbp-block-success .gbp-block-icon { color: var(--success); }
+.gbp-block-warning .gbp-block-icon { color: var(--warning); }
+.gbp-block-danger  .gbp-block-icon { color: var(--danger); }
 
 .gbp-instructions {
     display: flex;

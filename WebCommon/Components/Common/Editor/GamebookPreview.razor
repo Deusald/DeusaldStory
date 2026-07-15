@@ -111,7 +111,14 @@
             {
                 @foreach (StoryLogicRenderer.RenderedBlock block in sec.Rendered.Blocks)
                 {
-                    <div class="gbp-block @FrameClass(block.FrameStyle)">@SafeHtml(block.Text)</div>
+                    StoryTextFrameStyle style = block.FrameStyle;
+                    <div class="gbp-block @FrameClass(style)">
+                        @if (StoryStyle.FrameIcon(style) is { Length: > 0 } frameIcon)
+                        {
+                            <i class="gbp-block-icon bi @frameIcon" title="@StoryStyle.FrameLabel(style)"></i>
+                        }
+                        <span class="gbp-block-text">@SafeHtml(block.Text)</span>
+                    </div>
                 }
             }
 

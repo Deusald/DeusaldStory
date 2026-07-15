@@ -86,7 +86,14 @@
                 }
                 else
                 {
-                    <div class="lpv-block @FrameClass(block.FrameStyle)">@SafeHtml(block.Text)</div>
+                    StoryTextFrameStyle style = block.FrameStyle;
+                    <div class="lpv-block @FrameClass(style)">
+                        @if (StoryStyle.FrameIcon(style) is { Length: > 0 } frameIcon)
+                        {
+                            <i class="lpv-block-icon bi @frameIcon" title="@StoryStyle.FrameLabel(style)"></i>
+                        }
+                        <span class="lpv-block-text">@SafeHtml(block.Text)</span>
+                    </div>
                 }
             }
         }

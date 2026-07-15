@@ -102,6 +102,9 @@ namespace DeusaldStoryWeb
     /// <summary>A point on the graph canvas in world (un-panned, un-scaled) coordinates.</summary>
     public readonly record struct CanvasPoint(double X, double Y);
 
+    /// <summary>The graph canvas viewport — its pan offset (screen px) and zoom scale — so it can be restored after leaving/returning to the graph (e.g. an edit → preview → edit round-trip).</summary>
+    public readonly record struct GraphViewport(double PanX, double PanY, double Scale);
+
     /// <summary>
     /// One selectable entry in the right-click node palette. <see cref="Kind"/> tells the editor which kind of
     /// node to create; the rest is presentation. The available set is context-dependent (see the palette).
@@ -510,7 +513,7 @@ namespace DeusaldStoryWeb
                     Id        = ft.Id,
                     Kind      = StoryNodeKind.FlowText,
                     Title     = "FlowText",
-                    Subtitle  = FlowTextMediumLabel(ft),
+                    Subtitle  = FlowTextMediumLabel(ft) ?? "",
                     X         = ft.X,
                     Y         = ft.Y,
                     Deletable = true,
@@ -995,6 +998,16 @@ namespace DeusaldStoryWeb
             StoryTextFrameStyle.Warning => "Warning",
             StoryTextFrameStyle.Danger  => "Danger",
             _                           => "Normal"
+        };
+
+        /// <summary>The Bootstrap-icon class shown alongside a non-Normal frame style; empty for <see cref="StoryTextFrameStyle.Normal"/>.</summary>
+        public static string FrameIcon(StoryTextFrameStyle s) => s switch
+        {
+            StoryTextFrameStyle.Info    => "bi-info-circle-fill",
+            StoryTextFrameStyle.Success => "bi-check-circle-fill",
+            StoryTextFrameStyle.Warning => "bi-exclamation-triangle-fill",
+            StoryTextFrameStyle.Danger  => "bi-exclamation-octagon-fill",
+            _                           => ""
         };
     }
 }

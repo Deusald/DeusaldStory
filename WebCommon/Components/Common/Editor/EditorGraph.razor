@@ -308,6 +308,12 @@
     /// <summary>Whether the editor's clipboard holds something pasteable into this graph — drives the canvas menu's Paste item.</summary>
     [Parameter] public bool CanPaste { get; set; }
 
+    /// <summary>The pan/zoom to open this graph at — set by the parent so a re-created graph (e.g. returning from preview) reopens where it was left. Null keeps the default view.</summary>
+    [Parameter] public GraphViewport? InitialViewport { get; set; }
+
+    /// <summary>The graph's current pan/zoom — read by the parent before it swaps this graph out, so it can be restored later via <see cref="InitialViewport"/>.</summary>
+    public GraphViewport CurrentViewport => new(_PanX, _PanY, _Scale);
+
     // ── Node layout constants (must match the absolute positions in EditorGraph.razor.css) ──
     private const double NODE_W       = 216; // fixed card width
     private const double HEAD_TOP     = 12;  // kind row top
@@ -329,6 +335,17 @@
     private double _Scale = 1;
     private double _PanX  = 24;
     private double _PanY  = 28;
+
+    protected override void OnInitialized()
+    {
+        // Reopen where the parent last left this graph (survives an edit → preview → edit round-trip); default view otherwise.
+        if (InitialViewport is { } v)
+        {
+            _PanX  = v.PanX;
+            _PanY  = v.PanY;
+            _Scale = v.Scale;
+        }
+    }
 
     private ElementReference       _CanvasEl;
     private IJSObjectReference?    _Module;
