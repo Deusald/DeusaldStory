@@ -68,7 +68,6 @@
                                  OnCanvasContextMenu="OnCanvasContextMenu"
                                  OnNodeEdit="OnNodeEdit"
                                  OnNodePreview="OnNodePreview"
-                                 OnNodePortalJump="OnNodePortalJump"
                                  OnNodeDelete="OnNodeDelete"
                                  OnNodesDelete="OnNodesDelete"
                                  OnNodesCopy="OnNodesCopy"
@@ -541,19 +540,6 @@
         _GbpScrollKey    = null;
         _Mode            = EditorMode.Preview;
         RebuildNodes();
-    }
-
-    /// <summary>Context-menu "Go to portal out/in": recentre the view on the paired portal node and select it.</summary>
-    private async Task OnNodePortalJump(EdNode node)
-    {
-        if (_ProjectState.FindPortalByPoint(node.Id) is not StoryPortalNode portal) return;
-
-        Guid target = node.Kind == StoryNodeKind.PortalIn
-            ? portal.OutPoint.Id
-            : portal.InPoints.Count > 0 ? portal.InPoints[0].Id : Guid.Empty;
-
-        if (target != Guid.Empty && _GraphRef is not null)
-            await _GraphRef.CenterOnNode(target);
     }
 
     /// <summary>Wire an output port to an input port in the current graph (container or logic content).</summary>

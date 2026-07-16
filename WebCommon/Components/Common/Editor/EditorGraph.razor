@@ -225,16 +225,17 @@
                         <i class="bi bi-eye-fill"></i> Preview
                     </button>
                 }
-                @if (menu.Kind == StoryNodeKind.PortalIn)
+                @if (menu.PortalCrossTarget is Guid crossTarget)
                 {
-                    <button class="edg-menu-item" @onclick="() => MenuInvoke(OnNodePortalJump, menu)">
-                        <i class="bi bi-box-arrow-right"></i> Go to portal out
+                    bool isIn = IsPortalIn(menu);
+                    <button class="edg-menu-item" @onclick="() => MenuJumpTo(crossTarget)">
+                        <i class="bi @(isIn ? "bi-box-arrow-right" : "bi-box-arrow-in-right")"></i> Go to portal @(isIn ? "out" : "in")
                     </button>
                 }
-                @if (menu.Kind == StoryNodeKind.PortalOut)
+                @if (menu.PortalNextTarget is Guid nextTarget)
                 {
-                    <button class="edg-menu-item" @onclick="() => MenuInvoke(OnNodePortalJump, menu)">
-                        <i class="bi bi-box-arrow-in-right"></i> Go to portal in
+                    <button class="edg-menu-item" @onclick="() => MenuJumpTo(nextTarget)">
+                        <i class="bi bi-arrow-repeat"></i> Go to next @(IsPortalIn(menu) ? "in" : "out")
                     </button>
                 }
                 @if (menu.Editable)
@@ -316,7 +317,6 @@
     [Parameter] public EventCallback<Guid>       OnDisconnect        { get; set; }
     [Parameter] public EventCallback<EdNode>     OnNodeEdit          { get; set; }
     [Parameter] public EventCallback<EdNode>     OnNodePreview       { get; set; }
-    [Parameter] public EventCallback<EdNode>     OnNodePortalJump    { get; set; }
     [Parameter] public EventCallback<EdNode>     OnNodeDelete        { get; set; }
     [Parameter] public EventCallback<EdNode>     OnNodeAddPortalIn   { get; set; }
     [Parameter] public EventCallback<EdNode>     OnNodeAddPortalOut  { get; set; }
@@ -816,6 +816,16 @@
     /// <summary>Nodes that offer a "Preview" menu item: a logic node (its own preview), a container or the Root's Start
     /// (previews the first logic node reached from inside).</summary>
     private static bool CanPreview(EdNode n) => n.Kind is StoryNodeKind.Logic or StoryNodeKind.Container or StoryNodeKind.Start;
+
+    /// <summary>True when a portal node is an "in" side (container or logic) — picks the "out"/"in" wording and icons.</summary>
+    private static bool IsPortalIn(EdNode n) => n.Kind is StoryNodeKind.PortalIn or StoryNodeKind.LogicPortalIn;
+
+    /// <summary>Context-menu portal jump — close the menu and recentre the view on the paired / next portal node.</summary>
+    private async Task MenuJumpTo(Guid id)
+    {
+        _MenuNode = null;
+        await CenterOnNode(id);
+    }
 
     /// <summary>Pans the view so <paramref name="id"/>'s node sits at the centre and makes it the selection — used to
     /// jump between a portal's in and out nodes.</summary>

@@ -7,15 +7,25 @@
     <div class="rlm-box">
         <div class="rlm-header">
             <i class="bi bi-link-45deg rlm-icon"></i>
-            <span class="rlm-title">Localization project not found</span>
+            <span class="rlm-title">@(_ProjectMissing ? "Localization project not found" : "Re-link localization project")</span>
         </div>
 
         <div class="rlm-body">
-            <p class="rlm-msg">
-                <strong>@_StoryName</strong> is linked to a localization project that couldn't be opened —
-                it may have been moved, deleted, or created on another device. Select a localization
-                project to continue.
-            </p>
+            @if (_ProjectMissing)
+            {
+                <p class="rlm-msg">
+                    <strong>@_StoryName</strong> is linked to a localization project that couldn't be opened —
+                    it may have been moved, deleted, or created on another device. Select a localization
+                    project to continue.
+                </p>
+            }
+            else
+            {
+                <p class="rlm-msg">
+                    Choose the localization project <strong>@_StoryName</strong> should use. Its languages and
+                    text keys will replace the currently linked ones.
+                </p>
+            }
             <LocalizationProjectField @bind-Selected="_SelectedLoc"/>
         </div>
 
@@ -33,14 +43,18 @@
     [Parameter] public EventCallback                OnCancel  { get; set; }
 
     private bool           _Visible;
+    private bool           _ProjectMissing = true;
     private string         _StoryName = "";
     private LocProjectRef? _SelectedLoc;
 
-    public void Show(string storyName)
+    /// <summary>Opens the dialog. <paramref name="projectMissing"/> true (the default) frames it as recovering a broken
+    /// link on project open; false frames it as a deliberate change of the linked project from the editor.</summary>
+    public void Show(string storyName, bool projectMissing = true)
     {
-        _StoryName   = storyName;
-        _SelectedLoc = null;
-        _Visible     = true;
+        _StoryName      = storyName;
+        _ProjectMissing = projectMissing;
+        _SelectedLoc    = null;
+        _Visible        = true;
         StateHasChanged();
     }
 

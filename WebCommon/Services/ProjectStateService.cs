@@ -1926,6 +1926,23 @@ public partial class ProjectStateService(
         return await ResolveLocalizationAsync(project, storyLocation);
     }
 
+    /// <summary>
+    /// Re-links the <b>currently open</b> project to <paramref name="newReference"/>, persists the metadata, swaps in
+    /// the new <see cref="CurrentLocalization"/> and notifies open UI. Returns false when there is no open project or
+    /// the new reference can't be opened. Used by the editor's Localization panel to change the link in place.
+    /// </summary>
+    public async Task<bool> RelinkCurrentLocalizationAsync(string newReference)
+    {
+        if (CurrentProject is null || string.IsNullOrEmpty(CurrentProjectPath)) return false;
+
+        LocProject? loc = await RelinkAndSaveAsync(CurrentProject, CurrentProjectPath!, newReference);
+        if (loc is null) return false;
+
+        CurrentLocalization = loc;
+        ProjectDataChanged?.Invoke();
+        return true;
+    }
+
     public void CloseProject()
     {
         CurrentProject      = null;

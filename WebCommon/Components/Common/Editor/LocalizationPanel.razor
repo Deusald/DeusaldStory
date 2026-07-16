@@ -22,13 +22,19 @@
             </div>
             <div class="lop-head-sub">Browse the linked localization project's keys and translations.</div>
         </div>
-        @if (_Loc is not null)
-        {
-            <button class="lop-refresh" @onclick="Refresh" disabled="@_Refreshing" title="Refresh localization keys">
-                <i class="bi bi-arrow-clockwise @(_Refreshing ? "lop-spin" : "")"></i>
-                <span>Refresh</span>
+        <div class="lop-head-actions">
+            <button class="lop-refresh" @onclick="Relink" title="Link a different localization project">
+                <i class="bi bi-link-45deg"></i>
+                <span>Re-link</span>
             </button>
-        }
+            @if (_Loc is not null)
+            {
+                <button class="lop-refresh" @onclick="Refresh" disabled="@_Refreshing" title="Refresh localization keys">
+                    <i class="bi bi-arrow-clockwise @(_Refreshing ? "lop-spin" : "")"></i>
+                    <span>Refresh</span>
+                </button>
+            }
+        </div>
     </div>
 
     @if (_Loc is null)
@@ -36,6 +42,10 @@
         <div class="lop-empty">
             <i class="bi bi-translate"></i>
             <span>No localization project is linked to this story.</span>
+            <button class="lop-refresh" @onclick="Relink">
+                <i class="bi bi-link-45deg"></i>
+                <span>Link a project</span>
+            </button>
         </div>
     }
     else
@@ -160,9 +170,13 @@
 
 </div>
 
+<RelinkLocalizationModal @ref="_RelinkModal" OnConfirm="OnRelinkConfirmed"/>
+
 @code {
     /// <summary>Raised when the user hits Refresh, so the editor can re-project the graph with any new keys.</summary>
     [Parameter] public EventCallback OnRefresh { get; set; }
+
+    private RelinkLocalizationModal? _RelinkModal;
 
     private string _Search = "";
     private Guid?  _CategoryId;   // null = All
@@ -182,6 +196,21 @@
         _Refreshing = true;
         try   { await OnRefresh.InvokeAsync(); }
         finally { _Refreshing = false; }
+    }
+
+    /// <summary>Opens the picker to link a different localization project to this story.</summary>
+    private void Relink() =>
+        _RelinkModal?.Show(_ProjectState.CurrentProject?.Metadata.Name ?? "This story", projectMissing: false);
+
+    /// <summary>Points the story at the picked localization project and re-projects the graph with the new keys.</summary>
+    private async Task OnRelinkConfirmed(LocProjectRef reference)
+    {
+        if (await _ProjectState.RelinkCurrentLocalizationAsync(reference.Reference))
+        {
+            _SelectedKeyId = Guid.Empty;
+            _CategoryId    = null;
+            await OnRefresh.InvokeAsync();
+        }
     }
 
     /// <summary>Every language in the project, main language first, then the rest alphabetically.</summary>

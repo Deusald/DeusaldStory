@@ -114,6 +114,16 @@ namespace DeusaldStoryWeb
         /// <summary>Optional inline thumbnail (base64 PNG) drawn in the card body — e.g. an Icon node's picked icon.</summary>
         public string? Thumb { get; set; }
 
+        /// <summary>For a portal node (container or logic), the id of the node on the <b>opposite</b> side of the pair —
+        /// an "in" points at an "out" and vice versa — so the context menu can jump the view across the pair. Null on
+        /// non-portal nodes.</summary>
+        public Guid? PortalCrossTarget { get; set; }
+
+        /// <summary>For a portal side that has siblings (a many-in container portal's ins, or a many-out logic portal's
+        /// outs), the id of the <b>next</b> sibling of the same role, cycling round — so the menu can offer "Go to next
+        /// in/out". Null when this side has only one member.</summary>
+        public Guid? PortalNextTarget { get; set; }
+
         public List<EdPort> Inputs  { get; } = new();
         public List<EdPort> Outputs { get; } = new();
     }
@@ -212,17 +222,21 @@ namespace DeusaldStoryWeb
             {
                 if (!project.PortalNodes.TryGetValue(portalId, out StoryPortalNode? portal)) continue;
 
-                foreach (StoryConnectionPoint ip in portal.InPoints)
+                for (int x = 0; x < portal.InPoints.Count; ++x)
                 {
+                    StoryConnectionPoint ip = portal.InPoints[x];
                     EdNode inNode = new()
                     {
-                        Id        = ip.Id,
-                        Kind      = StoryNodeKind.PortalIn,
-                        Title     = portal.Name,
-                        Subtitle  = portal.Description,
-                        X         = ip.X,
-                        Y         = ip.Y,
-                        Deletable = true
+                        Id                = ip.Id,
+                        Kind              = StoryNodeKind.PortalIn,
+                        Title             = portal.Name,
+                        Subtitle          = portal.Description,
+                        X                 = ip.X,
+                        Y                 = ip.Y,
+                        Deletable         = true,
+                        // Many-in / one-out: the cross-jump lands on the single out; the next-jump cycles the other ins.
+                        PortalCrossTarget = portal.OutPoint.Id,
+                        PortalNextTarget  = portal.InPoints.Count > 1 ? portal.InPoints[(x + 1) % portal.InPoints.Count].Id : null
                     };
                     inNode.Inputs.Add(new EdPort { Id = ip.Id, Name = "Flow" });
                     nodes.Add(inNode);
@@ -230,13 +244,15 @@ namespace DeusaldStoryWeb
 
                 EdNode outNode = new()
                 {
-                    Id        = portal.OutPoint.Id,
-                    Kind      = StoryNodeKind.PortalOut,
-                    Title     = portal.Name,
-                    Subtitle  = portal.Description,
-                    X         = portal.OutPoint.X,
-                    Y         = portal.OutPoint.Y,
-                    Deletable = true
+                    Id                = portal.OutPoint.Id,
+                    Kind              = StoryNodeKind.PortalOut,
+                    Title             = portal.Name,
+                    Subtitle          = portal.Description,
+                    X                 = portal.OutPoint.X,
+                    Y                 = portal.OutPoint.Y,
+                    Deletable         = true,
+                    // The single out jumps back to the first in (no next-jump — there is only one out).
+                    PortalCrossTarget = portal.InPoints.Count > 0 ? portal.InPoints[0].Id : null
                 };
                 outNode.Outputs.Add(new EdPort { Id = portal.OutPoint.Id, Name = "Flow" });
                 nodes.Add(outNode);
@@ -696,30 +712,36 @@ namespace DeusaldStoryWeb
 
                 EdNode inNode = new()
                 {
-                    Id        = portal.InPoint.Id,
-                    Kind      = StoryNodeKind.LogicPortalIn,
-                    Title     = portal.Name,
-                    Subtitle  = outType == PortType.Data ? "any" : outLabel,
-                    X         = portal.InPoint.X,
-                    Y         = portal.InPoint.Y,
-                    Deletable = true,
-                    Editable  = true
+                    Id                = portal.InPoint.Id,
+                    Kind              = StoryNodeKind.LogicPortalIn,
+                    Title             = portal.Name,
+                    Subtitle          = outType == PortType.Data ? "any" : outLabel,
+                    X                 = portal.InPoint.X,
+                    Y                 = portal.InPoint.Y,
+                    Deletable         = true,
+                    Editable          = true,
+                    // One-in / many-out: the single in jumps to the first out (no next-jump — there is only one in).
+                    PortalCrossTarget = portal.OutPoints.Count > 0 ? portal.OutPoints[0].Id : null
                 };
                 inNode.Inputs.Add(new EdPort { Id = portal.InPoint.Id, Name = "Data", Type = PortType.Data });
                 nodes.Add(inNode);
 
-                foreach (StoryConnectionPoint outPoint in portal.OutPoints)
+                for (int x = 0; x < portal.OutPoints.Count; ++x)
                 {
+                    StoryConnectionPoint outPoint = portal.OutPoints[x];
                     EdNode outNode = new()
                     {
-                        Id        = outPoint.Id,
-                        Kind      = StoryNodeKind.LogicPortalOut,
-                        Title     = portal.Name,
-                        Subtitle  = outLabel,
-                        X         = outPoint.X,
-                        Y         = outPoint.Y,
-                        Deletable = true,
-                        Editable  = true
+                        Id                = outPoint.Id,
+                        Kind              = StoryNodeKind.LogicPortalOut,
+                        Title             = portal.Name,
+                        Subtitle          = outLabel,
+                        X                 = outPoint.X,
+                        Y                 = outPoint.Y,
+                        Deletable         = true,
+                        Editable          = true,
+                        // The cross-jump lands on the single in; the next-jump cycles the other outs.
+                        PortalCrossTarget = portal.InPoint.Id,
+                        PortalNextTarget  = portal.OutPoints.Count > 1 ? portal.OutPoints[(x + 1) % portal.OutPoints.Count].Id : null
                     };
                     outNode.Outputs.Add(new EdPort { Id = outPoint.Id, Name = outLabel, Type = outType });
                     nodes.Add(outNode);
