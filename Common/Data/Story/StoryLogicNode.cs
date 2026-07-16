@@ -38,6 +38,15 @@ namespace DeusaldStoryCommon
         /// <summary>SinglePath only — the variables this node declares and hands to the next node over its VFlow output.</summary>
         public List<StoryDeclaredVariable> DeclaredVariables { get; } = new();
 
+        /// <summary>
+        /// AcceptVariables contract — when non-empty, the exact set of incoming variables this node <b>expects</b> to
+        /// receive (name + possible values), owned by this node so its Prev Exit Variable ports and inner wiring stay
+        /// stable regardless of which upstream is wired in. Essential for reusable Logic blueprints: an instance's
+        /// upstream must provide exactly this set (validated by name + possible values). Empty ⇒ adapt live to whatever
+        /// upstream is wired (the legacy behaviour), unsafe for blueprints.
+        /// </summary>
+        public List<StoryDeclaredVariable> ExpectedVariables { get; } = new();
+
         /// <summary>SinglePath only — the single outer VFlow output all choices share. Kept stable across mode toggles.</summary>
         public StoryConnectionPoint VFlowOut { get; set; } = new() { Name = "Continue" };
 

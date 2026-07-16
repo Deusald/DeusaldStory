@@ -374,7 +374,7 @@ namespace DeusaldStoryCommon
                         && !string.IsNullOrWhiteSpace(cv.Name))
                         vals[cv.Name] = cv.Value;
                     else if (IncomingVariable(project, logic, src) is StoryDeclaredVariable dv && !string.IsNullOrWhiteSpace(dv.Name))
-                        vals[dv.Name] = values.TryGetValue(src, out string? sel) ? sel : "";
+                        vals[dv.Name] = StorySelectionResolver.IncomingValue(project, logic, src, values);
                 }
 
                 string rendered = StoryConditionPreview.Render(format, vals, out string? error);

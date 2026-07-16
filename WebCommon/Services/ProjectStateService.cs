@@ -1588,7 +1588,8 @@ public partial class ProjectStateService(
         bool                                                       gamebookInstructions,
         StoryLogicExitMode                                         exitMode,
         bool                                                       acceptVariables,
-        IReadOnlyList<(Guid Id, string Name, List<string> PossibleValues)> declaredVariables)
+        IReadOnlyList<(Guid Id, string Name, List<string> PossibleValues)> declaredVariables,
+        IReadOnlyList<(Guid Id, string Name, List<string> PossibleValues)>? expectedVariables = null)
     {
         using var _ = Edit(); // node edit + container connection cleanup are one step
         if (!CurrentProject!.LogicNodes.TryGetValue(logicId, out StoryLogicNode? logic)) return;
@@ -1600,6 +1601,8 @@ public partial class ProjectStateService(
         logic.AcceptVariables      = acceptVariables;
 
         ReconcileDeclaredVariables(logic, declaredVariables);
+        // The AcceptVariables incoming contract (empty when the node adapts live or doesn't accept variables).
+        ReconcileVariableList(logic.ExpectedVariables, acceptVariables ? expectedVariables ?? [] : []);
         PruneContentConnections(logic);
 
         // Drop container wires that reference outer ports this node no longer exposes after a mode/flag change.
@@ -1625,22 +1628,27 @@ public partial class ProjectStateService(
     /// <summary>Reconciles a logic node's declared variables (SinglePath), keeping matching ids and their per-choice values.</summary>
     private static void ReconcileDeclaredVariables(StoryLogicNode logic, IReadOnlyList<(Guid Id, string Name, List<string> PossibleValues)> desired)
     {
+        ReconcileVariableList(logic.DeclaredVariables, desired);
+
+        // Drop per-choice values for declared variables that no longer exist.
+        HashSet<Guid> keepIds = new(logic.DeclaredVariables.Select(d => d.Id));
+        foreach (StoryChoice choice in logic.Choices)
+            choice.VariableValues.RemoveAll(v => !keepIds.Contains(v.DeclaredVarId));
+    }
+
+    /// <summary>Reconciles a declared-variable list in place against the desired rows, keeping matching ids so wires survive.</summary>
+    private static void ReconcileVariableList(List<StoryDeclaredVariable> target, IReadOnlyList<(Guid Id, string Name, List<string> PossibleValues)> desired)
+    {
         List<StoryDeclaredVariable> rebuilt = new();
-        foreach ((Guid id, string dname, List<string> values) in desired)
+        foreach ((Guid id, string vname, List<string> values) in desired)
         {
-            StoryDeclaredVariable dv = (id != Guid.Empty ? logic.DeclaredVariables.Find(d => d.Id == id) : null) ?? new StoryDeclaredVariable();
-            dv.Name           = dname;
+            StoryDeclaredVariable dv = (id != Guid.Empty ? target.Find(d => d.Id == id) : null) ?? new StoryDeclaredVariable();
+            dv.Name           = vname;
             dv.PossibleValues = values;
             rebuilt.Add(dv);
         }
-
-        // Drop per-choice values for declared variables that no longer exist.
-        HashSet<Guid> keepIds = new(rebuilt.Select(d => d.Id));
-        foreach (StoryChoice choice in logic.Choices)
-            choice.VariableValues.RemoveAll(v => !keepIds.Contains(v.DeclaredVarId));
-
-        logic.DeclaredVariables.Clear();
-        logic.DeclaredVariables.AddRange(rebuilt);
+        target.Clear();
+        target.AddRange(rebuilt);
     }
 
     /// <summary>Removes inner content connections whose endpoints no longer exist.</summary>
@@ -1652,7 +1660,9 @@ public partial class ProjectStateService(
             logic.ExitLFlowIn.Id, logic.ExitVariablesIn.Id, logic.ExitAutoTextIn.Id
         };
         foreach (StoryChoice c in logic.Choices) valid.Add(c.TextIn.Id);
-        foreach (StoryDeclaredVariable d in logic.DeclaredVariables) valid.Add(d.Id); // Prev Exit Variable outputs
+        // Prev Exit Variable outputs in contract mode are the node's own ExpectedVariables ids — keep them so inner
+        // wires survive; a removed expected variable's id is absent here, so its wires are correctly pruned.
+        foreach (StoryDeclaredVariable d in logic.ExpectedVariables) valid.Add(d.Id);
         foreach (StoryLocalizationNode n in logic.LocalizationNodes) valid.Add(n.OutPoint.Id);
         foreach (StoryIconNode n in logic.IconNodes) valid.Add(n.OutPoint.Id);
         foreach (StoryLightDarkSwitchNode n in logic.LightDarkSwitchNodes)

@@ -794,7 +794,8 @@
         {
             _NewLogicNodeModal?.ShowEdit(ldef.Id, ldef.Name, ldef.Description,
                 ldef.GamebookInstructions, ldef.ExitMode, ldef.AcceptVariables,
-                ldef.DeclaredVariables.Select(d => (d.Id, d.Name, d.PossibleValues)));
+                ldef.DeclaredVariables.Select(d => (d.Id, d.Name, d.PossibleValues)),
+                ldef.ExpectedVariables.Select(d => (d.Id, d.Name, d.PossibleValues)));
         }
     }
 
@@ -1030,7 +1031,7 @@
             Guid parent = Project.LogicNodes.TryGetValue(args.EditId, out StoryLogicNode? l) ? l.ParentContainer : _CurrentId;
             _ProjectState.UpdateLogicNode(
                 parent, args.EditId, args.Name, args.Description,
-                args.GamebookInstructions, args.ExitMode, args.AcceptVariables, args.DeclaredVariables);
+                args.GamebookInstructions, args.ExitMode, args.AcceptVariables, args.DeclaredVariables, args.ExpectedVariables);
             RebuildNodes();
             _SelectedId = args.EditId;
             return;
@@ -1103,7 +1104,8 @@
                     _NewLogicNodeModal?.ShowEdit(
                         logic.Id, logic.Name, logic.Description,
                         logic.GamebookInstructions, logic.ExitMode, logic.AcceptVariables,
-                        logic.DeclaredVariables.Select(d => (d.Id, d.Name, d.PossibleValues)));
+                        logic.DeclaredVariables.Select(d => (d.Id, d.Name, d.PossibleValues)),
+                        logic.ExpectedVariables.Select(d => (d.Id, d.Name, d.PossibleValues)));
                 break;
 
             case StoryNodeKind.Container:
