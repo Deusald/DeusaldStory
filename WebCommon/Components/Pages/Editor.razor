@@ -21,7 +21,7 @@
 
     <div class="ed-body">
 
-        <EditorRail OnToolSelected="OnToolSelected"/>
+        <EditorRail @ref="_Rail" OnToolSelected="OnToolSelected"/>
 
         @if (_ActiveTool == EditorRail.Tool.Media)
         {
@@ -46,7 +46,7 @@
         else if (_ActiveTool == EditorRail.Tool.Blocks)
         {
             @* The blueprint library spans the whole centre; opening a definition drills into the graph behind it. *@
-            <BlueprintsPanel OnOpen="OnOpenBlueprint" OnEditSignature="OnEditSignature"/>
+            <BlueprintsPanel OnOpen="OnOpenBlueprint" OnEditSignature="OnEditSignature" OnEditProperties="OnEditBlueprintProperties"/>
         }
         else
         {
@@ -174,6 +174,12 @@
 @code {
     private EditorMode        _Mode = EditorMode.Edit;
     private EditorRail.Tool   _ActiveTool = EditorRail.Tool.Graph;
+    private EditorRail?        _Rail;
+
+    // Editing a blueprint definition runs in its own breadcrumb trail (starting at the blueprint), separate from the
+    // story trail. The story trail is stashed here and restored when the user returns via the Story graph rail button.
+    private bool               _EditingBlueprint;
+    private List<EditorCrumb>  _StoryCrumbs = [];
     private Guid              _SelectedId;
 
     private EditorGraph? _GraphRef; // the live graph (present only in Edit mode)
@@ -399,6 +405,17 @@
     {
         // Some rail tools take over the whole centre and unmount the graph — save its viewport first.
         CaptureViewport();
+
+        // The Story graph button leaves blueprint-editing mode and restores the story trail where the user left it.
+        if (tool == EditorRail.Tool.Graph && _EditingBlueprint)
+        {
+            _EditingBlueprint = false;
+            _Crumbs           = _StoryCrumbs;
+            _SelectedId       = Guid.Empty;
+            _Mode             = EditorMode.Edit;
+            RebuildNodes();
+        }
+
         _ActiveTool = tool;
     }
 
@@ -458,18 +475,20 @@
                 break;
 
             case StoryNodeKind.BlueprintInstance:
-                // Drill into the shared definition — edits here apply to every instance.
+                // Drill into the shared definition — edits here apply to every instance — in its own breadcrumb trail.
                 if (!Project.BlueprintInstances.TryGetValue(node.Id, out StoryBlueprintInstanceNode? bpInst)) return;
                 if (!Project.Blueprints.TryGetValue(bpInst.BlueprintId, out StoryBlueprint? bpDef)) return;
-                _Crumbs.Add(new EditorCrumb(bpDef.DefinitionNodeId, bpDef.Name,
-                    bpDef.Kind == StoryBlueprintKind.Container ? EditorScope.Container : EditorScope.Logic));
-                break;
+                BeginBlueprintTrail(bpDef.DefinitionNodeId, bpDef.Name,
+                    bpDef.Kind == StoryBlueprintKind.Container ? EditorScope.Container : EditorScope.Logic);
+                RebuildNodes();
+                return;
 
             case StoryNodeKind.FunctionInstance:
                 if (_CurrentLogicNode?.FunctionInstanceNodes.Find(n => n.Id == node.Id) is not StoryFunctionInstanceNode fnInst) return;
                 if (!Project.Blueprints.TryGetValue(fnInst.BlueprintId, out StoryBlueprint? fnDef)) return;
-                _Crumbs.Add(new EditorCrumb(fnDef.DefinitionNodeId, fnDef.Name, EditorScope.Logic));
-                break;
+                BeginBlueprintTrail(fnDef.DefinitionNodeId, fnDef.Name, EditorScope.Logic);
+                RebuildNodes();
+                return;
 
             default:
                 return;
@@ -726,12 +745,27 @@
     private void OnOpenBlueprint(Guid blueprintId)
     {
         if (!Project.Blueprints.TryGetValue(blueprintId, out StoryBlueprint? bp)) return;
+        BeginBlueprintTrail(bp.DefinitionNodeId, bp.Name,
+            bp.Kind == StoryBlueprintKind.Container ? EditorScope.Container : EditorScope.Logic);
+        RebuildNodes();
+    }
+
+    /// <summary>
+    /// Enters blueprint-editing mode: stash the story breadcrumb trail (once) and start a fresh trail rooted at the
+    /// blueprint definition, so editing a blueprint shows just the blueprint — not the story path that reached it.
+    /// </summary>
+    private void BeginBlueprintTrail(Guid definitionNodeId, string name, EditorScope scope)
+    {
+        if (!_EditingBlueprint)
+        {
+            _StoryCrumbs      = _Crumbs;
+            _EditingBlueprint = true;
+        }
+        _Crumbs     = [new EditorCrumb(definitionNodeId, name, scope)];
         _ActiveTool = EditorRail.Tool.Graph;
         _Mode       = EditorMode.Edit;
-        _Crumbs.Add(new EditorCrumb(bp.DefinitionNodeId, bp.Name,
-            bp.Kind == StoryBlueprintKind.Container ? EditorScope.Container : EditorScope.Logic));
         _SelectedId = Guid.Empty;
-        RebuildNodes();
+        _Rail?.SetActive(EditorRail.Tool.Graph);
     }
 
     /// <summary>Opens the signature editor for a Function blueprint (from the Blueprints panel).</summary>
@@ -741,6 +775,27 @@
         _FunctionSignatureModal?.Show(bp.Id, bp.Name,
             bp.Inputs.Select(p => (p.Id, p.Name, p.Type)),
             bp.Outputs.Select(p => (p.Id, p.Name, p.Type)));
+    }
+
+    /// <summary>Opens the properties editor for a Container/Logic blueprint definition (name, ports/flow types, exit mode, options).</summary>
+    private void OnEditBlueprintProperties(Guid blueprintId)
+    {
+        if (!Project.Blueprints.TryGetValue(blueprintId, out StoryBlueprint? bp)) return;
+
+        if (bp.Kind == StoryBlueprintKind.Container
+         && Project.ContainerNodes.TryGetValue(bp.DefinitionNodeId, out StoryContainerNode? cdef))
+        {
+            _NewContainerModal?.ShowEdit(cdef.Id, cdef.Name, cdef.Description,
+                cdef.EntryPoints.Select(p => (p.Id, p.Name, p.FlowKind)),
+                cdef.ExitPoints.Select(p => (p.Id, p.Name, p.FlowKind)));
+        }
+        else if (bp.Kind == StoryBlueprintKind.Logic
+              && Project.LogicNodes.TryGetValue(bp.DefinitionNodeId, out StoryLogicNode? ldef))
+        {
+            _NewLogicNodeModal?.ShowEdit(ldef.Id, ldef.Name, ldef.Description,
+                ldef.GamebookInstructions, ldef.ExitMode, ldef.AcceptVariables,
+                ldef.DeclaredVariables.Select(d => (d.Id, d.Name, d.PossibleValues)));
+        }
     }
 
     private void OnCommentConfirmed(NewCommentNodeModal.CommentArgs args)
@@ -971,8 +1026,10 @@
     {
         if (args.EditId != Guid.Empty)
         {
+            // Use the node's real parent (Empty for an out-of-tree blueprint definition), not the current graph.
+            Guid parent = Project.LogicNodes.TryGetValue(args.EditId, out StoryLogicNode? l) ? l.ParentContainer : _CurrentId;
             _ProjectState.UpdateLogicNode(
-                _CurrentId, args.EditId, args.Name, args.Description,
+                parent, args.EditId, args.Name, args.Description,
                 args.GamebookInstructions, args.ExitMode, args.AcceptVariables, args.DeclaredVariables);
             RebuildNodes();
             _SelectedId = args.EditId;
@@ -996,8 +1053,10 @@
     {
         if (args.EditId != Guid.Empty)
         {
+            // Use the node's real parent (Empty for an out-of-tree blueprint definition), not the current graph.
+            Guid parent = Project.ContainerNodes.TryGetValue(args.EditId, out StoryContainerNode? c) ? c.ParentContainer : _CurrentId;
             _ProjectState.UpdateContainerNode(
-                _CurrentId, args.EditId, args.Name, args.Description, args.Entries, args.Exits);
+                parent, args.EditId, args.Name, args.Description, args.Entries, args.Exits);
             RebuildNodes();
             _SelectedId = args.EditId;
             return;
@@ -1378,6 +1437,15 @@
             child.X = moved.X;
             child.Y = moved.Y;
             _ProjectState.MarkKeyDirty(child.Id);
+            return;
+        }
+
+        // A blueprint instance moved.
+        if (Project.BlueprintInstances.TryGetValue(moved.Id, out StoryBlueprintInstanceNode? inst))
+        {
+            inst.X = moved.X;
+            inst.Y = moved.Y;
+            _ProjectState.MarkKeyDirty(inst.Id);
             return;
         }
 

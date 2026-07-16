@@ -60,6 +60,12 @@
                         <i class="bi bi-input-cursor"></i>
                     </button>
                 }
+                else
+                {
+                    <button class="bpp-act" title="Edit properties (name, ports, options)" @onclick="() => OnEditProperties.InvokeAsync(item.Id)">
+                        <i class="bi bi-sliders"></i>
+                    </button>
+                }
                 @if (_ConfirmDelete == item.Id)
                 {
                     <button class="bpp-act bpp-act-danger" title="Confirm delete (removes all instances)" @onclick="() => Delete(item.Id)">
@@ -87,6 +93,9 @@
 
     /// <summary>Raised to edit a Function blueprint's signature.</summary>
     [Parameter] public EventCallback<Guid> OnEditSignature { get; set; }
+
+    /// <summary>Raised to edit a Container/Logic blueprint's properties (name, ports/exit mode, options).</summary>
+    [Parameter] public EventCallback<Guid> OnEditProperties { get; set; }
 
     private string _NewName      = "";
     private Guid   _ConfirmDelete = Guid.Empty;

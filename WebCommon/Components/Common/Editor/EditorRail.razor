@@ -69,4 +69,11 @@
         _Active = tool;
         await OnToolSelected.InvokeAsync(tool);
     }
+
+    /// <summary>Sets the highlighted tool without raising <see cref="OnToolSelected"/> — for programmatic navigation.</summary>
+    public void SetActive(Tool tool)
+    {
+        _Active = tool;
+        StateHasChanged();
+    }
 }

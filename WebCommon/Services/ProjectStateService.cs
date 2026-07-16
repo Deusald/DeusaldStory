@@ -1343,6 +1343,15 @@ public partial class ProjectStateService(
             MarkKeyDirty(logicId);
             return;
         }
+
+        StoryFunctionInstanceNode? fn = logic.FunctionInstanceNodes.Find(n => n.Id == movedId);
+        if (fn is not null)
+        {
+            fn.X = x;
+            fn.Y = y;
+            MarkKeyDirty(logicId);
+            return;
+        }
     }
 
     // ── Images ───────────────────────────────────────────────────────────────
