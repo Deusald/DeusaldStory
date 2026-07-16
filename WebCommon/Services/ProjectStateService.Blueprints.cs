@@ -372,4 +372,73 @@ public partial class ProjectStateService
         if (CurrentProject.ContainerNodes.TryGetValue(nodeId, out StoryContainerNode? c)) return string.IsNullOrWhiteSpace(c.Name) ? "Blueprint" : c.Name;
         return "Blueprint";
     }
+
+    // ── Recursion guard (for paste into a blueprint definition) ────────────────
+
+    /// <summary>
+    /// The blueprint whose definition body the graph rooted at <paramref name="graphNodeId"/> belongs to (a container or
+    /// logic node), or <c>null</c> when it belongs to the live story. Climbs the <c>ParentContainer</c> chain to the
+    /// out-of-tree root, then matches that root to a blueprint's <see cref="StoryBlueprint.DefinitionNodeId"/>.
+    /// </summary>
+    private StoryBlueprint? FindOwningBlueprint(Guid graphNodeId)
+    {
+        Guid rootId = OutOfTreeRoot(graphNodeId);
+        if (rootId == Guid.Empty || rootId == CurrentProject!.Metadata.RootStoryContainerNodeId) return null;
+        return CurrentProject.Blueprints.Values.FirstOrDefault(b => b.DefinitionNodeId == rootId);
+    }
+
+    /// <summary>Climbs the <c>ParentContainer</c> chain from a logic / container node to the out-of-tree root (the node whose parent is empty), or empty if the id is unknown.</summary>
+    private Guid OutOfTreeRoot(Guid nodeId)
+    {
+        Guid current = nodeId;
+        for (int guard = 0; guard < 4096; ++guard)
+        {
+            Guid parent;
+            if (CurrentProject!.LogicNodes.TryGetValue(current, out StoryLogicNode? l))          parent = l.ParentContainer;
+            else if (CurrentProject.ContainerNodes.TryGetValue(current, out StoryContainerNode? c)) parent = c.ParentContainer;
+            else return Guid.Empty;
+            if (parent == Guid.Empty) return current;
+            current = parent;
+        }
+        return Guid.Empty;
+    }
+
+    /// <summary>
+    /// Whether blueprint <paramref name="xId"/> transitively contains blueprint <paramref name="dId"/> (including
+    /// <c>x == d</c>) — i.e. placing an instance of X inside D's definition would make D contain itself. Walks the
+    /// blueprint-instance / function-instance references reachable from X's definition; a visited set defends against any
+    /// pre-existing cycle in the data.
+    /// </summary>
+    private bool BlueprintDependsOn(Guid xId, Guid dId) => DependsOn(xId, dId, new HashSet<Guid>());
+
+    private bool DependsOn(Guid xId, Guid dId, HashSet<Guid> visited)
+    {
+        if (xId == dId) return true;
+        if (!visited.Add(xId)) return false;
+        if (!CurrentProject!.Blueprints.TryGetValue(xId, out StoryBlueprint? x)) return false;
+        foreach (Guid childBpId in InstancedBlueprintIds(x))
+            if (DependsOn(childBpId, dId, visited)) return true;
+        return false;
+    }
+
+    /// <summary>Every blueprint id instanced directly inside <paramref name="bp"/>'s definition body (container instances + function instances, whole subtree for a container).</summary>
+    private IEnumerable<Guid> InstancedBlueprintIds(StoryBlueprint bp)
+    {
+        List<Guid> ids = new();
+        if (bp.Kind == StoryBlueprintKind.Container
+            && CurrentProject!.ContainerNodes.TryGetValue(bp.DefinitionNodeId, out StoryContainerNode? root))
+        {
+            List<object> entities = new();
+            CollectSubtreeEntities(root, entities);
+            foreach (object e in entities)
+            {
+                if (e is StoryBlueprintInstanceNode inst) ids.Add(inst.BlueprintId);
+                if (e is StoryLogicNode logic)
+                    foreach (StoryFunctionInstanceNode fi in logic.FunctionInstanceNodes) ids.Add(fi.BlueprintId);
+            }
+        }
+        else if (CurrentProject!.LogicNodes.TryGetValue(bp.DefinitionNodeId, out StoryLogicNode? defLogic))
+            foreach (StoryFunctionInstanceNode fi in defLogic.FunctionInstanceNodes) ids.Add(fi.BlueprintId);
+        return ids;
+    }
 }

@@ -37,6 +37,10 @@ public partial class ProjectStateService
         List<object>           clones            = new(); // non-portal entities to deep-clone
         Guid                   sourceContainerId = Guid.Empty;
 
+        // If we're pasting into a blueprint's definition body, an instance of a blueprint that (transitively) contains
+        // that same blueprint would make it contain itself — drop such instances instead of creating the cycle.
+        StoryBlueprint? owning = FindOwningBlueprint(containerId);
+
         foreach (Guid sourceId in sourceEdIds)
         {
             // A portal point attaches to the *same* portal instead of cloning a whole new pair, so the copy stays wired
@@ -58,6 +62,8 @@ public partial class ProjectStateService
 
             object? entity = ResolveContainerEntity(containerId, sourceId);
             if (entity is null || !seen.Add(entity)) continue;
+            if (entity is StoryBlueprintInstanceNode bpInst
+                && owning is not null && BlueprintDependsOn(bpInst.BlueprintId, owning.Id)) continue; // self-recursion
             clones.Add(entity);
             if (sourceContainerId == Guid.Empty) sourceContainerId = ParentContainerOf(entity);
         }
@@ -147,24 +153,37 @@ public partial class ProjectStateService
     /// <summary>
     /// Pastes copies of <paramref name="sourceEdIds"/> (inner content nodes of a logic graph, identified by the canvas
     /// node ids the editor selected) into logic node <paramref name="logicId"/>, offset by
-    /// (<paramref name="dx"/>, <paramref name="dy"/>). Wires between copied nodes are re-created; a copied logic-portal
-    /// out attaches to the same portal. Returns the new canvas node ids. One step.
+    /// (<paramref name="dx"/>, <paramref name="dy"/>). The copied ids are owned by <paramref name="sourceLogicId"/> — the
+    /// logic node the copy was taken from — which may differ from the target (e.g. pasting a story logic node's inner
+    /// graph into a Logic/Function blueprint definition). Wires between copied nodes are re-created; when source and
+    /// target are the same node a copied logic-portal out attaches to the same portal. Returns the new canvas node ids.
+    /// One step.
     /// </summary>
-    public List<Guid> PasteLogicInnerNodes(Guid logicId, IReadOnlyList<Guid> sourceEdIds, double dx, double dy)
+    public List<Guid> PasteLogicInnerNodes(Guid sourceLogicId, Guid logicId, IReadOnlyList<Guid> sourceEdIds, double dx, double dy)
     {
         if (!CurrentProject!.LogicNodes.TryGetValue(logicId, out StoryLogicNode? logic)) return new();
+        // Inner content nodes aren't project-global — they only resolve against their owning logic node. Resolve the
+        // copied ids (and their wires) against the *source* node; the target is only where the clones land.
+        if (!CurrentProject.LogicNodes.TryGetValue(sourceLogicId, out StoryLogicNode? source)) source = logic;
+        bool sameNode = ReferenceEquals(source, logic);
 
         using var _ = Edit();
-        List<Guid>             pasted = new();
-        HashSet<object>        seen   = new();
-        Dictionary<Guid, Guid> map    = new(); // shared old→new id map across the whole paste
-        List<object>           clones = new();
+        List<Guid>             pasted  = new();
+        HashSet<object>        seen    = new();
+        Dictionary<Guid, Guid> map     = new(); // shared old→new id map across the whole paste
+        List<object>           clones  = new();
+        List<object>           created = new(); // the clones actually inserted, for a post-pass over cross-node references
+
+        // Pasting into a blueprint's definition body: a function instance of a blueprint that (transitively) contains
+        // that same blueprint would make it call itself — drop such instances instead of creating the cycle.
+        StoryBlueprint? owning = FindOwningBlueprint(logicId);
 
         foreach (Guid sourceId in sourceEdIds)
         {
-            // A logic portal is one-in / many-out: a copied *out* (the many side) attaches as another out on the same
-            // portal, so it re-emits the same source; copying the single in is illegal and is skipped.
-            if (FindLogicPortalByPoint(logic, sourceId) is StoryLogicPortalNode portal)
+            // A logic portal is one-in / many-out: within the same node a copied *out* (the many side) attaches as
+            // another out on the same portal, so it re-emits the same source; copying the single in is illegal. Across
+            // nodes there is no shared portal to attach to, so the portal falls through to be cloned whole (below).
+            if (sameNode && FindLogicPortalByPoint(logic, sourceId) is StoryLogicPortalNode portal)
             {
                 StoryConnectionPoint? outPoint = portal.OutPoints.Find(p => p.Id == sourceId);
                 if (outPoint is null) continue; // the single in — nothing legal to paste
@@ -175,8 +194,10 @@ public partial class ProjectStateService
                 continue;
             }
 
-            object? model = FindInnerModel(logic, sourceId);
+            object? model = FindInnerModel(source, sourceId);
             if (model is null || !seen.Add(model)) continue;
+            if (model is StoryFunctionInstanceNode fnInst
+                && owning is not null && BlueprintDependsOn(fnInst.BlueprintId, owning.Id)) continue; // self-recursion
             clones.Add(model);
         }
 
@@ -193,6 +214,7 @@ public partial class ProjectStateService
                 clone.EndX += dx; clone.EndY += dy;
                 logic.ConditionFlowNodes.Add(clone);
                 pasted.Add(clone.Id);
+                created.Add(clone);
                 continue;
             }
 
@@ -200,11 +222,22 @@ public partial class ProjectStateService
             OffsetXY(cloneObj, dx, dy);
             AddCloneToLogic(logic, cloneObj);
             if (cloneObj.GetType().GetProperty("Id")?.GetValue(cloneObj) is Guid id) pasted.Add(id);
+            created.Add(cloneObj);
         }
 
-        // Re-create every inner wire whose both endpoints were copied (buffer first — we mutate the list we read).
+        // Cross-node paste: a copied node's reference into the *source* graph (a Register node it reads, a variable it
+        // compares) is only valid if that target was copied too — a reference to a node left behind now dangles in the
+        // target graph, so blank it. RemapClone already repointed references whose target *was* copied to the clone.
+        if (!sameNode)
+        {
+            HashSet<Guid> copiedIds = new(map.Values);
+            foreach (object o in created) DropDanglingLocalRefs(o, copiedIds);
+        }
+
+        // Re-create every inner wire of the *source* whose both endpoints were copied (buffer first — source and target
+        // may be the same list we mutate).
         List<StoryConnection> add = new();
-        foreach (StoryConnection c in logic.ContentConnections)
+        foreach (StoryConnection c in source.ContentConnections)
             if (map.TryGetValue(c.FromPoint, out Guid from) && map.TryGetValue(c.ToPoint, out Guid to))
                 add.Add(new StoryConnection { FromPoint = from, ToPoint = to });
         logic.ContentConnections.AddRange(add);
@@ -245,7 +278,8 @@ public partial class ProjectStateService
             ?? logic.UnregisterVariableNodes.Find(n => n.Id == edId)
             ?? logic.SetExternalVariableNodes.Find(n => n.Id == edId)
             ?? logic.ConditionFlowNodes.Find(n => n.Id == edId || n.EndId == edId)
-            ?? (object?)logic.CommentNodes.Find(n => n.Id == edId);
+            ?? (object?)logic.FunctionInstanceNodes.Find(n => n.Id == edId)
+            ?? logic.CommentNodes.Find(n => n.Id == edId);
         return found ?? FindLogicPortalByPoint(logic, edId);
     }
 
@@ -370,6 +404,45 @@ public partial class ProjectStateService
             xp.SetValue(o, (double)xp.GetValue(o)! + dx);
         if (o.GetType().GetProperty("Y") is { CanWrite: true } yp && yp.PropertyType == typeof(double))
             yp.SetValue(o, (double)yp.GetValue(o)! + dy);
+    }
+
+    /// <summary>
+    /// Blanks any graph-local reference on a cloned inner node whose target wasn't part of the copy (its remapped id is
+    /// not in <paramref name="copiedIds"/>) — used only for a cross-node paste, where such a reference would otherwise
+    /// dangle into the source graph. Project-global references (localization keys, images, story variables, blueprint
+    /// ids) are left alone: they resolve the same in any graph.
+    /// </summary>
+    private static void DropDanglingLocalRefs(object node, HashSet<Guid> copiedIds)
+    {
+        switch (node)
+        {
+            case StoryGetVariableNode g:        g.RegisteredVariableId = KeepLocalRef(g.RegisteredVariableId, copiedIds); break;
+            case StoryUnregisterVariableNode u: u.RegisteredVariableId = KeepLocalRef(u.RegisteredVariableId, copiedIds); break;
+            case StorySetVariableNode s:
+                s.RegisteredVariableId = KeepLocalRef(s.RegisteredVariableId, copiedIds);
+                SanitizeCondition(s.ValidationRule, copiedIds);
+                break;
+            case StoryRegisterVariableNode r: SanitizeCondition(r.ValidationRule, copiedIds); break;
+            case StoryConditionFlowNode c:    SanitizeCondition(c.Condition, copiedIds);      break;
+        }
+    }
+
+    /// <summary>Keeps a graph-local reference id only when its target was copied (its remapped id is present); otherwise blanks it.</summary>
+    private static Guid KeepLocalRef(Guid id, HashSet<Guid> copiedIds) => copiedIds.Contains(id) ? id : Guid.Empty;
+
+    /// <summary>
+    /// Recursively blanks a condition tree's variable operand refs that point at a non-copied node. The
+    /// <see cref="StorageValidation.ThisEntryRef"/> sentinel (a well-known constant, not a node id) is preserved.
+    /// </summary>
+    private static void SanitizeCondition(StoryConditionExpr? expr, HashSet<Guid> copiedIds)
+    {
+        if (expr is null) return;
+        if (expr.LeftVariableRef != Guid.Empty && expr.LeftVariableRef != StorageValidation.ThisEntryRef
+            && !copiedIds.Contains(expr.LeftVariableRef)) expr.LeftVariableRef = Guid.Empty;
+        if (expr.RightKind == StoryConditionOperandKind.Variable && expr.RightVariableRef != Guid.Empty
+            && expr.RightVariableRef != StorageValidation.ThisEntryRef && !copiedIds.Contains(expr.RightVariableRef))
+            expr.RightVariableRef = Guid.Empty;
+        foreach (StoryConditionExpr child in expr.Children) SanitizeCondition(child, copiedIds);
     }
 
     /// <summary>Appends a cloned inner-content node to the matching <c>List&lt;T&gt;</c> on <paramref name="logic"/> by its runtime type.</summary>

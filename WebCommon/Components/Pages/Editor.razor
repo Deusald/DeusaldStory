@@ -1288,8 +1288,9 @@
     // The copy buffer: the canvas node ids that were copied, and the scope they came from (a container's graph or a
     // logic node's inner graph). Paste only pastes into a matching scope. Ids are resolved against the live project at
     // paste time, so a copy carries no snapshot — deleting the originals before pasting simply yields nothing.
-    private List<Guid>  _Clipboard      = [];
-    private EditorScope _ClipboardScope = EditorScope.Container;
+    private List<Guid>  _Clipboard        = [];
+    private EditorScope _ClipboardScope   = EditorScope.Container;
+    private Guid        _ClipboardOwnerId = Guid.Empty; // the graph (container / logic node) the copy was taken from — inner nodes only resolve against their owner
 
     /// <summary>Whether the clipboard holds something that can be pasted into the current graph (same scope) — drives the canvas Paste option.</summary>
     private bool CanPaste => _Clipboard.Count > 0 && _ClipboardScope == _Scope;
@@ -1298,8 +1299,9 @@
     private void OnNodesCopy(IReadOnlyList<EdNode> nodes)
     {
         // Boundary/built-in nodes (Start/End/Entry/Exit, logic Entry/Exit, Prev Exit) can't be copied — skip them.
-        _Clipboard      = nodes.Where(n => n.Deletable).Select(n => n.Id).ToList();
-        _ClipboardScope = _Scope;
+        _Clipboard        = nodes.Where(n => n.Deletable).Select(n => n.Id).ToList();
+        _ClipboardScope   = _Scope;
+        _ClipboardOwnerId = _CurrentId;
     }
 
     /// <summary>Paste the clipboard into the current graph, offset from the originals (Ctrl/Cmd+V).</summary>
@@ -1308,7 +1310,7 @@
         if (_Clipboard.Count == 0 || _ClipboardScope != _Scope) return;
 
         List<Guid> pasted = _InLogic
-            ? _ProjectState.PasteLogicInnerNodes(_CurrentId, _Clipboard, _PASTE_OFFSET, _PASTE_OFFSET)
+            ? _ProjectState.PasteLogicInnerNodes(_ClipboardOwnerId, _CurrentId, _Clipboard, _PASTE_OFFSET, _PASTE_OFFSET)
             : _ProjectState.PasteContainerNodes(_CurrentId, _Clipboard, _PASTE_OFFSET, _PASTE_OFFSET);
 
         // Select every pasted node so the author can drag the whole group at once (a single node stays the primary
