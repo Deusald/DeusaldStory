@@ -219,6 +219,24 @@
             }
             else
             {
+                @if (CanPreview(menu))
+                {
+                    <button class="edg-menu-item" @onclick="() => MenuInvoke(OnNodePreview, menu)">
+                        <i class="bi bi-eye-fill"></i> Preview
+                    </button>
+                }
+                @if (menu.Kind == StoryNodeKind.PortalIn)
+                {
+                    <button class="edg-menu-item" @onclick="() => MenuInvoke(OnNodePortalJump, menu)">
+                        <i class="bi bi-box-arrow-right"></i> Go to portal out
+                    </button>
+                }
+                @if (menu.Kind == StoryNodeKind.PortalOut)
+                {
+                    <button class="edg-menu-item" @onclick="() => MenuInvoke(OnNodePortalJump, menu)">
+                        <i class="bi bi-box-arrow-in-right"></i> Go to portal in
+                    </button>
+                }
                 @if (menu.Editable)
                 {
                     <button class="edg-menu-item" @onclick="() => MenuInvoke(OnNodeEdit, menu)">
@@ -291,6 +309,8 @@
     [Parameter] public EventCallback<EdConnectRequest> OnConnect     { get; set; }
     [Parameter] public EventCallback<Guid>       OnDisconnect        { get; set; }
     [Parameter] public EventCallback<EdNode>     OnNodeEdit          { get; set; }
+    [Parameter] public EventCallback<EdNode>     OnNodePreview       { get; set; }
+    [Parameter] public EventCallback<EdNode>     OnNodePortalJump    { get; set; }
     [Parameter] public EventCallback<EdNode>     OnNodeDelete        { get; set; }
     [Parameter] public EventCallback<EdNode>     OnNodeAddPortalIn   { get; set; }
     [Parameter] public EventCallback<EdNode>     OnNodeAddPortalOut  { get; set; }
@@ -776,7 +796,7 @@
     /// <summary>Right-click on a node — open its context menu at the cursor. Built-in boundary nodes get one only when part of a multi-selection.</summary>
     private void NodeContextMenu(MouseEventArgs e, EdNode node)
     {
-        if (!IsMultiSelected(node) && !node.Deletable && !node.Editable) { _MenuNode = null; return; }
+        if (!IsMultiSelected(node) && !node.Deletable && !node.Editable && !CanPreview(node)) { _MenuNode = null; return; }
         _CanvasMenu = false;
         _MenuNode   = node;
         _MenuX      = e.ClientX;
@@ -785,6 +805,24 @@
 
     private void CloseMenu() => _MenuNode = null;
     private void CloseCanvasMenu() => _CanvasMenu = false;
+
+    /// <summary>Nodes that offer a "Preview" menu item: a logic node (its own preview), a container or the Root's Start
+    /// (previews the first logic node reached from inside).</summary>
+    private static bool CanPreview(EdNode n) => n.Kind is StoryNodeKind.Logic or StoryNodeKind.Container or StoryNodeKind.Start;
+
+    /// <summary>Pans the view so <paramref name="id"/>'s node sits at the centre and makes it the selection — used to
+    /// jump between a portal's in and out nodes.</summary>
+    public async Task CenterOnNode(Guid id)
+    {
+        if (Nodes.Find(n => n.Id == id) is not EdNode node) return;
+        double[] r = await RectAsync();
+        _Selected.Clear();
+        _SelectedEdgeId = null;
+        _PanX = r[2] / 2 - (node.X + NODE_W        / 2) * _Scale;
+        _PanY = r[3] / 2 - (node.Y + NodeHeight(node) / 2) * _Scale;
+        await SelectedChanged.InvokeAsync(id);
+        StateHasChanged();
+    }
 
     // ── Canvas menu actions ──────────────────────────────────────────────────
 

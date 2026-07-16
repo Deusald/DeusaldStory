@@ -55,6 +55,18 @@ namespace DeusaldStoryCommon
             return FollowFromOutput(project, lk, container, fromExitPointId, 0);
         }
 
+        /// <summary>
+        /// Follows the flow <b>arriving</b> at an entry point <paramref name="entryPointId"/> (a container's
+        /// <see cref="StoryContainerNode.EntryPoints"/> id — the Root's Start, or any container's entry) inward to the
+        /// first logic node it reaches, the story End, or a dead end. Used to preview a container / the Root at its
+        /// first stop point.
+        /// </summary>
+        public static NextLogicResult ResolveNextLogicFromEntry(StoryProject project, Guid entryPointId)
+        {
+            Lookups lk = Lookups.Build(project);
+            return ArriveAt(project, lk, entryPointId, 0);
+        }
+
         /// <summary>Follows the single wire leaving <paramref name="outputPointId"/> within <paramref name="container"/>.</summary>
         private static NextLogicResult FollowFromOutput(
             StoryProject project, Lookups lk, StoryContainerNode container, Guid outputPointId, int guard)
