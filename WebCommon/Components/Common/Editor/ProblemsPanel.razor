@@ -28,7 +28,7 @@
 
     <div class="prb-body">
         @{
-            List<StoryProblem> problems = _Result?.Problems ?? new List<StoryProblem>();
+            List<StoryProblem> problems = _Problems;
         }
         @if (problems.Count == 0)
         {
@@ -64,7 +64,7 @@
     /// <summary>Raised when the user clicks a problem, so the editor can navigate to it.</summary>
     [Parameter] public EventCallback<StoryProblem> OnNavigate { get; set; }
 
-    private StoryValidationResult? _Result;
+    private List<StoryProblem> _Problems = new();
 
     protected override void OnInitialized()
     {
@@ -74,8 +74,18 @@
 
     private void Revalidate()
     {
-        if (_ProjectState.CurrentProject is StoryProject project)
-            _Result = StoryGraphValidator.Validate(project, _ProjectState.CurrentLocalization);
+        if (_ProjectState.CurrentProject is null) { _Problems = new(); return; }
+
+        // Validate the blueprint-flattened project (so instances/blueprint content are checked as if inlined), and add
+        // the expander's own structural problems (missing / recursive blueprints). A definition bug reports once per
+        // instance, so collapse identical messages.
+        StoryBlueprintExpander.ExpandResult expanded = _ProjectState.GetExpanded();
+        StoryValidationResult result = StoryGraphValidator.Validate(expanded.Project, _ProjectState.CurrentLocalization);
+        _Problems = expanded.Problems
+            .Concat(result.Problems)
+            .GroupBy(p => p.Message)
+            .Select(g => g.First())
+            .ToList();
     }
 
     private void OnDataChanged() => InvokeAsync(() =>

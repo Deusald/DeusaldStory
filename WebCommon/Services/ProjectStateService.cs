@@ -1111,6 +1111,7 @@ public partial class ProjectStateService(
         logic.Choices.AddRange(rebuilt);
         MarkKeyDirty(logicId);
         MarkKeyDirty(logic.ParentContainer);
+        ReconcileIfDefinition(logicId); // choices are a Logic blueprint's exit boundary
     }
 
     /// <summary>Sets which registered storage variables are released when the story reaches The End (edited on the End node).</summary>
@@ -1609,6 +1610,7 @@ public partial class ProjectStateService(
 
         MarkKeyDirty(logicId);
         MarkKeyDirty(containerId);
+        ReconcileIfDefinition(logicId); // exit mode / accept-variables change this node's boundary as a Logic blueprint
     }
 
     /// <summary>Reconciles a logic node's declared variables (SinglePath), keeping matching ids and their per-choice values.</summary>
@@ -1722,12 +1724,12 @@ public partial class ProjectStateService(
     /// container's ports are wired) and inside the container itself (where the boundary nodes are wired).
     /// </summary>
     public void UpdateContainerNode(
-        Guid                                  parentContainerId,
-        Guid                                  containerId,
-        string                                name,
-        string                                description,
-        IReadOnlyList<(Guid Id, string Name)> entries,
-        IReadOnlyList<(Guid Id, string Name)> exits)
+        Guid                                                     parentContainerId,
+        Guid                                                     containerId,
+        string                                                   name,
+        string                                                   description,
+        IReadOnlyList<(Guid Id, string Name, StoryPointFlow Flow)> entries,
+        IReadOnlyList<(Guid Id, string Name, StoryPointFlow Flow)> exits)
     {
         using var _ = Edit(); // container edit + parent/self connection cleanup are one step
         if (!CurrentProject!.ContainerNodes.TryGetValue(containerId, out StoryContainerNode? container)) return;
@@ -1740,6 +1742,7 @@ public partial class ProjectStateService(
 
         MarkKeyDirty(containerId);
         MarkKeyDirty(parentContainerId);
+        ReconcileIfDefinition(containerId); // this container may itself be a blueprint's definition body
     }
 
     /// <summary>
@@ -1750,26 +1753,27 @@ public partial class ProjectStateService(
     /// <paramref name="isEntry"/> is provided (they are drawn as nodes inside a container).
     /// </summary>
     private void ReconcilePoints(
-        List<StoryConnectionPoint>            points,
-        IReadOnlyList<(Guid Id, string Name)> desired,
-        Guid                                  connCleanupContainerA,
-        Guid?                                 connCleanupContainerB,
-        bool?                                 isEntry = null)
+        List<StoryConnectionPoint>                                 points,
+        IReadOnlyList<(Guid Id, string Name, StoryPointFlow Flow)> desired,
+        Guid                                                       connCleanupContainerA,
+        Guid?                                                      connCleanupContainerB,
+        bool?                                                      isEntry = null)
     {
         List<StoryConnectionPoint> rebuilt = new();
         int                        newIndex = points.Count;
 
-        foreach ((Guid id, string pname) in desired)
+        foreach ((Guid id, string pname, StoryPointFlow flow) in desired)
         {
             StoryConnectionPoint? existing = id != Guid.Empty ? points.Find(p => p.Id == id) : null;
             if (existing is not null)
             {
-                existing.Name = pname;
+                existing.Name     = pname;
+                existing.FlowKind = flow;
                 rebuilt.Add(existing);
             }
             else
             {
-                StoryConnectionPoint created = new() { Name = pname };
+                StoryConnectionPoint created = new() { Name = pname, FlowKind = flow };
                 if (isEntry is not null)
                 {
                     created.X = isEntry.Value ? 40 : 640;
@@ -1806,6 +1810,7 @@ public partial class ProjectStateService(
         CurrentProjectPath  = folderPath;
         CurrentLocalization = localization;
         IsDirty             = false;
+        _ExpandVersion++; // invalidate the flattened-project cache for the newly loaded project
         ChangedFileIds.Clear();
         ResetHistory();
         ProjectChanged?.Invoke();
@@ -1965,6 +1970,7 @@ public partial class ProjectStateService(
 
     private void RaiseDirty()
     {
+        _ExpandVersion++; // the flattened (blueprint-expanded) project is now stale
         if (!IsDirty)
         {
             IsDirty = true;

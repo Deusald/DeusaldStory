@@ -35,7 +35,9 @@ namespace DeusaldStoryCommon
         public const string PORTALS_FOLDER         = "Portals";
         public const string IMAGES_FOLDER          = "Images";
         public const string VARIABLES_FOLDER       = "Variables";
-        public const int    CURRENT_FORMAT_VERSION = 8;
+        public const string BLUEPRINTS_FOLDER      = "Blueprints";
+        public const string INSTANCES_FOLDER       = "BlueprintInstances";
+        public const int    CURRENT_FORMAT_VERSION = 9;
 
         private static readonly JsonSerializerSettings _JsonSettings = new()
         {
@@ -76,20 +78,24 @@ namespace DeusaldStoryCommon
             // story whose LocalizationProjectPath is empty or unreachable on this platform still opens here.
 
             // ── Read sub-folders ───────────────────────────────────────────────
-            List<StoryContainerNode> containerNodes = await ReadFolderAsync<StoryContainerNode>(store, CONTAINERS_FOLDER);
-            List<StoryLogicNode>     logicNodes     = await ReadFolderAsync<StoryLogicNode>(store, LOGIC_FOLDER);
-            List<StoryPortalNode>    portalNodes    = await ReadFolderAsync<StoryPortalNode>(store, PORTALS_FOLDER);
-            List<StoryImage>         images         = await ReadFolderAsync<StoryImage>(store, IMAGES_FOLDER);
-            List<StoryVariable>      variables      = await ReadFolderAsync<StoryVariable>(store, VARIABLES_FOLDER);
+            List<StoryContainerNode>         containerNodes = await ReadFolderAsync<StoryContainerNode>(store, CONTAINERS_FOLDER);
+            List<StoryLogicNode>             logicNodes     = await ReadFolderAsync<StoryLogicNode>(store, LOGIC_FOLDER);
+            List<StoryPortalNode>            portalNodes    = await ReadFolderAsync<StoryPortalNode>(store, PORTALS_FOLDER);
+            List<StoryImage>                 images         = await ReadFolderAsync<StoryImage>(store, IMAGES_FOLDER);
+            List<StoryVariable>              variables      = await ReadFolderAsync<StoryVariable>(store, VARIABLES_FOLDER);
+            List<StoryBlueprint>             blueprints     = await ReadFolderAsync<StoryBlueprint>(store, BLUEPRINTS_FOLDER);
+            List<StoryBlueprintInstanceNode> instances      = await ReadFolderAsync<StoryBlueprintInstanceNode>(store, INSTANCES_FOLDER);
 
             return new StoryProject
             {
-                Metadata       = metadata,
-                ContainerNodes = containerNodes.ToDictionary(k => k.Id),
-                LogicNodes     = logicNodes.ToDictionary(k => k.Id),
-                PortalNodes    = portalNodes.ToDictionary(k => k.Id),
-                Images         = images.ToDictionary(k => k.Id),
-                Variables      = variables.ToDictionary(k => k.Id)
+                Metadata           = metadata,
+                ContainerNodes     = containerNodes.ToDictionary(k => k.Id),
+                LogicNodes         = logicNodes.ToDictionary(k => k.Id),
+                PortalNodes        = portalNodes.ToDictionary(k => k.Id),
+                Images             = images.ToDictionary(k => k.Id),
+                Variables          = variables.ToDictionary(k => k.Id),
+                Blueprints         = blueprints.ToDictionary(k => k.Id),
+                BlueprintInstances = instances.ToDictionary(k => k.Id)
             };
         }
 
@@ -109,11 +115,13 @@ namespace DeusaldStoryCommon
 
             await WriteJsonAsync(store, METADATA_FILE_NAME, project.Metadata);
 
-            await SaveFolderAsync(store, CONTAINERS_FOLDER, project.ContainerNodes.Values.ToList(), n => n.Id.ToString());
-            await SaveFolderAsync(store, LOGIC_FOLDER,      project.LogicNodes.Values.ToList(),     n => n.Id.ToString());
-            await SaveFolderAsync(store, PORTALS_FOLDER,    project.PortalNodes.Values.ToList(),    n => n.Id.ToString());
-            await SaveFolderAsync(store, IMAGES_FOLDER,     project.Images.Values.ToList(),         n => n.Id.ToString());
-            await SaveFolderAsync(store, VARIABLES_FOLDER,  project.Variables.Values.ToList(),      n => n.Id.ToString());
+            await SaveFolderAsync(store, CONTAINERS_FOLDER, project.ContainerNodes.Values.ToList(),     n => n.Id.ToString());
+            await SaveFolderAsync(store, LOGIC_FOLDER,      project.LogicNodes.Values.ToList(),         n => n.Id.ToString());
+            await SaveFolderAsync(store, PORTALS_FOLDER,    project.PortalNodes.Values.ToList(),        n => n.Id.ToString());
+            await SaveFolderAsync(store, IMAGES_FOLDER,     project.Images.Values.ToList(),             n => n.Id.ToString());
+            await SaveFolderAsync(store, VARIABLES_FOLDER,  project.Variables.Values.ToList(),          n => n.Id.ToString());
+            await SaveFolderAsync(store, BLUEPRINTS_FOLDER, project.Blueprints.Values.ToList(),         n => n.Id.ToString());
+            await SaveFolderAsync(store, INSTANCES_FOLDER,  project.BlueprintInstances.Values.ToList(), n => n.Id.ToString());
         }
 
         // ── Incremental Save ────────────────────
@@ -132,11 +140,13 @@ namespace DeusaldStoryCommon
             // Always rewrite metadata (cheap, contains UpdatedAt / the localization link)
             await WriteJsonAsync(store, METADATA_FILE_NAME, project.Metadata);
 
-            await UpdateFilesWithIdAsync(project.ContainerNodes.Values.ToList(), CONTAINERS_FOLDER);
-            await UpdateFilesWithIdAsync(project.LogicNodes.Values.ToList(),     LOGIC_FOLDER);
-            await UpdateFilesWithIdAsync(project.PortalNodes.Values.ToList(),    PORTALS_FOLDER);
-            await UpdateFilesWithIdAsync(project.Images.Values.ToList(),         IMAGES_FOLDER);
-            await UpdateFilesWithIdAsync(project.Variables.Values.ToList(),      VARIABLES_FOLDER);
+            await UpdateFilesWithIdAsync(project.ContainerNodes.Values.ToList(),     CONTAINERS_FOLDER);
+            await UpdateFilesWithIdAsync(project.LogicNodes.Values.ToList(),         LOGIC_FOLDER);
+            await UpdateFilesWithIdAsync(project.PortalNodes.Values.ToList(),        PORTALS_FOLDER);
+            await UpdateFilesWithIdAsync(project.Images.Values.ToList(),             IMAGES_FOLDER);
+            await UpdateFilesWithIdAsync(project.Variables.Values.ToList(),          VARIABLES_FOLDER);
+            await UpdateFilesWithIdAsync(project.Blueprints.Values.ToList(),         BLUEPRINTS_FOLDER);
+            await UpdateFilesWithIdAsync(project.BlueprintInstances.Values.ToList(), INSTANCES_FOLDER);
 
             async Task UpdateFilesWithIdAsync<T>(List<T> data, string folder) where T : IFileWithId
             {

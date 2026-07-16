@@ -1,0 +1,85 @@
+@namespace DeusaldStoryWeb.Components.Common
+@using DeusaldStoryCommon
+
+@* ─────────────────────────────────────────────────────────────────────────
+   Picks a blueprint to place an instance of. The parent passes the candidate
+   blueprints (already filtered by kind for the current graph); picking one
+   raises OnSelect with its id.
+   ───────────────────────────────────────────────────────────────────────── *@
+
+@if (_Visible)
+{
+    <div class="modal-backdrop" @onclick="Cancel"></div>
+
+    <div class="modal-box bpk-box" @onclick:stopPropagation="true">
+
+        <div class="modal-header">
+            <span class="modal-title">@_Title</span>
+            <button class="modal-close" @onclick="Cancel" title="Close">
+                <i class="bi bi-x-lg"></i>
+            </button>
+        </div>
+
+        <div class="modal-body">
+            @if (_Items.Count == 0)
+            {
+                <div class="modal-note">
+                    <i class="bi bi-info-circle"></i>
+                    <span>No blueprints yet — create one from the Blueprints panel in the left rail.</span>
+                </div>
+            }
+            else
+            {
+                <div class="bpk-list">
+                    @foreach (StoryBlueprint bp in _Items)
+                    {
+                        StoryBlueprint item = bp;
+                        <button class="bpk-item" @onclick="() => Pick(item.Id)">
+                            <i class="bi @KindIcon(item.Kind)"></i>
+                            <span class="bpk-item-name">@item.Name</span>
+                            <span class="bpk-item-kind">@item.Kind</span>
+                        </button>
+                    }
+                </div>
+            }
+        </div>
+
+        <div class="modal-footer">
+            <button class="modal-btn modal-btn-ghost" @onclick="Cancel">Cancel</button>
+        </div>
+
+    </div>
+}
+
+@code {
+    [Parameter] public EventCallback<Guid> OnSelect { get; set; }
+
+    private bool                 _Visible;
+    private string               _Title = "Place blueprint";
+    private List<StoryBlueprint> _Items = new();
+
+    /// <summary>Opens the picker over the given blueprints with a context title.</summary>
+    public void Show(IEnumerable<StoryBlueprint> blueprints, string title)
+    {
+        _Items   = blueprints.OrderBy(b => b.Name).ToList();
+        _Title   = title;
+        _Visible = true;
+        StateHasChanged();
+    }
+
+    private async Task Pick(Guid id)
+    {
+        _Visible = false;
+        await OnSelect.InvokeAsync(id);
+    }
+
+    private void Cancel() => _Visible = false;
+
+    private static string KindIcon(StoryBlueprintKind k) => k switch
+    {
+        StoryBlueprintKind.Container => "bi-collection",
+        StoryBlueprintKind.Logic     => "bi-diamond-half",
+        StoryBlueprintKind.Function  => "bi-cpu",
+        _                            => "bi-diagram-3"
+    };
+}

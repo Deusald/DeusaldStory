@@ -25,6 +25,9 @@ namespace DeusaldStoryCommon
         public List<Guid> Logic      { get; } = new();
         public List<Guid> Portals    { get; } = new();
 
+        /// <summary>Blueprint instance nodes placed in this container's graph (references into <see cref="StoryProject.BlueprintInstances"/>).</summary>
+        public List<Guid> Instances  { get; } = new();
+
         /// <summary>Free-text comment notes placed in this container's graph (no ports; documentation only).</summary>
         public List<StoryCommentNode> Comments { get; } = new();
 

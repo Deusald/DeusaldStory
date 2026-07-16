@@ -30,6 +30,15 @@
 
     <div class="lpv-screen @(_Paper ? "paper" : "")">
 
+        @if (Logic.GamebookInstructions)
+        {
+            @* This node has no player-facing screen in the app — it runs silently and only prints a
+               generated instruction section in the Gamebook. Badge it so the author knows. *@
+            <div class="lpv-gb-badge">
+                <i class="bi bi-gear-fill"></i> Gamebook instructions
+            </div>
+        }
+
         <div class="lpv-head">
             @if (_Rendered.IconData is not null)
             {
@@ -196,8 +205,14 @@
         _Rendered = Render(); // a Light/Dark switch may resolve to a different icon
     }
 
-    private StoryLogicRenderer.RenderedLogic Render() =>
-        StoryLogicRenderer.Render(_ProjectState.CurrentProject!, _ProjectState.CurrentLocalization, Logic, Values, _Paper, StoryRenderTarget.App);
+    private StoryLogicRenderer.RenderedLogic Render()
+    {
+        // Render against the blueprint-flattened project so function instances inside this node are resolved; a normal
+        // node keeps the same id there (functions inlined), a drilled-into definition falls back to the raw node.
+        StoryProject proj = _ProjectState.GetExpandedProject();
+        StoryLogicNode node = proj.LogicNodes.TryGetValue(Logic.Id, out StoryLogicNode? flat) ? flat : Logic;
+        return StoryLogicRenderer.Render(proj, _ProjectState.CurrentLocalization, node, Values, _Paper, StoryRenderTarget.App);
+    }
 
     /// <summary>
     /// Renders preview text with a whitelist of basic formatting tags (b/i/br/…) plus the project-image tags

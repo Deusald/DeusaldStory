@@ -95,6 +95,20 @@ public partial class ProjectStateService
                 case StoryContainerNode container:
                     pasted.Add(PasteContainerSubtree(container, containerId, target, dx, dy, map));
                     break;
+                case StoryBlueprintInstanceNode inst:
+                {
+                    // Clone remaps the instance's own id + its port-map ids (owned); BlueprintId / DefinitionPointId are
+                    // plain Guids that survive, so the copy still references the same blueprint definition.
+                    StoryBlueprintInstanceNode clone = RemapClone(inst, map);
+                    clone.ParentContainer = containerId;
+                    clone.X += dx;
+                    clone.Y += dy;
+                    CurrentProject.BlueprintInstances.Add(clone.Id, clone);
+                    target.Instances.Add(clone.Id);
+                    MarkKeyDirty(clone.Id);
+                    pasted.Add(clone.Id);
+                    break;
+                }
             }
         }
 
@@ -107,9 +121,10 @@ public partial class ProjectStateService
     /// <summary>The container a copyable top-level entity lives in (portals are handled separately), or empty for comments.</summary>
     private static Guid ParentContainerOf(object entity) => entity switch
     {
-        StoryLogicNode     l => l.ParentContainer,
-        StoryContainerNode c => c.ParentContainer,
-        _                    => Guid.Empty
+        StoryLogicNode             l => l.ParentContainer,
+        StoryContainerNode         c => c.ParentContainer,
+        StoryBlueprintInstanceNode i => i.ParentContainer,
+        _                            => Guid.Empty
     };
 
     /// <summary>
@@ -205,6 +220,7 @@ public partial class ProjectStateService
     {
         if (CurrentProject!.LogicNodes.TryGetValue(edId, out StoryLogicNode? logic))       return logic;
         if (CurrentProject.ContainerNodes.TryGetValue(edId, out StoryContainerNode? child)) return child;
+        if (CurrentProject.BlueprintInstances.TryGetValue(edId, out StoryBlueprintInstanceNode? inst)) return inst;
         if (FindPortalByPoint(edId) is StoryPortalNode portal)                              return portal;
         if (CurrentProject.ContainerNodes.TryGetValue(containerId, out StoryContainerNode? owner))
             return owner.Comments.Find(c => c.Id == edId);
@@ -279,6 +295,13 @@ public partial class ProjectStateService
                     MarkKeyDirty(clone.Id);
                     break;
                 }
+                case StoryBlueprintInstanceNode inst:
+                {
+                    StoryBlueprintInstanceNode clone = RemapClone(inst, map);
+                    CurrentProject!.BlueprintInstances[clone.Id] = clone;
+                    MarkKeyDirty(clone.Id);
+                    break;
+                }
             }
         }
         return newTopId;
@@ -292,6 +315,8 @@ public partial class ProjectStateService
             if (CurrentProject!.LogicNodes.TryGetValue(logicId, out StoryLogicNode? logic)) entities.Add(logic);
         foreach (Guid portalId in container.Portals)
             if (CurrentProject!.PortalNodes.TryGetValue(portalId, out StoryPortalNode? portal)) entities.Add(portal);
+        foreach (Guid instanceId in container.Instances)
+            if (CurrentProject!.BlueprintInstances.TryGetValue(instanceId, out StoryBlueprintInstanceNode? inst)) entities.Add(inst);
         foreach (Guid childId in container.Containers)
             if (CurrentProject!.ContainerNodes.TryGetValue(childId, out StoryContainerNode? child)) CollectSubtreeEntities(child, entities);
     }

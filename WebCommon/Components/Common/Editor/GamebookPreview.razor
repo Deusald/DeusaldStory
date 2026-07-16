@@ -208,8 +208,13 @@
         catch (JSDisconnectedException) { /* circuit already gone — nothing to unwind */ }
     }
 
-    private StoryGamebookPreview.Result Build() =>
-        StoryGamebookPreview.Build(_ProjectState.CurrentProject!, _ProjectState.CurrentLocalization, Logic);
+    private StoryGamebookPreview.Result Build()
+    {
+        // Build against the blueprint-flattened project so function instances inside this node are resolved.
+        StoryProject proj = _ProjectState.GetExpandedProject();
+        StoryLogicNode node = proj.LogicNodes.TryGetValue(Logic.Id, out StoryLogicNode? flat) ? flat : Logic;
+        return StoryGamebookPreview.Build(proj, _ProjectState.CurrentLocalization, node);
+    }
 
     private MarkupString SafeHtml(string text) => (MarkupString)PreviewHtmlSanitizer.ToSafeHtml(text, ResolveImageTag, ResolveVariableTag);
 

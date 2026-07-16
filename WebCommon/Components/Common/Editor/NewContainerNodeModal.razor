@@ -40,6 +40,30 @@
                           maxlength="500"></textarea>
             </div>
 
+            @* ── Entry point ───────────────────────────────────────────── *@
+            <div class="modal-field">
+                <label class="modal-label">
+                    Entry point
+                    <span class="modal-label-hint">where the story enters this container</span>
+                </label>
+                <div class="ncm-point">
+                    <span class="ncm-point-dot" style="background:var(--success)"></span>
+                    <input class="modal-input"
+                           type="text"
+                           placeholder="In"
+                           value="@_Entry.Name"
+                           @oninput="e => _Entry.Name = e.Value?.ToString() ?? string.Empty"
+                           maxlength="60"/>
+                    <select class="modal-input ncm-flow"
+                            title="Flow type"
+                            value="@_Entry.Flow"
+                            @onchange="e => _Entry.Flow = ParseFlow(e.Value)">
+                        <option value="@StoryPointFlow.Flow">Flow</option>
+                        <option value="@StoryPointFlow.VFlow">VFlow</option>
+                    </select>
+                </div>
+            </div>
+
             @* ── Exit points ───────────────────────────────────────────── *@
             <div class="modal-field">
                 <label class="modal-label">
@@ -57,6 +81,13 @@
                                value="@_Exits[index].Name"
                                @oninput="e => _Exits[index].Name = e.Value?.ToString() ?? string.Empty"
                                maxlength="60"/>
+                        <select class="modal-input ncm-flow"
+                                title="Flow type"
+                                value="@_Exits[index].Flow"
+                                @onchange="e => _Exits[index].Flow = ParseFlow(e.Value)">
+                            <option value="@StoryPointFlow.Flow">Flow</option>
+                            <option value="@StoryPointFlow.VFlow">VFlow</option>
+                        </select>
                         <button class="ncm-point-del"
                                 title="Remove exit"
                                 disabled="@(_Exits.Count <= 1)"
@@ -90,7 +121,7 @@
     private bool           _Visible;
     private bool           _IsEdit;
     private Guid           _EditId;
-    private Guid           _EntryId;   // the single entry's id, preserved across edits so its wire survives
+    private PointRow       _Entry       = new() { Name = "In" };   // the single entry, preserved across edits so its wire survives
     private string         _Name        = "";
     private string         _Description = "";
     private List<PointRow> _Exits       = new() { new PointRow { Name = "Out" } };
@@ -100,7 +131,7 @@
     {
         _IsEdit      = false;
         _EditId      = Guid.Empty;
-        _EntryId     = Guid.Empty;
+        _Entry       = new PointRow { Name = "In" };
         _Name        = "";
         _Description = "";
         _Exits       = new List<PointRow> { new PointRow { Name = "Out" } };
@@ -110,18 +141,19 @@
 
     /// <summary>Opens the modal to edit an existing container, preserving the entry/exit-point ids so wires survive.</summary>
     public void ShowEdit(
-        Guid                                id,
-        string                              name,
-        string                              description,
-        IEnumerable<(Guid Id, string Name)> entries,
-        IEnumerable<(Guid Id, string Name)> exits)
+        Guid                                             id,
+        string                                           name,
+        string                                           description,
+        IEnumerable<(Guid Id, string Name, StoryPointFlow Flow)> entries,
+        IEnumerable<(Guid Id, string Name, StoryPointFlow Flow)> exits)
     {
         _IsEdit      = true;
         _EditId      = id;
-        _EntryId     = entries.Select(e => e.Id).FirstOrDefault();
+        (Guid Id, string Name, StoryPointFlow Flow) entry = entries.FirstOrDefault();
+        _Entry       = new PointRow { Id = entry.Id, Name = string.IsNullOrEmpty(entry.Name) ? "In" : entry.Name, Flow = entry.Flow };
         _Name        = name;
         _Description = description;
-        _Exits       = exits.Select(e => new PointRow { Id = e.Id, Name = e.Name }).ToList();
+        _Exits       = exits.Select(e => new PointRow { Id = e.Id, Name = e.Name, Flow = e.Flow }).ToList();
         if (_Exits.Count == 0) _Exits.Add(new PointRow { Name = "Out" });
         _Visible = true;
         StateHasChanged();
@@ -139,37 +171,43 @@
         _Exits.RemoveAt(index);
     }
 
+    private static StoryPointFlow ParseFlow(object? value) =>
+        Enum.TryParse(value?.ToString(), out StoryPointFlow flow) ? flow : StoryPointFlow.Flow;
+
     private async Task Confirm()
     {
         if (!_CanConfirm) return;
         _Visible = false;
 
+        string entryName = string.IsNullOrWhiteSpace(_Entry.Name) ? "In" : _Entry.Name.Trim();
+
         await OnConfirm.InvokeAsync(new NewContainerNodeArgs(
             _EditId,
             _Name.Trim(),
             _Description.Trim(),
-            new List<(Guid Id, string Name)> { (_EntryId, "In") },
+            new List<(Guid Id, string Name, StoryPointFlow Flow)> { (_Entry.Id, entryName, _Entry.Flow) },
             Clean(_Exits)));
     }
 
-    private static List<(Guid Id, string Name)> Clean(IEnumerable<PointRow> rows) =>
+    private static List<(Guid Id, string Name, StoryPointFlow Flow)> Clean(IEnumerable<PointRow> rows) =>
         rows.Where(r => !string.IsNullOrWhiteSpace(r.Name))
-            .Select(r => (r.Id, r.Name.Trim()))
+            .Select(r => (r.Id, r.Name.Trim(), r.Flow))
             .ToList();
 
     private void Cancel() => _Visible = false;
 
     private sealed class PointRow
     {
-        public Guid   Id   { get; set; }
-        public string Name { get; set; } = "";
+        public Guid           Id   { get; set; }
+        public string         Name { get; set; } = "";
+        public StoryPointFlow Flow { get; set; } = StoryPointFlow.Flow;
     }
 
     /// <summary>Result passed back to the parent. <see cref="EditId"/> is empty for a create, set for an edit.</summary>
     public record NewContainerNodeArgs(
-        Guid                         EditId,
-        string                       Name,
-        string                       Description,
-        List<(Guid Id, string Name)> Entries,
-        List<(Guid Id, string Name)> Exits);
+        Guid                                      EditId,
+        string                                    Name,
+        string                                    Description,
+        List<(Guid Id, string Name, StoryPointFlow Flow)> Entries,
+        List<(Guid Id, string Name, StoryPointFlow Flow)> Exits);
 }

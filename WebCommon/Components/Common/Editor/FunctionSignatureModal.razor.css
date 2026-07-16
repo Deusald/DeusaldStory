@@ -1,0 +1,55 @@
+.fsm-box { width: 460px; max-width: 92vw; }
+
+.fsm-body {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.fsm-row {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+}
+.fsm-row + .fsm-row { margin-top: 8px; }
+.fsm-row .modal-input:first-child { flex: 1; }
+
+.fsm-type {
+    flex-shrink: 0;
+    width: auto;
+    min-width: 104px;
+    cursor: pointer;
+}
+
+.fsm-del {
+    flex-shrink: 0;
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: var(--r-sm);
+    color: var(--text-faint);
+    cursor: pointer;
+    padding: 8px 10px;
+    line-height: 1;
+    font-size: 12px;
+    transition: color var(--dur) var(--ease), border-color var(--dur) var(--ease), background var(--dur) var(--ease);
+}
+.fsm-del:hover { color: var(--danger); border-color: var(--danger); background: var(--surface-3); }
+
+.fsm-add {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 10px;
+    align-self: flex-start;
+    background: transparent;
+    border: 1px dashed var(--border-strong);
+    border-radius: var(--r-sm);
+    color: var(--text-muted);
+    font-size: 12.5px;
+    font-weight: 500;
+    padding: 7px 12px;
+    cursor: pointer;
+    transition: color var(--dur) var(--ease), border-color var(--dur) var(--ease), background var(--dur) var(--ease);
+}
+.fsm-add:hover { color: var(--text-soft); border-color: var(--border-hover); background: var(--surface-3); }
+.fsm-add i { font-size: 11px; }

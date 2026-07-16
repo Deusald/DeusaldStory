@@ -22,7 +22,7 @@ public partial class ProjectStateService
 {
     // ── Types ──────────────────────────────────────────────────────────────
 
-    private enum EntityKind { Metadata, Container, Logic, Portal, Image, Variable }
+    private enum EntityKind { Metadata, Container, Logic, Portal, Image, Variable, Blueprint, BlueprintInstance }
 
     /// <summary>One entity's change within an action: null Json means the entity did not exist / was deleted.</summary>
     private readonly record struct HistoryChange(EntityKind Kind, Guid Id, string? Before, string? After);
@@ -206,6 +206,8 @@ public partial class ProjectStateService
             foreach (KeyValuePair<Guid, StoryPortalNode>    kv in p.PortalNodes)    _Shadow[kv.Key] = (EntityKind.Portal,    Serialize(kv.Value));
             foreach (KeyValuePair<Guid, StoryImage>         kv in p.Images)         _Shadow[kv.Key] = (EntityKind.Image,     Serialize(kv.Value));
             foreach (KeyValuePair<Guid, StoryVariable>      kv in p.Variables)      _Shadow[kv.Key] = (EntityKind.Variable,  Serialize(kv.Value));
+            foreach (KeyValuePair<Guid, StoryBlueprint>              kv in p.Blueprints)         _Shadow[kv.Key] = (EntityKind.Blueprint,         Serialize(kv.Value));
+            foreach (KeyValuePair<Guid, StoryBlueprintInstanceNode>  kv in p.BlueprintInstances) _Shadow[kv.Key] = (EntityKind.BlueprintInstance, Serialize(kv.Value));
         }
         HistoryChanged?.Invoke();
     }
@@ -225,6 +227,8 @@ public partial class ProjectStateService
         if (p.PortalNodes.TryGetValue(id, out StoryPortalNode? po))         { kind = EntityKind.Portal;    exists = true; return Serialize(po); }
         if (p.Images.TryGetValue(id, out StoryImage? im))                   { kind = EntityKind.Image;     exists = true; return Serialize(im); }
         if (p.Variables.TryGetValue(id, out StoryVariable? v))              { kind = EntityKind.Variable;  exists = true; return Serialize(v); }
+        if (p.Blueprints.TryGetValue(id, out StoryBlueprint? bp))           { kind = EntityKind.Blueprint;         exists = true; return Serialize(bp); }
+        if (p.BlueprintInstances.TryGetValue(id, out StoryBlueprintInstanceNode? bi)) { kind = EntityKind.BlueprintInstance; exists = true; return Serialize(bi); }
         return null;
     }
 
@@ -256,6 +260,14 @@ public partial class ProjectStateService
             case EntityKind.Variable:
                 if (json is null) p.Variables.Remove(id);
                 else              p.Variables[id] = Deserialize<StoryVariable>(json);
+                break;
+            case EntityKind.Blueprint:
+                if (json is null) p.Blueprints.Remove(id);
+                else              p.Blueprints[id] = Deserialize<StoryBlueprint>(json);
+                break;
+            case EntityKind.BlueprintInstance:
+                if (json is null) p.BlueprintInstances.Remove(id);
+                else              p.BlueprintInstances[id] = Deserialize<StoryBlueprintInstanceNode>(json);
                 break;
         }
     }

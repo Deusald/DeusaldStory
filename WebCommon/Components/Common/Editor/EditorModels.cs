@@ -24,34 +24,8 @@ namespace DeusaldStoryWeb
         Logic
     }
 
-    /// <summary>
-    /// What a connection port carries, so wiring only joins compatible ports.
-    /// <list type="bullet">
-    /// <item><see cref="Flow"/> — plain container-level story flow (go to the next node). Many-in, one-out.</item>
-    /// <item><see cref="VFlow"/> — variable-flow: a single container-level path that carries a set of named variables
-    /// to a consuming node's "accept variables" input. Many-in, one-out.</item>
-    /// <item><see cref="LFlow"/> — the inner logic-render chain inside a logic node. One-in, one-out (a linear chain).</item>
-    /// <item><see cref="Text"/> — resolved localization / SmartFormat text.</item>
-    /// <item><see cref="Icon"/> — a project image.</item>
-    /// <item><see cref="Variable"/> — an App-only variable value (unknown when the Gamebook is printed).</item>
-    /// <item><see cref="CVariable"/> — a constant variable, known before any section is evaluated. A CVariable output
-    /// may feed a Variable input, but a Variable output may not feed a CVariable input.</item>
-    /// </list>
-    /// </summary>
-    public enum PortType
-    {
-        Flow,
-        VFlow,
-        LFlow,
-        Text,
-        Icon,
-        Variable,
-        CVariable,
-
-        /// <summary>A logic portal's <b>in</b> port — accepts any value signal (Text / Icon / Variable / Constant). A
-        /// portal <b>out</b> adopts the concrete type of whatever is wired into the in; it stays <c>Data</c> until then.</summary>
-        Data
-    }
+    // PortType moved to DeusaldStoryCommon (Common/Data/Story/PortType.cs) so persisted data — a Function
+    // blueprint's signature ports — can carry a port type. Referenced here via `using DeusaldStoryCommon`.
 
     /// <summary>
     /// One step in the editor's breadcrumb — the path the user has drilled into (containers, and finally a logic
@@ -98,7 +72,11 @@ namespace DeusaldStoryWeb
         LogicPortalOut,          // inside a logic node: a value portal's output node (the value re-emerges here) (orange)
         ConditionFlow,           // inside a logic node: on the LFlow chain, injects an optional block of flow gated by a constant condition (pink)
         EndConditionFlow,        // inside a logic node: the paired terminator that closes a Condition node's injected block (pink)
-        Comment                  // in a container's graph or a logic node's inner graph: a free-text author note, no ports (dim)
+        Comment,                 // in a container's graph or a logic node's inner graph: a free-text author note, no ports (dim)
+        BlueprintInstance,       // in a container's graph: an instance referencing a Container/Logic blueprint (purple)
+        FunctionInstance,        // inside a logic node: on the LFlow chain, an instance referencing a Function blueprint (purple)
+        FunctionEntry,           // inside a function definition's inner graph: the Entry node (LFlow-out + signature inputs) (green)
+        FunctionExit             // inside a function definition's inner graph: the Exit node (signature outputs + LFlow-in) (red)
     }
 
     /// <summary>A point on the graph canvas in world (un-panned, un-scaled) coordinates.</summary>
@@ -184,7 +162,7 @@ namespace DeusaldStoryWeb
                     Deletable = false,
                     Editable  = false
                 };
-                node.Outputs.Add(new EdPort { Id = ep.Id, Name = "Flow" });
+                node.Outputs.Add(new EdPort { Id = ep.Id, Name = ep.FlowKind == StoryPointFlow.VFlow ? "Variables" : "Flow", Type = ep.FlowKind == StoryPointFlow.VFlow ? PortType.VFlow : PortType.Flow });
                 nodes.Add(node);
             }
 
@@ -200,7 +178,7 @@ namespace DeusaldStoryWeb
                     Deletable = false,
                     Editable  = false
                 };
-                node.Inputs.Add(new EdPort { Id = xp.Id, Name = "Flow" });
+                node.Inputs.Add(new EdPort { Id = xp.Id, Name = xp.FlowKind == StoryPointFlow.VFlow ? "Variables" : "Flow", Type = xp.FlowKind == StoryPointFlow.VFlow ? PortType.VFlow : PortType.Flow });
                 nodes.Add(node);
             }
 
@@ -278,8 +256,38 @@ namespace DeusaldStoryWeb
                     Y         = child.Y,
                     Deletable = true
                 };
-                node.Inputs.AddRange(child.EntryPoints.Select(p => new EdPort { Id = p.Id, Name = p.Name }));
-                node.Outputs.AddRange(child.ExitPoints.Select(p => new EdPort { Id = p.Id, Name = p.Name }));
+                node.Inputs.AddRange(child.EntryPoints.Select(p => new EdPort { Id = p.Id, Name = p.Name, Type = p.FlowKind == StoryPointFlow.VFlow ? PortType.VFlow : PortType.Flow }));
+                node.Outputs.AddRange(child.ExitPoints.Select(p => new EdPort { Id = p.Id, Name = p.Name, Type = p.FlowKind == StoryPointFlow.VFlow ? PortType.VFlow : PortType.Flow }));
+                nodes.Add(node);
+            }
+
+            foreach (Guid instanceId in container.Instances)
+            {
+                if (!project.BlueprintInstances.TryGetValue(instanceId, out StoryBlueprintInstanceNode? inst)) continue;
+
+                bool found = project.Blueprints.TryGetValue(inst.BlueprintId, out StoryBlueprint? bp);
+                EdNode node = new()
+                {
+                    Id        = inst.Id,
+                    Kind      = StoryNodeKind.BlueprintInstance,
+                    Title     = found ? bp!.Name : "Missing blueprint",
+                    Subtitle  = found ? "Blueprint" : "(deleted blueprint)",
+                    X         = inst.X,
+                    Y         = inst.Y,
+                    Deletable = true
+                };
+
+                // Mirror the port types from the definition's current boundary, matched by DefinitionPointId.
+                Dictionary<Guid, PortType> types = new();
+                if (found)
+                    foreach (BlueprintBoundaryPort b in StoryBlueprintBoundary.Enumerate(project, bp!))
+                        types[b.DefinitionPointId] = b.Type;
+
+                foreach (StoryBlueprintPortMap p in inst.EntryPorts)
+                    node.Inputs.Add(new EdPort { Id = p.Id, Name = p.Name, Type = types.TryGetValue(p.DefinitionPointId, out PortType te) ? te : PortType.Flow });
+                foreach (StoryBlueprintPortMap p in inst.ExitPorts)
+                    node.Outputs.Add(new EdPort { Id = p.Id, Name = p.Name, Type = types.TryGetValue(p.DefinitionPointId, out PortType tx) ? tx : PortType.Flow });
+
                 nodes.Add(node);
             }
 
@@ -328,48 +336,66 @@ namespace DeusaldStoryWeb
         {
             List<EdNode> nodes = new();
 
+            // When this logic node is a Function blueprint's definition body, its Entry/Exit expose the typed signature
+            // (LFlow + inputs / outputs + LFlow) instead of the story-screen Title/Choices ports.
+            StoryBlueprint? funcBp = null;
+            foreach (StoryBlueprint b in project.Blueprints.Values)
+                if (b.Kind == StoryBlueprintKind.Function && b.DefinitionNodeId == logic.Id) { funcBp = b; break; }
+
             // ── Entry node (green) — flow starts here; Title/Subtitle/Icon feed its content. ──
             (double ex, double ey) = PointPos(logic.EntryPoint, _LOGIC_ENTRY_X, _LOGIC_ENTRY_Y);
             EdNode entry = new()
             {
                 Id        = logic.EntryPoint.Id,
-                Kind      = StoryNodeKind.LogicEntry,
-                Title     = "Entry",
+                Kind      = funcBp is null ? StoryNodeKind.LogicEntry : StoryNodeKind.FunctionEntry,
+                Title     = funcBp is null ? "Entry" : "Function in",
                 X         = ex,
                 Y         = ey,
                 Deletable = false,
-                Editable  = false
+                Editable  = funcBp is not null
             };
-            entry.Inputs.Add(new EdPort { Id = logic.TitleIn.Id,    Name = "Title",    Type = PortType.Text });
-            entry.Inputs.Add(new EdPort { Id = logic.SubtitleIn.Id, Name = "Subtitle", Type = PortType.Text });
-            entry.Inputs.Add(new EdPort { Id = logic.IconIn.Id,     Name = "Icon",     Type = PortType.Icon });
+            if (funcBp is null)
+            {
+                entry.Inputs.Add(new EdPort { Id = logic.TitleIn.Id,    Name = "Title",    Type = PortType.Text });
+                entry.Inputs.Add(new EdPort { Id = logic.SubtitleIn.Id, Name = "Subtitle", Type = PortType.Text });
+                entry.Inputs.Add(new EdPort { Id = logic.IconIn.Id,     Name = "Icon",     Type = PortType.Icon });
+            }
             entry.Outputs.Add(new EdPort { Id = logic.EntryPoint.Id, Name = "Flow", Type = PortType.LFlow });
+            if (funcBp is not null)
+                foreach (StorySignaturePort input in funcBp.Inputs)
+                    entry.Outputs.Add(new EdPort { Id = input.Id, Name = input.Name, Type = input.Type });
             nodes.Add(entry);
 
             // ── Exit node (red) — the single terminator carrying the node's choices. One LFlow input, one Text input
             //    per choice, one Variables input (wire it to auto-resolve the choice in the App), and — in auto mode —
             //    a single Auto-text input overriding the default "Click here to continue…" label. ──
-            bool autoMode = logic.ContentConnections.Exists(c => c.ToPoint == logic.ExitVariablesIn.Id);
+            bool autoMode = funcBp is null && logic.ContentConnections.Exists(c => c.ToPoint == logic.ExitVariablesIn.Id);
             (double xx, double xy) = PointPos(logic.ExitLFlowIn, _LOGIC_EXIT_X, _LOGIC_EXIT_Y0);
             EdNode exit = new()
             {
                 Id        = logic.ExitLFlowIn.Id,
-                Kind      = StoryNodeKind.LogicExit,
-                Title     = "Exit",
+                Kind      = funcBp is null ? StoryNodeKind.LogicExit : StoryNodeKind.FunctionExit,
+                Title     = funcBp is null ? "Exit" : "Function out",
                 Subtitle  = autoMode ? "Auto" : "",
                 X         = xx,
                 Y         = xy,
                 Deletable = false,
-                Editable  = true
+                Editable  = funcBp is null
             };
-            exit.Inputs.Add(new EdPort { Id = logic.ExitLFlowIn.Id,     Name = "Flow",      Type = PortType.LFlow });
-            exit.Inputs.Add(new EdPort { Id = logic.ExitVariablesIn.Id, Name = "Variables", Type = PortType.Variable });
-            if (autoMode)
-                exit.Inputs.Add(new EdPort { Id = logic.ExitAutoTextIn.Id, Name = "Text", Type = PortType.Text });
-            foreach (StoryChoice choice in logic.Choices)
+            if (funcBp is not null)
+                foreach (StorySignaturePort output in funcBp.Outputs)
+                    exit.Inputs.Add(new EdPort { Id = output.Id, Name = output.Name, Type = output.Type });
+            exit.Inputs.Add(new EdPort { Id = logic.ExitLFlowIn.Id, Name = "Flow", Type = PortType.LFlow });
+            if (funcBp is null)
             {
-                string label = string.IsNullOrWhiteSpace(choice.Name) ? "Choice" : choice.Name;
-                exit.Inputs.Add(new EdPort { Id = choice.TextIn.Id, Name = $"{label} text", Type = PortType.Text });
+                exit.Inputs.Add(new EdPort { Id = logic.ExitVariablesIn.Id, Name = "Variables", Type = PortType.Variable });
+                if (autoMode)
+                    exit.Inputs.Add(new EdPort { Id = logic.ExitAutoTextIn.Id, Name = "Text", Type = PortType.Text });
+                foreach (StoryChoice choice in logic.Choices)
+                {
+                    string label = string.IsNullOrWhiteSpace(choice.Name) ? "Choice" : choice.Name;
+                    exit.Inputs.Add(new EdPort { Id = choice.TextIn.Id, Name = $"{label} text", Type = PortType.Text });
+                }
             }
             nodes.Add(exit);
 
@@ -737,12 +763,40 @@ namespace DeusaldStoryWeb
                 nodes.Add(end);
             }
 
+            // ── Function instances (purple) — an inlined computation on the LFlow chain: LFlow + typed inputs in, typed outputs + LFlow out. ──
+            foreach (StoryFunctionInstanceNode fi in logic.FunctionInstanceNodes)
+            {
+                bool found = project.Blueprints.TryGetValue(fi.BlueprintId, out StoryBlueprint? fbp) && fbp!.Kind == StoryBlueprintKind.Function;
+                EdNode node = new()
+                {
+                    Id        = fi.Id,
+                    Kind      = StoryNodeKind.FunctionInstance,
+                    Title     = found ? fbp!.Name : "Missing function",
+                    Subtitle  = found ? "Function" : "(deleted function)",
+                    X         = fi.X,
+                    Y         = fi.Y,
+                    Deletable = true,
+                    Editable  = false
+                };
+                node.Inputs.Add(new EdPort { Id = fi.FlowIn.Id, Name = "Flow", Type = PortType.LFlow });
+                foreach (StoryBlueprintPortMap pm in fi.InputPorts)
+                    node.Inputs.Add(new EdPort { Id = pm.Id, Name = pm.Name, Type = found ? SignatureType(fbp!.Inputs, pm.DefinitionPointId) : PortType.Data });
+                foreach (StoryBlueprintPortMap pm in fi.OutputPorts)
+                    node.Outputs.Add(new EdPort { Id = pm.Id, Name = pm.Name, Type = found ? SignatureType(fbp!.Outputs, pm.DefinitionPointId) : PortType.Data });
+                node.Outputs.Add(new EdPort { Id = fi.FlowOut.Id, Name = "Flow", Type = PortType.LFlow });
+                nodes.Add(node);
+            }
+
             // ── Comment notes (dim, portless) — free-text author notes; ignored during playback. ──
             foreach (StoryCommentNode comment in logic.CommentNodes)
                 nodes.Add(BuildCommentNode(comment));
 
             return nodes;
         }
+
+        /// <summary>The port type of a function signature port by its definition id, or Data when it no longer exists.</summary>
+        private static PortType SignatureType(List<StorySignaturePort> signature, Guid definitionPointId) =>
+            signature.Find(p => p.Id == definitionPointId)?.Type ?? PortType.Data;
 
         /// <summary>
         /// The concrete port type a logic portal carries — the type of the output wired into its in (following any
@@ -912,6 +966,10 @@ namespace DeusaldStoryWeb
             StoryNodeKind.ConditionFlow           => "CONDITION",
             StoryNodeKind.EndConditionFlow        => "END CONDITION",
             StoryNodeKind.Comment                 => "COMMENT",
+            StoryNodeKind.BlueprintInstance       => "BLUEPRINT",
+            StoryNodeKind.FunctionInstance        => "FUNCTION",
+            StoryNodeKind.FunctionEntry           => "ENTRY",
+            StoryNodeKind.FunctionExit            => "EXIT",
             _                       => ""
         };
 
@@ -962,6 +1020,10 @@ namespace DeusaldStoryWeb
             StoryNodeKind.ConditionFlow           => "bi-signpost-split",
             StoryNodeKind.EndConditionFlow        => "bi-sign-merge-left",
             StoryNodeKind.Comment                 => "bi-chat-left-text",
+            StoryNodeKind.BlueprintInstance       => "bi-diagram-3",
+            StoryNodeKind.FunctionInstance        => "bi-cpu",
+            StoryNodeKind.FunctionEntry           => "bi-box-arrow-in-right",
+            StoryNodeKind.FunctionExit            => "bi-box-arrow-right",
             _                       => "bi-circle"
         };
 
@@ -1028,6 +1090,10 @@ namespace DeusaldStoryWeb
             StoryNodeKind.ConditionFlow           => "var(--pink)",
             StoryNodeKind.EndConditionFlow        => "var(--pink)",
             StoryNodeKind.Comment                 => "var(--text-dim)",
+            StoryNodeKind.BlueprintInstance       => "var(--purple)",
+            StoryNodeKind.FunctionInstance        => "var(--purple)",
+            StoryNodeKind.FunctionEntry           => "var(--success)",
+            StoryNodeKind.FunctionExit            => "var(--danger)",
             _                       => "var(--text-dim)"
         };
 

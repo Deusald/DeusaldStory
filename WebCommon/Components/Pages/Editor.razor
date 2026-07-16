@@ -43,6 +43,11 @@
             @* The problems list spans the whole centre; clicking a row navigates the graph behind it. *@
             <ProblemsPanel OnNavigate="OnProblemNavigate"/>
         }
+        else if (_ActiveTool == EditorRail.Tool.Blocks)
+        {
+            @* The blueprint library spans the whole centre; opening a definition drills into the graph behind it. *@
+            <BlueprintsPanel OnOpen="OnOpenBlueprint" OnEditSignature="OnEditSignature"/>
+        }
         else
         {
             <div class="ed-stage">
@@ -72,6 +77,7 @@
                                  OnNodeAddPortalOut="OnNodeAddPortalOut"
                                  OnNodeReparent="OnNodeReparent"
                                  OnNodeMoveToParent="OnNodeMoveToParent"
+                                 OnNodeMakeBlueprint="OnNodeMakeBlueprint"
                                  OnUndo="OnUndo"
                                  OnRedo="OnRedo"
                                  CanMoveToParent="@(!_InLogic && !IsRootContainer)"
@@ -162,6 +168,8 @@
 <ConditionFlowModal        @ref="_ConditionFlowModal"       OnConfirm="OnConditionFlowConfirmed"/>
 <NewCommentNodeModal       @ref="_NewCommentNodeModal"      OnConfirm="OnCommentConfirmed"/>
 <FlowTextOptionsModal      @ref="_FlowTextOptionsModal"     OnConfirm="OnFlowTextConfirmed"/>
+<BlueprintPickerModal      @ref="_BlueprintPicker"          OnSelect="OnBlueprintPicked"/>
+<FunctionSignatureModal    @ref="_FunctionSignatureModal"   OnConfirm="OnSignatureConfirmed"/>
 
 @code {
     private EditorMode        _Mode = EditorMode.Edit;
@@ -202,6 +210,8 @@
     private ConditionFlowModal?        _ConditionFlowModal;
     private NewCommentNodeModal?       _NewCommentNodeModal;
     private FlowTextOptionsModal?      _FlowTextOptionsModal;
+    private BlueprintPickerModal?      _BlueprintPicker;
+    private FunctionSignatureModal?    _FunctionSignatureModal;
 
     // Where the next created node is placed — the right-clicked canvas point (or a staggered default).
     private double _PendingX;
@@ -447,6 +457,20 @@
                 _Crumbs.Add(new EditorCrumb(logic.Id, logic.Name, EditorScope.Logic));
                 break;
 
+            case StoryNodeKind.BlueprintInstance:
+                // Drill into the shared definition — edits here apply to every instance.
+                if (!Project.BlueprintInstances.TryGetValue(node.Id, out StoryBlueprintInstanceNode? bpInst)) return;
+                if (!Project.Blueprints.TryGetValue(bpInst.BlueprintId, out StoryBlueprint? bpDef)) return;
+                _Crumbs.Add(new EditorCrumb(bpDef.DefinitionNodeId, bpDef.Name,
+                    bpDef.Kind == StoryBlueprintKind.Container ? EditorScope.Container : EditorScope.Logic));
+                break;
+
+            case StoryNodeKind.FunctionInstance:
+                if (_CurrentLogicNode?.FunctionInstanceNodes.Find(n => n.Id == node.Id) is not StoryFunctionInstanceNode fnInst) return;
+                if (!Project.Blueprints.TryGetValue(fnInst.BlueprintId, out StoryBlueprint? fnDef)) return;
+                _Crumbs.Add(new EditorCrumb(fnDef.DefinitionNodeId, fnDef.Name, EditorScope.Logic));
+                break;
+
             default:
                 return;
         }
@@ -599,6 +623,7 @@
                 new NodePaletteItem(StoryNodeKind.SetExternalVariable, "bi-sliders",        "Set external variable", "On the logic chain — assigns a value to a story-wide external variable (App only; no Gamebook instruction)."),
                 new NodePaletteItem(StoryNodeKind.LogicPortalIn,      "bi-box-arrow-in-right", "Portal",                "A one-in / many-out relay — feed any Text/Icon/Variable output into the in, read it from every out."),
                 new NodePaletteItem(StoryNodeKind.ConditionFlow,      "bi-signpost-split",  "Condition",             "On the logic chain — injects the block wired from its \"Condition true\" output (up to the paired End condition) when a constant-variable condition holds, then continues."),
+                new NodePaletteItem(StoryNodeKind.FunctionInstance,   "bi-cpu",             "Function instance",     "Places a reusable Function blueprint on the logic chain — LFlow plus its typed inputs/outputs."),
                 new NodePaletteItem(StoryNodeKind.Comment,                "bi-chat-left-text", "Comment",                 "A free-text note explaining how nodes connect. No ports; ignored during playback.")
             ]
             :
@@ -606,6 +631,7 @@
                 new NodePaletteItem(StoryNodeKind.Logic,     "bi-diamond-half",       "Logic node",     "A stop point that generates content and runs calculations on variables."),
                 new NodePaletteItem(StoryNodeKind.Container, "bi-collection",         "Container node", "Groups other nodes into a nested sub-graph with its own entries and exits."),
                 new NodePaletteItem(StoryNodeKind.PortalIn,  "bi-box-arrow-in-right", "Portal node",    "A linked in/out pair that teleports flow across the graph to keep it clean."),
+                new NodePaletteItem(StoryNodeKind.BlueprintInstance, "bi-diagram-3",  "Blueprint instance", "Places an instance of a Container/Logic blueprint — editing the blueprint changes every instance."),
                 new NodePaletteItem(StoryNodeKind.Comment,   "bi-chat-left-text",     "Comment",        "A free-text note explaining how nodes connect. No ports; ignored during playback.")
             ];
 
@@ -662,8 +688,59 @@
                     _SelectedId = cond.Id;
                 RebuildNodes();
                 break;
+            case StoryNodeKind.BlueprintInstance:
+                _BlueprintPicker?.Show(
+                    Project.Blueprints.Values.Where(b => b.Kind != StoryBlueprintKind.Function),
+                    "Place blueprint instance");
+                break;
+            case StoryNodeKind.FunctionInstance:
+                _BlueprintPicker?.Show(
+                    Project.Blueprints.Values.Where(b => b.Kind == StoryBlueprintKind.Function),
+                    "Place function instance");
+                break;
             case StoryNodeKind.Comment:   _NewCommentNodeModal?.Show();   break;
         }
+    }
+
+    /// <summary>A blueprint was picked from the palette — place the right kind of instance at the pending position.</summary>
+    private void OnBlueprintPicked(Guid blueprintId)
+    {
+        if (!Project.Blueprints.TryGetValue(blueprintId, out StoryBlueprint? bp)) return;
+        if (bp.Kind == StoryBlueprintKind.Function)
+        {
+            if (_ProjectState.AddFunctionInstanceNode(_CurrentId, blueprintId, _PendingX, _PendingY) is StoryFunctionInstanceNode fi)
+                _SelectedId = fi.Id;
+        }
+        else if (_ProjectState.AddBlueprintInstanceNode(_CurrentId, blueprintId, _PendingX, _PendingY) is StoryBlueprintInstanceNode inst)
+            _SelectedId = inst.Id;
+        RebuildNodes();
+    }
+
+    private void OnSignatureConfirmed(FunctionSignatureModal.SignatureArgs args)
+    {
+        _ProjectState.UpdateBlueprintSignature(args.BlueprintId, args.Inputs, args.Outputs);
+        RebuildNodes();
+    }
+
+    /// <summary>Opens a blueprint's shared definition for editing (from the Blueprints panel).</summary>
+    private void OnOpenBlueprint(Guid blueprintId)
+    {
+        if (!Project.Blueprints.TryGetValue(blueprintId, out StoryBlueprint? bp)) return;
+        _ActiveTool = EditorRail.Tool.Graph;
+        _Mode       = EditorMode.Edit;
+        _Crumbs.Add(new EditorCrumb(bp.DefinitionNodeId, bp.Name,
+            bp.Kind == StoryBlueprintKind.Container ? EditorScope.Container : EditorScope.Logic));
+        _SelectedId = Guid.Empty;
+        RebuildNodes();
+    }
+
+    /// <summary>Opens the signature editor for a Function blueprint (from the Blueprints panel).</summary>
+    private void OnEditSignature(Guid blueprintId)
+    {
+        if (!Project.Blueprints.TryGetValue(blueprintId, out StoryBlueprint? bp) || bp.Kind != StoryBlueprintKind.Function) return;
+        _FunctionSignatureModal?.Show(bp.Id, bp.Name,
+            bp.Inputs.Select(p => (p.Id, p.Name, p.Type)),
+            bp.Outputs.Select(p => (p.Id, p.Name, p.Type)));
     }
 
     private void OnCommentConfirmed(NewCommentNodeModal.CommentArgs args)
@@ -926,8 +1003,8 @@
             return;
         }
 
-        List<StoryConnectionPoint> entries = args.Entries.Select(e => new StoryConnectionPoint { Name = e.Name }).ToList();
-        List<StoryConnectionPoint> exits   = args.Exits.Select(e => new StoryConnectionPoint { Name = e.Name }).ToList();
+        List<StoryConnectionPoint> entries = args.Entries.Select(e => new StoryConnectionPoint { Name = e.Name, FlowKind = e.Flow }).ToList();
+        List<StoryConnectionPoint> exits   = args.Exits.Select(e => new StoryConnectionPoint { Name = e.Name, FlowKind = e.Flow }).ToList();
 
         StoryContainerNode node = _ProjectState.AddContainerNode(
             _CurrentId, args.Name, args.Description, entries, exits, _PendingX, _PendingY);
@@ -974,8 +1051,8 @@
                 if (Project.ContainerNodes.TryGetValue(node.Id, out StoryContainerNode? child))
                     _NewContainerModal?.ShowEdit(
                         child.Id, child.Name, child.Description,
-                        child.EntryPoints.Select(p => (p.Id, p.Name)),
-                        child.ExitPoints.Select(p => (p.Id, p.Name)));
+                        child.EntryPoints.Select(p => (p.Id, p.Name, p.FlowKind)),
+                        child.ExitPoints.Select(p => (p.Id, p.Name, p.FlowKind)));
                 break;
 
             case StoryNodeKind.PortalIn:
@@ -1154,6 +1231,8 @@
             case StoryNodeKind.ConditionFlow:
             case StoryNodeKind.EndConditionFlow:    _ProjectState.DeleteConditionFlowNode(_CurrentId, node.Id);  break;
             case StoryNodeKind.Comment:                 _ProjectState.DeleteCommentNode(_CurrentId, node.Id);               break;
+            case StoryNodeKind.BlueprintInstance:   _ProjectState.DeleteBlueprintInstance(_CurrentId, node.Id);  break;
+            case StoryNodeKind.FunctionInstance:    _ProjectState.DeleteFunctionInstanceNode(_CurrentId, node.Id); break;
         }
     }
 
@@ -1240,6 +1319,14 @@
         _ProjectState.ReparentNode(_CurrentId, node.Id, parent.Id, x, y);
 
         if (_SelectedId == node.Id) _SelectedId = Guid.Empty;
+        RebuildNodes();
+    }
+
+    /// <summary>Context-menu "Make into blueprint" — extract the node into a new blueprint, replacing it with an instance in place.</summary>
+    private void OnNodeMakeBlueprint(EdNode node)
+    {
+        if (_ProjectState.MakeIntoBlueprint(_CurrentId, node.Id) is StoryBlueprint bp)
+            _SelectedId = Project.BlueprintInstances.Values.FirstOrDefault(i => i.BlueprintId == bp.Id)?.Id ?? Guid.Empty;
         RebuildNodes();
     }
 

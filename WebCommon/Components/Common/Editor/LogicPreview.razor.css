@@ -174,6 +174,25 @@
     opacity: .8;
 }
 
+/* Gamebook-instruction marker — this node has no player-facing app screen; it runs silently and
+   only prints a generated instruction section in the Gamebook. Mirrors GamebookPreview's badge. */
+.lpv-gb-badge {
+    align-self: flex-start;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    margin-bottom: 14px;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    color: var(--warning);
+    background: color-mix(in srgb, var(--warning) 14%, transparent);
+    border: 1px solid color-mix(in srgb, var(--warning) 40%, transparent);
+    border-radius: var(--r-pill);
+    padding: 3px 10px;
+}
+
 /* Continue buttons — the app's dummy "next" (one per exit branch). */
 .lpv-continue {
     display: flex;

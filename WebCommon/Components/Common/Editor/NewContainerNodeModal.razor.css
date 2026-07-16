@@ -25,6 +25,13 @@
     flex-shrink: 0;
 }
 
+.ncm-flow {
+    flex-shrink: 0;
+    width: auto;
+    min-width: 88px;
+    cursor: pointer;
+}
+
 .ncm-point-del {
     flex-shrink: 0;
     background: transparent;
