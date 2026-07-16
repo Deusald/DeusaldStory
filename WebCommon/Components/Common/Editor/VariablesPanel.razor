@@ -1,4 +1,5 @@
 @namespace DeusaldStoryWeb.Components.Common
+@inject UiLocalizationService Loc
 @inject ProjectStateService _ProjectState
 @implements IDisposable
 
@@ -15,9 +16,9 @@
         <div class="var-head-text">
             <div class="var-head-title">
                 <i class="bi bi-braces"></i>
-                <span>Variables</span>
+                <span>@Loc.T(Localization.Editor.Panels.Variables.title)</span>
             </div>
-            <div class="var-head-sub">Story-wide values the gamebook reads and branches on.</div>
+            <div class="var-head-sub">@Loc.T(Localization.Editor.Panels.Variables.subtitle)</div>
         </div>
     </div>
 
@@ -28,13 +29,13 @@
             <div class="var-search">
                 <i class="bi bi-search"></i>
                 <input class="modal-input" type="text"
-                       placeholder="Search variables…"
+                       placeholder="@Loc.T(Localization.Editor.Panels.Variables.searchPlaceholder)"
                        @bind="_Search" @bind:event="oninput"/>
             </div>
 
             <button class="var-add" @onclick="AddVariable">
                 <i class="bi bi-plus-lg"></i>
-                <span>Add variable</span>
+                <span>@Loc.T(Localization.Editor.Panels.Variables.addVariable)</span>
             </button>
 
             <div class="var-list">
@@ -43,7 +44,7 @@
                 }
                 @if (list.Count == 0)
                 {
-                    <div class="var-list-empty">No variables match.</div>
+                    <div class="var-list-empty">@Loc.T(Localization.Editor.Panels.Variables.noneMatch)</div>
                 }
                 else
                 {
@@ -53,14 +54,14 @@
                         <button class="var-item @(_SelectedId == variable.Id ? "selected" : "")"
                                 @onclick="() => Select(variable.Id)">
                             <div class="var-item-name">
-                                @(string.IsNullOrWhiteSpace(variable.Name) ? "(unnamed)" : variable.Name)
+                                @(string.IsNullOrWhiteSpace(variable.Name) ? Loc.T(Localization.Common.Placeholders.unnamed) : variable.Name)
                                 @if (StoryBuiltInVariables.IsBuiltIn(variable.Id))
                                 {
-                                    <i class="bi bi-lock-fill var-item-lock" title="Built-in, read-only"></i>
+                                    <i class="bi bi-lock-fill var-item-lock" title="@Loc.T(Localization.Editor.Panels.Variables.builtInLock)"></i>
                                 }
                             </div>
                             <div class="var-item-sub">
-                                @variable.PossibleValues.Count value@(variable.PossibleValues.Count == 1 ? "" : "s")
+                                @Loc.T(Localization.Common.Misc.valueCount, new Dictionary<string, object> { ["count"] = variable.PossibleValues.Count })
                             </div>
                         </button>
                     }
@@ -74,7 +75,7 @@
             {
                 <div class="var-edit-empty">
                     <i class="bi bi-braces"></i>
-                    <span>Select a variable to edit it, or add a new one.</span>
+                    <span>@Loc.T(Localization.Editor.Panels.Variables.selectEmpty)</span>
                 </div>
             }
             else if (StoryBuiltInVariables.IsBuiltIn(sel.Id))
@@ -82,29 +83,29 @@
                 <div class="var-edit-scroll">
 
                     <div class="var-edit-toolbar">
-                        <span class="var-edit-heading">Built-in variable</span>
-                        <span class="var-builtin-badge"><i class="bi bi-lock-fill"></i> Read-only</span>
+                        <span class="var-edit-heading">@Loc.T(Localization.Editor.Panels.Variables.builtInHeading)</span>
+                        <span class="var-builtin-badge"><i class="bi bi-lock-fill"></i> @Loc.T(Localization.Editor.Panels.Variables.readOnly)</span>
                     </div>
 
                     <div class="var-builtin-note">
-                        This variable is always available and can't be edited or deleted. Its value follows the preview
-                        mode — <b>@StoryBuiltInVariables.AppValue</b> in the app and <b>@StoryBuiltInVariables.GamebookValue</b>
-                        in the printed gamebook. Connect it through an External Variable node into a SmartFormat node's
-                        Variables input to branch text on the current medium (e.g. <code>{@sel.Name}</code>).
+                        @((MarkupString)Loc.T(Localization.Editor.Panels.Variables.builtInNote)
+                            .Replace("[appValue]", StoryBuiltInVariables.AppValue)
+                            .Replace("[gamebookValue]", StoryBuiltInVariables.GamebookValue)
+                            .Replace("[sel]", sel.Name))
                     </div>
 
                     <div class="modal-field">
-                        <label class="modal-label">Name</label>
+                        <label class="modal-label">@Loc.T(Localization.Common.Fields.name)</label>
                         <input class="modal-input" type="text" value="@sel.Name" readonly disabled/>
                     </div>
 
                     <div class="modal-field">
-                        <label class="modal-label">Description</label>
+                        <label class="modal-label">@Loc.T(Localization.Common.Fields.description)</label>
                         <textarea class="modal-input var-textarea" rows="2" value="@sel.Description" readonly disabled></textarea>
                     </div>
 
                     <div class="modal-field">
-                        <label class="modal-label">Possible values</label>
+                        <label class="modal-label">@Loc.T(Localization.Editor.Panels.Variables.possibleValues)</label>
                         <div class="var-values">
                             @foreach (string val in sel.PossibleValues)
                             {
@@ -122,16 +123,16 @@
                 <div class="var-edit-scroll">
 
                     <div class="var-edit-toolbar">
-                        <span class="var-edit-heading">Edit variable</span>
-                        <button class="var-delete" @onclick="() => DeleteVariable(sel)" title="Delete variable">
+                        <span class="var-edit-heading">@Loc.T(Localization.Editor.Panels.Variables.editHeading)</span>
+                        <button class="var-delete" @onclick="() => DeleteVariable(sel)" title="@Loc.T(Localization.Editor.Panels.Variables.deleteTooltip)">
                             <i class="bi bi-trash"></i>
-                            <span>Delete</span>
+                            <span>@Loc.T(Localization.Common.Buttons.delete)</span>
                         </button>
                     </div>
 
                     @* Name *@
                     <div class="modal-field">
-                        <label class="modal-label">Name</label>
+                        <label class="modal-label">@Loc.T(Localization.Common.Fields.name)</label>
                         <input class="modal-input" type="text" maxlength="100"
                                value="@sel.Name"
                                @oninput="e => OnNameInput(sel, e)"/>
@@ -143,7 +144,7 @@
 
                     @* Description *@
                     <div class="modal-field">
-                        <label class="modal-label">Description</label>
+                        <label class="modal-label">@Loc.T(Localization.Common.Fields.description)</label>
                         <textarea class="modal-input var-textarea" rows="2" maxlength="500"
                                   value="@sel.Description"
                                   @oninput="e => OnDescriptionInput(sel, e)"></textarea>
@@ -154,18 +155,18 @@
                         <label class="var-check">
                             <input type="checkbox" checked="@sel.IsConstant" @onchange="e => OnConstantChanged(sel, e)"/>
                             <span>
-                                Constant
-                                <span class="modal-label-hint">known before any section is evaluated (e.g. the printed language) — exposes a Constant port and may be used in Gamebook text</span>
+                                @Loc.T(Localization.Editor.Panels.Variables.constant)
+                                <span class="modal-label-hint">@Loc.T(Localization.Editor.Panels.Variables.constantHint)</span>
                             </span>
                         </label>
                     </div>
 
                     @* Possible values *@
                     <div class="modal-field">
-                        <label class="modal-label">Possible values</label>
+                        <label class="modal-label">@Loc.T(Localization.Editor.Panels.Variables.possibleValues)</label>
                         @if (sel.PossibleValues.Count == 0)
                         {
-                            <div class="var-values-empty">No values yet.</div>
+                            <div class="var-values-empty">@Loc.T(Localization.Editor.Panels.Variables.noValues)</div>
                         }
                         else
                         {
@@ -177,7 +178,7 @@
                                         <input class="modal-input" type="text" maxlength="200"
                                                value="@sel.PossibleValues[index]"
                                                @oninput="e => OnValueInput(sel, index, e)"/>
-                                        <button class="var-value-del" title="Remove value"
+                                        <button class="var-value-del" title="@Loc.T(Localization.Editor.Panels.Variables.removeValue)"
                                                 @onclick="() => RemoveValue(sel, index)">
                                             <i class="bi bi-x-lg"></i>
                                         </button>
@@ -187,7 +188,7 @@
                         }
                         <button class="var-value-add" @onclick="() => AddValue(sel)">
                             <i class="bi bi-plus-lg"></i>
-                            <span>Add value</span>
+                            <span>@Loc.T(Localization.Editor.Panels.Variables.addValue)</span>
                         </button>
                     </div>
 
@@ -262,8 +263,8 @@
         string value = e.Value?.ToString() ?? "";
         v.Name = value;
 
-        if (string.IsNullOrWhiteSpace(value))               _NameError = "Name can't be empty.";
-        else if (_ProjectState.IsVariableNameTaken(value, v.Id)) _NameError = "Another variable uses that name.";
+        if (string.IsNullOrWhiteSpace(value))               _NameError = Loc.T(Localization.Common.Errors.nameEmpty);
+        else if (_ProjectState.IsVariableNameTaken(value, v.Id)) _NameError = Loc.T(Localization.Editor.Panels.Variables.errNameTaken);
         else                                                _NameError = null;
 
         _ProjectState.MarkKeyDirty(v.Id);

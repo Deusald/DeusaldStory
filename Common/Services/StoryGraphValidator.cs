@@ -62,7 +62,7 @@ namespace DeusaldStoryCommon
                         problems.Add(new StoryProblem
                         {
                             Severity    = StoryProblemSeverity.Error,
-                            Message     = $"'{PointName(entry, isRoot ? "Start" : "Entry")}' is not connected — flow entering here leads nowhere.",
+                            Message     = UiLang.T(Localization.Validation.entryNotConnected, new Dictionary<string, object> { ["point"] = PointName(entry, isRoot ? UiLang.T(Localization.Validation.pointStart) : UiLang.T(Localization.Validation.pointEntry)) }),
                             ContainerId = container.Id,
                             PointId     = entry.Id
                         });
@@ -80,7 +80,7 @@ namespace DeusaldStoryCommon
                             problems.Add(new StoryProblem
                             {
                                 Severity    = StoryProblemSeverity.Error,
-                                Message     = $"The variables output of logic node '{NodeName(logic.Name)}' is not connected.",
+                                Message     = UiLang.T(Localization.Validation.variablesOutputNotConnected, new Dictionary<string, object> { ["node"] = NodeName(logic.Name) }),
                                 ContainerId = container.Id,
                                 LogicNodeId = logic.Id,
                                 PointId     = logic.VFlowOut.Id
@@ -93,7 +93,7 @@ namespace DeusaldStoryCommon
                             problems.Add(new StoryProblem
                             {
                                 Severity    = StoryProblemSeverity.Error,
-                                Message     = $"Choice '{NodeName(choice.Name)}' of logic node '{NodeName(logic.Name)}' is not connected to a next node.",
+                                Message     = UiLang.T(Localization.Validation.choiceNotConnected, new Dictionary<string, object> { ["choice"] = NodeName(choice.Name), ["logic"] = NodeName(logic.Name) }),
                                 ContainerId = container.Id,
                                 LogicNodeId = logic.Id,
                                 PointId     = choice.OuterFlowOut.Id
@@ -109,7 +109,7 @@ namespace DeusaldStoryCommon
                             problems.Add(new StoryProblem
                             {
                                 Severity    = StoryProblemSeverity.Error,
-                                Message     = $"Exit '{PointName(exit, "Out")}' of container '{NodeName(child.Name)}' is not connected.",
+                                Message     = UiLang.T(Localization.Validation.containerExitNotConnected, new Dictionary<string, object> { ["exit"] = PointName(exit, UiLang.T(Localization.Validation.pointOut)), ["container"] = NodeName(child.Name) }),
                                 ContainerId = container.Id,
                                 PointId     = exit.Id
                             });
@@ -123,7 +123,7 @@ namespace DeusaldStoryCommon
                         problems.Add(new StoryProblem
                         {
                             Severity    = StoryProblemSeverity.Error,
-                            Message     = $"Portal '{NodeName(portal.Name)}' out is not connected.",
+                            Message     = UiLang.T(Localization.Validation.portalOutNotConnected, new Dictionary<string, object> { ["portal"] = NodeName(portal.Name) }),
                             ContainerId = container.Id,
                             PointId     = portal.OutPoint.Id
                         });
@@ -147,7 +147,7 @@ namespace DeusaldStoryCommon
                     problems.Add(new StoryProblem
                     {
                         Severity    = StoryProblemSeverity.Error,
-                        Message     = $"Logic node '{NodeName(logic.Name)}' has no choices — add at least one continuation on its Exit node.",
+                        Message     = UiLang.T(Localization.Validation.logicNoChoices, new Dictionary<string, object> { ["node"] = NodeName(logic.Name) }),
                         ContainerId = logic.ParentContainer,
                         LogicNodeId = logic.Id
                     });
@@ -160,19 +160,19 @@ namespace DeusaldStoryCommon
                     int elseCount = logic.Choices.Count(c => c.IsElse);
                     if (elseCount != 1)
                         problems.Add(Node(logic, elseCount == 0
-                            ? $"Auto-resolving node '{NodeName(logic.Name)}' needs exactly one locked 'Else' choice."
-                            : $"Auto-resolving node '{NodeName(logic.Name)}' has more than one 'Else' choice — only one fallback is allowed."));
+                            ? UiLang.T(Localization.Validation.autoNeedsOneElse, new Dictionary<string, object> { ["node"] = NodeName(logic.Name) })
+                            : UiLang.T(Localization.Validation.autoMultipleElse, new Dictionary<string, object> { ["node"] = NodeName(logic.Name) })));
 
                     foreach (StoryChoice c in logic.Choices)
                         if (!c.IsElse && c.Condition is null)
-                            problems.Add(Node(logic, $"Choice '{NodeName(c.Name)}' in '{NodeName(logic.Name)}' has no condition — set one or make it the Else."));
+                            problems.Add(Node(logic, UiLang.T(Localization.Validation.choiceNoCondition, new Dictionary<string, object> { ["choice"] = NodeName(c.Name), ["logic"] = NodeName(logic.Name) })));
                 }
 
                 if (logic.ExitMode == StoryLogicExitMode.SinglePath)
                     foreach (StoryChoice c in logic.Choices)
                         foreach (StoryDeclaredVariable dv in logic.DeclaredVariables)
                             if (c.VariableValues.Find(v => v.DeclaredVarId == dv.Id) is null)
-                                problems.Add(Node(logic, $"Choice '{NodeName(c.Name)}' in '{NodeName(logic.Name)}' has no value for variable '{NodeName(dv.Name)}'."));
+                                problems.Add(Node(logic, UiLang.T(Localization.Validation.choiceNoVariableValue, new Dictionary<string, object> { ["choice"] = NodeName(c.Name), ["logic"] = NodeName(logic.Name), ["var"] = NodeName(dv.Name) })));
             }
         }
 
@@ -189,7 +189,7 @@ namespace DeusaldStoryCommon
                     foreach (StoryConnection c in logic.ContentConnections.Where(c => c.ToPoint == cf.VariablesIn.Id))
                         if (!IsConstantSource(project, logic, c.FromPoint))
                             problems.Add(Inner(logic, cf.Id,
-                                $"Condition '{NodeName(cf.Name)}' in '{NodeName(logic.Name)}' uses a non-constant variable — only constant variables are allowed so the block renders the same in the App and the Gamebook."));
+                                UiLang.T(Localization.Validation.conditionNonConstant, new Dictionary<string, object> { ["cond"] = NodeName(cf.Name), ["logic"] = NodeName(logic.Name) })));
         }
 
         /// <summary>Whether the output wired at <paramref name="fromPoint"/> (resolved through any portal) is a constant value source.</summary>
@@ -222,14 +222,14 @@ namespace DeusaldStoryCommon
             {
                 if (!logic.AcceptVariables || logic.ExpectedVariables.Count == 0) continue;
 
-                string nodeName = string.IsNullOrWhiteSpace(logic.Name) ? "(unnamed)" : logic.Name;
+                string nodeName = string.IsNullOrWhiteSpace(logic.Name) ? UiLang.T(Localization.Common.Placeholders.unnamed) : logic.Name;
                 StoryLogicNode? upstream = StorySelectionResolver.SourceNode(project, logic);
                 if (upstream is null)
                 {
                     problems.Add(new StoryProblem
                     {
                         Severity    = StoryProblemSeverity.Error,
-                        Message     = $"'{nodeName}' expects incoming variables but its Variables input isn't wired to a Single-path node.",
+                        Message     = UiLang.T(Localization.Validation.expectsIncomingNotWired, new Dictionary<string, object> { ["node"] = nodeName }),
                         ContainerId = logic.ParentContainer,
                         LogicNodeId = logic.Id
                     });
@@ -246,13 +246,13 @@ namespace DeusaldStoryCommon
                     string detail = string.Join("; ",
                         new[]
                         {
-                            missing.Count > 0 ? $"missing: {string.Join(", ", missing)}" : null,
-                            extra.Count   > 0 ? $"unexpected: {string.Join(", ", extra)}" : null
+                            missing.Count > 0 ? UiLang.T(Localization.Validation.contractMissing, new Dictionary<string, object> { ["names"] = string.Join(", ", missing) }) : null,
+                            extra.Count   > 0 ? UiLang.T(Localization.Validation.contractUnexpected, new Dictionary<string, object> { ["names"] = string.Join(", ", extra) }) : null
                         }.Where(s => s is not null));
                     problems.Add(new StoryProblem
                     {
                         Severity    = StoryProblemSeverity.Error,
-                        Message     = $"'{nodeName}' receives variables that don't match its contract ({detail}).",
+                        Message     = UiLang.T(Localization.Validation.contractMismatch, new Dictionary<string, object> { ["node"] = nodeName, ["detail"] = detail }),
                         ContainerId = logic.ParentContainer,
                         LogicNodeId = logic.Id
                     });
@@ -268,7 +268,7 @@ namespace DeusaldStoryCommon
                         problems.Add(new StoryProblem
                         {
                             Severity    = StoryProblemSeverity.Error,
-                            Message     = $"'{nodeName}' variable '{exp.Name}' has different possible values than its contract expects.",
+                            Message     = UiLang.T(Localization.Validation.contractValuesDiffer, new Dictionary<string, object> { ["node"] = nodeName, ["var"] = exp.Name }),
                             ContainerId = logic.ParentContainer,
                             LogicNodeId = logic.Id
                         });
@@ -289,7 +289,7 @@ namespace DeusaldStoryCommon
                 foreach (StoryGamebookPreview.Section section in gamebook.Sections)
                     foreach (string error in section.Rendered.Errors)
                         if (seen.Add(error))
-                            problems.Add(Node(logic, $"In '{NodeName(logic.Name)}': {error}"));
+                            problems.Add(Node(logic, UiLang.T(Localization.Validation.gamebookTextPrefix, new Dictionary<string, object> { ["node"] = NodeName(logic.Name), ["error"] = error })));
             }
         }
 
@@ -334,7 +334,7 @@ namespace DeusaldStoryCommon
                         problems.Add(new StoryProblem
                         {
                             Severity    = StoryProblemSeverity.Error,
-                            Message     = $"Variable state differs across the paths reaching '{NodeName(logic.Name)}' — a variable is left registered on some paths but not others.",
+                            Message     = UiLang.T(Localization.Validation.variableStateDiverges, new Dictionary<string, object> { ["node"] = NodeName(logic.Name) }),
                             ContainerId = logic.ParentContainer,
                             LogicNodeId = logic.Id
                         });
@@ -385,24 +385,24 @@ namespace DeusaldStoryCommon
                         StoryRegisterVariableNode reg = op.Register!;
                         if (!active.Add(reg.Id))
                         {
-                            problems.Add(Inner(logic, reg.Id, $"Variable '{NodeName(reg.Name)}' is registered again while already active."));
+                            problems.Add(Inner(logic, reg.Id, UiLang.T(Localization.Validation.variableReRegistered, new Dictionary<string, object> { ["node"] = NodeName(reg.Name) })));
                             break;
                         }
                         if (reg.SlotIndex < 0 || reg.SlotIndex >= StorageSlots.Count(reg.Type))
-                            problems.Add(Inner(logic, reg.Id, $"Slot {StorageSlots.Label(reg.Type, reg.SlotIndex)} is out of range for {reg.Type} storage."));
+                            problems.Add(Inner(logic, reg.Id, UiLang.T(Localization.Validation.slotOutOfRange, new Dictionary<string, object> { ["slot"] = StorageSlots.Label(reg.Type, reg.SlotIndex), ["type"] = reg.Type })));
                         else if (active.Any(id => id != reg.Id && regById.TryGetValue(id, out StoryRegisterVariableNode? other)
                                                   && other.Type == reg.Type && other.SlotIndex == reg.SlotIndex))
-                            problems.Add(Inner(logic, reg.Id, $"Slot {StorageSlots.Label(reg.Type, reg.SlotIndex)} is already in use by another registered variable."));
+                            problems.Add(Inner(logic, reg.Id, UiLang.T(Localization.Validation.slotInUse, new Dictionary<string, object> { ["slot"] = StorageSlots.Label(reg.Type, reg.SlotIndex) })));
                         break;
 
                     case StorageOpKind.Set:
                         if (!active.Contains(op.TargetRegisterId))
-                            problems.Add(Inner(logic, op.InnerId, $"Set of variable '{TargetName(op.TargetRegisterId, regById)}' that isn't registered on this path."));
+                            problems.Add(Inner(logic, op.InnerId, UiLang.T(Localization.Validation.setUnregistered, new Dictionary<string, object> { ["target"] = TargetName(op.TargetRegisterId, regById) })));
                         break;
 
                     case StorageOpKind.Unregister:
                         if (!active.Remove(op.TargetRegisterId))
-                            problems.Add(Inner(logic, op.InnerId, $"Unregister of variable '{TargetName(op.TargetRegisterId, regById)}' that isn't registered on this path."));
+                            problems.Add(Inner(logic, op.InnerId, UiLang.T(Localization.Validation.unregisterUnregistered, new Dictionary<string, object> { ["target"] = TargetName(op.TargetRegisterId, regById) })));
                         break;
                 }
             }
@@ -441,7 +441,7 @@ namespace DeusaldStoryCommon
                     problems.Add(new StoryProblem
                     {
                         Severity    = StoryProblemSeverity.Error,
-                        Message     = $"Text references variable '{name}' that isn't registered where '{NodeName(logic.Name)}' is shown.",
+                        Message     = UiLang.T(Localization.Validation.textRefUnregistered, new Dictionary<string, object> { ["name"] = name, ["node"] = NodeName(logic.Name) }),
                         ContainerId = logic.ParentContainer,
                         LogicNodeId = logic.Id,
                         InnerNodeId = loc.Id
@@ -466,7 +466,7 @@ namespace DeusaldStoryCommon
                 StoryProblem problem = new()
                 {
                     Severity    = StoryProblemSeverity.Error,
-                    Message     = $"Variable '{TargetName(id, regById)}' is still registered when the story reaches The End — unregister it first (or release it on the End node).",
+                    Message     = UiLang.T(Localization.Validation.variableNotReleasedAtEnd, new Dictionary<string, object> { ["target"] = TargetName(id, regById) }),
                     InnerNodeId = id
                 };
                 if (regOwnerById.TryGetValue(id, out StoryLogicNode? owner))
@@ -569,9 +569,9 @@ namespace DeusaldStoryCommon
         };
 
         private static string TargetName(Guid id, Dictionary<Guid, StoryRegisterVariableNode> regById) =>
-            regById.TryGetValue(id, out StoryRegisterVariableNode? reg) ? NodeName(reg.Name) : "(unknown)";
+            regById.TryGetValue(id, out StoryRegisterVariableNode? reg) ? NodeName(reg.Name) : UiLang.T(Localization.Validation.unknownTarget);
 
-        private static string NodeName(string name) => string.IsNullOrWhiteSpace(name) ? "(unnamed)" : name;
+        private static string NodeName(string name) => string.IsNullOrWhiteSpace(name) ? UiLang.T(Localization.Common.Placeholders.unnamed) : name;
 
         private static string PointName(StoryConnectionPoint point, string fallback) =>
             string.IsNullOrWhiteSpace(point.Name) ? fallback : point.Name;

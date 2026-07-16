@@ -1,4 +1,5 @@
 @namespace DeusaldStoryWeb.Components.Common
+@inject UiLocalizationService Loc
 @inject ProjectStateService _ProjectState
 
 @* ─────────────────────────────────────────────────────────────────────────
@@ -14,8 +15,8 @@
     <div class="modal-box rvm-box" @onclick:stopPropagation="true">
 
         <div class="modal-header">
-            <span class="modal-title">@(_IsEdit ? "Edit variable" : "Register variable")</span>
-            <button class="modal-close" @onclick="Cancel" title="Close">
+            <span class="modal-title">@(_IsEdit ? Loc.T(Localization.Editor.Modals.RegisterVariable.editTitle) : Loc.T(Localization.Editor.Modals.RegisterVariable.title))</span>
+            <button class="modal-close" @onclick="Cancel" title="@Loc.T(Localization.Common.Buttons.close)">
                 <i class="bi bi-x-lg"></i>
             </button>
         </div>
@@ -24,10 +25,10 @@
 
             @* ── Name ──────────────────────────────────────────────────── *@
             <div class="modal-field">
-                <label class="modal-label">Name</label>
+                <label class="modal-label">@Loc.T(Localization.Common.Fields.name)</label>
                 <input class="modal-input"
                        type="text"
-                       placeholder="Secret treasure number"
+                       placeholder="@Loc.T(Localization.Editor.Modals.RegisterVariable.namePlaceholder)"
                        @bind="_Name"
                        @bind:event="oninput"
                        maxlength="100"/>
@@ -36,11 +37,11 @@
             @* ── Description ───────────────────────────────────────────── *@
             <div class="modal-field">
                 <label class="modal-label">
-                    Description
-                    <span class="modal-label-hint">optional</span>
+                    @Loc.T(Localization.Common.Fields.description)
+                    <span class="modal-label-hint">@Loc.T(Localization.Common.Fields.optional)</span>
                 </label>
                 <textarea class="modal-input rvm-textarea"
-                          placeholder="What this variable represents in the story…"
+                          placeholder="@Loc.T(Localization.Editor.Modals.RegisterVariable.descriptionPlaceholder)"
                           @bind="_Description"
                           @bind:event="oninput"
                           rows="2"
@@ -50,15 +51,15 @@
             @* ── Storage type + slot ───────────────────────────────────── *@
             <div class="rvm-row">
                 <div class="modal-field rvm-grow">
-                    <label class="modal-label">Storage type</label>
+                    <label class="modal-label">@Loc.T(Localization.Editor.Modals.RegisterVariable.storageType)</label>
                     <select class="modal-input" @bind="_Type">
-                        <option value="@StorageVariableType.Number">Number (D6 / token)</option>
-                        <option value="@StorageVariableType.Dial">Dial (−7…7)</option>
-                        <option value="@StorageVariableType.String">String (written)</option>
+                        <option value="@StorageVariableType.Number">@Loc.T(Localization.Editor.Modals.RegisterVariable.storageTypeNumber)</option>
+                        <option value="@StorageVariableType.Dial">@Loc.T(Localization.Common.Misc.dialRange)</option>
+                        <option value="@StorageVariableType.String">@Loc.T(Localization.Common.Misc.stringWritten)</option>
                     </select>
                 </div>
                 <div class="modal-field rvm-grow">
-                    <label class="modal-label">Slot</label>
+                    <label class="modal-label">@Loc.T(Localization.Common.Fields.slot)</label>
                     <select class="modal-input" @bind="_SlotIndex">
                         @foreach (int i in AvailableSlots())
                         {
@@ -73,21 +74,21 @@
                 @* ── Number storage mode + value count ──────────────────── *@
                 <div class="rvm-row">
                     <div class="modal-field rvm-grow">
-                        <label class="modal-label">Stored with</label>
+                        <label class="modal-label">@Loc.T(Localization.Common.Fields.storedWith)</label>
                         <select class="modal-input" @bind="_Mode">
-                            <option value="@NumberStorageMode.Dice">D6 die</option>
-                            <option value="@NumberStorageMode.Token">Number token</option>
+                            <option value="@NumberStorageMode.Dice">@Loc.T(Localization.Common.StoredWith.dice)</option>
+                            <option value="@NumberStorageMode.Token">@Loc.T(Localization.Common.StoredWith.token)</option>
                         </select>
                     </div>
                     <div class="modal-field rvm-grow">
-                        <label class="modal-label">Values</label>
+                        <label class="modal-label">@Loc.T(Localization.Common.Fields.values)</label>
                         <select class="modal-input" @bind="_ValueCount">
-                            <option value="@NumberValueCount.One">1 — presence flag</option>
-                            <option value="@NumberValueCount.Two">2 — even / odd</option>
-                            <option value="@NumberValueCount.Three">3 — 1&2 / 3&4 / 5&6</option>
-                            <option value="@NumberValueCount.Four">4 — 1 / 2 / 3 / 4</option>
-                            <option value="@NumberValueCount.Five">5 — 1 … 5</option>
-                            <option value="@NumberValueCount.Six">6 — 1 … 6</option>
+                            <option value="@NumberValueCount.One">@Loc.T(Localization.Common.ValueCounts.one)</option>
+                            <option value="@NumberValueCount.Two">@Loc.T(Localization.Common.ValueCounts.two)</option>
+                            <option value="@NumberValueCount.Three">@Loc.T(Localization.Common.ValueCounts.three)</option>
+                            <option value="@NumberValueCount.Four">@Loc.T(Localization.Common.ValueCounts.four)</option>
+                            <option value="@NumberValueCount.Five">@Loc.T(Localization.Common.ValueCounts.five)</option>
+                            <option value="@NumberValueCount.Six">@Loc.T(Localization.Common.ValueCounts.six)</option>
                         </select>
                     </div>
                 </div>
@@ -97,18 +98,18 @@
             {
                 @* ── Assignment ────────────────────────────────────────── *@
                 <div class="modal-field">
-                    <label class="modal-label">Initial value</label>
+                    <label class="modal-label">@Loc.T(Localization.Common.Fields.initialValue)</label>
                     <select class="modal-input" @bind="_Assignment">
-                        <option value="@NumberAssignment.Unset">Leave unset (no instruction)</option>
-                        <option value="@NumberAssignment.SetSpecific">Set to a specific value</option>
-                        <option value="@NumberAssignment.Randomize">Randomize (roll / draw)</option>
+                        <option value="@NumberAssignment.Unset">@Loc.T(Localization.Editor.Modals.RegisterVariable.unsetNoInstruction)</option>
+                        <option value="@NumberAssignment.SetSpecific">@Loc.T(Localization.Common.Assignment.setSpecific)</option>
+                        <option value="@NumberAssignment.Randomize">@Loc.T(Localization.Common.Assignment.randomize)</option>
                     </select>
                 </div>
 
                 @if (_Assignment == NumberAssignment.SetSpecific)
                 {
                     <div class="modal-field">
-                        <label class="modal-label">Value</label>
+                        <label class="modal-label">@Loc.T(Localization.Common.Fields.value)</label>
                         <input class="modal-input"
                                type="number"
                                min="@ValueMin"
@@ -127,8 +128,8 @@
                                    checked="@_Secret"
                                    @onchange="e => _Secret = (bool)(e.Value ?? false)"/>
                             <span>
-                                Secret
-                                <span class="modal-label-hint">players set / draw it without learning the value until told</span>
+                                @Loc.T(Localization.Common.Fields.secret)
+                                <span class="modal-label-hint">@Loc.T(Localization.Editor.Modals.RegisterVariable.secretHint)</span>
                             </span>
                         </label>
                     </div>
@@ -139,21 +140,21 @@
             {
                 @* ── String value mode ─────────────────────────────────── *@
                 <div class="modal-field">
-                    <label class="modal-label">Value</label>
+                    <label class="modal-label">@Loc.T(Localization.Common.Fields.value)</label>
                     <select class="modal-input" @bind="_StringMode">
-                        <option value="@StringValueMode.Unset">Leave unset (no instruction)</option>
-                        <option value="@StringValueMode.Specific">Set a specific value</option>
-                        <option value="@StringValueMode.PlayerInput">Player fills it in</option>
+                        <option value="@StringValueMode.Unset">@Loc.T(Localization.Editor.Modals.RegisterVariable.unsetNoInstruction)</option>
+                        <option value="@StringValueMode.Specific">@Loc.T(Localization.Common.VariableInput.stringModeSpecific)</option>
+                        <option value="@StringValueMode.PlayerInput">@Loc.T(Localization.Common.VariableInput.stringModePlayerInput)</option>
                     </select>
                 </div>
 
                 @if (_StringMode == StringValueMode.Specific)
                 {
                     <div class="modal-field">
-                        <label class="modal-label">Written value</label>
+                        <label class="modal-label">@Loc.T(Localization.Common.VariableInput.writtenValue)</label>
                         <input class="modal-input"
                                type="text"
-                               placeholder="What the player writes on the slot"
+                               placeholder="@Loc.T(Localization.Common.VariableInput.writtenValuePlaceholder)"
                                @bind="_StringValue"
                                @bind:event="oninput"
                                maxlength="30"/>
@@ -163,27 +164,25 @@
                 @if (_StringMode == StringValueMode.PlayerInput)
                 {
                     <div class="modal-field">
-                        <label class="modal-label">Player enters</label>
+                        <label class="modal-label">@Loc.T(Localization.Common.VariableInput.playerEnters)</label>
                         <select class="modal-input" @bind="_StringInputKind">
-                            <option value="@StringInputKind.Text">Text</option>
-                            <option value="@StringInputKind.Number">Number</option>
+                            <option value="@StringInputKind.Text">@Loc.T(Localization.Common.InputKind.text)</option>
+                            <option value="@StringInputKind.Number">@Loc.T(Localization.Common.InputKind.number)</option>
                         </select>
                         <span class="modal-label-hint">
-                            App shows an input field. Wire a Localization node into the node's Instruction port to tell
-                            the player what to write, and into its Placeholder port to set the hint shown inside the field.
-                            Reference this variable's slot in the instruction text as <code>@_SlotToken</code>.
+                            @((MarkupString)Loc.T(Localization.Common.VariableInput.playerInputHint).Replace("[slotToken]", _SlotToken))
                         </span>
                     </div>
 
                     <div class="modal-note">
                         <i class="bi bi-info-circle"></i>
-                        <span>The checks below are enforced in the <b>App</b> only — the printed Gamebook cannot validate a written entry.</span>
+                        <span>@((MarkupString)Loc.T(Localization.Common.VariableInput.appOnlyChecksNote))</span>
                     </div>
 
                     @* ── Character-limit range ──────────────────────────── *@
                     <div class="rvm-row">
                         <div class="modal-field rvm-grow">
-                            <label class="modal-label">Min length</label>
+                            <label class="modal-label">@Loc.T(Localization.Common.VariableInput.minLength)</label>
                             <input class="modal-input"
                                    type="number"
                                    min="0"
@@ -192,7 +191,7 @@
                                    @bind:event="oninput"/>
                         </div>
                         <div class="modal-field rvm-grow">
-                            <label class="modal-label">Max length</label>
+                            <label class="modal-label">@Loc.T(Localization.Common.VariableInput.maxLength)</label>
                             <input class="modal-input"
                                    type="number"
                                    min="1"
@@ -205,15 +204,15 @@
                     @* ── Message shown when the entry length is out of range ── *@
                     <div class="modal-field">
                         <label class="modal-label">
-                            Length error message
-                            <span class="modal-label-hint">shown when the entry is outside the range</span>
+                            @Loc.T(Localization.Common.VariableInput.lengthErrorMessage)
+                            <span class="modal-label-hint">@Loc.T(Localization.Common.VariableInput.lengthErrorHint)</span>
                         </label>
                         <div class="rvm-keyrow">
                             <span class="rvm-keyname @(_LengthErrorKeyId == Guid.Empty ? "rvm-keyname-empty" : "")">@KeyLabel(_LengthErrorKeyId)</span>
-                            <button class="modal-btn modal-btn-ghost rvm-keybtn" @onclick="PickLengthErrorKey">Pick key</button>
+                            <button class="modal-btn modal-btn-ghost rvm-keybtn" @onclick="PickLengthErrorKey">@Loc.T(Localization.Common.Buttons.pickKey)</button>
                             @if (_LengthErrorKeyId != Guid.Empty)
                             {
-                                <button class="modal-btn modal-btn-ghost rvm-keybtn" @onclick="() => _LengthErrorKeyId = Guid.Empty">Clear</button>
+                                <button class="modal-btn modal-btn-ghost rvm-keybtn" @onclick="() => _LengthErrorKeyId = Guid.Empty">@Loc.T(Localization.Common.Buttons.clear)</button>
                             }
                         </div>
                     </div>
@@ -221,12 +220,11 @@
                     @* ── Validation rule (reuses the exit auto-condition builder) ── *@
                     <div class="modal-field">
                         <label class="modal-label">
-                            Validation rule
-                            <span class="modal-label-hint">optional — the entry is accepted only when this holds</span>
+                            @Loc.T(Localization.Common.VariableInput.validationRule)
+                            <span class="modal-label-hint">@Loc.T(Localization.Common.VariableInput.validationRuleHint)</span>
                         </label>
                         <span class="modal-label-hint">
-                            Compare <b>This entry</b> against another variable or a typed value — e.g. <b>This entry ≠ [Name]</b>
-                            to force a value different from another variable. An empty rule accepts anything.
+                            @((MarkupString)Loc.T(Localization.Common.VariableInput.validationRuleExplain))
                         </span>
                         <div class="rvm-rule">
                             <ExitConditionEditor Expr="_ValidationRule" Vars="RuleVars()" OnChanged="StateHasChanged"/>
@@ -237,15 +235,15 @@
                     {
                         <div class="modal-field">
                             <label class="modal-label">
-                                Rule error message
-                                <span class="modal-label-hint">shown when the rule is not met</span>
+                                @Loc.T(Localization.Common.VariableInput.ruleErrorMessage)
+                                <span class="modal-label-hint">@Loc.T(Localization.Common.VariableInput.ruleErrorHint)</span>
                             </label>
                             <div class="rvm-keyrow">
                                 <span class="rvm-keyname @(_ValidationErrorKeyId == Guid.Empty ? "rvm-keyname-empty" : "")">@KeyLabel(_ValidationErrorKeyId)</span>
-                                <button class="modal-btn modal-btn-ghost rvm-keybtn" @onclick="PickValidationErrorKey">Pick key</button>
+                                <button class="modal-btn modal-btn-ghost rvm-keybtn" @onclick="PickValidationErrorKey">@Loc.T(Localization.Common.Buttons.pickKey)</button>
                                 @if (_ValidationErrorKeyId != Guid.Empty)
                                 {
-                                    <button class="modal-btn modal-btn-ghost rvm-keybtn" @onclick="() => _ValidationErrorKeyId = Guid.Empty">Clear</button>
+                                    <button class="modal-btn modal-btn-ghost rvm-keybtn" @onclick="() => _ValidationErrorKeyId = Guid.Empty">@Loc.T(Localization.Common.Buttons.clear)</button>
                                 }
                             </div>
                         </div>
@@ -256,36 +254,36 @@
             @* ── Preview value ──────────────────────────────────────────── *@
             <div class="modal-field">
                 <label class="modal-label">
-                    Preview value
-                    <span class="modal-label-hint">optional</span>
+                    @Loc.T(Localization.Common.Fields.previewValue)
+                    <span class="modal-label-hint">@Loc.T(Localization.Common.Fields.optional)</span>
                 </label>
                 <input class="modal-input"
                        type="text"
-                       placeholder="value shown when a Get variable reads this in the App preview"
+                       placeholder="@Loc.T(Localization.Editor.Modals.RegisterVariable.previewValuePlaceholder)"
                        @bind="_PreviewValue"
                        @bind:event="oninput"
                        maxlength="100"/>
-                <span class="modal-label-hint">the App tracks the live value at play time; used by a Get variable node that leaves its own preview value blank</span>
+                <span class="modal-label-hint">@Loc.T(Localization.Editor.Modals.RegisterVariable.previewValueHint)</span>
             </div>
 
             @* ── Gamebook / App placement ───────────────────────────────── *@
             <div class="modal-field">
-                <label class="modal-label">Placement</label>
+                <label class="modal-label">@Loc.T(Localization.Common.Fields.placement)</label>
                 <select class="modal-input" @bind="_Placement">
-                    <option value="@StorageInstructionPlacement.Below">Below the text</option>
-                    <option value="@StorageInstructionPlacement.Above">Above the text</option>
+                    <option value="@StorageInstructionPlacement.Below">@Loc.T(Localization.Common.Fields.placementBelow)</option>
+                    <option value="@StorageInstructionPlacement.Above">@Loc.T(Localization.Common.Fields.placementAbove)</option>
                 </select>
-                <span class="modal-label-hint">where the instruction / input field sits relative to the section text</span>
+                <span class="modal-label-hint">@Loc.T(Localization.Editor.Modals.RegisterVariable.placementHint)</span>
             </div>
 
         </div>
 
         <div class="modal-footer">
-            <button class="modal-btn modal-btn-ghost" @onclick="Cancel">Cancel</button>
+            <button class="modal-btn modal-btn-ghost" @onclick="Cancel">@Loc.T(Localization.Common.Buttons.cancel)</button>
             <button class="modal-btn modal-btn-primary"
                     @onclick="Confirm"
                     disabled="@(!_CanConfirm)">
-                @(_IsEdit ? "Save changes" : "Register")
+                @(_IsEdit ? Loc.T(Localization.Common.Buttons.saveChanges) : Loc.T(Localization.Editor.Modals.RegisterVariable.confirmRegister))
             </button>
         </div>
 
@@ -424,20 +422,20 @@
     /// <summary>The operands the validation rule can reference: "This entry" plus every other registered variable.</summary>
     private List<(Guid Id, string Name)> RuleVars()
     {
-        List<(Guid, string)> vars = new() { (StorageValidation.ThisEntryRef, "This entry") };
+        List<(Guid, string)> vars = new() { (StorageValidation.ThisEntryRef, Loc.T(Localization.Common.VariableInput.thisEntry)) };
         if (_ProjectState.CurrentProject is not null)
             foreach (StoryLogicNode logic in _ProjectState.CurrentProject.LogicNodes.Values)
                 foreach (StoryRegisterVariableNode reg in logic.RegisterVariableNodes.OrderBy(v => v.Name, StringComparer.OrdinalIgnoreCase))
                     if (reg.Id != _EditNodeId)
-                        vars.Add((reg.Id, $"{(string.IsNullOrWhiteSpace(reg.Name) ? "(unnamed)" : reg.Name)} [{StorageSlots.Label(reg.Type, reg.SlotIndex)}]"));
+                        vars.Add((reg.Id, $"{(string.IsNullOrWhiteSpace(reg.Name) ? Loc.T(Localization.Common.Placeholders.unnamed) : reg.Name)} [{StorageSlots.Label(reg.Type, reg.SlotIndex)}]"));
         return vars;
     }
 
     /// <summary>The localization key's display name, or a placeholder when none is picked.</summary>
     private string KeyLabel(Guid keyId)
     {
-        if (keyId == Guid.Empty) return "Default message";
-        return _ProjectState.CurrentLocalization?.Keys.Find(k => k.Id == keyId)?.KeyName ?? "(missing key)";
+        if (keyId == Guid.Empty) return Loc.T(Localization.Common.VariableInput.defaultMessage);
+        return _ProjectState.CurrentLocalization?.Keys.Find(k => k.Id == keyId)?.KeyName ?? Loc.T(Localization.Common.VariableInput.missingKey);
     }
 
     private void PickLengthErrorKey()

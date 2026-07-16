@@ -1,4 +1,5 @@
 @namespace DeusaldStoryWeb.Components.Common
+@inject UiLocalizationService Loc
 
 @* ─────────────────────────────────────────────────────────────────────────
    Left tool rail. Placeholder navigation matching the design mock — the
@@ -10,18 +11,18 @@
 
     @* ── Primary: story graph ────────────────────────────────────────── *@
     <button class="edr-btn edr-primary @(_Active == Tool.Graph ? "active" : "")"
-            title="Story graph" @onclick="() => Select(Tool.Graph)">
+            title="@Loc.T(Localization.Editor.Rail.storyGraph)" @onclick="() => Select(Tool.Graph)">
         <i class="bi bi-bezier2"></i>
     </button>
 
     <div class="edr-sep"></div>
 
     @* ── Tools ───────────────────────────────────────────────────────── *@
-    @foreach ((Tool tool, string icon, string label) in _Tools)
+    @foreach ((Tool tool, string icon, Guid label) in _Tools)
     {
         Tool t = tool;
         <button class="edr-btn @(_Active == t ? "active" : "")"
-                title="@label" @onclick="() => Select(t)">
+                title="@Loc.T(label)" @onclick="() => Select(t)">
             <i class="bi @icon"></i>
         </button>
     }
@@ -30,11 +31,11 @@
 
     @* ── Bottom: diagnostics + history ───────────────────────────────── *@
     <button class="edr-btn @(_Active == Tool.Problems ? "active" : "")"
-            title="Problems" @onclick="() => Select(Tool.Problems)">
+            title="@Loc.T(Localization.Editor.Rail.problems)" @onclick="() => Select(Tool.Problems)">
         <i class="bi bi-exclamation-triangle"></i>
     </button>
     <button class="edr-btn @(_Active == Tool.History ? "active" : "")"
-            title="History" @onclick="() => Select(Tool.History)">
+            title="@Loc.T(Localization.Editor.Rail.history)" @onclick="() => Select(Tool.History)">
         <i class="bi bi-clock-history"></i>
     </button>
 
@@ -52,16 +53,16 @@
     private Tool _Active = Tool.Graph;
 
     // Middle tool stack (order mirrors the mock).
-    private static readonly (Tool Tool, string Icon, string Label)[] _Tools =
+    private static readonly (Tool Tool, string Icon, Guid Label)[] _Tools =
     [
-        (Tool.Connections,  "bi-share",       "Connections"),
-        (Tool.Outline,      "bi-list-ul",     "Outline"),
-        (Tool.Flow,         "bi-play",        "Flow"),
-        (Tool.Localization, "bi-globe",       "Localization"),
-        (Tool.Variables,    "bi-braces",      "Variables"),
-        (Tool.Blocks,       "bi-diagram-3",   "Blueprints"),
-        (Tool.Media,        "bi-image",       "Media"),
-        (Tool.Preview,      "bi-play-circle", "Preview")
+        (Tool.Connections,  "bi-share",       Localization.Editor.Rail.connections),
+        (Tool.Outline,      "bi-list-ul",     Localization.Editor.Rail.outline),
+        (Tool.Flow,         "bi-play",        Localization.Editor.Rail.flow),
+        (Tool.Localization, "bi-globe",       Localization.Editor.Rail.localization),
+        (Tool.Variables,    "bi-braces",      Localization.Editor.Rail.variables),
+        (Tool.Blocks,       "bi-diagram-3",   Localization.Editor.Rail.blueprints),
+        (Tool.Media,        "bi-image",       Localization.Editor.Rail.media),
+        (Tool.Preview,      "bi-play-circle", Localization.Editor.Rail.preview)
     ];
 
     private async Task Select(Tool tool)

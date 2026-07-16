@@ -1,6 +1,7 @@
 @namespace DeusaldStoryWeb.Components.Common
 @using DeusaldStoryCommon
 @inject ProjectStateService _ProjectState
+@inject UiLocalizationService Loc
 @implements IDisposable
 
 @* ─────────────────────────────────────────────────────────────────────────
@@ -15,29 +16,29 @@
     <div class="bpp-head">
         <div class="bpp-head-title">
             <i class="bi bi-diagram-3"></i>
-            <span>Blueprints</span>
+            <span>@Loc.T(Localization.Editor.Panels.Blueprints.title)</span>
         </div>
-        <div class="bpp-head-sub">Reusable node templates — editing a blueprint changes every instance of it.</div>
+        <div class="bpp-head-sub">@Loc.T(Localization.Editor.Panels.Blueprints.subtitle)</div>
     </div>
 
     <div class="bpp-new">
-        <input class="modal-input" type="text" placeholder="New blueprint name…"
+        <input class="modal-input" type="text" placeholder="@Loc.T(Localization.Editor.Panels.Blueprints.newNamePlaceholder)"
                @bind="_NewName" @bind:event="oninput" maxlength="100"/>
         <button class="modal-btn modal-btn-ghost" disabled="@_CantCreate" @onclick="() => Create(StoryBlueprintKind.Container)">
-            <i class="bi bi-collection"></i> Container
+            <i class="bi bi-collection"></i> @Loc.T(Localization.Editor.Panels.Blueprints.container)
         </button>
         <button class="modal-btn modal-btn-ghost" disabled="@_CantCreate" @onclick="() => Create(StoryBlueprintKind.Logic)">
-            <i class="bi bi-diamond-half"></i> Logic
+            <i class="bi bi-diamond-half"></i> @Loc.T(Localization.Editor.Panels.Blueprints.logic)
         </button>
         <button class="modal-btn modal-btn-ghost" disabled="@_CantCreate" @onclick="() => Create(StoryBlueprintKind.Function)">
-            <i class="bi bi-cpu"></i> Function
+            <i class="bi bi-cpu"></i> @Loc.T(Localization.Editor.Panels.Blueprints.function)
         </button>
     </div>
 
     <div class="bpp-list">
         @if (Blueprints.Count == 0)
         {
-            <div class="bpp-empty">No blueprints yet. Create one above, or right-click a node and choose “Make into blueprint”.</div>
+            <div class="bpp-empty">@Loc.T(Localization.Editor.Panels.Blueprints.empty)</div>
         }
         @foreach (StoryBlueprint bp in Blueprints)
         {
@@ -49,35 +50,35 @@
                        @onchange="e => Rename(item.Id, e.Value?.ToString() ?? string.Empty)"
                        maxlength="100"/>
                 <span class="bpp-item-kind">@item.Kind</span>
-                <span class="bpp-item-count">@InstanceCount(item)×</span>
+                <span class="bpp-item-count">@Loc.T(Localization.Editor.Panels.Blueprints.instanceCount, new Dictionary<string, object> { ["count"] = InstanceCount(item) })</span>
 
-                <button class="bpp-act" title="Open definition" @onclick="() => OnOpen.InvokeAsync(item.Id)">
+                <button class="bpp-act" title="@Loc.T(Localization.Editor.Panels.Blueprints.openDefinition)" @onclick="() => OnOpen.InvokeAsync(item.Id)">
                     <i class="bi bi-box-arrow-in-right"></i>
                 </button>
                 @if (item.Kind == StoryBlueprintKind.Function)
                 {
-                    <button class="bpp-act" title="Edit signature" @onclick="() => OnEditSignature.InvokeAsync(item.Id)">
+                    <button class="bpp-act" title="@Loc.T(Localization.Editor.Panels.Blueprints.editSignature)" @onclick="() => OnEditSignature.InvokeAsync(item.Id)">
                         <i class="bi bi-input-cursor"></i>
                     </button>
                 }
                 else
                 {
-                    <button class="bpp-act" title="Edit properties (name, ports, options)" @onclick="() => OnEditProperties.InvokeAsync(item.Id)">
+                    <button class="bpp-act" title="@Loc.T(Localization.Editor.Panels.Blueprints.editProperties)" @onclick="() => OnEditProperties.InvokeAsync(item.Id)">
                         <i class="bi bi-sliders"></i>
                     </button>
                 }
                 @if (_ConfirmDelete == item.Id)
                 {
-                    <button class="bpp-act bpp-act-danger" title="Confirm delete (removes all instances)" @onclick="() => Delete(item.Id)">
+                    <button class="bpp-act bpp-act-danger" title="@Loc.T(Localization.Editor.Panels.Blueprints.confirmDelete)" @onclick="() => Delete(item.Id)">
                         <i class="bi bi-check-lg"></i>
                     </button>
-                    <button class="bpp-act" title="Cancel" @onclick="() => _ConfirmDelete = Guid.Empty">
+                    <button class="bpp-act" title="@Loc.T(Localization.Common.Buttons.cancel)" @onclick="() => _ConfirmDelete = Guid.Empty">
                         <i class="bi bi-x-lg"></i>
                     </button>
                 }
                 else
                 {
-                    <button class="bpp-act" title="Delete" @onclick="() => _ConfirmDelete = item.Id">
+                    <button class="bpp-act" title="@Loc.T(Localization.Common.Buttons.delete)" @onclick="() => _ConfirmDelete = item.Id">
                         <i class="bi bi-trash"></i>
                     </button>
                 }

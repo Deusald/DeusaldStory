@@ -1,5 +1,6 @@
 @namespace DeusaldStoryWeb.Components.Common
 @inject ProjectStateService _ProjectState
+@inject UiLocalizationService Loc
 
 @* ─────────────────────────────────────────────────────────────────────────
    Picks a single icon from the project's image library (the Icon kind only).
@@ -13,8 +14,8 @@
     <div class="modal-box icp-box" @onclick:stopPropagation="true">
 
         <div class="modal-header">
-            <span class="modal-title">Pick an icon</span>
-            <button class="modal-close" @onclick="Cancel" title="Close">
+            <span class="modal-title">@Loc.T(Localization.Editor.Modals.IconPicker.title)</span>
+            <button class="modal-close" @onclick="Cancel" title="@Loc.T(Localization.Common.Buttons.close)">
                 <i class="bi bi-x-lg"></i>
             </button>
         </div>
@@ -27,7 +28,7 @@
             {
                 <div class="icp-empty">
                     <i class="bi bi-emoji-smile"></i>
-                    <span>No icons yet — add square, power-of-two PNGs from the Images panel.</span>
+                    <span>@Loc.T(Localization.Editor.Modals.IconPicker.noIconsEmpty)</span>
                 </div>
             }
             else
@@ -50,11 +51,11 @@
         </div>
 
         <div class="modal-footer">
-            <button class="modal-btn modal-btn-ghost" @onclick="Cancel">Cancel</button>
+            <button class="modal-btn modal-btn-ghost" @onclick="Cancel">@Loc.T(Localization.Common.Buttons.cancel)</button>
             <button class="modal-btn modal-btn-primary"
                     @onclick="Confirm"
                     disabled="@(_SelectedImageId == Guid.Empty)">
-                Select icon
+                @Loc.T(Localization.Editor.Modals.IconPicker.selectIcon)
             </button>
         </div>
 

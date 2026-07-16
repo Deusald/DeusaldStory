@@ -1,4 +1,5 @@
 @namespace DeusaldStoryWeb.Components.Common
+@inject UiLocalizationService Loc
 @using DeusaldStoryCommon
 
 @* ─────────────────────────────────────────────────────────────────────────
@@ -15,7 +16,7 @@
 
         <div class="modal-header">
             <span class="modal-title">@_Title</span>
-            <button class="modal-close" @onclick="Cancel" title="Close">
+            <button class="modal-close" @onclick="Cancel" title="@Loc.T(Localization.Common.Buttons.close)">
                 <i class="bi bi-x-lg"></i>
             </button>
         </div>
@@ -25,7 +26,7 @@
             {
                 <div class="modal-note">
                     <i class="bi bi-info-circle"></i>
-                    <span>No blueprints yet — create one from the Blueprints panel in the left rail.</span>
+                    <span>@Loc.T(Localization.Editor.Modals.BlueprintPicker.noBlueprintsEmpty)</span>
                 </div>
             }
             else
@@ -45,7 +46,7 @@
         </div>
 
         <div class="modal-footer">
-            <button class="modal-btn modal-btn-ghost" @onclick="Cancel">Cancel</button>
+            <button class="modal-btn modal-btn-ghost" @onclick="Cancel">@Loc.T(Localization.Common.Buttons.cancel)</button>
         </div>
 
     </div>
@@ -55,8 +56,11 @@
     [Parameter] public EventCallback<Guid> OnSelect { get; set; }
 
     private bool                 _Visible;
-    private string               _Title = "Place blueprint";
+    private string               _Title = "";
     private List<StoryBlueprint> _Items = new();
+
+    protected override void OnInitialized() =>
+        _Title = Loc.T(Localization.Editor.Modals.BlueprintPicker.defaultTitle);
 
     /// <summary>Opens the picker over the given blueprints with a context title.</summary>
     public void Show(IEnumerable<StoryBlueprint> blueprints, string title)

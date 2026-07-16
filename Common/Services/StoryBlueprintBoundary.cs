@@ -53,15 +53,15 @@ namespace DeusaldStoryCommon
                     if (project.LogicNodes.TryGetValue(blueprint.DefinitionNodeId, out StoryLogicNode? logic))
                     {
                         ports.Add(new BlueprintBoundaryPort(logic.EntryPoint.Id,
-                            logic.AcceptVariables ? "Variables" : "Flow", true,
+                            UiLang.T(logic.AcceptVariables ? Localization.Editor.Nodes.Ports.variables : Localization.Editor.Nodes.Ports.flow), true,
                             logic.AcceptVariables ? PortType.VFlow : PortType.Flow));
 
                         if (logic.ExitMode == StoryLogicExitMode.SinglePath)
-                            ports.Add(new BlueprintBoundaryPort(logic.VFlowOut.Id, "Continue", false, PortType.VFlow));
+                            ports.Add(new BlueprintBoundaryPort(logic.VFlowOut.Id, UiLang.T(Localization.Editor.Nodes.Ports.continueLabel), false, PortType.VFlow));
                         else
                             foreach (StoryChoice choice in logic.Choices)
                                 ports.Add(new BlueprintBoundaryPort(choice.OuterFlowOut.Id,
-                                    string.IsNullOrWhiteSpace(choice.Name) ? "Choice" : choice.Name, false, PortType.Flow));
+                                    string.IsNullOrWhiteSpace(choice.Name) ? UiLang.T(Localization.Editor.Nodes.Ports.choice) : choice.Name, false, PortType.Flow));
                     }
                     break;
 

@@ -380,8 +380,8 @@ namespace DeusaldStoryCommon
                 string rendered = StoryConditionPreview.Render(format, vals, out string? error);
                 if (error is not null)
                     errors.Add(hasOmittedVariable
-                        ? $"SmartFormat failed to render: {error} (probable cause: a Variable is wired here and is unavailable in the Gamebook)."
-                        : $"SmartFormat failed to render: {error}");
+                        ? UiLang.T(Localization.Services.Renderer.smartFormatFailedGamebook, new Dictionary<string, object> { ["error"] = error })
+                        : UiLang.T(Localization.Services.Renderer.smartFormatFailed,         new Dictionary<string, object> { ["error"] = error }));
                 return rendered;
             }
 

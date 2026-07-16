@@ -1,6 +1,7 @@
 @page "/editor"
 @layout EmptyLayout
 @namespace DeusaldStoryWeb.Components.Pages
+@inject UiLocalizationService Loc
 @inject ProjectStateService _ProjectState
 @inject NavigationManager   _Nav
 @implements IDisposable
@@ -87,10 +88,10 @@
                     <div class="ed-preview">
                         <div class="ed-preview-switch">
                             <button class="ed-preview-tab @(_PreviewGamebook ? "" : "active")" @onclick="() => SetPreviewKind(false)">
-                                <i class="bi bi-phone"></i> App
+                                <i class="bi bi-phone"></i> @Loc.T(Localization.Editor.Page.previewTabApp)
                             </button>
                             <button class="ed-preview-tab @(_PreviewGamebook ? "active" : "")" @onclick="() => SetPreviewKind(true)">
-                                <i class="bi bi-book"></i> Gamebook
+                                <i class="bi bi-book"></i> @Loc.T(Localization.Editor.Page.previewTabGamebook)
                             </button>
                         </div>
                         @if (_PreviewNotice is not null)
@@ -116,8 +117,8 @@
                     <div class="ed-play">
                         <div class="ed-play-inner">
                             <i class="bi bi-play-circle"></i>
-                            <div class="ed-play-title">Play mode</div>
-                            <div class="ed-play-sub">Step through the story from the start node. Runtime playback is coming next.</div>
+                            <div class="ed-play-title">@Loc.T(Localization.Editor.Page.playModeTitle)</div>
+                            <div class="ed-play-sub">@Loc.T(Localization.Editor.Page.playModeSubtitle)</div>
                         </div>
                     </div>
                 }
@@ -290,7 +291,7 @@
 
     private string RootName() =>
         Project.ContainerNodes.TryGetValue(Project.Metadata.RootStoryContainerNodeId, out StoryContainerNode? root)
-            ? root.Name : "Root";
+            ? root.Name : Loc.T(Localization.Editor.Page.rootFallbackName);
 
     private bool IsRootContainer => _CurrentId == Project.Metadata.RootStoryContainerNodeId;
 
@@ -373,11 +374,11 @@
                 break;
 
             case StoryFlowNavigator.NextKind.End:
-                _PreviewNotice = "This branch reaches The End.";
+                _PreviewNotice = Loc.T(Localization.Editor.Page.previewNoticeReachedEnd);
                 break;
 
             default:
-                _PreviewNotice = "This exit isn't connected — wire it to the next node.";
+                _PreviewNotice = Loc.T(Localization.Editor.Page.previewNoticeExitNotConnected);
                 break;
         }
     }
@@ -613,31 +614,31 @@
         _InLogic
             ?
             [
-                new NodePaletteItem(StoryNodeKind.Localization,     "bi-translate",       "Localization node",     "Picks a localization key that supplies this logic node's title text."),
-                new NodePaletteItem(StoryNodeKind.Icon,             "bi-emoji-smile",     "Icon node",             "Picks a project icon to show alongside this logic node's content."),
-                new NodePaletteItem(StoryNodeKind.LightDarkSwitch,  "bi-circle-half",     "Light/Dark switch",     "Outputs one of two icons depending on the render theme (dark or paper/light)."),
-                new NodePaletteItem(StoryNodeKind.SmartFormat,      "bi-braces-asterisk", "SmartFormat node",      "Formats a text with SmartFormat, substituting connected External Variable values."),
-                new NodePaletteItem(StoryNodeKind.ExternalVariable, "bi-braces",          "External Variable node", "Feeds a story variable's value into a SmartFormat node."),
-                new NodePaletteItem(StoryNodeKind.GetVariable,      "bi-box-arrow-down",  "Get variable",           "Reads a registered variable: a Value output (App) and a Slot-tag output (Gamebook)."),
-                new NodePaletteItem(StoryNodeKind.ConstantVariable, "bi-braces",          "Constant variable",      "Supplies a named constant value into a SmartFormat / Exit variables input (never splits Gamebook sections)."),
-                new NodePaletteItem(StoryNodeKind.FlowText,         "bi-text-paragraph",  "FlowText node",         "On the logic chain — renders a connected text block, then continues to the next node."),
-                new NodePaletteItem(StoryNodeKind.SplitForApp,      "bi-scissors",        "Split for App",         "On the logic chain — App only: breaks the screen here with a \"Click here to continue…\" button (Gamebook ignores it)."),
-                new NodePaletteItem(StoryNodeKind.RegisterVariable,   "bi-box-seam",        "Register variable",     "On the logic chain — claims a physical storage slot for a new variable."),
-                new NodePaletteItem(StoryNodeKind.SetVariable,        "bi-pencil-square",   "Set variable",          "On the logic chain — assigns a value to an already-registered variable."),
-                new NodePaletteItem(StoryNodeKind.UnregisterVariable, "bi-box-arrow-up",    "Unregister variable",   "On the logic chain — releases a registered variable and frees its slot."),
-                new NodePaletteItem(StoryNodeKind.SetExternalVariable, "bi-sliders",        "Set external variable", "On the logic chain — assigns a value to a story-wide external variable (App only; no Gamebook instruction)."),
-                new NodePaletteItem(StoryNodeKind.LogicPortalIn,      "bi-box-arrow-in-right", "Portal",                "A one-in / many-out relay — feed any Text/Icon/Variable output into the in, read it from every out."),
-                new NodePaletteItem(StoryNodeKind.ConditionFlow,      "bi-signpost-split",  "Condition",             "On the logic chain — injects the block wired from its \"Condition true\" output (up to the paired End condition) when a constant-variable condition holds, then continues."),
-                new NodePaletteItem(StoryNodeKind.FunctionInstance,   "bi-cpu",             "Function instance",     "Places a reusable Function blueprint on the logic chain — LFlow plus its typed inputs/outputs."),
-                new NodePaletteItem(StoryNodeKind.Comment,                "bi-chat-left-text", "Comment",                 "A free-text note explaining how nodes connect. No ports; ignored during playback.")
+                new NodePaletteItem(StoryNodeKind.Localization,     "bi-translate",       Loc.T(Localization.Editor.Palette.Items.localizationLabel),     Loc.T(Localization.Editor.Palette.Items.localizationDesc)),
+                new NodePaletteItem(StoryNodeKind.Icon,             "bi-emoji-smile",     Loc.T(Localization.Editor.Palette.Items.iconLabel),             Loc.T(Localization.Editor.Palette.Items.iconDesc)),
+                new NodePaletteItem(StoryNodeKind.LightDarkSwitch,  "bi-circle-half",     Loc.T(Localization.Editor.Palette.Items.lightDarkLabel),     Loc.T(Localization.Editor.Palette.Items.lightDarkDesc)),
+                new NodePaletteItem(StoryNodeKind.SmartFormat,      "bi-braces-asterisk", Loc.T(Localization.Editor.Palette.Items.smartFormatLabel),      Loc.T(Localization.Editor.Palette.Items.smartFormatDesc)),
+                new NodePaletteItem(StoryNodeKind.ExternalVariable, "bi-braces",          Loc.T(Localization.Editor.Palette.Items.externalVariableLabel), Loc.T(Localization.Editor.Palette.Items.externalVariableDesc)),
+                new NodePaletteItem(StoryNodeKind.GetVariable,      "bi-box-arrow-down",  Loc.T(Localization.Editor.Palette.Items.getVariableLabel),           Loc.T(Localization.Editor.Palette.Items.getVariableDesc)),
+                new NodePaletteItem(StoryNodeKind.ConstantVariable, "bi-braces",          Loc.T(Localization.Editor.Palette.Items.constantVariableLabel),      Loc.T(Localization.Editor.Palette.Items.constantVariableDesc)),
+                new NodePaletteItem(StoryNodeKind.FlowText,         "bi-text-paragraph",  Loc.T(Localization.Editor.Palette.Items.flowTextLabel),         Loc.T(Localization.Editor.Palette.Items.flowTextDesc)),
+                new NodePaletteItem(StoryNodeKind.SplitForApp,      "bi-scissors",        Loc.T(Localization.Editor.Palette.Items.splitForAppLabel),         Loc.T(Localization.Editor.Palette.Items.splitForAppDesc)),
+                new NodePaletteItem(StoryNodeKind.RegisterVariable,   "bi-box-seam",        Loc.T(Localization.Editor.Palette.Items.registerVariableLabel),     Loc.T(Localization.Editor.Palette.Items.registerVariableDesc)),
+                new NodePaletteItem(StoryNodeKind.SetVariable,        "bi-pencil-square",   Loc.T(Localization.Editor.Palette.Items.setVariableLabel),          Loc.T(Localization.Editor.Palette.Items.setVariableDesc)),
+                new NodePaletteItem(StoryNodeKind.UnregisterVariable, "bi-box-arrow-up",    Loc.T(Localization.Editor.Palette.Items.unregisterVariableLabel),   Loc.T(Localization.Editor.Palette.Items.unregisterVariableDesc)),
+                new NodePaletteItem(StoryNodeKind.SetExternalVariable, "bi-sliders",        Loc.T(Localization.Editor.Palette.Items.setExternalVariableLabel), Loc.T(Localization.Editor.Palette.Items.setExternalVariableDesc)),
+                new NodePaletteItem(StoryNodeKind.LogicPortalIn,      "bi-box-arrow-in-right", Loc.T(Localization.Editor.Palette.Items.logicPortalLabel),                Loc.T(Localization.Editor.Palette.Items.logicPortalDesc)),
+                new NodePaletteItem(StoryNodeKind.ConditionFlow,      "bi-signpost-split",  Loc.T(Localization.Editor.Palette.Items.conditionLabel),             Loc.T(Localization.Editor.Palette.Items.conditionDesc)),
+                new NodePaletteItem(StoryNodeKind.FunctionInstance,   "bi-cpu",             Loc.T(Localization.Editor.Palette.Items.functionInstanceLabel),     Loc.T(Localization.Editor.Palette.Items.functionInstanceDesc)),
+                new NodePaletteItem(StoryNodeKind.Comment,                "bi-chat-left-text", Loc.T(Localization.Editor.Palette.Items.commentLabel),                 Loc.T(Localization.Editor.Palette.Items.commentDesc))
             ]
             :
             [
-                new NodePaletteItem(StoryNodeKind.Logic,     "bi-diamond-half",       "Logic node",     "A stop point that generates content and runs calculations on variables."),
-                new NodePaletteItem(StoryNodeKind.Container, "bi-collection",         "Container node", "Groups other nodes into a nested sub-graph with its own entries and exits."),
-                new NodePaletteItem(StoryNodeKind.PortalIn,  "bi-box-arrow-in-right", "Portal node",    "A linked in/out pair that teleports flow across the graph to keep it clean."),
-                new NodePaletteItem(StoryNodeKind.BlueprintInstance, "bi-diagram-3",  "Blueprint instance", "Places an instance of a Container/Logic blueprint — editing the blueprint changes every instance."),
-                new NodePaletteItem(StoryNodeKind.Comment,   "bi-chat-left-text",     "Comment",        "A free-text note explaining how nodes connect. No ports; ignored during playback.")
+                new NodePaletteItem(StoryNodeKind.Logic,     "bi-diamond-half",       Loc.T(Localization.Editor.Palette.Items.logicLabel),     Loc.T(Localization.Editor.Palette.Items.logicDesc)),
+                new NodePaletteItem(StoryNodeKind.Container, "bi-collection",         Loc.T(Localization.Editor.Palette.Items.containerLabel), Loc.T(Localization.Editor.Palette.Items.containerDesc)),
+                new NodePaletteItem(StoryNodeKind.PortalIn,  "bi-box-arrow-in-right", Loc.T(Localization.Editor.Palette.Items.portalLabel),    Loc.T(Localization.Editor.Palette.Items.portalDesc)),
+                new NodePaletteItem(StoryNodeKind.BlueprintInstance, "bi-diagram-3",  Loc.T(Localization.Editor.Palette.Items.blueprintInstanceLabel), Loc.T(Localization.Editor.Palette.Items.blueprintInstanceDesc)),
+                new NodePaletteItem(StoryNodeKind.Comment,   "bi-chat-left-text",     Loc.T(Localization.Editor.Palette.Items.commentLabel),        Loc.T(Localization.Editor.Palette.Items.commentDesc))
             ];
 
     private void OnPaletteSelect(NodePaletteItem item)
@@ -696,12 +697,12 @@
             case StoryNodeKind.BlueprintInstance:
                 _BlueprintPicker?.Show(
                     Project.Blueprints.Values.Where(b => b.Kind != StoryBlueprintKind.Function),
-                    "Place blueprint instance");
+                    Loc.T(Localization.Editor.Palette.placeInstanceTitle));
                 break;
             case StoryNodeKind.FunctionInstance:
                 _BlueprintPicker?.Show(
                     Project.Blueprints.Values.Where(b => b.Kind == StoryBlueprintKind.Function),
-                    "Place function instance");
+                    Loc.T(Localization.Editor.Palette.placeFunctionTitle));
                 break;
             case StoryNodeKind.Comment:   _NewCommentNodeModal?.Show();   break;
         }
@@ -1023,7 +1024,7 @@
             return;
         }
 
-        StoryConnectionPoint entry = new() { Name = "In" };
+        StoryConnectionPoint entry = new() { Name = Loc.T(Localization.Editor.Page.defaultEntryPointName) };
         StoryLogicNode node = _ProjectState.AddLogicNode(
             _CurrentId, args.Name, args.Description, entry, _PendingX, _PendingY,
             args.GamebookInstructions, args.ExitMode, args.AcceptVariables);
@@ -1216,16 +1217,18 @@
         fromPoint = logic.ResolvePortalSource(fromPoint);
         if (logic.ExternalVariableNodes.Find(n => n.OutPoint.Id == fromPoint) is StoryExternalVariableNode ev)
             return (StoryBuiltInVariables.Find(ev.SelectedVariableId)
-                    ?? (Project.Variables.TryGetValue(ev.SelectedVariableId, out StoryVariable? v) ? v : null))?.Name ?? "(variable)";
+                    ?? (Project.Variables.TryGetValue(ev.SelectedVariableId, out StoryVariable? v) ? v : null))?.Name ?? Loc.T(Localization.Editor.Page.variableNameFallback);
         if (logic.GetVariableNodes.Find(n => n.OutPoint.Id == fromPoint || n.SlotOutPoint.Id == fromPoint) is StoryGetVariableNode gv)
         {
             if (!string.IsNullOrWhiteSpace(gv.NameOverride)) return gv.NameOverride;
             string regName = EditorProjection.FindRegister(Project, gv.RegisteredVariableId)?.Name ?? "";
             bool   slot    = gv.SlotOutPoint.Id == fromPoint;
-            return string.IsNullOrWhiteSpace(regName) ? (slot ? "(slot)" : "(get)") : (slot ? $"{regName} (slot)" : regName);
+            return string.IsNullOrWhiteSpace(regName)
+                ? (slot ? Loc.T(Localization.Editor.Page.slotNameFallback) : Loc.T(Localization.Editor.Page.getNameFallback))
+                : (slot ? Loc.T(Localization.Editor.Page.registerSlotName, new Dictionary<string, object> { ["regName"] = regName }) : regName);
         }
         if (logic.ConstantVariableNodes.Find(n => n.OutPoint.Id == fromPoint) is StoryConstantVariableNode cn)
-            return string.IsNullOrWhiteSpace(cn.Name) ? "(constant)" : cn.Name;
+            return string.IsNullOrWhiteSpace(cn.Name) ? Loc.T(Localization.Editor.Page.constantNameFallback) : cn.Name;
         return StorySelectionResolver.IncomingVariables(Project, logic).Find(d => d.Id == fromPoint)?.Name ?? "";
     }
 

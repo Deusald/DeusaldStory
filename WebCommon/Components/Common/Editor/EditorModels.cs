@@ -172,7 +172,7 @@ namespace DeusaldStoryWeb
                     Deletable = false,
                     Editable  = false
                 };
-                node.Outputs.Add(new EdPort { Id = ep.Id, Name = ep.FlowKind == StoryPointFlow.VFlow ? "Variables" : "Flow", Type = ep.FlowKind == StoryPointFlow.VFlow ? PortType.VFlow : PortType.Flow });
+                node.Outputs.Add(new EdPort { Id = ep.Id, Name = ep.FlowKind == StoryPointFlow.VFlow ? UiLang.T(Localization.Editor.Nodes.Ports.variables) : UiLang.T(Localization.Editor.Nodes.Ports.flow), Type = ep.FlowKind == StoryPointFlow.VFlow ? PortType.VFlow : PortType.Flow });
                 nodes.Add(node);
             }
 
@@ -188,7 +188,7 @@ namespace DeusaldStoryWeb
                     Deletable = false,
                     Editable  = false
                 };
-                node.Inputs.Add(new EdPort { Id = xp.Id, Name = xp.FlowKind == StoryPointFlow.VFlow ? "Variables" : "Flow", Type = xp.FlowKind == StoryPointFlow.VFlow ? PortType.VFlow : PortType.Flow });
+                node.Inputs.Add(new EdPort { Id = xp.Id, Name = xp.FlowKind == StoryPointFlow.VFlow ? UiLang.T(Localization.Editor.Nodes.Ports.variables) : UiLang.T(Localization.Editor.Nodes.Ports.flow), Type = xp.FlowKind == StoryPointFlow.VFlow ? PortType.VFlow : PortType.Flow });
                 nodes.Add(node);
             }
 
@@ -208,13 +208,13 @@ namespace DeusaldStoryWeb
                 };
                 // Accept-variables makes the single entry a VFlow input (flow that also carries the upstream variables).
                 // Label the port after its type so the author can tell a plain-flow entry from a variable-carrying one.
-                node.Inputs.Add(new EdPort { Id = logic.EntryPoint.Id, Name = logic.AcceptVariables ? "Variables" : "Flow", Type = logic.AcceptVariables ? PortType.VFlow : PortType.Flow });
+                node.Inputs.Add(new EdPort { Id = logic.EntryPoint.Id, Name = logic.AcceptVariables ? UiLang.T(Localization.Editor.Nodes.Ports.variables) : UiLang.T(Localization.Editor.Nodes.Ports.flow), Type = logic.AcceptVariables ? PortType.VFlow : PortType.Flow });
 
                 if (logic.ExitMode == StoryLogicExitMode.SinglePath)
-                    node.Outputs.Add(new EdPort { Id = logic.VFlowOut.Id, Name = "Continue", Type = PortType.VFlow });
+                    node.Outputs.Add(new EdPort { Id = logic.VFlowOut.Id, Name = UiLang.T(Localization.Editor.Nodes.Ports.continueLabel), Type = PortType.VFlow });
                 else
                     node.Outputs.AddRange(logic.Choices.Select(c =>
-                        new EdPort { Id = c.OuterFlowOut.Id, Name = string.IsNullOrWhiteSpace(c.Name) ? "Choice" : c.Name, Type = PortType.Flow }));
+                        new EdPort { Id = c.OuterFlowOut.Id, Name = string.IsNullOrWhiteSpace(c.Name) ? UiLang.T(Localization.Editor.Nodes.Ports.choice) : c.Name, Type = PortType.Flow }));
                 nodes.Add(node);
             }
 
@@ -238,7 +238,7 @@ namespace DeusaldStoryWeb
                         PortalCrossTarget = portal.OutPoint.Id,
                         PortalNextTarget  = portal.InPoints.Count > 1 ? portal.InPoints[(x + 1) % portal.InPoints.Count].Id : null
                     };
-                    inNode.Inputs.Add(new EdPort { Id = ip.Id, Name = "Flow" });
+                    inNode.Inputs.Add(new EdPort { Id = ip.Id, Name = UiLang.T(Localization.Editor.Nodes.Ports.flow) });
                     nodes.Add(inNode);
                 }
 
@@ -254,7 +254,7 @@ namespace DeusaldStoryWeb
                     // The single out jumps back to the first in (no next-jump — there is only one out).
                     PortalCrossTarget = portal.InPoints.Count > 0 ? portal.InPoints[0].Id : null
                 };
-                outNode.Outputs.Add(new EdPort { Id = portal.OutPoint.Id, Name = "Flow" });
+                outNode.Outputs.Add(new EdPort { Id = portal.OutPoint.Id, Name = UiLang.T(Localization.Editor.Nodes.Ports.flow) });
                 nodes.Add(outNode);
             }
 
@@ -286,8 +286,8 @@ namespace DeusaldStoryWeb
                 {
                     Id        = inst.Id,
                     Kind      = StoryNodeKind.BlueprintInstance,
-                    Title     = found ? bp!.Name : "Missing blueprint",
-                    Subtitle  = found ? "Blueprint" : "(deleted blueprint)",
+                    Title     = found ? bp!.Name : UiLang.T(Localization.Editor.Nodes.Titles.missingBlueprint),
+                    Subtitle  = found ? UiLang.T(Localization.Editor.Nodes.Titles.blueprintSubtitle) : UiLang.T(Localization.Editor.Nodes.Titles.deletedBlueprint),
                     X         = inst.X,
                     Y         = inst.Y,
                     Deletable = true
@@ -364,7 +364,7 @@ namespace DeusaldStoryWeb
             {
                 Id        = logic.EntryPoint.Id,
                 Kind      = funcBp is null ? StoryNodeKind.LogicEntry : StoryNodeKind.FunctionEntry,
-                Title     = funcBp is null ? "Entry" : "Function in",
+                Title     = funcBp is null ? UiLang.T(Localization.Editor.Nodes.Titles.entry) : UiLang.T(Localization.Editor.Nodes.Titles.functionIn),
                 X         = ex,
                 Y         = ey,
                 Deletable = false,
@@ -372,11 +372,11 @@ namespace DeusaldStoryWeb
             };
             if (funcBp is null)
             {
-                entry.Inputs.Add(new EdPort { Id = logic.TitleIn.Id,    Name = "Title",    Type = PortType.Text });
-                entry.Inputs.Add(new EdPort { Id = logic.SubtitleIn.Id, Name = "Subtitle", Type = PortType.Text });
-                entry.Inputs.Add(new EdPort { Id = logic.IconIn.Id,     Name = "Icon",     Type = PortType.Icon });
+                entry.Inputs.Add(new EdPort { Id = logic.TitleIn.Id,    Name = UiLang.T(Localization.Editor.Nodes.Ports.title),    Type = PortType.Text });
+                entry.Inputs.Add(new EdPort { Id = logic.SubtitleIn.Id, Name = UiLang.T(Localization.Editor.Nodes.Ports.subtitle), Type = PortType.Text });
+                entry.Inputs.Add(new EdPort { Id = logic.IconIn.Id,     Name = UiLang.T(Localization.Editor.Nodes.Ports.icon),     Type = PortType.Icon });
             }
-            entry.Outputs.Add(new EdPort { Id = logic.EntryPoint.Id, Name = "Flow", Type = PortType.LFlow });
+            entry.Outputs.Add(new EdPort { Id = logic.EntryPoint.Id, Name = UiLang.T(Localization.Editor.Nodes.Ports.flow), Type = PortType.LFlow });
             if (funcBp is not null)
                 foreach (StorySignaturePort input in funcBp.Inputs)
                     entry.Outputs.Add(new EdPort { Id = input.Id, Name = input.Name, Type = input.Type });
@@ -391,8 +391,8 @@ namespace DeusaldStoryWeb
             {
                 Id        = logic.ExitLFlowIn.Id,
                 Kind      = funcBp is null ? StoryNodeKind.LogicExit : StoryNodeKind.FunctionExit,
-                Title     = funcBp is null ? "Exit" : "Function out",
-                Subtitle  = autoMode ? "Auto" : "",
+                Title     = funcBp is null ? UiLang.T(Localization.Editor.Nodes.Titles.exit) : UiLang.T(Localization.Editor.Nodes.Titles.functionOut),
+                Subtitle  = autoMode ? UiLang.T(Localization.Editor.Nodes.Titles.exitAutoSubtitle) : "",
                 X         = xx,
                 Y         = xy,
                 Deletable = false,
@@ -401,16 +401,16 @@ namespace DeusaldStoryWeb
             if (funcBp is not null)
                 foreach (StorySignaturePort output in funcBp.Outputs)
                     exit.Inputs.Add(new EdPort { Id = output.Id, Name = output.Name, Type = output.Type });
-            exit.Inputs.Add(new EdPort { Id = logic.ExitLFlowIn.Id, Name = "Flow", Type = PortType.LFlow });
+            exit.Inputs.Add(new EdPort { Id = logic.ExitLFlowIn.Id, Name = UiLang.T(Localization.Editor.Nodes.Ports.flow), Type = PortType.LFlow });
             if (funcBp is null)
             {
-                exit.Inputs.Add(new EdPort { Id = logic.ExitVariablesIn.Id, Name = "Variables", Type = PortType.Variable });
+                exit.Inputs.Add(new EdPort { Id = logic.ExitVariablesIn.Id, Name = UiLang.T(Localization.Editor.Nodes.Ports.variables), Type = PortType.Variable });
                 if (autoMode)
-                    exit.Inputs.Add(new EdPort { Id = logic.ExitAutoTextIn.Id, Name = "Text", Type = PortType.Text });
+                    exit.Inputs.Add(new EdPort { Id = logic.ExitAutoTextIn.Id, Name = UiLang.T(Localization.Editor.Nodes.Ports.text), Type = PortType.Text });
                 foreach (StoryChoice choice in logic.Choices)
                 {
-                    string label = string.IsNullOrWhiteSpace(choice.Name) ? "Choice" : choice.Name;
-                    exit.Inputs.Add(new EdPort { Id = choice.TextIn.Id, Name = $"{label} text", Type = PortType.Text });
+                    string label = string.IsNullOrWhiteSpace(choice.Name) ? UiLang.T(Localization.Editor.Nodes.Ports.choice) : choice.Name;
+                    exit.Inputs.Add(new EdPort { Id = choice.TextIn.Id, Name = UiLang.T(Localization.Editor.Nodes.Ports.choiceText, new Dictionary<string, object> { ["label"] = label }), Type = PortType.Text });
                 }
             }
             nodes.Add(exit);
@@ -423,13 +423,13 @@ namespace DeusaldStoryWeb
                 {
                     Id        = loc.Id,
                     Kind      = StoryNodeKind.Localization,
-                    Title     = key is not null ? FullKeyName(key, localization!) : "(no key)",
+                    Title     = key is not null ? FullKeyName(key, localization!) : UiLang.T(Localization.Editor.Nodes.Titles.noKey),
                     Subtitle  = key is not null ? PreviewText(key, localization) : "",
                     X         = loc.X,
                     Y         = loc.Y,
                     Deletable = true
                 };
-                node.Outputs.Add(new EdPort { Id = loc.OutPoint.Id, Name = "Text", Type = PortType.Text });
+                node.Outputs.Add(new EdPort { Id = loc.OutPoint.Id, Name = UiLang.T(Localization.Editor.Nodes.Ports.text), Type = PortType.Text });
                 nodes.Add(node);
             }
 
@@ -441,13 +441,13 @@ namespace DeusaldStoryWeb
                 {
                     Id        = ico.Id,
                     Kind      = StoryNodeKind.Icon,
-                    Title     = found ? image!.Name : "(no icon)",
+                    Title     = found ? image!.Name : UiLang.T(Localization.Editor.Nodes.Titles.noIcon),
                     Thumb     = found ? image!.Data : null,
                     X         = ico.X,
                     Y         = ico.Y,
                     Deletable = true
                 };
-                node.Outputs.Add(new EdPort { Id = ico.OutPoint.Id, Name = "Icon", Type = PortType.Icon });
+                node.Outputs.Add(new EdPort { Id = ico.OutPoint.Id, Name = UiLang.T(Localization.Editor.Nodes.Ports.icon), Type = PortType.Icon });
                 nodes.Add(node);
             }
 
@@ -458,15 +458,15 @@ namespace DeusaldStoryWeb
                 {
                     Id        = lds.Id,
                     Kind      = StoryNodeKind.LightDarkSwitch,
-                    Title     = "Light / Dark",
+                    Title     = UiLang.T(Localization.Editor.Nodes.Titles.lightDark),
                     X         = lds.X,
                     Y         = lds.Y,
                     Deletable = true,
                     Editable  = false
                 };
-                node.Inputs.Add(new EdPort { Id = lds.DarkIn.Id,  Name = "Dark",  Type = PortType.Icon });
-                node.Inputs.Add(new EdPort { Id = lds.LightIn.Id, Name = "Light", Type = PortType.Icon });
-                node.Outputs.Add(new EdPort { Id = lds.OutPoint.Id, Name = "Icon", Type = PortType.Icon });
+                node.Inputs.Add(new EdPort { Id = lds.DarkIn.Id,  Name = UiLang.T(Localization.Editor.Nodes.Ports.dark),  Type = PortType.Icon });
+                node.Inputs.Add(new EdPort { Id = lds.LightIn.Id, Name = UiLang.T(Localization.Editor.Nodes.Ports.light), Type = PortType.Icon });
+                node.Outputs.Add(new EdPort { Id = lds.OutPoint.Id, Name = UiLang.T(Localization.Editor.Nodes.Ports.icon), Type = PortType.Icon });
                 nodes.Add(node);
             }
 
@@ -477,15 +477,15 @@ namespace DeusaldStoryWeb
                 {
                     Id        = sf.Id,
                     Kind      = StoryNodeKind.SmartFormat,
-                    Title     = "SmartFormat",
+                    Title     = UiLang.T(Localization.Editor.Nodes.Titles.smartFormat),
                     X         = sf.X,
                     Y         = sf.Y,
                     Deletable = true,
                     Editable  = false
                 };
-                node.Inputs.Add(new EdPort { Id = sf.LocalizationIn.Id, Name = "Text",      Type = PortType.Text });
-                node.Inputs.Add(new EdPort { Id = sf.VariablesIn.Id,    Name = "Variables", Type = PortType.Variable });
-                node.Outputs.Add(new EdPort { Id = sf.OutPoint.Id, Name = "Text", Type = PortType.Text });
+                node.Inputs.Add(new EdPort { Id = sf.LocalizationIn.Id, Name = UiLang.T(Localization.Editor.Nodes.Ports.text),      Type = PortType.Text });
+                node.Inputs.Add(new EdPort { Id = sf.VariablesIn.Id,    Name = UiLang.T(Localization.Editor.Nodes.Ports.variables), Type = PortType.Variable });
+                node.Outputs.Add(new EdPort { Id = sf.OutPoint.Id, Name = UiLang.T(Localization.Editor.Nodes.Ports.text), Type = PortType.Text });
                 nodes.Add(node);
             }
 
@@ -499,14 +499,14 @@ namespace DeusaldStoryWeb
                 {
                     Id        = ev.Id,
                     Kind      = StoryNodeKind.ExternalVariable,
-                    Title     = found ? variable!.Name : "(no variable)",
+                    Title     = found ? variable!.Name : UiLang.T(Localization.Editor.Nodes.Titles.noVariable),
                     Subtitle  = found ? variable!.Description : "",
                     X         = ev.X,
                     Y         = ev.Y,
                     Deletable = true
                 };
                 bool constant = variable is not null && (variable.IsConstant || StoryBuiltInVariables.IsBuiltIn(variable.Id));
-                node.Outputs.Add(new EdPort { Id = ev.OutPoint.Id, Name = "Variable", Type = constant ? PortType.CVariable : PortType.Variable });
+                node.Outputs.Add(new EdPort { Id = ev.OutPoint.Id, Name = UiLang.T(Localization.Editor.Nodes.Ports.variable), Type = constant ? PortType.CVariable : PortType.Variable });
                 nodes.Add(node);
             }
 
@@ -521,14 +521,14 @@ namespace DeusaldStoryWeb
                 {
                     Id        = gv.Id,
                     Kind      = StoryNodeKind.GetVariable,
-                    Title     = string.IsNullOrWhiteSpace(name) ? "(no variable)" : name,
-                    Subtitle  = found ? $"{StorageSlots.Label(reg!.Type, reg.SlotIndex)} · {reg.Type}" : "unregistered",
+                    Title     = string.IsNullOrWhiteSpace(name) ? UiLang.T(Localization.Editor.Nodes.Titles.noVariable) : name,
+                    Subtitle  = found ? UiLang.T(Localization.Editor.Nodes.Titles.slotTypeSubtitle, new Dictionary<string, object> { ["slot"] = StorageSlots.Label(reg!.Type, reg.SlotIndex), ["type"] = reg.Type }) : UiLang.T(Localization.Editor.Nodes.Titles.unregistered),
                     X         = gv.X,
                     Y         = gv.Y,
                     Deletable = true
                 };
-                node.Outputs.Add(new EdPort { Id = gv.OutPoint.Id,     Name = "Value", Type = PortType.Variable });
-                node.Outputs.Add(new EdPort { Id = gv.SlotOutPoint.Id, Name = "Slot",  Type = PortType.CVariable });
+                node.Outputs.Add(new EdPort { Id = gv.OutPoint.Id,     Name = UiLang.T(Localization.Editor.Nodes.Ports.value), Type = PortType.Variable });
+                node.Outputs.Add(new EdPort { Id = gv.SlotOutPoint.Id, Name = UiLang.T(Localization.Editor.Nodes.Ports.slot),  Type = PortType.CVariable });
                 nodes.Add(node);
             }
 
@@ -539,13 +539,13 @@ namespace DeusaldStoryWeb
                 {
                     Id        = cv.Id,
                     Kind      = StoryNodeKind.ConstantVariable,
-                    Title     = string.IsNullOrWhiteSpace(cv.Name) ? "(unnamed)" : cv.Name,
+                    Title     = string.IsNullOrWhiteSpace(cv.Name) ? UiLang.T(Localization.Common.Placeholders.unnamed) : cv.Name,
                     Subtitle  = cv.Value,
                     X         = cv.X,
                     Y         = cv.Y,
                     Deletable = true
                 };
-                node.Outputs.Add(new EdPort { Id = cv.OutPoint.Id, Name = "Value", Type = PortType.CVariable });
+                node.Outputs.Add(new EdPort { Id = cv.OutPoint.Id, Name = UiLang.T(Localization.Editor.Nodes.Ports.value), Type = PortType.CVariable });
                 nodes.Add(node);
             }
 
@@ -556,16 +556,16 @@ namespace DeusaldStoryWeb
                 {
                     Id        = ft.Id,
                     Kind      = StoryNodeKind.FlowText,
-                    Title     = "FlowText",
+                    Title     = UiLang.T(Localization.Editor.Nodes.Titles.flowText),
                     Subtitle  = FlowTextMediumLabel(ft) ?? "",
                     X         = ft.X,
                     Y         = ft.Y,
                     Deletable = true,
                     Editable  = true
                 };
-                node.Inputs.Add(new EdPort { Id = ft.FlowIn.Id, Name = "Flow", Type = PortType.LFlow });
-                node.Inputs.Add(new EdPort { Id = ft.TextIn.Id, Name = "Text", Type = PortType.Text });
-                node.Outputs.Add(new EdPort { Id = ft.FlowOut.Id, Name = "Flow", Type = PortType.LFlow });
+                node.Inputs.Add(new EdPort { Id = ft.FlowIn.Id, Name = UiLang.T(Localization.Editor.Nodes.Ports.flow), Type = PortType.LFlow });
+                node.Inputs.Add(new EdPort { Id = ft.TextIn.Id, Name = UiLang.T(Localization.Editor.Nodes.Ports.text), Type = PortType.Text });
+                node.Outputs.Add(new EdPort { Id = ft.FlowOut.Id, Name = UiLang.T(Localization.Editor.Nodes.Ports.flow), Type = PortType.LFlow });
                 nodes.Add(node);
             }
 
@@ -576,15 +576,15 @@ namespace DeusaldStoryWeb
                 {
                     Id        = split.Id,
                     Kind      = StoryNodeKind.SplitForApp,
-                    Title     = "Split For App",
-                    Subtitle  = "App page break",
+                    Title     = UiLang.T(Localization.Editor.Nodes.Titles.splitForApp),
+                    Subtitle  = UiLang.T(Localization.Editor.Nodes.Titles.splitForAppSubtitle),
                     X         = split.X,
                     Y         = split.Y,
                     Deletable = true,
                     Editable  = false
                 };
-                node.Inputs.Add(new EdPort { Id = split.FlowIn.Id, Name = "Flow", Type = PortType.LFlow });
-                node.Outputs.Add(new EdPort { Id = split.FlowOut.Id, Name = "Flow", Type = PortType.LFlow });
+                node.Inputs.Add(new EdPort { Id = split.FlowIn.Id, Name = UiLang.T(Localization.Editor.Nodes.Ports.flow), Type = PortType.LFlow });
+                node.Outputs.Add(new EdPort { Id = split.FlowOut.Id, Name = UiLang.T(Localization.Editor.Nodes.Ports.flow), Type = PortType.LFlow });
                 nodes.Add(node);
             }
 
@@ -595,19 +595,19 @@ namespace DeusaldStoryWeb
                 {
                     Id        = reg.Id,
                     Kind      = StoryNodeKind.RegisterVariable,
-                    Title     = string.IsNullOrWhiteSpace(reg.Name) ? "(unnamed variable)" : reg.Name,
-                    Subtitle  = $"{StorageSlots.Label(reg.Type, reg.SlotIndex)} · {reg.Type}",
+                    Title     = string.IsNullOrWhiteSpace(reg.Name) ? UiLang.T(Localization.Common.Placeholders.unnamedVariable) : reg.Name,
+                    Subtitle  = UiLang.T(Localization.Editor.Nodes.Titles.slotTypeSubtitle, new Dictionary<string, object> { ["slot"] = StorageSlots.Label(reg.Type, reg.SlotIndex), ["type"] = reg.Type }),
                     X         = reg.X,
                     Y         = reg.Y,
                     Deletable = true
                 };
-                node.Inputs.Add(new EdPort { Id = reg.FlowIn.Id, Name = "Flow", Type = PortType.LFlow });
+                node.Inputs.Add(new EdPort { Id = reg.FlowIn.Id, Name = UiLang.T(Localization.Editor.Nodes.Ports.flow), Type = PortType.LFlow });
                 if (reg.Type == StorageVariableType.String && reg.StringMode == StringValueMode.PlayerInput)
                 {
-                    node.Inputs.Add(new EdPort { Id = reg.InstructionIn.Id, Name = "Instruction", Type = PortType.Text });
-                    node.Inputs.Add(new EdPort { Id = reg.PlaceholderIn.Id, Name = "Placeholder", Type = PortType.Text });
+                    node.Inputs.Add(new EdPort { Id = reg.InstructionIn.Id, Name = UiLang.T(Localization.Editor.Nodes.Ports.instruction), Type = PortType.Text });
+                    node.Inputs.Add(new EdPort { Id = reg.PlaceholderIn.Id, Name = UiLang.T(Localization.Editor.Nodes.Ports.placeholder), Type = PortType.Text });
                 }
-                node.Outputs.Add(new EdPort { Id = reg.FlowOut.Id, Name = "Flow", Type = PortType.LFlow });
+                node.Outputs.Add(new EdPort { Id = reg.FlowOut.Id, Name = UiLang.T(Localization.Editor.Nodes.Ports.flow), Type = PortType.LFlow });
                 nodes.Add(node);
             }
 
@@ -619,19 +619,19 @@ namespace DeusaldStoryWeb
                 {
                     Id        = set.Id,
                     Kind      = StoryNodeKind.SetVariable,
-                    Title     = target is not null ? $"Set {NameOf(target)}" : "Set (no variable)",
+                    Title     = target is not null ? UiLang.T(Localization.Editor.Nodes.Titles.setVariable, new Dictionary<string, object> { ["name"] = NameOf(target) }) : UiLang.T(Localization.Editor.Nodes.Titles.setNoVariable),
                     Subtitle  = target is not null ? StorageSlots.Label(target.Type, target.SlotIndex) : "",
                     X         = set.X,
                     Y         = set.Y,
                     Deletable = true
                 };
-                node.Inputs.Add(new EdPort { Id = set.FlowIn.Id, Name = "Flow", Type = PortType.LFlow });
+                node.Inputs.Add(new EdPort { Id = set.FlowIn.Id, Name = UiLang.T(Localization.Editor.Nodes.Ports.flow), Type = PortType.LFlow });
                 if (target is { Type: StorageVariableType.String } && set.StringMode == StringValueMode.PlayerInput)
                 {
-                    node.Inputs.Add(new EdPort { Id = set.InstructionIn.Id, Name = "Instruction", Type = PortType.Text });
-                    node.Inputs.Add(new EdPort { Id = set.PlaceholderIn.Id, Name = "Placeholder", Type = PortType.Text });
+                    node.Inputs.Add(new EdPort { Id = set.InstructionIn.Id, Name = UiLang.T(Localization.Editor.Nodes.Ports.instruction), Type = PortType.Text });
+                    node.Inputs.Add(new EdPort { Id = set.PlaceholderIn.Id, Name = UiLang.T(Localization.Editor.Nodes.Ports.placeholder), Type = PortType.Text });
                 }
-                node.Outputs.Add(new EdPort { Id = set.FlowOut.Id, Name = "Flow", Type = PortType.LFlow });
+                node.Outputs.Add(new EdPort { Id = set.FlowOut.Id, Name = UiLang.T(Localization.Editor.Nodes.Ports.flow), Type = PortType.LFlow });
                 nodes.Add(node);
             }
 
@@ -643,14 +643,14 @@ namespace DeusaldStoryWeb
                 {
                     Id        = unreg.Id,
                     Kind      = StoryNodeKind.UnregisterVariable,
-                    Title     = target is not null ? $"Unregister {NameOf(target)}" : "Unregister (no variable)",
+                    Title     = target is not null ? UiLang.T(Localization.Editor.Nodes.Titles.unregisterVariable, new Dictionary<string, object> { ["name"] = NameOf(target) }) : UiLang.T(Localization.Editor.Nodes.Titles.unregisterNoVariable),
                     Subtitle  = target is not null ? StorageSlots.Label(target.Type, target.SlotIndex) : "",
                     X         = unreg.X,
                     Y         = unreg.Y,
                     Deletable = true
                 };
-                node.Inputs.Add(new EdPort { Id = unreg.FlowIn.Id, Name = "Flow", Type = PortType.LFlow });
-                node.Outputs.Add(new EdPort { Id = unreg.FlowOut.Id, Name = "Flow", Type = PortType.LFlow });
+                node.Inputs.Add(new EdPort { Id = unreg.FlowIn.Id, Name = UiLang.T(Localization.Editor.Nodes.Ports.flow), Type = PortType.LFlow });
+                node.Outputs.Add(new EdPort { Id = unreg.FlowOut.Id, Name = UiLang.T(Localization.Editor.Nodes.Ports.flow), Type = PortType.LFlow });
                 nodes.Add(node);
             }
 
@@ -664,15 +664,15 @@ namespace DeusaldStoryWeb
                 {
                     Id        = se.Id,
                     Kind      = StoryNodeKind.SetExternalVariable,
-                    Title     = found ? $"Set {variable!.Name}" : "Set external (no variable)",
-                    Subtitle  = remapped ? "= remapped value" : mapped ? "= mapped value" : string.IsNullOrEmpty(se.Value) ? "" : $"= {se.Value}",
+                    Title     = found ? UiLang.T(Localization.Editor.Nodes.Titles.setExternal, new Dictionary<string, object> { ["name"] = variable!.Name }) : UiLang.T(Localization.Editor.Nodes.Titles.setExternalNoVariable),
+                    Subtitle  = remapped ? UiLang.T(Localization.Editor.Nodes.Titles.setExternalRemapped) : mapped ? UiLang.T(Localization.Editor.Nodes.Titles.setExternalMapped) : string.IsNullOrEmpty(se.Value) ? "" : UiLang.T(Localization.Editor.Nodes.Titles.setExternalValue, new Dictionary<string, object> { ["value"] = se.Value }),
                     X         = se.X,
                     Y         = se.Y,
                     Deletable = true
                 };
-                node.Inputs.Add(new EdPort { Id = se.FlowIn.Id, Name = "Flow", Type = PortType.LFlow });
-                if (mapped) node.Inputs.Add(new EdPort { Id = se.ValueIn.Id, Name = "Value", Type = PortType.Variable });
-                node.Outputs.Add(new EdPort { Id = se.FlowOut.Id, Name = "Flow", Type = PortType.LFlow });
+                node.Inputs.Add(new EdPort { Id = se.FlowIn.Id, Name = UiLang.T(Localization.Editor.Nodes.Ports.flow), Type = PortType.LFlow });
+                if (mapped) node.Inputs.Add(new EdPort { Id = se.ValueIn.Id, Name = UiLang.T(Localization.Editor.Nodes.Ports.value), Type = PortType.Variable });
+                node.Outputs.Add(new EdPort { Id = se.FlowOut.Id, Name = UiLang.T(Localization.Editor.Nodes.Ports.flow), Type = PortType.LFlow });
                 nodes.Add(node);
             }
 
@@ -691,7 +691,7 @@ namespace DeusaldStoryWeb
                 {
                     Id        = prev.Id,
                     Kind      = StoryNodeKind.PrevExitVariable,
-                    Title     = "Prev Exit Variables",
+                    Title     = UiLang.T(Localization.Editor.Nodes.Titles.prevExitVariables),
                     Subtitle  = string.Join(", ", incoming.Select(d => d.Name)),
                     X         = px,
                     Y         = py,
@@ -699,7 +699,7 @@ namespace DeusaldStoryWeb
                     Editable  = false
                 };
                 foreach (StoryDeclaredVariable dv in incoming)
-                    node.Outputs.Add(new EdPort { Id = dv.Id, Name = string.IsNullOrWhiteSpace(dv.Name) ? "(var)" : dv.Name, Type = PortType.CVariable });
+                    node.Outputs.Add(new EdPort { Id = dv.Id, Name = string.IsNullOrWhiteSpace(dv.Name) ? UiLang.T(Localization.Editor.Nodes.Ports.varFallback) : dv.Name, Type = PortType.CVariable });
                 nodes.Add(node);
             }
 
@@ -715,7 +715,7 @@ namespace DeusaldStoryWeb
                     Id                = portal.InPoint.Id,
                     Kind              = StoryNodeKind.LogicPortalIn,
                     Title             = portal.Name,
-                    Subtitle          = outType == PortType.Data ? "any" : outLabel,
+                    Subtitle          = outType == PortType.Data ? UiLang.T(Localization.Editor.Nodes.Titles.portalAny) : outLabel,
                     X                 = portal.InPoint.X,
                     Y                 = portal.InPoint.Y,
                     Deletable         = true,
@@ -723,7 +723,7 @@ namespace DeusaldStoryWeb
                     // One-in / many-out: the single in jumps to the first out (no next-jump — there is only one in).
                     PortalCrossTarget = portal.OutPoints.Count > 0 ? portal.OutPoints[0].Id : null
                 };
-                inNode.Inputs.Add(new EdPort { Id = portal.InPoint.Id, Name = "Data", Type = PortType.Data });
+                inNode.Inputs.Add(new EdPort { Id = portal.InPoint.Id, Name = UiLang.T(Localization.Editor.Nodes.Ports.data), Type = PortType.Data });
                 nodes.Add(inNode);
 
                 for (int x = 0; x < portal.OutPoints.Count; ++x)
@@ -757,31 +757,31 @@ namespace DeusaldStoryWeb
                 {
                     Id        = cf.Id,
                     Kind      = StoryNodeKind.ConditionFlow,
-                    Title     = string.IsNullOrWhiteSpace(cf.Name) ? "Condition" : cf.Name,
-                    Subtitle  = cf.Negate ? "negated" : "",
+                    Title     = string.IsNullOrWhiteSpace(cf.Name) ? UiLang.T(Localization.Editor.Nodes.Titles.condition) : cf.Name,
+                    Subtitle  = cf.Negate ? UiLang.T(Localization.Editor.Nodes.Titles.conditionNegated) : "",
                     X         = cf.X,
                     Y         = cf.Y,
                     Deletable = true,
                     Editable  = true
                 };
-                condition.Inputs.Add(new EdPort { Id = cf.FlowIn.Id, Name = "Flow", Type = PortType.LFlow });
-                condition.Inputs.Add(new EdPort { Id = cf.VariablesIn.Id, Name = "Variables", Type = PortType.Variable });
-                condition.Outputs.Add(new EdPort { Id = cf.ContinueOut.Id, Name = "Continue", Type = PortType.LFlow });
-                condition.Outputs.Add(new EdPort { Id = cf.ConditionTrueOut.Id, Name = "Condition true", Type = PortType.LFlow });
+                condition.Inputs.Add(new EdPort { Id = cf.FlowIn.Id, Name = UiLang.T(Localization.Editor.Nodes.Ports.flow), Type = PortType.LFlow });
+                condition.Inputs.Add(new EdPort { Id = cf.VariablesIn.Id, Name = UiLang.T(Localization.Editor.Nodes.Ports.variables), Type = PortType.Variable });
+                condition.Outputs.Add(new EdPort { Id = cf.ContinueOut.Id, Name = UiLang.T(Localization.Editor.Nodes.Ports.continueLabel), Type = PortType.LFlow });
+                condition.Outputs.Add(new EdPort { Id = cf.ConditionTrueOut.Id, Name = UiLang.T(Localization.Editor.Nodes.Ports.conditionTrue), Type = PortType.LFlow });
                 nodes.Add(condition);
 
                 EdNode end = new()
                 {
                     Id        = cf.EndId,
                     Kind      = StoryNodeKind.EndConditionFlow,
-                    Title     = string.IsNullOrWhiteSpace(cf.Name) ? "End condition" : cf.Name,
+                    Title     = string.IsNullOrWhiteSpace(cf.Name) ? UiLang.T(Localization.Editor.Nodes.Titles.endCondition) : cf.Name,
                     Subtitle  = "",
                     X         = cf.EndX,
                     Y         = cf.EndY,
                     Deletable = true,
                     Editable  = false
                 };
-                end.Inputs.Add(new EdPort { Id = cf.EndFlowIn.Id, Name = "Flow", Type = PortType.LFlow });
+                end.Inputs.Add(new EdPort { Id = cf.EndFlowIn.Id, Name = UiLang.T(Localization.Editor.Nodes.Ports.flow), Type = PortType.LFlow });
                 nodes.Add(end);
             }
 
@@ -793,19 +793,19 @@ namespace DeusaldStoryWeb
                 {
                     Id        = fi.Id,
                     Kind      = StoryNodeKind.FunctionInstance,
-                    Title     = found ? fbp!.Name : "Missing function",
-                    Subtitle  = found ? "Function" : "(deleted function)",
+                    Title     = found ? fbp!.Name : UiLang.T(Localization.Editor.Nodes.Titles.missingFunction),
+                    Subtitle  = found ? UiLang.T(Localization.Editor.Nodes.Titles.functionSubtitle) : UiLang.T(Localization.Editor.Nodes.Titles.deletedFunction),
                     X         = fi.X,
                     Y         = fi.Y,
                     Deletable = true,
                     Editable  = false
                 };
-                node.Inputs.Add(new EdPort { Id = fi.FlowIn.Id, Name = "Flow", Type = PortType.LFlow });
+                node.Inputs.Add(new EdPort { Id = fi.FlowIn.Id, Name = UiLang.T(Localization.Editor.Nodes.Ports.flow), Type = PortType.LFlow });
                 foreach (StoryBlueprintPortMap pm in fi.InputPorts)
                     node.Inputs.Add(new EdPort { Id = pm.Id, Name = pm.Name, Type = found ? SignatureType(fbp!.Inputs, pm.DefinitionPointId) : PortType.Data });
                 foreach (StoryBlueprintPortMap pm in fi.OutputPorts)
                     node.Outputs.Add(new EdPort { Id = pm.Id, Name = pm.Name, Type = found ? SignatureType(fbp!.Outputs, pm.DefinitionPointId) : PortType.Data });
-                node.Outputs.Add(new EdPort { Id = fi.FlowOut.Id, Name = "Flow", Type = PortType.LFlow });
+                node.Outputs.Add(new EdPort { Id = fi.FlowOut.Id, Name = UiLang.T(Localization.Editor.Nodes.Ports.flow), Type = PortType.LFlow });
                 nodes.Add(node);
             }
 
@@ -876,11 +876,11 @@ namespace DeusaldStoryWeb
         /// <summary>A short human label for a resolved port type (shown as a portal node's subtitle / port name).</summary>
         public static string PortTypeLabel(PortType t) => t switch
         {
-            PortType.Text      => "Text",
-            PortType.Icon      => "Icon",
-            PortType.Variable  => "Variable",
-            PortType.CVariable => "Constant",
-            _                  => "Data"
+            PortType.Text      => UiLang.T(Localization.Editor.Nodes.PortTypes.text),
+            PortType.Icon      => UiLang.T(Localization.Editor.Nodes.PortTypes.icon),
+            PortType.Variable  => UiLang.T(Localization.Editor.Nodes.PortTypes.variable),
+            PortType.CVariable => UiLang.T(Localization.Editor.Nodes.PortTypes.constant),
+            _                  => UiLang.T(Localization.Editor.Nodes.PortTypes.data)
         };
 
         /// <summary>A compact symbol for a condition operator (used in the Exit-node auto-resolution editor).</summary>
@@ -909,7 +909,7 @@ namespace DeusaldStoryWeb
 
         /// <summary>A registered variable's display name, falling back to a placeholder when unnamed.</summary>
         private static string NameOf(StoryRegisterVariableNode reg) =>
-            string.IsNullOrWhiteSpace(reg.Name) ? "(unnamed variable)" : reg.Name;
+            string.IsNullOrWhiteSpace(reg.Name) ? UiLang.T(Localization.Common.Placeholders.unnamedVariable) : reg.Name;
 
         /// <summary>
         /// Subtitle for a FlowText node — the non-Normal frame style and/or a medium restriction, joined with " · ".
@@ -920,9 +920,9 @@ namespace DeusaldStoryWeb
             string? medium = (ft.RenderInApp, ft.RenderInGamebook) switch
             {
                 (true,  true)  => null,
-                (true,  false) => "App only",
-                (false, true)  => "Gamebook only",
-                (false, false) => "Not rendered"
+                (true,  false) => UiLang.T(Localization.Editor.Nodes.Mediums.appOnly),
+                (false, true)  => UiLang.T(Localization.Editor.Nodes.Mediums.gamebookOnly),
+                (false, false) => UiLang.T(Localization.Editor.Nodes.Mediums.notRendered)
             };
             string? frame = ft.FrameStyle == StoryTextFrameStyle.Normal ? null : StoryStyle.FrameLabel(ft.FrameStyle);
             return (frame, medium) switch
@@ -972,39 +972,39 @@ namespace DeusaldStoryWeb
     {
         public static string NodeLabel(StoryNodeKind k) => k switch
         {
-            StoryNodeKind.Start     => "START",
-            StoryNodeKind.End       => "END",
-            StoryNodeKind.Entry     => "ENTRY",
-            StoryNodeKind.Exit      => "EXIT",
-            StoryNodeKind.Logic     => "LOGIC",
-            StoryNodeKind.Container => "CONTAINER",
-            StoryNodeKind.PortalIn  => "PORTAL IN",
-            StoryNodeKind.PortalOut => "PORTAL OUT",
-            StoryNodeKind.LogicEntry   => "ENTRY",
-            StoryNodeKind.LogicExit    => "EXIT",
-            StoryNodeKind.Localization => "LOCALIZATION",
-            StoryNodeKind.Icon         => "ICON",
-            StoryNodeKind.LightDarkSwitch => "LIGHT / DARK",
-            StoryNodeKind.SmartFormat      => "SMART FORMAT",
-            StoryNodeKind.ExternalVariable => "EXTERNAL VARIABLE",
-            StoryNodeKind.GetVariable      => "GET VARIABLE",
-            StoryNodeKind.ConstantVariable => "CONSTANT VARIABLE",
-            StoryNodeKind.FlowText         => "FLOW TEXT",
-            StoryNodeKind.SplitForApp      => "SPLIT FOR APP",
-            StoryNodeKind.RegisterVariable   => "REGISTER VARIABLE",
-            StoryNodeKind.SetVariable        => "SET VARIABLE",
-            StoryNodeKind.UnregisterVariable => "UNREGISTER VARIABLE",
-            StoryNodeKind.SetExternalVariable => "SET EXTERNAL VARIABLE",
-            StoryNodeKind.PrevExitVariable        => "PREV EXIT VARIABLES",
-            StoryNodeKind.LogicPortalIn           => "PORTAL IN",
-            StoryNodeKind.LogicPortalOut          => "PORTAL OUT",
-            StoryNodeKind.ConditionFlow           => "CONDITION",
-            StoryNodeKind.EndConditionFlow        => "END CONDITION",
-            StoryNodeKind.Comment                 => "COMMENT",
-            StoryNodeKind.BlueprintInstance       => "BLUEPRINT",
-            StoryNodeKind.FunctionInstance        => "FUNCTION",
-            StoryNodeKind.FunctionEntry           => "ENTRY",
-            StoryNodeKind.FunctionExit            => "EXIT",
+            StoryNodeKind.Start     => UiLang.T(Localization.Editor.Nodes.Labels.start),
+            StoryNodeKind.End       => UiLang.T(Localization.Editor.Nodes.Labels.end),
+            StoryNodeKind.Entry     => UiLang.T(Localization.Editor.Nodes.Labels.entry),
+            StoryNodeKind.Exit      => UiLang.T(Localization.Editor.Nodes.Labels.exit),
+            StoryNodeKind.Logic     => UiLang.T(Localization.Editor.Nodes.Labels.logic),
+            StoryNodeKind.Container => UiLang.T(Localization.Editor.Nodes.Labels.container),
+            StoryNodeKind.PortalIn  => UiLang.T(Localization.Editor.Nodes.Labels.portalIn),
+            StoryNodeKind.PortalOut => UiLang.T(Localization.Editor.Nodes.Labels.portalOut),
+            StoryNodeKind.LogicEntry   => UiLang.T(Localization.Editor.Nodes.Labels.entry),
+            StoryNodeKind.LogicExit    => UiLang.T(Localization.Editor.Nodes.Labels.exit),
+            StoryNodeKind.Localization => UiLang.T(Localization.Editor.Nodes.Labels.localization),
+            StoryNodeKind.Icon         => UiLang.T(Localization.Editor.Nodes.Labels.icon),
+            StoryNodeKind.LightDarkSwitch => UiLang.T(Localization.Editor.Nodes.Labels.lightDark),
+            StoryNodeKind.SmartFormat      => UiLang.T(Localization.Editor.Nodes.Labels.smartFormat),
+            StoryNodeKind.ExternalVariable => UiLang.T(Localization.Editor.Nodes.Labels.externalVariable),
+            StoryNodeKind.GetVariable      => UiLang.T(Localization.Editor.Nodes.Labels.getVariable),
+            StoryNodeKind.ConstantVariable => UiLang.T(Localization.Editor.Nodes.Labels.constantVariable),
+            StoryNodeKind.FlowText         => UiLang.T(Localization.Editor.Nodes.Labels.flowText),
+            StoryNodeKind.SplitForApp      => UiLang.T(Localization.Editor.Nodes.Labels.splitForApp),
+            StoryNodeKind.RegisterVariable   => UiLang.T(Localization.Editor.Nodes.Labels.registerVariable),
+            StoryNodeKind.SetVariable        => UiLang.T(Localization.Editor.Nodes.Labels.setVariable),
+            StoryNodeKind.UnregisterVariable => UiLang.T(Localization.Editor.Nodes.Labels.unregisterVariable),
+            StoryNodeKind.SetExternalVariable => UiLang.T(Localization.Editor.Nodes.Labels.setExternalVariable),
+            StoryNodeKind.PrevExitVariable        => UiLang.T(Localization.Editor.Nodes.Labels.prevExitVariables),
+            StoryNodeKind.LogicPortalIn           => UiLang.T(Localization.Editor.Nodes.Labels.portalIn),
+            StoryNodeKind.LogicPortalOut          => UiLang.T(Localization.Editor.Nodes.Labels.portalOut),
+            StoryNodeKind.ConditionFlow           => UiLang.T(Localization.Editor.Nodes.Labels.condition),
+            StoryNodeKind.EndConditionFlow        => UiLang.T(Localization.Editor.Nodes.Labels.endCondition),
+            StoryNodeKind.Comment                 => UiLang.T(Localization.Editor.Nodes.Labels.comment),
+            StoryNodeKind.BlueprintInstance       => UiLang.T(Localization.Editor.Nodes.Labels.blueprint),
+            StoryNodeKind.FunctionInstance        => UiLang.T(Localization.Editor.Nodes.Labels.function),
+            StoryNodeKind.FunctionEntry           => UiLang.T(Localization.Editor.Nodes.Labels.entry),
+            StoryNodeKind.FunctionExit            => UiLang.T(Localization.Editor.Nodes.Labels.exit),
             _                       => ""
         };
 
@@ -1145,11 +1145,11 @@ namespace DeusaldStoryWeb
         /// <summary>The human label for a text-block frame style, shown in the FlowText options dropdown and on the canvas node.</summary>
         public static string FrameLabel(StoryTextFrameStyle s) => s switch
         {
-            StoryTextFrameStyle.Info    => "Info",
-            StoryTextFrameStyle.Success => "Success",
-            StoryTextFrameStyle.Warning => "Warning",
-            StoryTextFrameStyle.Danger  => "Danger",
-            _                           => "Normal"
+            StoryTextFrameStyle.Info    => UiLang.T(Localization.Editor.Nodes.Frames.info),
+            StoryTextFrameStyle.Success => UiLang.T(Localization.Editor.Nodes.Frames.success),
+            StoryTextFrameStyle.Warning => UiLang.T(Localization.Editor.Nodes.Frames.warning),
+            StoryTextFrameStyle.Danger  => UiLang.T(Localization.Editor.Nodes.Frames.danger),
+            _                           => UiLang.T(Localization.Editor.Nodes.Frames.normal)
         };
 
         /// <summary>The Bootstrap-icon class shown alongside a non-Normal frame style; empty for <see cref="StoryTextFrameStyle.Normal"/>.</summary>

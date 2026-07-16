@@ -1,4 +1,5 @@
 @namespace DeusaldStoryWeb.Components.Common
+@inject UiLocalizationService Loc
 @inject ProjectStateService _ProjectState
 
 <div class="ins-root">
@@ -7,8 +8,8 @@
     {
         <div class="ins-empty">
             <i class="bi bi-boxes"></i>
-            <div class="ins-empty-title">No node selected</div>
-            <div class="ins-empty-sub">Select a node in the graph to inspect and edit its contents.</div>
+            <div class="ins-empty-title">@Loc.T(Localization.Editor.Inspector.emptyTitle)</div>
+            <div class="ins-empty-sub">@Loc.T(Localization.Editor.Inspector.emptySub)</div>
         </div>
     }
     else
@@ -39,9 +40,9 @@
             @if (ConnectedText is string connected)
             {
                 <div class="ins-section-head">
-                    <span class="ins-section-label">Connected text</span>
+                    <span class="ins-section-label">@Loc.T(Localization.Editor.Inspector.connectedText)</span>
                 </div>
-                <div class="ins-text">@(string.IsNullOrWhiteSpace(connected) ? "(nothing connected)" : connected)</div>
+                <div class="ins-text">@(string.IsNullOrWhiteSpace(connected) ? Loc.T(Localization.Editor.Inspector.nothingConnected) : connected)</div>
             }
 
             @if (!string.IsNullOrEmpty(Node.Thumb))
@@ -54,7 +55,7 @@
             @if (Node.Inputs.Count > 0)
             {
                 <div class="ins-section-head">
-                    <span class="ins-section-label">Inputs</span>
+                    <span class="ins-section-label">@Loc.T(Localization.Editor.Inspector.inputs)</span>
                     <span class="ins-section-count">@Node.Inputs.Count</span>
                 </div>
                 @foreach (EdPort port in Node.Inputs)
@@ -70,7 +71,7 @@
             @if (Node.Outputs.Count > 0)
             {
                 <div class="ins-section-head">
-                    <span class="ins-section-label">Outputs</span>
+                    <span class="ins-section-label">@Loc.T(Localization.Editor.Inspector.outputs)</span>
                     <span class="ins-section-count">@Node.Outputs.Count</span>
                 </div>
                 @foreach (EdPort port in Node.Outputs)
@@ -107,16 +108,16 @@
         }
     }
 
-    private static string PortName(EdPort port) => string.IsNullOrEmpty(port.Name) ? "(unnamed)" : port.Name;
+    private string PortName(EdPort port) => string.IsNullOrEmpty(port.Name) ? Loc.T(Localization.Common.Placeholders.unnamed) : port.Name;
 
-    private static string PortTypeLabel(PortType type) => type switch
+    private string PortTypeLabel(PortType type) => type switch
     {
-        PortType.VFlow     => "Variable Flow",
-        PortType.LFlow     => "Logic Flow",
-        PortType.Text      => "Text",
-        PortType.Icon      => "Icon",
-        PortType.Variable  => "Variable",
-        PortType.CVariable => "Constant Variable",
-        _                  => "Flow"
+        PortType.VFlow     => Loc.T(Localization.Editor.Inspector.PortTypes.vflow),
+        PortType.LFlow     => Loc.T(Localization.Editor.Inspector.PortTypes.lflow),
+        PortType.Text      => Loc.T(Localization.Editor.Inspector.PortTypes.text),
+        PortType.Icon      => Loc.T(Localization.Editor.Inspector.PortTypes.icon),
+        PortType.Variable  => Loc.T(Localization.Editor.Inspector.PortTypes.variable),
+        PortType.CVariable => Loc.T(Localization.Editor.Inspector.PortTypes.cvariable),
+        _                  => Loc.T(Localization.Editor.Inspector.PortTypes.flow)
     };
 }

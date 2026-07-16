@@ -1,5 +1,6 @@
 @namespace DeusaldStoryWeb.Components.Common
 @inject ProjectStateService _ProjectState
+@inject UiLocalizationService Loc
 @implements IDisposable
 
 @* ─────────────────────────────────────────────────────────────────────────
@@ -18,20 +19,20 @@
         <div class="lop-head-text">
             <div class="lop-head-title">
                 <i class="bi bi-globe"></i>
-                <span>Localization</span>
+                <span>@Loc.T(Localization.Editor.Panels.Localization.title)</span>
             </div>
-            <div class="lop-head-sub">Browse the linked localization project's keys and translations.</div>
+            <div class="lop-head-sub">@Loc.T(Localization.Editor.Panels.Localization.subtitle)</div>
         </div>
         <div class="lop-head-actions">
-            <button class="lop-refresh" @onclick="Relink" title="Link a different localization project">
+            <button class="lop-refresh" @onclick="Relink" title="@Loc.T(Localization.Editor.Panels.Localization.relinkTooltip)">
                 <i class="bi bi-link-45deg"></i>
-                <span>Re-link</span>
+                <span>@Loc.T(Localization.Editor.Panels.Localization.relink)</span>
             </button>
             @if (_Loc is not null)
             {
-                <button class="lop-refresh" @onclick="Refresh" disabled="@_Refreshing" title="Refresh localization keys">
+                <button class="lop-refresh" @onclick="Refresh" disabled="@_Refreshing" title="@Loc.T(Localization.Common.Loc.refreshTooltip)">
                     <i class="bi bi-arrow-clockwise @(_Refreshing ? "lop-spin" : "")"></i>
-                    <span>Refresh</span>
+                    <span>@Loc.T(Localization.Editor.Panels.Localization.refresh)</span>
                 </button>
             }
         </div>
@@ -41,10 +42,10 @@
     {
         <div class="lop-empty">
             <i class="bi bi-translate"></i>
-            <span>No localization project is linked to this story.</span>
+            <span>@Loc.T(Localization.Common.Loc.noProjectLinked)</span>
             <button class="lop-refresh" @onclick="Relink">
                 <i class="bi bi-link-45deg"></i>
-                <span>Link a project</span>
+                <span>@Loc.T(Localization.Editor.Panels.Localization.linkProject)</span>
             </button>
         </div>
     }
@@ -54,7 +55,7 @@
             <i class="bi bi-search"></i>
             <input class="modal-input"
                    type="text"
-                   placeholder="Search keys by name, description or tag…"
+                   placeholder="@Loc.T(Localization.Common.Loc.searchKeysPlaceholder)"
                    @bind="_Search"
                    @bind:event="oninput"/>
         </div>
@@ -65,7 +66,7 @@
             <div class="lop-cats">
                 <button class="lop-cat @(_CategoryId is null ? "active" : "")"
                         @onclick="() => SelectCategory(null)">
-                    <i class="bi bi-collection"></i> All keys
+                    <i class="bi bi-collection"></i> @Loc.T(Localization.Common.Loc.allKeys)
                     <span class="lop-cat-count">@_Loc.Keys.Count</span>
                 </button>
                 @foreach ((LocCategory cat, int depth) in FlatCategories())
@@ -87,7 +88,7 @@
                 }
                 @if (keys.Count == 0)
                 {
-                    <div class="lop-keys-empty">No keys match.</div>
+                    <div class="lop-keys-empty">@Loc.T(Localization.Common.Loc.noKeysMatch)</div>
                 }
                 else
                 {
@@ -115,7 +116,7 @@
                 {
                     <div class="lop-trans-empty">
                         <i class="bi bi-card-text"></i>
-                        <span>Select a key to see its translations.</span>
+                        <span>@Loc.T(Localization.Editor.Panels.Localization.selectKeyEmpty)</span>
                     </div>
                 }
                 else
@@ -147,13 +148,13 @@
                                     <span class="lop-lang-code">@lang</span>
                                     @if (isMain)
                                     {
-                                        <span class="lop-lang-main">main</span>
+                                        <span class="lop-lang-main">@Loc.T(Localization.Editor.Panels.Localization.mainBadge)</span>
                                     }
                                     <span class="lop-status lop-status-@StatusClass(tr)">@StatusLabel(tr)</span>
                                 </div>
                                 @if (string.IsNullOrEmpty(tr?.Text))
                                 {
-                                    <div class="lop-trans-text lop-trans-text-empty">— no translation —</div>
+                                    <div class="lop-trans-text lop-trans-text-empty">@Loc.T(Localization.Editor.Panels.Localization.noTranslation)</div>
                                 }
                                 else
                                 {
@@ -200,7 +201,7 @@
 
     /// <summary>Opens the picker to link a different localization project to this story.</summary>
     private void Relink() =>
-        _RelinkModal?.Show(_ProjectState.CurrentProject?.Metadata.Name ?? "This story", projectMissing: false);
+        _RelinkModal?.Show(_ProjectState.CurrentProject?.Metadata.Name ?? Loc.T(Localization.Editor.Panels.Localization.defaultStoryName), projectMissing: false);
 
     /// <summary>Points the story at the picked localization project and re-projects the graph with the new keys.</summary>
     private async Task OnRelinkConfirmed(LocProjectRef reference)
@@ -277,11 +278,11 @@
         return key.Translations.Find(t => t.LanguageId == main)?.Text ?? "";
     }
 
-    private static string StatusLabel(LocKeyTranslation? tr) => tr?.Status switch
+    private string StatusLabel(LocKeyTranslation? tr) => tr?.Status switch
     {
-        TranslationStatus.Approved  => "approved",
-        TranslationStatus.Suggested => "suggested",
-        _                           => "untranslated"
+        TranslationStatus.Approved  => Loc.T(Localization.Editor.Panels.Localization.statusApproved),
+        TranslationStatus.Suggested => Loc.T(Localization.Editor.Panels.Localization.statusSuggested),
+        _                           => Loc.T(Localization.Editor.Panels.Localization.statusUntranslated)
     };
 
     private static string StatusClass(LocKeyTranslation? tr) => tr?.Status switch

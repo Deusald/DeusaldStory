@@ -1,4 +1,5 @@
 @namespace DeusaldStoryWeb.Components.Common
+@inject UiLocalizationService Loc
 @inject ProjectStateService _ProjectState
 
 @* ─────────────────────────────────────────────────────────────────────────
@@ -20,10 +21,10 @@
     <div class="lpv-toolbar">
         <div class="lpv-toggle">
             <button class="lpv-toggle-btn @(_Paper ? "" : "active")" @onclick="() => SetPaper(false)">
-                <i class="bi bi-moon-stars-fill"></i> Dark
+                <i class="bi bi-moon-stars-fill"></i> @Loc.T(Localization.Editor.Preview.Logic.themeDark)
             </button>
             <button class="lpv-toggle-btn @(_Paper ? "active" : "")" @onclick="() => SetPaper(true)">
-                <i class="bi bi-sun-fill"></i> Light
+                <i class="bi bi-sun-fill"></i> @Loc.T(Localization.Editor.Preview.Logic.themeLight)
             </button>
         </div>
     </div>
@@ -35,7 +36,7 @@
             @* This node has no player-facing screen in the app — it runs silently and only prints a
                generated instruction section in the Gamebook. Badge it so the author knows. *@
             <div class="lpv-gb-badge">
-                <i class="bi bi-gear-fill"></i> Gamebook instructions
+                <i class="bi bi-gear-fill"></i> @Loc.T(Localization.Editor.Preview.Logic.gamebookInstructionsBadge)
             </div>
         }
 
@@ -43,13 +44,13 @@
             @if (_Rendered.IconData is not null)
             {
                 <div class="lpv-icon">
-                    <img src="data:image/png;base64,@_Rendered.IconData" alt="icon"/>
+                    <img src="data:image/png;base64,@_Rendered.IconData" alt="@Loc.T(Localization.Editor.Preview.iconAlt)"/>
                 </div>
             }
             <div class="lpv-titles">
                 @if (string.IsNullOrEmpty(_Rendered.Title))
                 {
-                    <div class="lpv-title lpv-placeholder">No title connected</div>
+                    <div class="lpv-title lpv-placeholder">@Loc.T(Localization.Editor.Preview.noTitleConnected)</div>
                 }
                 else
                 {
@@ -72,7 +73,7 @@
 
         @if (pageCount > 1)
         {
-            <div class="lpv-page-tag">Page @(pageIndex + 1) / @pageCount</div>
+            <div class="lpv-page-tag">@Loc.T(Localization.Editor.Preview.Logic.pageTag, new Dictionary<string, object> { ["page"] = pageIndex + 1, ["total"] = pageCount })</div>
         }
 
         @* Player-input String fields sit above the text when so placed. Number/Dial/specific values store silently. *@
@@ -83,7 +84,7 @@
 
         @if (!nodeHasBlocks)
         {
-            <div class="lpv-block lpv-placeholder">No text blocks connected — wire the Entry flow into a FlowText node.</div>
+            <div class="lpv-block lpv-placeholder">@Loc.T(Localization.Editor.Preview.Logic.noTextBlocks)</div>
         }
         else
         {
@@ -91,7 +92,7 @@
             {
                 @if (string.IsNullOrEmpty(block.Text))
                 {
-                    <div class="lpv-block lpv-placeholder">(empty text)</div>
+                    <div class="lpv-block lpv-placeholder">@Loc.T(Localization.Editor.Preview.Logic.emptyText)</div>
                 }
                 else
                 {
@@ -143,7 +144,7 @@
             @* No choices — the Exit node needs at least one continuation. *@
             <div class="lpv-continue">
                 <button class="lpv-continue-btn" disabled>
-                    <span class="lpv-placeholder">Add a choice on the Exit node</span>
+                    <span class="lpv-placeholder">@Loc.T(Localization.Editor.Preview.Logic.addChoiceOnExit)</span>
                 </button>
             </div>
         }
@@ -160,7 +161,7 @@
         <label class="lpv-input-label">
             @if (string.IsNullOrEmpty(field.Text))
             {
-                <span class="lpv-placeholder">(no instruction connected)</span>
+                <span class="lpv-placeholder">@Loc.T(Localization.Editor.Preview.Logic.noInstructionConnected)</span>
             }
             else
             {
@@ -171,7 +172,7 @@
                type="@(field.InputKind == StringInputKind.Number ? "number" : "text")"
                minlength="1"
                maxlength="@(field.MaxLength > 0 ? field.MaxLength : 30)"
-               placeholder="@(!string.IsNullOrEmpty(field.Placeholder) ? field.Placeholder : field.InputKind == StringInputKind.Number ? "Enter a number…" : "Enter text…")"/>
+               placeholder="@(!string.IsNullOrEmpty(field.Placeholder) ? field.Placeholder : field.InputKind == StringInputKind.Number ? Loc.T(Localization.Editor.Preview.Logic.inputEnterNumber) : Loc.T(Localization.Editor.Preview.Logic.inputEnterText))"/>
     </div>;
 
     /// <summary>External Variable values driving SmartFormat blocks (variable id → value); owned by the parent.</summary>

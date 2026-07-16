@@ -119,15 +119,15 @@ namespace DeusaldStoryCommon
             outProj.BlueprintInstances.Remove(inst.Id);
             outParent.Instances.Remove(inst.Id);
 
-            if (depth > _DEPTH_CAP) { AddProblem(result, outParent.Id, "Blueprint nesting is too deep — expansion stopped."); return; }
+            if (depth > _DEPTH_CAP) { AddProblem(result, outParent.Id, UiLang.T(Localization.Validation.blueprintNestingTooDeep)); return; }
             if (!authoring.Blueprints.TryGetValue(inst.BlueprintId, out StoryBlueprint? bp))
             {
-                AddProblem(result, outParent.Id, "A blueprint instance references a blueprint that no longer exists.");
+                AddProblem(result, outParent.Id, UiLang.T(Localization.Validation.blueprintMissing));
                 return;
             }
             if (!stack.Add(bp.Id))
             {
-                AddProblem(result, outParent.Id, $"Blueprint '{bp.Name}' contains itself — recursive expansion stopped.");
+                AddProblem(result, outParent.Id, UiLang.T(Localization.Validation.blueprintRecursive, new Dictionary<string, object> { ["name"] = bp.Name }));
                 return;
             }
 
@@ -267,18 +267,18 @@ namespace DeusaldStoryCommon
                     outLogic.ContentConnections.Add(new StoryConnection { FromPoint = spineInSource, ToPoint = target });
             }
 
-            if (depth > _DEPTH_CAP) { AddProblem(result, outLogic.ParentContainer, "Function nesting is too deep — expansion stopped.", outLogic.Id); BridgeSpine(); return; }
+            if (depth > _DEPTH_CAP) { AddProblem(result, outLogic.ParentContainer, UiLang.T(Localization.Validation.functionNestingTooDeep), outLogic.Id); BridgeSpine(); return; }
             if (!authoring.Blueprints.TryGetValue(fi.BlueprintId, out StoryBlueprint? bp)
              || bp.Kind != StoryBlueprintKind.Function
              || !authoring.LogicNodes.TryGetValue(bp.DefinitionNodeId, out StoryLogicNode? def))
             {
-                AddProblem(result, outLogic.ParentContainer, "A function instance references a function that no longer exists.", outLogic.Id);
+                AddProblem(result, outLogic.ParentContainer, UiLang.T(Localization.Validation.functionMissing), outLogic.Id);
                 BridgeSpine();
                 return;
             }
             if (!stack.Add(bp.Id))
             {
-                AddProblem(result, outLogic.ParentContainer, $"Function '{bp.Name}' calls itself — inlining stopped.", outLogic.Id);
+                AddProblem(result, outLogic.ParentContainer, UiLang.T(Localization.Validation.functionRecursive, new Dictionary<string, object> { ["name"] = bp.Name }), outLogic.Id);
                 BridgeSpine();
                 return;
             }

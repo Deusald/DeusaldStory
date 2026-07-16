@@ -1,4 +1,5 @@
 @namespace DeusaldStoryWeb.Components.Common
+@inject UiLocalizationService Loc
 @inject ProjectStateService _ProjectState
 @implements IDisposable
 
@@ -16,13 +17,13 @@
         <div class="prb-head-text">
             <div class="prb-head-title">
                 <i class="bi bi-exclamation-triangle"></i>
-                <span>Problems</span>
+                <span>@Loc.T(Localization.Editor.Panels.Problems.title)</span>
             </div>
-            <div class="prb-head-sub">Flow and variable issues found across the whole story.</div>
+            <div class="prb-head-sub">@Loc.T(Localization.Editor.Panels.Problems.subtitle)</div>
         </div>
-        <button class="prb-recheck" @onclick="Revalidate" title="Re-check the story">
+        <button class="prb-recheck" @onclick="Revalidate" title="@Loc.T(Localization.Editor.Panels.Problems.recheckTooltip)">
             <i class="bi bi-arrow-clockwise"></i>
-            <span>Re-check</span>
+            <span>@Loc.T(Localization.Editor.Panels.Problems.recheck)</span>
         </button>
     </div>
 
@@ -34,13 +35,13 @@
         {
             <div class="prb-empty">
                 <i class="bi bi-check-circle"></i>
-                <div class="prb-empty-title">No problems found</div>
-                <div class="prb-empty-sub">Every flow connector is wired and all storage variables balance.</div>
+                <div class="prb-empty-title">@Loc.T(Localization.Editor.Panels.Problems.noneTitle)</div>
+                <div class="prb-empty-sub">@Loc.T(Localization.Editor.Panels.Problems.noneSub)</div>
             </div>
         }
         else
         {
-            <div class="prb-count">@problems.Count issue@(problems.Count == 1 ? "" : "s")</div>
+            <div class="prb-count">@Loc.T(Localization.Editor.Panels.Problems.issueCount, new Dictionary<string, object> { ["count"] = problems.Count })</div>
             <div class="prb-list">
                 @foreach (StoryProblem p in problems)
                 {

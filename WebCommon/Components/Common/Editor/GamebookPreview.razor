@@ -1,4 +1,5 @@
 @namespace DeusaldStoryWeb.Components.Common
+@inject UiLocalizationService Loc
 @implements IAsyncDisposable
 @inject ProjectStateService _ProjectState
 @inject IJSRuntime _JS
@@ -20,10 +21,10 @@
     <div class="gbp-summary">
         <i class="bi bi-journal-text"></i>
         <span>
-            @result.Sections.Count section@(result.Sections.Count == 1 ? "" : "s")
+            @Loc.T(Localization.Editor.Preview.Gamebook.sectionCount, new Dictionary<string, object> { ["count"] = result.Sections.Count })
             @if (result.Truncated)
             {
-                <span class="gbp-warn"> · showing @result.Sections.Count of @result.TotalCombinations combinations</span>
+                <span class="gbp-warn">@Loc.T(Localization.Editor.Preview.Gamebook.truncatedCombinations, new Dictionary<string, object> { ["shown"] = result.Sections.Count, ["total"] = result.TotalCombinations })</span>
             }
         </span>
     </div>
@@ -35,18 +36,18 @@
         <div class="gbp-section @(selected ? "selected" : "")" id="@($"gbp-sec-{i}")">
 
             <div class="gbp-section-head">
-                <span class="gbp-section-tag">[§ @(i + 1)]</span>
+                <span class="gbp-section-tag">@Loc.T(Localization.Editor.Preview.Gamebook.sectionTag, new Dictionary<string, object> { ["n"] = i + 1 })</span>
                 @if (!string.IsNullOrEmpty(sec.Label))
                 {
                     <span class="gbp-section-combo">@sec.Label</span>
                 }
                 @if (selected)
                 {
-                    <span class="gbp-section-badge gbp-section-selected"><i class="bi bi-eye-fill"></i> Preview selected</span>
+                    <span class="gbp-section-badge gbp-section-selected"><i class="bi bi-eye-fill"></i> @Loc.T(Localization.Editor.Preview.Gamebook.selectedBadge)</span>
                 }
                 @if (sec.IsInstructions)
                 {
-                    <span class="gbp-section-badge"><i class="bi bi-gear-fill"></i> Instructions</span>
+                    <span class="gbp-section-badge"><i class="bi bi-gear-fill"></i> @Loc.T(Localization.Editor.Preview.Gamebook.instructionsBadge)</span>
                 }
             </div>
 
@@ -54,13 +55,13 @@
                 @if (sec.Rendered.IconData is not null)
                 {
                     <div class="gbp-icon">
-                        <img src="data:image/png;base64,@sec.Rendered.IconData" alt="icon"/>
+                        <img src="data:image/png;base64,@sec.Rendered.IconData" alt="@Loc.T(Localization.Editor.Preview.iconAlt)"/>
                     </div>
                 }
                 <div class="gbp-titles">
                     @if (string.IsNullOrEmpty(sec.Rendered.Title))
                     {
-                        <div class="gbp-title gbp-placeholder">No title connected</div>
+                        <div class="gbp-title gbp-placeholder">@Loc.T(Localization.Editor.Preview.noTitleConnected)</div>
                     }
                     else
                     {
@@ -92,7 +93,7 @@
                 <div class="gbp-instructions">
                     @if (sec.InstructionLines.Count == 0)
                     {
-                        <div class="gbp-block gbp-placeholder">No operations to instruct yet — add External Variables (or interaction blocks) to this node.</div>
+                        <div class="gbp-block gbp-placeholder">@Loc.T(Localization.Editor.Preview.Gamebook.noOperations)</div>
                     }
                     else
                     {
@@ -105,7 +106,7 @@
             }
             else if (sec.Rendered.Blocks.Count == 0)
             {
-                <div class="gbp-block gbp-placeholder">No text blocks connected.</div>
+                <div class="gbp-block gbp-placeholder">@Loc.T(Localization.Editor.Preview.Gamebook.noTextBlocks)</div>
             }
             else
             {

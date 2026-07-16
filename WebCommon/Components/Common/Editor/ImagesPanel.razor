@@ -1,5 +1,6 @@
 @namespace DeusaldStoryWeb.Components.Common
 @inject ProjectStateService _ProjectState
+@inject UiLocalizationService Loc
 
 @* ─────────────────────────────────────────────────────────────────────────
    The project's image library. Two lists: inline ICONS (square power-of-two
@@ -12,9 +13,9 @@
     <div class="imp-head">
         <div class="imp-head-title">
             <i class="bi bi-image"></i>
-            <span>Images</span>
+            <span>@Loc.T(Localization.Editor.Panels.Images.title)</span>
         </div>
-        <div class="imp-head-sub">Referenced from story text by name. PNG only.</div>
+        <div class="imp-head-sub">@Loc.T(Localization.Editor.Panels.Images.subtitle)</div>
     </div>
 
     @if (_Error is not null)
@@ -22,13 +23,13 @@
         <div class="imp-error">
             <i class="bi bi-exclamation-triangle"></i>
             <span>@_Error</span>
-            <button class="imp-error-close" @onclick="() => _Error = null" title="Dismiss"><i class="bi bi-x-lg"></i></button>
+            <button class="imp-error-close" @onclick="() => _Error = null" title="@Loc.T(Localization.Editor.Panels.Images.dismiss)"><i class="bi bi-x-lg"></i></button>
         </div>
     }
 
     <div class="imp-body">
-        @Section(StoryImageKind.Icon,  "Icons",  "bi-emoji-smile", "Square, power-of-two sizes (32×32, 64×64, …). Shown inline with text.")
-        @Section(StoryImageKind.Image, "Images", "bi-card-image",  "Any size. Shown as a picture in the story.")
+        @Section(StoryImageKind.Icon,  Loc.T(Localization.Editor.Panels.Images.iconsTitle),  "bi-emoji-smile", Loc.T(Localization.Editor.Panels.Images.iconsHint))
+        @Section(StoryImageKind.Image, Loc.T(Localization.Editor.Panels.Images.imagesTitle), "bi-card-image",  Loc.T(Localization.Editor.Panels.Images.imagesHint))
     </div>
 
 </div>
@@ -39,12 +40,12 @@
     <div class="modal-backdrop" @onclick="CancelRename"></div>
     <div class="modal-box imp-rename-box" @onclick:stopPropagation="true">
         <div class="modal-header">
-            <span class="modal-title">Rename image</span>
-            <button class="modal-close" @onclick="CancelRename" title="Close"><i class="bi bi-x-lg"></i></button>
+            <span class="modal-title">@Loc.T(Localization.Editor.Panels.Images.renameTitle)</span>
+            <button class="modal-close" @onclick="CancelRename" title="@Loc.T(Localization.Common.Buttons.close)"><i class="bi bi-x-lg"></i></button>
         </div>
         <div class="modal-body">
             <div class="modal-field">
-                <label class="modal-label">Name</label>
+                <label class="modal-label">@Loc.T(Localization.Common.Fields.name)</label>
                 <input class="modal-input" type="text" @bind="_RenameValue" @bind:event="oninput"
                        maxlength="100" @onkeydown="OnRenameKeyDown" @ref="_RenameInput"/>
                 @if (_RenameError is not null)
@@ -54,8 +55,8 @@
             </div>
         </div>
         <div class="modal-footer">
-            <button class="modal-btn modal-btn-ghost" @onclick="CancelRename">Cancel</button>
-            <button class="modal-btn modal-btn-primary" @onclick="ConfirmRename" disabled="@(!CanRename)">Save</button>
+            <button class="modal-btn modal-btn-ghost" @onclick="CancelRename">@Loc.T(Localization.Common.Buttons.cancel)</button>
+            <button class="modal-btn modal-btn-primary" @onclick="ConfirmRename" disabled="@(!CanRename)">@Loc.T(Localization.Common.Buttons.save)</button>
         </div>
     </div>
 }
@@ -66,18 +67,15 @@
     <div class="modal-backdrop" @onclick="CancelDelete"></div>
     <div class="modal-box imp-delete-box" @onclick:stopPropagation="true">
         <div class="modal-header">
-            <span class="modal-title">Delete image</span>
-            <button class="modal-close" @onclick="CancelDelete" title="Close"><i class="bi bi-x-lg"></i></button>
+            <span class="modal-title">@Loc.T(Localization.Editor.Panels.Images.deleteTitle)</span>
+            <button class="modal-close" @onclick="CancelDelete" title="@Loc.T(Localization.Common.Buttons.close)"><i class="bi bi-x-lg"></i></button>
         </div>
         <div class="modal-body">
-            <p class="imp-delete-text">
-                Delete <strong>@_Deleting.Name</strong>? Any story text that references it by name will no longer
-                resolve. This cannot be undone.
-            </p>
+            <p class="imp-delete-text">@((MarkupString)Loc.T(Localization.Editor.Panels.Images.deleteConfirm, new Dictionary<string, object> { ["name"] = _Deleting.Name }))</p>
         </div>
         <div class="modal-footer">
-            <button class="modal-btn modal-btn-ghost" @onclick="CancelDelete">Cancel</button>
-            <button class="modal-btn modal-btn-danger" @onclick="ConfirmDelete">Delete</button>
+            <button class="modal-btn modal-btn-ghost" @onclick="CancelDelete">@Loc.T(Localization.Common.Buttons.cancel)</button>
+            <button class="modal-btn modal-btn-danger" @onclick="ConfirmDelete">@Loc.T(Localization.Common.Buttons.delete)</button>
         </div>
     </div>
 }
@@ -116,7 +114,7 @@
                 </div>
                 <label class="imp-upload">
                     <i class="bi bi-upload"></i>
-                    <span>Upload PNG</span>
+                    <span>@Loc.T(Localization.Editor.Panels.Images.upload)</span>
                     <InputFile class="imp-file" accept="image/png" multiple
                                OnChange="e => OnFilesSelected(e, kind)"/>
                 </label>
@@ -127,7 +125,7 @@
             {
                 <div class="imp-empty">
                     <i class="bi bi-images"></i>
-                    <span>No @title.ToLowerInvariant() yet — upload a PNG to get started.</span>
+                    <span>@Loc.T(Localization.Editor.Panels.Images.sectionEmpty, new Dictionary<string, object> { ["kind"] = title.ToLowerInvariant() })</span>
                 </div>
             }
             else
@@ -141,13 +139,13 @@
                             </div>
                             <div class="imp-card-meta">
                                 <div class="imp-card-name" title="@img.Name">@img.Name</div>
-                                <div class="imp-card-dim">@img.Width×@img.Height</div>
+                                <div class="imp-card-dim">@Loc.T(Localization.Editor.Panels.Images.cardDimensions, new Dictionary<string, object> { ["w"] = img.Width, ["h"] = img.Height })</div>
                             </div>
                             <div class="imp-card-actions">
-                                <button class="imp-act" title="Rename" @onclick="() => BeginRename(img)">
+                                <button class="imp-act" title="@Loc.T(Localization.Editor.Panels.Images.rename)" @onclick="() => BeginRename(img)">
                                     <i class="bi bi-pencil"></i>
                                 </button>
-                                <button class="imp-act imp-act-danger" title="Delete" @onclick="() => _Deleting = img">
+                                <button class="imp-act imp-act-danger" title="@Loc.T(Localization.Common.Buttons.delete)" @onclick="() => _Deleting = img">
                                     <i class="bi bi-trash"></i>
                                 </button>
                             </div>
@@ -176,19 +174,19 @@
             }
             catch (Exception)
             {
-                problems.Add($"“{file.Name}” is larger than {_MAX_BYTES / (1024 * 1024)} MB.");
+                problems.Add(Loc.T(Localization.Editor.Panels.Images.errTooLarge, new Dictionary<string, object> { ["name"] = file.Name, ["mb"] = _MAX_BYTES / (1024 * 1024) }));
                 continue;
             }
 
             if (!PngInfo.TryReadSize(bytes, out int width, out int height))
             {
-                problems.Add($"“{file.Name}” is not a valid PNG.");
+                problems.Add(Loc.T(Localization.Editor.Panels.Images.errInvalidPng, new Dictionary<string, object> { ["name"] = file.Name }));
                 continue;
             }
 
             if (kind == StoryImageKind.Icon && (width != height || !PngInfo.IsPowerOfTwo(width)))
             {
-                problems.Add($"“{file.Name}” ({width}×{height}) is not a square power-of-two icon.");
+                problems.Add(Loc.T(Localization.Editor.Panels.Images.errNotSquarePow2, new Dictionary<string, object> { ["name"] = file.Name, ["w"] = width, ["h"] = height }));
                 continue;
             }
 
@@ -245,11 +243,11 @@
         if (_Renaming is null) return;
 
         string value = _RenameValue.Trim();
-        if (value.Length == 0) { _RenameError = "Name can't be empty."; return; }
+        if (value.Length == 0) { _RenameError = Loc.T(Localization.Common.Errors.nameEmpty); return; }
         if (!string.Equals(value, _Renaming.Name, StringComparison.Ordinal)
             && _ProjectState.IsImageNameTaken(value, _Renaming.Id))
         {
-            _RenameError = "Another image already uses that name.";
+            _RenameError = Loc.T(Localization.Editor.Panels.Images.errNameTaken);
             return;
         }
 

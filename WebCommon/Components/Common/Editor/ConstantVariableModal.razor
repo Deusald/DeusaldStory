@@ -1,4 +1,5 @@
 @namespace DeusaldStoryWeb.Components.Common
+@inject UiLocalizationService Loc
 
 @* ─────────────────────────────────────────────────────────────────────────
    Creates / edits a Constant Variable node: a named constant value wired into a
@@ -13,8 +14,8 @@
     <div class="modal-box cvm-box" @onclick:stopPropagation="true">
 
         <div class="modal-header">
-            <span class="modal-title">@(_IsEdit ? "Edit constant variable" : "Constant variable")</span>
-            <button class="modal-close" @onclick="Cancel" title="Close">
+            <span class="modal-title">@(_IsEdit ? Loc.T(Localization.Editor.Modals.ConstantVariable.editTitle) : Loc.T(Localization.Editor.Modals.ConstantVariable.title))</span>
+            <button class="modal-close" @onclick="Cancel" title="@Loc.T(Localization.Common.Buttons.close)">
                 <i class="bi bi-x-lg"></i>
             </button>
         </div>
@@ -22,21 +23,21 @@
         <div class="modal-body">
 
             <div class="modal-field">
-                <label class="modal-label">Name</label>
+                <label class="modal-label">@Loc.T(Localization.Common.Fields.name)</label>
                 <input class="modal-input"
                        type="text"
-                       placeholder="token name"
+                       placeholder="@Loc.T(Localization.Editor.Modals.ConstantVariable.tokenNamePlaceholder)"
                        @bind="_Name"
                        @bind:event="oninput"
                        maxlength="100"/>
-                <span class="modal-label-hint">the <code>{token}</code> name this value fills in the text</span>
+                <span class="modal-label-hint">@((MarkupString)Loc.T(Localization.Editor.Modals.ConstantVariable.tokenNameHint))</span>
             </div>
 
             <div class="modal-field">
-                <label class="modal-label">Value</label>
+                <label class="modal-label">@Loc.T(Localization.Common.Fields.value)</label>
                 <input class="modal-input"
                        type="text"
-                       placeholder="constant value"
+                       placeholder="@Loc.T(Localization.Editor.Modals.ConstantVariable.valuePlaceholder)"
                        @bind="_Value"
                        @bind:event="oninput"
                        maxlength="200"/>
@@ -44,17 +45,17 @@
 
             <div class="modal-note">
                 <i class="bi bi-info-circle"></i>
-                <span>Wire this node's <b>Value</b> output into a SmartFormat variables input (or the Exit node's variables input) to use it.</span>
+                <span>@((MarkupString)Loc.T(Localization.Editor.Modals.ConstantVariable.note))</span>
             </div>
 
         </div>
 
         <div class="modal-footer">
-            <button class="modal-btn modal-btn-ghost" @onclick="Cancel">Cancel</button>
+            <button class="modal-btn modal-btn-ghost" @onclick="Cancel">@Loc.T(Localization.Common.Buttons.cancel)</button>
             <button class="modal-btn modal-btn-primary"
                     @onclick="Confirm"
                     disabled="@(string.IsNullOrWhiteSpace(_Name))">
-                @(_IsEdit ? "Save changes" : "Add constant variable node")
+                @(_IsEdit ? Loc.T(Localization.Common.Buttons.saveChanges) : Loc.T(Localization.Editor.Modals.ConstantVariable.addButton))
             </button>
         </div>
 

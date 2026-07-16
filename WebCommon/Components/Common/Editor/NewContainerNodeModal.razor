@@ -1,4 +1,5 @@
 @namespace DeusaldStoryWeb.Components.Common
+@inject UiLocalizationService Loc
 
 @if (_Visible)
 {
@@ -7,8 +8,8 @@
     <div class="modal-box ncm-box" @onclick:stopPropagation="true">
 
         <div class="modal-header">
-            <span class="modal-title">@(_IsEdit ? "Edit container node" : "New container node")</span>
-            <button class="modal-close" @onclick="Cancel" title="Close">
+            <span class="modal-title">@(_IsEdit ? Loc.T(Localization.Editor.Modals.Container.editTitle) : Loc.T(Localization.Editor.Modals.Container.title))</span>
+            <button class="modal-close" @onclick="Cancel" title="@Loc.T(Localization.Common.Buttons.close)">
                 <i class="bi bi-x-lg"></i>
             </button>
         </div>
@@ -17,10 +18,10 @@
 
             @* ── Name ──────────────────────────────────────────────────── *@
             <div class="modal-field">
-                <label class="modal-label">Name</label>
+                <label class="modal-label">@Loc.T(Localization.Common.Fields.name)</label>
                 <input class="modal-input"
                        type="text"
-                       placeholder="Chapter 1"
+                       placeholder="@Loc.T(Localization.Editor.Modals.Container.namePlaceholder)"
                        @bind="_Name"
                        @bind:event="oninput"
                        maxlength="100"/>
@@ -29,11 +30,11 @@
             @* ── Description ───────────────────────────────────────────── *@
             <div class="modal-field">
                 <label class="modal-label">
-                    Description
-                    <span class="modal-label-hint">optional</span>
+                    @Loc.T(Localization.Common.Fields.description)
+                    <span class="modal-label-hint">@Loc.T(Localization.Common.Fields.optional)</span>
                 </label>
                 <textarea class="modal-input ncm-textarea"
-                          placeholder="A short description of this part of the story…"
+                          placeholder="@Loc.T(Localization.Editor.Modals.Container.descriptionPlaceholder)"
                           @bind="_Description"
                           @bind:event="oninput"
                           rows="2"
@@ -43,23 +44,23 @@
             @* ── Entry point ───────────────────────────────────────────── *@
             <div class="modal-field">
                 <label class="modal-label">
-                    Entry point
-                    <span class="modal-label-hint">where the story enters this container</span>
+                    @Loc.T(Localization.Editor.Modals.Container.entryPointLabel)
+                    <span class="modal-label-hint">@Loc.T(Localization.Editor.Modals.Container.entryPointHint)</span>
                 </label>
                 <div class="ncm-point">
                     <span class="ncm-point-dot" style="background:var(--success)"></span>
                     <input class="modal-input"
                            type="text"
-                           placeholder="In"
+                           placeholder="@Loc.T(Localization.Editor.Modals.Container.entryNamePlaceholder)"
                            value="@_Entry.Name"
                            @oninput="e => _Entry.Name = e.Value?.ToString() ?? string.Empty"
                            maxlength="60"/>
                     <select class="modal-input ncm-flow"
-                            title="Flow type"
+                            title="@Loc.T(Localization.Editor.Modals.Container.flowType)"
                             value="@_Entry.Flow"
                             @onchange="e => _Entry.Flow = ParseFlow(e.Value)">
-                        <option value="@StoryPointFlow.Flow">Flow</option>
-                        <option value="@StoryPointFlow.VFlow">VFlow</option>
+                        <option value="@StoryPointFlow.Flow">@Loc.T(Localization.Editor.Modals.Container.flowFlow)</option>
+                        <option value="@StoryPointFlow.VFlow">@Loc.T(Localization.Editor.Modals.Container.flowVFlow)</option>
                     </select>
                 </div>
             </div>
@@ -67,8 +68,8 @@
             @* ── Exit points ───────────────────────────────────────────── *@
             <div class="modal-field">
                 <label class="modal-label">
-                    Exit points
-                    <span class="modal-label-hint">at least one — ways the story can leave this container</span>
+                    @Loc.T(Localization.Editor.Modals.Container.exitPointsLabel)
+                    <span class="modal-label-hint">@Loc.T(Localization.Editor.Modals.Container.exitPointsHint)</span>
                 </label>
                 @for (int i = 0; i < _Exits.Count; i++)
                 {
@@ -77,19 +78,19 @@
                         <span class="ncm-point-dot" style="background:var(--danger)"></span>
                         <input class="modal-input"
                                type="text"
-                               placeholder="Out"
+                               placeholder="@Loc.T(Localization.Editor.Modals.Container.exitNamePlaceholder)"
                                value="@_Exits[index].Name"
                                @oninput="e => _Exits[index].Name = e.Value?.ToString() ?? string.Empty"
                                maxlength="60"/>
                         <select class="modal-input ncm-flow"
-                                title="Flow type"
+                                title="@Loc.T(Localization.Editor.Modals.Container.flowType)"
                                 value="@_Exits[index].Flow"
                                 @onchange="e => _Exits[index].Flow = ParseFlow(e.Value)">
-                            <option value="@StoryPointFlow.Flow">Flow</option>
-                            <option value="@StoryPointFlow.VFlow">VFlow</option>
+                            <option value="@StoryPointFlow.Flow">@Loc.T(Localization.Editor.Modals.Container.flowFlow)</option>
+                            <option value="@StoryPointFlow.VFlow">@Loc.T(Localization.Editor.Modals.Container.flowVFlow)</option>
                         </select>
                         <button class="ncm-point-del"
-                                title="Remove exit"
+                                title="@Loc.T(Localization.Editor.Modals.Container.removeExit)"
                                 disabled="@(_Exits.Count <= 1)"
                                 @onclick="() => RemoveExit(index)">
                             <i class="bi bi-trash"></i>
@@ -97,18 +98,18 @@
                     </div>
                 }
                 <button class="ncm-add" @onclick="AddExit">
-                    <i class="bi bi-plus-lg"></i> Add exit
+                    <i class="bi bi-plus-lg"></i> @Loc.T(Localization.Editor.Modals.Container.addExit)
                 </button>
             </div>
 
         </div>
 
         <div class="modal-footer">
-            <button class="modal-btn modal-btn-ghost" @onclick="Cancel">Cancel</button>
+            <button class="modal-btn modal-btn-ghost" @onclick="Cancel">@Loc.T(Localization.Common.Buttons.cancel)</button>
             <button class="modal-btn modal-btn-primary"
                     @onclick="Confirm"
                     disabled="@(!_CanConfirm)">
-                @(_IsEdit ? "Save changes" : "Create container")
+                @(_IsEdit ? Loc.T(Localization.Common.Buttons.saveChanges) : Loc.T(Localization.Editor.Modals.Container.createButton))
             </button>
         </div>
 

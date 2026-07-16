@@ -1,4 +1,5 @@
 @namespace DeusaldStoryWeb.Components.Common
+@inject UiLocalizationService Loc
 @inject ProjectStateService _ProjectState
 
 @* ─────────────────────────────────────────────────────────────────────────
@@ -15,8 +16,8 @@
     <div class="modal-box sev-box" @onclick:stopPropagation="true">
 
         <div class="modal-header">
-            <span class="modal-title">@(_IsEdit ? "Edit set external variable" : "Set external variable")</span>
-            <button class="modal-close" @onclick="Cancel" title="Close">
+            <span class="modal-title">@(_IsEdit ? Loc.T(Localization.Editor.Modals.SetExternalVariable.editTitle) : Loc.T(Localization.Editor.Modals.SetExternalVariable.title))</span>
+            <button class="modal-close" @onclick="Cancel" title="@Loc.T(Localization.Common.Buttons.close)">
                 <i class="bi bi-x-lg"></i>
             </button>
         </div>
@@ -30,21 +31,21 @@
             {
                 <div class="sev-empty">
                     <i class="bi bi-braces"></i>
-                    <span>No variables yet — add some in the Variables panel first.</span>
+                    <span>@Loc.T(Localization.Editor.Modals.SetExternalVariable.noVariablesYet)</span>
                 </div>
             }
             else
             {
                 <div class="modal-field">
-                    <label class="modal-label">Variable</label>
+                    <label class="modal-label">@Loc.T(Localization.Common.Fields.variable)</label>
                     <div class="sev-list">
                         @foreach (StoryVariable v in vars)
                         {
                             StoryVariable variable = v;
                             <button class="sev-item @(_SelectedVariableId == variable.Id ? "selected" : "")"
                                     @onclick="() => SelectVariable(variable)">
-                                <span class="sev-item-name">@(string.IsNullOrWhiteSpace(variable.Name) ? "(unnamed)" : variable.Name)</span>
-                                <span class="sev-item-sub">@variable.PossibleValues.Count value@(variable.PossibleValues.Count == 1 ? "" : "s")</span>
+                                <span class="sev-item-name">@(string.IsNullOrWhiteSpace(variable.Name) ? Loc.T(Localization.Common.Placeholders.unnamed) : variable.Name)</span>
+                                <span class="sev-item-sub">@Loc.T(Localization.Common.Misc.valueCount, new Dictionary<string, object> { ["count"] = variable.PossibleValues.Count })</span>
                             </button>
                         }
                     </div>
@@ -53,11 +54,11 @@
                 @if (Selected is StoryVariable sel)
                 {
                     <div class="modal-field">
-                        <label class="modal-label">How to assign</label>
+                        <label class="modal-label">@Loc.T(Localization.Editor.Modals.SetExternalVariable.howToAssign)</label>
                         <select class="modal-input" value="@((int)_Mode)" @onchange="OnModeChanged">
-                            <option value="@((int)StorySetExternalVariableMode.SpecificValue)">Set to selected value</option>
-                            <option value="@((int)StorySetExternalVariableMode.MapFromVariable)">Map from variable input</option>
-                            <option value="@((int)StorySetExternalVariableMode.RemapFromVariable)">Remap from variable input</option>
+                            <option value="@((int)StorySetExternalVariableMode.SpecificValue)">@Loc.T(Localization.Editor.Modals.SetExternalVariable.modeSpecificValue)</option>
+                            <option value="@((int)StorySetExternalVariableMode.MapFromVariable)">@Loc.T(Localization.Editor.Modals.SetExternalVariable.modeMapFromVariable)</option>
+                            <option value="@((int)StorySetExternalVariableMode.RemapFromVariable)">@Loc.T(Localization.Editor.Modals.SetExternalVariable.modeRemapFromVariable)</option>
                         </select>
                     </div>
 
@@ -65,10 +66,10 @@
                     {
                         case StorySetExternalVariableMode.SpecificValue:
                             <div class="modal-field">
-                                <label class="modal-label">Value</label>
+                                <label class="modal-label">@Loc.T(Localization.Common.Fields.value)</label>
                                 @if (sel.PossibleValues.Count == 0)
                                 {
-                                    <div class="sev-hint">This variable has no possible values — add some in the Variables panel.</div>
+                                    <div class="sev-hint">@Loc.T(Localization.Editor.Modals.SetExternalVariable.noPossibleValues)</div>
                                 }
                                 else
                                 {
@@ -83,28 +84,27 @@
                             break;
 
                         case StorySetExternalVariableMode.MapFromVariable:
-                            <div class="sev-hint">The assigned value comes from whatever variable is wired into this node's <b>Value</b> input.</div>
+                            <div class="sev-hint">@((MarkupString)Loc.T(Localization.Editor.Modals.SetExternalVariable.mapFromVariableHint))</div>
                             break;
 
                         case StorySetExternalVariableMode.RemapFromVariable:
                             <div class="sev-hint">
-                                Each incoming value wired into this node's <b>Value</b> input is converted to the
-                                external variable value you pick below before being assigned.
+                                @((MarkupString)Loc.T(Localization.Editor.Modals.SetExternalVariable.remapFromVariableHint))
                             </div>
                             @if (sel.PossibleValues.Count == 0)
                             {
-                                <div class="sev-hint">This variable has no possible values — add some in the Variables panel.</div>
+                                <div class="sev-hint">@Loc.T(Localization.Editor.Modals.SetExternalVariable.noPossibleValues)</div>
                             }
                             else
                             {
                                 <div class="modal-field">
-                                    <label class="modal-label">Value conversions</label>
+                                    <label class="modal-label">@Loc.T(Localization.Editor.Modals.SetExternalVariable.valueConversions)</label>
                                     <div class="sev-map">
                                         @for (int i = 0; i < _ValueMap.Count; ++i)
                                         {
                                             int row = i;
                                             <div class="sev-map-row">
-                                                <input class="modal-input sev-map-from" placeholder="incoming value"
+                                                <input class="modal-input sev-map-from" placeholder="@Loc.T(Localization.Editor.Modals.SetExternalVariable.incomingValuePlaceholder)"
                                                        value="@_ValueMap[row].From"
                                                        @onchange="e => _ValueMap[row].From = e.Value?.ToString() ?? string.Empty"/>
                                                 <i class="bi bi-arrow-right sev-map-arrow"></i>
@@ -115,14 +115,14 @@
                                                         <option value="@value">@value</option>
                                                     }
                                                 </select>
-                                                <button class="sev-map-del" title="Remove conversion" @onclick="() => RemoveMapping(row)">
+                                                <button class="sev-map-del" title="@Loc.T(Localization.Editor.Modals.SetExternalVariable.removeConversion)" @onclick="() => RemoveMapping(row)">
                                                     <i class="bi bi-x-lg"></i>
                                                 </button>
                                             </div>
                                         }
                                     </div>
                                     <button class="modal-btn modal-btn-ghost sev-map-add" @onclick="() => AddMapping(sel)">
-                                        <i class="bi bi-plus-lg"></i> Add conversion
+                                        <i class="bi bi-plus-lg"></i> @Loc.T(Localization.Editor.Modals.SetExternalVariable.addConversion)
                                     </button>
                                 </div>
                             }
@@ -134,11 +134,11 @@
         </div>
 
         <div class="modal-footer">
-            <button class="modal-btn modal-btn-ghost" @onclick="Cancel">Cancel</button>
+            <button class="modal-btn modal-btn-ghost" @onclick="Cancel">@Loc.T(Localization.Common.Buttons.cancel)</button>
             <button class="modal-btn modal-btn-primary"
                     @onclick="Confirm"
                     disabled="@(!CanConfirm)">
-                @(_IsEdit ? "Save changes" : "Add set node")
+                @(_IsEdit ? Loc.T(Localization.Common.Buttons.saveChanges) : Loc.T(Localization.Editor.Modals.SetExternalVariable.confirm))
             </button>
         </div>
 

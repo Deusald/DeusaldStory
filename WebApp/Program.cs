@@ -19,6 +19,9 @@ builder.Services.AddScoped<ILocalizationProjectPicker, WebLocalizationProjectPic
 builder.Services.AddScoped<IExcelInterop, WebExcelInterop>();
 builder.Services.AddScoped<RecentProjectsStore>();
 
+// UI localization (editor's own strings; per-user language preference)
+builder.Services.AddScoped<UiLocalizationService>();
+
 // Session state (one per app in WASM)
 builder.Services.AddScoped<ProjectStateService>();
 

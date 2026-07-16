@@ -1,4 +1,5 @@
 @namespace DeusaldStoryWeb.Components.Common
+@inject UiLocalizationService Loc
 
 @if (_Visible)
 {
@@ -7,8 +8,8 @@
     <div class="modal-box nlm-box" @onclick:stopPropagation="true">
 
         <div class="modal-header">
-            <span class="modal-title">@(_IsEdit ? "Edit logic node" : "New logic node")</span>
-            <button class="modal-close" @onclick="Cancel" title="Close">
+            <span class="modal-title">@(_IsEdit ? Loc.T(Localization.Editor.Modals.Logic.editTitle) : Loc.T(Localization.Editor.Modals.Logic.title))</span>
+            <button class="modal-close" @onclick="Cancel" title="@Loc.T(Localization.Common.Buttons.close)">
                 <i class="bi bi-x-lg"></i>
             </button>
         </div>
@@ -17,10 +18,10 @@
 
             @* ── Name ──────────────────────────────────────────────────── *@
             <div class="modal-field">
-                <label class="modal-label">Name</label>
+                <label class="modal-label">@Loc.T(Localization.Common.Fields.name)</label>
                 <input class="modal-input"
                        type="text"
-                       placeholder="Arrival at the Gate"
+                       placeholder="@Loc.T(Localization.Editor.Modals.Logic.namePlaceholder)"
                        @bind="_Name"
                        @bind:event="oninput"
                        maxlength="100"/>
@@ -29,11 +30,11 @@
             @* ── Description ───────────────────────────────────────────── *@
             <div class="modal-field">
                 <label class="modal-label">
-                    Description
-                    <span class="modal-label-hint">optional</span>
+                    @Loc.T(Localization.Common.Fields.description)
+                    <span class="modal-label-hint">@Loc.T(Localization.Common.Fields.optional)</span>
                 </label>
                 <textarea class="modal-input nlm-textarea"
-                          placeholder="A short description of what happens here…"
+                          placeholder="@Loc.T(Localization.Editor.Modals.Logic.descriptionPlaceholder)"
                           @bind="_Description"
                           @bind:event="oninput"
                           rows="2"
@@ -43,21 +44,21 @@
             @* ── Exit mode ─────────────────────────────────────────────── *@
             <div class="modal-field">
                 <label class="modal-label">
-                    Exit mode
-                    <span class="modal-label-hint">how this node hands its choices to the next node(s)</span>
+                    @Loc.T(Localization.Editor.Modals.Logic.exitModeLabel)
+                    <span class="modal-label-hint">@Loc.T(Localization.Editor.Modals.Logic.exitModeHint)</span>
                 </label>
                 <div class="nlm-mode">
                     <button type="button"
                             class="nlm-mode-opt @(_ExitMode == StoryLogicExitMode.ManyPaths ? "active" : "")"
                             @onclick="() => _ExitMode = StoryLogicExitMode.ManyPaths">
-                        <span class="nlm-mode-title">Many paths</span>
-                        <span class="nlm-mode-desc">one Flow output per choice</span>
+                        <span class="nlm-mode-title">@Loc.T(Localization.Editor.Modals.Logic.manyPathsTitle)</span>
+                        <span class="nlm-mode-desc">@Loc.T(Localization.Editor.Modals.Logic.manyPathsDesc)</span>
                     </button>
                     <button type="button"
                             class="nlm-mode-opt @(_ExitMode == StoryLogicExitMode.SinglePath ? "active" : "")"
                             @onclick="() => _ExitMode = StoryLogicExitMode.SinglePath">
-                        <span class="nlm-mode-title">Single path + Variables</span>
-                        <span class="nlm-mode-desc">one VFlow output carrying declared variables</span>
+                        <span class="nlm-mode-title">@Loc.T(Localization.Editor.Modals.Logic.singlePathTitle)</span>
+                        <span class="nlm-mode-desc">@Loc.T(Localization.Editor.Modals.Logic.singlePathDesc)</span>
                     </button>
                 </div>
             </div>
@@ -67,8 +68,8 @@
             {
                 <div class="modal-field">
                     <label class="modal-label">
-                        Declared variables
-                        <span class="modal-label-hint">handed to the next node; their possible-value combinations become its Gamebook sections</span>
+                        @Loc.T(Localization.Editor.Modals.Logic.declaredVariablesLabel)
+                        <span class="modal-label-hint">@Loc.T(Localization.Editor.Modals.Logic.declaredVariablesHint)</span>
                     </label>
                     @for (int i = 0; i < _Vars.Count; i++)
                     {
@@ -77,23 +78,23 @@
                             <span class="nlm-point-dot" style="background:var(--code-func)"></span>
                             <input class="modal-input nlm-var-name"
                                    type="text"
-                                   placeholder="A"
+                                   placeholder="@Loc.T(Localization.Editor.Modals.Logic.variableNamePlaceholder)"
                                    value="@_Vars[index].Name"
                                    @oninput="e => _Vars[index].Name = e.Value?.ToString() ?? string.Empty"
                                    maxlength="60"/>
                             <input class="modal-input nlm-var-vals"
                                    type="text"
-                                   placeholder="values, comma-separated"
+                                   placeholder="@Loc.T(Localization.Editor.Modals.Logic.variableValuesPlaceholder)"
                                    value="@_Vars[index].ValuesCsv"
                                    @oninput="e => _Vars[index].ValuesCsv = e.Value?.ToString() ?? string.Empty"
                                    maxlength="300"/>
-                            <button class="nlm-point-del" title="Remove variable" @onclick="() => RemoveVar(index)">
+                            <button class="nlm-point-del" title="@Loc.T(Localization.Editor.Modals.Logic.removeVariable)" @onclick="() => RemoveVar(index)">
                                 <i class="bi bi-trash"></i>
                             </button>
                         </div>
                     }
                     <button class="nlm-add-exit" @onclick="AddVar">
-                        <i class="bi bi-plus-lg"></i> Add variable
+                        <i class="bi bi-plus-lg"></i> @Loc.T(Localization.Editor.Modals.Logic.addVariable)
                     </button>
                 </div>
             }
@@ -105,8 +106,8 @@
                            checked="@_GamebookInstructions"
                            @onchange="e => _GamebookInstructions = (bool)(e.Value ?? false)"/>
                     <span>
-                        Gamebook instructions
-                        <span class="modal-label-hint">runs automatically in the app; prints a generated instruction section in the Gamebook</span>
+                        @Loc.T(Localization.Editor.Modals.Logic.gamebookInstructionsLabel)
+                        <span class="modal-label-hint">@Loc.T(Localization.Editor.Modals.Logic.gamebookInstructionsHint)</span>
                     </span>
                 </label>
             </div>
@@ -118,8 +119,8 @@
                            checked="@_AcceptVariables"
                            @onchange="e => _AcceptVariables = (bool)(e.Value ?? false)"/>
                     <span>
-                        Accept variables
-                        <span class="modal-label-hint">adds a VFlow input for an upstream Single-path node's declared variables</span>
+                        @Loc.T(Localization.Editor.Modals.Logic.acceptVariablesLabel)
+                        <span class="modal-label-hint">@Loc.T(Localization.Editor.Modals.Logic.acceptVariablesHint)</span>
                     </span>
                 </label>
             </div>
@@ -129,8 +130,8 @@
             {
                 <div class="modal-field">
                     <label class="modal-label">
-                        Expected incoming variables
-                        <span class="modal-label-hint">the exact set the upstream must provide (name + values); required for reusable blueprints, else the upstream is trusted as-is</span>
+                        @Loc.T(Localization.Editor.Modals.Logic.expectedVariablesLabel)
+                        <span class="modal-label-hint">@Loc.T(Localization.Editor.Modals.Logic.expectedVariablesHint)</span>
                     </label>
                     @for (int i = 0; i < _Expected.Count; i++)
                     {
@@ -139,23 +140,23 @@
                             <span class="nlm-point-dot" style="background:var(--code-func)"></span>
                             <input class="modal-input nlm-var-name"
                                    type="text"
-                                   placeholder="A"
+                                   placeholder="@Loc.T(Localization.Editor.Modals.Logic.variableNamePlaceholder)"
                                    value="@_Expected[index].Name"
                                    @oninput="e => _Expected[index].Name = e.Value?.ToString() ?? string.Empty"
                                    maxlength="60"/>
                             <input class="modal-input nlm-var-vals"
                                    type="text"
-                                   placeholder="values, comma-separated"
+                                   placeholder="@Loc.T(Localization.Editor.Modals.Logic.variableValuesPlaceholder)"
                                    value="@_Expected[index].ValuesCsv"
                                    @oninput="e => _Expected[index].ValuesCsv = e.Value?.ToString() ?? string.Empty"
                                    maxlength="300"/>
-                            <button class="nlm-point-del" title="Remove variable" @onclick="() => _Expected.RemoveAt(index)">
+                            <button class="nlm-point-del" title="@Loc.T(Localization.Editor.Modals.Logic.removeVariable)" @onclick="() => _Expected.RemoveAt(index)">
                                 <i class="bi bi-trash"></i>
                             </button>
                         </div>
                     }
                     <button class="nlm-add-exit" @onclick="() => _Expected.Add(new PointRow())">
-                        <i class="bi bi-plus-lg"></i> Add expected variable
+                        <i class="bi bi-plus-lg"></i> @Loc.T(Localization.Editor.Modals.Logic.addExpectedVariable)
                     </button>
                 </div>
             }
@@ -163,11 +164,11 @@
         </div>
 
         <div class="modal-footer">
-            <button class="modal-btn modal-btn-ghost" @onclick="Cancel">Cancel</button>
+            <button class="modal-btn modal-btn-ghost" @onclick="Cancel">@Loc.T(Localization.Common.Buttons.cancel)</button>
             <button class="modal-btn modal-btn-primary"
                     @onclick="Confirm"
                     disabled="@(!_CanConfirm)">
-                @(_IsEdit ? "Save changes" : "Create node")
+                @(_IsEdit ? Loc.T(Localization.Common.Buttons.saveChanges) : Loc.T(Localization.Editor.Modals.Logic.createButton))
             </button>
         </div>
 

@@ -85,7 +85,7 @@ namespace DeusaldStoryCommon
                 Key              = key,
                 Rendered         = rendered,
                 IsInstructions   = true,
-                InstructionLines = incoming.Select(dv => $"{(string.IsNullOrWhiteSpace(dv.Name) ? "(variable)" : dv.Name)} = {(values.TryGetValue(dv.Id, out string? v) ? v : "")}").ToList()
+                InstructionLines = incoming.Select(dv => $"{(string.IsNullOrWhiteSpace(dv.Name) ? UiLang.T(Localization.Services.Gamebook.instructionVariableFallback) : dv.Name)} = {(values.TryGetValue(dv.Id, out string? v) ? v : "")}").ToList()
             };
         }
 
@@ -138,7 +138,7 @@ namespace DeusaldStoryCommon
 
             if (choices.Count == 0)
             {
-                lines.Add(new ContinueLine { Text = "This node has no choices — add at least one continuation on its Exit node.", IsError = true });
+                lines.Add(new ContinueLine { Text = UiLang.T(Localization.Services.Gamebook.noChoices), IsError = true });
                 return lines;
             }
 
@@ -149,7 +149,7 @@ namespace DeusaldStoryCommon
 
                 if (rc.OuterFlowOut == Guid.Empty)
                 {
-                    lines.Add(new ContinueLine { Text = $"Choice “{(hasText ? label : "?")}” is not connected to a next node.", IsError = true });
+                    lines.Add(new ContinueLine { Text = UiLang.T(Localization.Services.Gamebook.choiceNotConnected, new Dictionary<string, object> { ["label"] = hasText ? label : "?" }), IsError = true });
                     continue;
                 }
 
@@ -158,11 +158,11 @@ namespace DeusaldStoryCommon
                 {
                     case StoryFlowNavigator.NextKind.End:
                         string theEnd = StoryCommonLocalizationKeys.Resolve(localization, StoryCommonLocalizationKeys.GamebookTheEnd);
-                        lines.Add(new ContinueLine { Text = hasText ? $"{label} — {theEnd}" : theEnd });
+                        lines.Add(new ContinueLine { Text = hasText ? UiLang.T(Localization.Services.Gamebook.choiceToEnd, new Dictionary<string, object> { ["label"] = label, ["theEnd"] = theEnd }) : theEnd });
                         break;
 
                     case StoryFlowNavigator.NextKind.Dangling:
-                        lines.Add(new ContinueLine { Text = $"Choice “{(hasText ? label : "?")}” leads nowhere.", IsError = true });
+                        lines.Add(new ContinueLine { Text = UiLang.T(Localization.Services.Gamebook.choiceLeadsNowhere, new Dictionary<string, object> { ["label"] = hasText ? label : "?" }), IsError = true });
                         break;
 
                     case StoryFlowNavigator.NextKind.Logic when next.Logic is not null:
@@ -215,9 +215,11 @@ namespace DeusaldStoryCommon
         /// <summary>Placeholder section reference token, e.g. <c>[§ Forest Path · A=Win]</c>.</summary>
         private static string SectionToken(StoryLogicNode node, List<StoryDeclaredVariable> vars, Dictionary<Guid, string> values)
         {
-            string name    = string.IsNullOrWhiteSpace(node.Name) ? "(unnamed)" : node.Name;
+            string name    = string.IsNullOrWhiteSpace(node.Name) ? UiLang.T(Localization.Common.Placeholders.unnamed) : node.Name;
             string summary = ComboLabel(vars, values);
-            return string.IsNullOrEmpty(summary) ? $"[§ {name}]" : $"[§ {name} · {summary}]";
+            return string.IsNullOrEmpty(summary)
+                ? UiLang.T(Localization.Services.Gamebook.sectionTokenBare, new Dictionary<string, object> { ["name"] = name })
+                : UiLang.T(Localization.Services.Gamebook.sectionToken,     new Dictionary<string, object> { ["name"] = name, ["summary"] = summary });
         }
 
         /// <summary>A short "A=val, B=val2" label for a combination (empty when no incoming variables).</summary>

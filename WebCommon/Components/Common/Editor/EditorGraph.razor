@@ -1,4 +1,5 @@
 @namespace DeusaldStoryWeb.Components.Common
+@inject UiLocalizationService Loc
 @implements IAsyncDisposable
 @inject IJSRuntime _JS
 
@@ -7,10 +8,10 @@
     @* ── Floating toolbar ────────────────────────────────────────────── *@
     <div class="edg-toolbar">
         <button class="edg-tool-btn edg-tool-primary" @onclick="AddNodeAtCenter">
-            <i class="bi bi-plus-lg"></i> Add node
+            <i class="bi bi-plus-lg"></i> @Loc.T(Localization.Editor.Graph.addNode)
         </button>
-        <span class="edg-tool-count">@Nodes.Count nodes</span>
-        <span class="edg-tool-hint">drag to select · middle-drag or Space+drag to pan · double-click a container to open it</span>
+        <span class="edg-tool-count">@Loc.T(Localization.Editor.Graph.nodeCount, new Dictionary<string, object> { ["count"] = Nodes.Count })</span>
+        <span class="edg-tool-hint">@Loc.T(Localization.Editor.Graph.toolbarHint)</span>
     </div>
 
     @* ── Canvas ──────────────────────────────────────────────────────── *@
@@ -90,10 +91,10 @@
                          @oncontextmenu="e => NodeContextMenu(e, n)"
                          @oncontextmenu:stopPropagation="true" @oncontextmenu:preventDefault="true">
                         <div class="edg-node-comment-head">
-                            <i class="bi bi-chat-left-text"></i> COMMENT
+                            <i class="bi bi-chat-left-text"></i> @Loc.T(Localization.Editor.Graph.commentHeader)
                         </div>
                         <div class="edg-node-comment-body">
-                            @(string.IsNullOrWhiteSpace(n.Title) ? "(empty note)" : n.Title)
+                            @(string.IsNullOrWhiteSpace(n.Title) ? Loc.T(Localization.Editor.Graph.commentEmpty) : n.Title)
                         </div>
                     </div>
                     continue;
@@ -112,7 +113,7 @@
                         </span>
                         @if (!n.Deletable)
                         {
-                            <span class="edg-node-lock" title="Built-in node — edit via the container's entry/exit points">
+                            <span class="edg-node-lock" title="@Loc.T(Localization.Editor.Graph.builtInLockTooltip)">
                                 <i class="bi bi-lock-fill"></i>
                             </span>
                         }
@@ -177,7 +178,7 @@
         {
             <div class="edg-minimap"
                  @onpointerdown="MinimapDown" @onpointerdown:stopPropagation="true" @onpointerdown:preventDefault="true">
-                <div class="edg-minimap-label">MAP</div>
+                <div class="edg-minimap-label">@Loc.T(Localization.Editor.Graph.minimap)</div>
                 @{
                     const double mapW = 168, mapH = 96, pad = 10, nodeH = 82;
                     double minX = Nodes.Min(n => n.X), maxX = Nodes.Max(n => n.X) + NODE_W;
@@ -210,11 +211,11 @@
                 @* Right-clicked a node that is part of a multi-selection — act on the whole group (only copyable/deletable ones). *@
                 int count = SelectedNodes().Count(n => n.Deletable);
                 <button class="edg-menu-item" @onclick="MenuCopySelected">
-                    <i class="bi bi-clipboard"></i> Copy @count nodes
+                    <i class="bi bi-clipboard"></i> @Loc.T(Localization.Editor.Graph.copyNodesCount, new Dictionary<string, object> { ["count"] = count })
                 </button>
                 <div class="edg-menu-sep"></div>
                 <button class="edg-menu-item edg-menu-danger" @onclick="MenuDeleteSelected">
-                    <i class="bi bi-trash"></i> Delete @count nodes
+                    <i class="bi bi-trash"></i> @Loc.T(Localization.Editor.Graph.deleteNodesCount, new Dictionary<string, object> { ["count"] = count })
                 </button>
             }
             else
@@ -222,60 +223,60 @@
                 @if (CanPreview(menu))
                 {
                     <button class="edg-menu-item" @onclick="() => MenuInvoke(OnNodePreview, menu)">
-                        <i class="bi bi-eye-fill"></i> Preview
+                        <i class="bi bi-eye-fill"></i> @Loc.T(Localization.Editor.Graph.preview)
                     </button>
                 }
                 @if (menu.PortalCrossTarget is Guid crossTarget)
                 {
                     bool isIn = IsPortalIn(menu);
                     <button class="edg-menu-item" @onclick="() => MenuJumpTo(crossTarget)">
-                        <i class="bi @(isIn ? "bi-box-arrow-right" : "bi-box-arrow-in-right")"></i> Go to portal @(isIn ? "out" : "in")
+                        <i class="bi @(isIn ? "bi-box-arrow-right" : "bi-box-arrow-in-right")"></i> @(isIn ? Loc.T(Localization.Editor.Graph.goToPortalOut) : Loc.T(Localization.Editor.Graph.goToPortalIn))
                     </button>
                 }
                 @if (menu.PortalNextTarget is Guid nextTarget)
                 {
                     <button class="edg-menu-item" @onclick="() => MenuJumpTo(nextTarget)">
-                        <i class="bi bi-arrow-repeat"></i> Go to next @(IsPortalIn(menu) ? "in" : "out")
+                        <i class="bi bi-arrow-repeat"></i> @(IsPortalIn(menu) ? Loc.T(Localization.Editor.Graph.goToNextIn) : Loc.T(Localization.Editor.Graph.goToNextOut))
                     </button>
                 }
                 @if (menu.Editable)
                 {
                     <button class="edg-menu-item" @onclick="() => MenuInvoke(OnNodeEdit, menu)">
-                        <i class="bi bi-pencil"></i> Edit @MenuNoun(menu)
+                        <i class="bi bi-pencil"></i> @Loc.T(Localization.Editor.Graph.editNoun, new Dictionary<string, object> { ["noun"] = MenuNoun(menu) })
                     </button>
                 }
                 @if (menu.Kind is StoryNodeKind.PortalIn or StoryNodeKind.PortalOut)
                 {
                     <button class="edg-menu-item" @onclick="() => MenuInvoke(OnNodeAddPortalIn, menu)">
-                        <i class="bi bi-box-arrow-in-right"></i> Add portal in
+                        <i class="bi bi-box-arrow-in-right"></i> @Loc.T(Localization.Editor.Graph.addPortalIn)
                     </button>
                 }
                 @if (menu.Kind is StoryNodeKind.LogicPortalIn or StoryNodeKind.LogicPortalOut)
                 {
                     <button class="edg-menu-item" @onclick="() => MenuInvoke(OnNodeAddPortalOut, menu)">
-                        <i class="bi bi-box-arrow-right"></i> Add portal out
+                        <i class="bi bi-box-arrow-right"></i> @Loc.T(Localization.Editor.Graph.addPortalOut)
                     </button>
                 }
                 @if (CanMoveToParent && menu.Kind is StoryNodeKind.Logic or StoryNodeKind.Container)
                 {
                     <button class="edg-menu-item" @onclick="() => MenuInvoke(OnNodeMoveToParent, menu)">
-                        <i class="bi bi-box-arrow-up-left"></i> Move to parent
+                        <i class="bi bi-box-arrow-up-left"></i> @Loc.T(Localization.Editor.Graph.moveToParent)
                     </button>
                 }
                 @if (menu.Kind is StoryNodeKind.Logic or StoryNodeKind.Container)
                 {
                     <button class="edg-menu-item" @onclick="() => MenuInvoke(OnNodeMakeBlueprint, menu)">
-                        <i class="bi bi-diagram-3"></i> Make into blueprint
+                        <i class="bi bi-diagram-3"></i> @Loc.T(Localization.Editor.Graph.makeIntoBlueprint)
                     </button>
                 }
                 @if (menu.Deletable)
                 {
                     <button class="edg-menu-item" @onclick="() => MenuCopyOne(menu)">
-                        <i class="bi bi-clipboard"></i> Copy @MenuNoun(menu)
+                        <i class="bi bi-clipboard"></i> @Loc.T(Localization.Editor.Graph.copyNoun, new Dictionary<string, object> { ["noun"] = MenuNoun(menu) })
                     </button>
                     <div class="edg-menu-sep"></div>
                     <button class="edg-menu-item edg-menu-danger" @onclick="() => MenuInvoke(OnNodeDelete, menu)">
-                        <i class="bi bi-trash"></i> Delete @MenuNoun(menu)
+                        <i class="bi bi-trash"></i> @Loc.T(Localization.Editor.Graph.deleteNoun, new Dictionary<string, object> { ["noun"] = MenuNoun(menu) })
                     </button>
                 }
             }
@@ -291,13 +292,13 @@
         <div class="edg-menu" style="left:@F(_CanvasMenuX)px; top:@F(_CanvasMenuY)px;"
              @oncontextmenu:preventDefault="true" @oncontextmenu:stopPropagation="true">
             <button class="edg-menu-item" @onclick="CanvasMenuAddNode">
-                <i class="bi bi-plus-lg"></i> Add node
+                <i class="bi bi-plus-lg"></i> @Loc.T(Localization.Editor.Graph.addNode)
             </button>
             @if (CanPaste)
             {
                 <div class="edg-menu-sep"></div>
                 <button class="edg-menu-item" @onclick="CanvasMenuPaste">
-                    <i class="bi bi-clipboard-check"></i> Paste
+                    <i class="bi bi-clipboard-check"></i> @Loc.T(Localization.Editor.Graph.paste)
                 </button>
             }
         </div>
@@ -889,27 +890,27 @@
         await callback.InvokeAsync(node);
     }
 
-    private static string MenuNoun(EdNode n) => n.Kind switch
+    private string MenuNoun(EdNode n) => n.Kind switch
     {
-        StoryNodeKind.Logic        => "logic node",
-        StoryNodeKind.Container    => "container",
-        StoryNodeKind.PortalIn     => "portal in",
-        StoryNodeKind.PortalOut    => "portal",
-        StoryNodeKind.LogicPortalIn  => "portal",
-        StoryNodeKind.LogicPortalOut => "portal out",
-        StoryNodeKind.Localization    => "localization node",
-        StoryNodeKind.Icon            => "icon node",
-        StoryNodeKind.LightDarkSwitch => "light/dark switch",
-        StoryNodeKind.SmartFormat      => "SmartFormat node",
-        StoryNodeKind.ExternalVariable => "external variable node",
-        StoryNodeKind.FlowText         => "flow text node",
-        StoryNodeKind.SplitForApp      => "split for App node",
-        StoryNodeKind.SetExternalVariable => "set external variable node",
-        StoryNodeKind.ConstantVariable        => "constant variable node",
-        StoryNodeKind.GetVariable             => "get variable node",
-        StoryNodeKind.PrevExitVariable        => "prev exit variables",
-        StoryNodeKind.Comment                 => "comment",
-        _                       => "node"
+        StoryNodeKind.Logic        => Loc.T(Localization.Editor.Graph.Nouns.logicNode),
+        StoryNodeKind.Container    => Loc.T(Localization.Editor.Graph.Nouns.container),
+        StoryNodeKind.PortalIn     => Loc.T(Localization.Editor.Graph.Nouns.portalIn),
+        StoryNodeKind.PortalOut    => Loc.T(Localization.Editor.Graph.Nouns.portalOut),
+        StoryNodeKind.LogicPortalIn  => Loc.T(Localization.Editor.Graph.Nouns.logicPortalIn),
+        StoryNodeKind.LogicPortalOut => Loc.T(Localization.Editor.Graph.Nouns.logicPortalOut),
+        StoryNodeKind.Localization    => Loc.T(Localization.Editor.Graph.Nouns.localizationNode),
+        StoryNodeKind.Icon            => Loc.T(Localization.Editor.Graph.Nouns.iconNode),
+        StoryNodeKind.LightDarkSwitch => Loc.T(Localization.Editor.Graph.Nouns.lightDarkSwitch),
+        StoryNodeKind.SmartFormat      => Loc.T(Localization.Editor.Graph.Nouns.smartFormatNode),
+        StoryNodeKind.ExternalVariable => Loc.T(Localization.Editor.Graph.Nouns.externalVariableNode),
+        StoryNodeKind.FlowText         => Loc.T(Localization.Editor.Graph.Nouns.flowTextNode),
+        StoryNodeKind.SplitForApp      => Loc.T(Localization.Editor.Graph.Nouns.splitForAppNode),
+        StoryNodeKind.SetExternalVariable => Loc.T(Localization.Editor.Graph.Nouns.setExternalVariableNode),
+        StoryNodeKind.ConstantVariable        => Loc.T(Localization.Editor.Graph.Nouns.constantVariableNode),
+        StoryNodeKind.GetVariable             => Loc.T(Localization.Editor.Graph.Nouns.getVariableNode),
+        StoryNodeKind.PrevExitVariable        => Loc.T(Localization.Editor.Graph.Nouns.prevExitVariables),
+        StoryNodeKind.Comment                 => Loc.T(Localization.Editor.Graph.Nouns.comment),
+        _                       => Loc.T(Localization.Editor.Graph.Nouns.nodeFallback)
     };
 
     // ── Edge geometry ──────────────────────────────────────────────────────

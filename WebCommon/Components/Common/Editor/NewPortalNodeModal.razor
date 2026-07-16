@@ -1,4 +1,5 @@
 @namespace DeusaldStoryWeb.Components.Common
+@inject UiLocalizationService Loc
 
 @if (_Visible)
 {
@@ -7,8 +8,8 @@
     <div class="modal-box npm-portal-box" @onclick:stopPropagation="true">
 
         <div class="modal-header">
-            <span class="modal-title">@(_IsEdit ? "Edit portal" : "New portal")</span>
-            <button class="modal-close" @onclick="Cancel" title="Close">
+            <span class="modal-title">@(_IsEdit ? Loc.T(Localization.Editor.Modals.Portal.editTitle) : Loc.T(Localization.Editor.Modals.Portal.title))</span>
+            <button class="modal-close" @onclick="Cancel" title="@Loc.T(Localization.Common.Buttons.close)">
                 <i class="bi bi-x-lg"></i>
             </button>
         </div>
@@ -19,17 +20,16 @@
             {
                 <div class="npm-portal-hint">
                     <i class="bi bi-box-arrow-in-right" style="color:var(--orange)"></i>
-                    Creates a linked <strong>portal in</strong> and <strong>portal out</strong>. Flow reaching the in
-                    teleports to the out — right-click either later to add more portal ins.
+                    @((MarkupString)Loc.T(Localization.Editor.Modals.Portal.createHint))
                 </div>
             }
 
             @* ── Name ──────────────────────────────────────────────────── *@
             <div class="modal-field">
-                <label class="modal-label">Name</label>
+                <label class="modal-label">@Loc.T(Localization.Common.Fields.name)</label>
                 <input class="modal-input"
                        type="text"
-                       placeholder="To the market"
+                       placeholder="@Loc.T(Localization.Editor.Modals.Portal.namePlaceholder)"
                        @bind="_Name"
                        @bind:event="oninput"
                        maxlength="100"/>
@@ -38,11 +38,11 @@
             @* ── Description ───────────────────────────────────────────── *@
             <div class="modal-field">
                 <label class="modal-label">
-                    Description
-                    <span class="modal-label-hint">optional</span>
+                    @Loc.T(Localization.Common.Fields.description)
+                    <span class="modal-label-hint">@Loc.T(Localization.Common.Fields.optional)</span>
                 </label>
                 <textarea class="modal-input npm-portal-textarea"
-                          placeholder="A short note about where this portal leads…"
+                          placeholder="@Loc.T(Localization.Editor.Modals.Portal.descriptionPlaceholder)"
                           @bind="_Description"
                           @bind:event="oninput"
                           rows="2"
@@ -52,11 +52,11 @@
         </div>
 
         <div class="modal-footer">
-            <button class="modal-btn modal-btn-ghost" @onclick="Cancel">Cancel</button>
+            <button class="modal-btn modal-btn-ghost" @onclick="Cancel">@Loc.T(Localization.Common.Buttons.cancel)</button>
             <button class="modal-btn modal-btn-primary"
                     @onclick="Confirm"
                     disabled="@(!_CanConfirm)">
-                @(_IsEdit ? "Save changes" : "Create portal")
+                @(_IsEdit ? Loc.T(Localization.Common.Buttons.saveChanges) : Loc.T(Localization.Editor.Modals.Portal.createButton))
             </button>
         </div>
 

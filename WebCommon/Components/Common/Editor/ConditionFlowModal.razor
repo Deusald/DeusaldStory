@@ -1,4 +1,5 @@
 @namespace DeusaldStoryWeb.Components.Common
+@inject UiLocalizationService Loc
 
 @* ─────────────────────────────────────────────────────────────────────────
    Edits a Condition node: its name, a "negate" toggle, and the boolean
@@ -15,8 +16,8 @@
     <div class="modal-box cfm-box" @onclick:stopPropagation="true">
 
         <div class="modal-header">
-            <span class="modal-title">Condition</span>
-            <button class="modal-close" @onclick="Cancel" title="Close">
+            <span class="modal-title">@Loc.T(Localization.Editor.Modals.ConditionFlow.title)</span>
+            <button class="modal-close" @onclick="Cancel" title="@Loc.T(Localization.Common.Buttons.close)">
                 <i class="bi bi-x-lg"></i>
             </button>
         </div>
@@ -24,30 +25,28 @@
         <div class="modal-body cfm-body">
 
             <div class="cfm-field">
-                <label class="cfm-label">Name</label>
-                <input class="modal-input" type="text" placeholder="Condition name…"
+                <label class="cfm-label">@Loc.T(Localization.Common.Fields.name)</label>
+                <input class="modal-input" type="text" placeholder="@Loc.T(Localization.Editor.Modals.ConditionFlow.namePlaceholder)"
                        @bind="_Name" @bind:event="oninput"/>
             </div>
 
             <label class="cfm-negate">
                 <input type="checkbox" @bind="_Negate"/>
-                <span>Negate — enter the block when the condition is <b>false</b></span>
+                <span>@((MarkupString)Loc.T(Localization.Editor.Modals.ConditionFlow.negateLabel))</span>
             </label>
 
             @if (_AvailableVars.Count == 0)
             {
                 <div class="modal-note">
                     <i class="bi bi-info-circle"></i>
-                    <span>Wire one or more <b>constant</b> variables into this node's <b>Variables</b> input, then reopen
-                          this dialog to build the condition. An empty condition is always true.</span>
+                    <span>@((MarkupString)Loc.T(Localization.Editor.Modals.ConditionFlow.noVarsHint))</span>
                 </div>
             }
             else
             {
                 <div class="modal-note">
                     <i class="bi bi-info-circle"></i>
-                    <span>The block runs when this condition holds@(_Negate ? " (inverted by Negate)" : ""). Only constant
-                          variables are offered, so it renders the same in the App and the Gamebook.</span>
+                    <span>@Loc.T(Localization.Editor.Modals.ConditionFlow.holdsHint, new Dictionary<string, object> { ["negated"] = _Negate ? Loc.T(Localization.Editor.Modals.ConditionFlow.holdsHintNegated) : "" })</span>
                 </div>
             }
 
@@ -56,8 +55,8 @@
         </div>
 
         <div class="modal-footer">
-            <button class="modal-btn modal-btn-ghost" @onclick="Cancel">Cancel</button>
-            <button class="modal-btn modal-btn-primary" @onclick="Confirm">Save changes</button>
+            <button class="modal-btn modal-btn-ghost" @onclick="Cancel">@Loc.T(Localization.Common.Buttons.cancel)</button>
+            <button class="modal-btn modal-btn-primary" @onclick="Confirm">@Loc.T(Localization.Common.Buttons.saveChanges)</button>
         </div>
 
     </div>

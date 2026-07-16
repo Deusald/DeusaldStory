@@ -1,5 +1,6 @@
 @namespace DeusaldStoryWeb.Components.Common
 @inject ProjectStateService _ProjectState
+@inject UiLocalizationService Loc
 
 @* ─────────────────────────────────────────────────────────────────────────
    Picks a registered variable for an Unregister-variable node to release.
@@ -13,8 +14,8 @@
     <div class="modal-box uvp-box" @onclick:stopPropagation="true">
 
         <div class="modal-header">
-            <span class="modal-title">Unregister variable</span>
-            <button class="modal-close" @onclick="Cancel" title="Close">
+            <span class="modal-title">@Loc.T(Localization.Editor.Modals.UnregisterVariablePicker.title)</span>
+            <button class="modal-close" @onclick="Cancel" title="@Loc.T(Localization.Common.Buttons.close)">
                 <i class="bi bi-x-lg"></i>
             </button>
         </div>
@@ -28,7 +29,7 @@
             {
                 <div class="uvp-empty">
                     <i class="bi bi-box-seam"></i>
-                    <span>No variables registered yet — add a Register-variable node first.</span>
+                    <span>@Loc.T(Localization.Common.Messages.noVariablesRegistered)</span>
                 </div>
             }
             else
@@ -39,30 +40,30 @@
                         StoryRegisterVariableNode variable = v;
                         <button class="uvp-item @(_RegisteredVariableId == variable.Id ? "selected" : "")"
                                 @onclick="() => _RegisteredVariableId = variable.Id">
-                            <span class="uvp-item-name">@(string.IsNullOrWhiteSpace(variable.Name) ? "(unnamed)" : variable.Name)</span>
+                            <span class="uvp-item-name">@(string.IsNullOrWhiteSpace(variable.Name) ? Loc.T(Localization.Common.Placeholders.unnamed) : variable.Name)</span>
                             <span class="uvp-item-slot">@StorageSlots.Label(variable.Type, variable.SlotIndex)</span>
                         </button>
                     }
                 </div>
 
                 <div class="modal-field">
-                    <label class="modal-label">Placement</label>
+                    <label class="modal-label">@Loc.T(Localization.Common.Fields.placement)</label>
                     <select class="modal-input" @bind="_Placement">
-                        <option value="@StorageInstructionPlacement.Below">Below the text</option>
-                        <option value="@StorageInstructionPlacement.Above">Above the text</option>
+                        <option value="@StorageInstructionPlacement.Below">@Loc.T(Localization.Common.Fields.placementBelow)</option>
+                        <option value="@StorageInstructionPlacement.Above">@Loc.T(Localization.Common.Fields.placementAbove)</option>
                     </select>
-                    <span class="modal-label-hint">where the "clear slot" instruction sits relative to the section text</span>
+                    <span class="modal-label-hint">@Loc.T(Localization.Editor.Modals.UnregisterVariablePicker.placementHint)</span>
                 </div>
             }
 
         </div>
 
         <div class="modal-footer">
-            <button class="modal-btn modal-btn-ghost" @onclick="Cancel">Cancel</button>
+            <button class="modal-btn modal-btn-ghost" @onclick="Cancel">@Loc.T(Localization.Common.Buttons.cancel)</button>
             <button class="modal-btn modal-btn-primary"
                     @onclick="Confirm"
                     disabled="@(_RegisteredVariableId == Guid.Empty)">
-                Select variable
+                @Loc.T(Localization.Common.Buttons.selectVariable)
             </button>
         </div>
 

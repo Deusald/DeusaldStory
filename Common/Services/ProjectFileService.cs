@@ -61,18 +61,17 @@ namespace DeusaldStoryCommon
             // ── Read metadata ──────────────────────────────────────────────────
             if (!await store.FileExistsAsync(METADATA_FILE_NAME))
                 throw new ProjectFolderException(
-                    $"'{METADATA_FILE_NAME}' not found — this does not appear to be a valid project.");
+                    UiLang.T(Localization.Services.ProjectFile.metadataNotFound, new Dictionary<string, object> { ["file"] = METADATA_FILE_NAME }));
 
             StoryProjectMetadata metadata = await ReadJsonAsync<StoryProjectMetadata>(store, METADATA_FILE_NAME)
-                                         ?? throw new ProjectFolderException($"'{METADATA_FILE_NAME}' is empty or malformed.");
+                                         ?? throw new ProjectFolderException(UiLang.T(Localization.Services.ProjectFile.metadataMalformed, new Dictionary<string, object> { ["file"] = METADATA_FILE_NAME }));
 
             if (metadata.FormatVersion > CURRENT_FORMAT_VERSION)
                 throw new ProjectFolderException(
-                    $"Project uses format version {metadata.FormatVersion} but this application " +
-                    $"only supports up to version {CURRENT_FORMAT_VERSION}. Please update the application.");
+                    UiLang.T(Localization.Services.ProjectFile.formatVersionTooNew, new Dictionary<string, object> { ["version"] = metadata.FormatVersion, ["supported"] = CURRENT_FORMAT_VERSION }));
 
             if (metadata.Id == Guid.Empty)
-                throw new ProjectFolderException($"'{METADATA_FILE_NAME}' contains an invalid project Id.");
+                throw new ProjectFolderException(UiLang.T(Localization.Services.ProjectFile.invalidId, new Dictionary<string, object> { ["file"] = METADATA_FILE_NAME }));
 
             // The linked localization project is resolved by the caller (block-until-relink on open), so a
             // story whose LocalizationProjectPath is empty or unreachable on this platform still opens here.

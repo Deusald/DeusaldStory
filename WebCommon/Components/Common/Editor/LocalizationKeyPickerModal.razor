@@ -1,5 +1,6 @@
 @namespace DeusaldStoryWeb.Components.Common
 @inject ProjectStateService _ProjectState
+@inject UiLocalizationService Loc
 @implements IDisposable
 
 @* ─────────────────────────────────────────────────────────────────────────
@@ -16,8 +17,8 @@
     <div class="modal-box lkp-box" style="@(Elevated ? "z-index:2060" : "")" @onclick:stopPropagation="true">
 
         <div class="modal-header">
-            <span class="modal-title">Pick a localization key</span>
-            <button class="modal-close" @onclick="Cancel" title="Close">
+            <span class="modal-title">@Loc.T(Localization.Editor.Modals.LocalizationKeyPicker.title)</span>
+            <button class="modal-close" @onclick="Cancel" title="@Loc.T(Localization.Common.Buttons.close)">
                 <i class="bi bi-x-lg"></i>
             </button>
         </div>
@@ -28,7 +29,7 @@
             {
                 <div class="lkp-empty">
                     <i class="bi bi-translate"></i>
-                    <span>No localization project is linked to this story.</span>
+                    <span>@Loc.T(Localization.Common.Loc.noProjectLinked)</span>
                 </div>
             }
             else
@@ -37,7 +38,7 @@
                     <i class="bi bi-search"></i>
                     <input class="modal-input"
                            type="text"
-                           placeholder="Search keys by name, description or tag…"
+                           placeholder="@Loc.T(Localization.Common.Loc.searchKeysPlaceholder)"
                            @bind="_Search"
                            @bind:event="oninput"
                            @ref="_SearchInput"/>
@@ -49,7 +50,7 @@
                     <div class="lkp-cats">
                         <button class="lkp-cat @(_CategoryId is null ? "active" : "")"
                                 @onclick="() => SelectCategory(null)">
-                            <i class="bi bi-collection"></i> All keys
+                            <i class="bi bi-collection"></i> @Loc.T(Localization.Common.Loc.allKeys)
                             <span class="lkp-cat-count">@_Loc.Keys.Count</span>
                         </button>
                         @foreach ((LocCategory cat, int depth) in FlatCategories())
@@ -71,7 +72,7 @@
                         }
                         @if (keys.Count == 0)
                         {
-                            <div class="lkp-keys-empty">No keys match.</div>
+                            <div class="lkp-keys-empty">@Loc.T(Localization.Common.Loc.noKeysMatch)</div>
                         }
                         else
                         {
@@ -99,11 +100,11 @@
         </div>
 
         <div class="modal-footer">
-            <button class="modal-btn modal-btn-ghost" @onclick="Cancel">Cancel</button>
+            <button class="modal-btn modal-btn-ghost" @onclick="Cancel">@Loc.T(Localization.Common.Buttons.cancel)</button>
             <button class="modal-btn modal-btn-primary"
                     @onclick="Confirm"
                     disabled="@(_SelectedKeyId == Guid.Empty)">
-                Select key
+                @Loc.T(Localization.Common.Buttons.selectKey)
             </button>
         </div>
 

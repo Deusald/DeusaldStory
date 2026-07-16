@@ -1,4 +1,5 @@
 @namespace DeusaldStoryWeb.Components.Common
+@inject UiLocalizationService Loc
 @inject ProjectStateService _ProjectState
 
 @* ─────────────────────────────────────────────────────────────────────────
@@ -13,13 +14,13 @@
     <div class="pvp-header">
         <span class="pvp-kind">
             <span class="pvp-kind-dot"></span>
-            @(Gamebook ? "GAMEBOOK" : "VARIABLES")
+            @(Gamebook ? Loc.T(Localization.Editor.Panels.PreviewVariables.kindGamebook) : Loc.T(Localization.Editor.Panels.PreviewVariables.kindVariables))
         </span>
-        <div class="pvp-title">@(Gamebook ? "Generated sections" : "Preview values")</div>
+        <div class="pvp-title">@(Gamebook ? Loc.T(Localization.Editor.Panels.PreviewVariables.generatedSectionsTitle) : Loc.T(Localization.Editor.Panels.PreviewVariables.previewValuesTitle))</div>
         <div class="pvp-subtitle">
             @(Gamebook
-                ? "Every section is generated for all variable combinations — nothing to set here."
-                : "Tweak this node's variables to see how the text renders.")
+                ? Loc.T(Localization.Editor.Panels.PreviewVariables.gamebookSubtitle)
+                : Loc.T(Localization.Editor.Panels.PreviewVariables.valuesSubtitle))
         </div>
     </div>
 
@@ -31,14 +32,14 @@
         {
             <div class="pvp-empty">
                 <i class="bi bi-book"></i>
-                <span>Gamebook sections are generated from the previous node's choices, so there are no live inputs to change here.</span>
+                <span>@Loc.T(Localization.Editor.Panels.PreviewVariables.gamebookEmpty)</span>
             </div>
         }
         else if (vars.Count == 0)
         {
             <div class="pvp-empty">
                 <i class="bi bi-braces"></i>
-                <span>This logic node has no variables to preview.</span>
+                <span>@Loc.T(Localization.Editor.Panels.PreviewVariables.noVariablesEmpty)</span>
             </div>
         }
         else
@@ -47,7 +48,7 @@
             {
                 StoryVariable variable = v;
                 <div class="pvp-field">
-                    <label class="pvp-label">@(string.IsNullOrWhiteSpace(variable.Name) ? "(unnamed)" : variable.Name)</label>
+                    <label class="pvp-label">@(string.IsNullOrWhiteSpace(variable.Name) ? Loc.T(Localization.Common.Placeholders.unnamed) : variable.Name)</label>
                     @if (variable.PossibleValues.Count > 0)
                     {
                         <select class="modal-input"
@@ -55,7 +56,7 @@
                                 @onchange="e => OnValueChanged(variable.Id, e)">
                             @foreach (string val in variable.PossibleValues)
                             {
-                                <option value="@val">@(string.IsNullOrEmpty(val) ? "(empty)" : val)</option>
+                                <option value="@val">@(string.IsNullOrEmpty(val) ? Loc.T(Localization.Common.Placeholders.empty) : val)</option>
                             }
                         </select>
                     }
@@ -107,7 +108,7 @@
         List<StoryVariable> ordered = map.Values.OrderBy(v => v.Name, StringComparer.OrdinalIgnoreCase).ToList();
 
         foreach (StoryDeclaredVariable d in StorySelectionResolver.IncomingVariables(_ProjectState.CurrentProject!, Logic))
-            ordered.Add(new StoryVariable { Id = d.Id, Name = string.IsNullOrWhiteSpace(d.Name) ? "(incoming)" : d.Name, PossibleValues = d.PossibleValues });
+            ordered.Add(new StoryVariable { Id = d.Id, Name = string.IsNullOrWhiteSpace(d.Name) ? Loc.T(Localization.Editor.Panels.PreviewVariables.incoming) : d.Name, PossibleValues = d.PossibleValues });
 
         return ordered;
     }

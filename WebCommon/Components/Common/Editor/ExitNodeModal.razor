@@ -1,4 +1,5 @@
 @namespace DeusaldStoryWeb.Components.Common
+@inject UiLocalizationService Loc
 
 @* ─────────────────────────────────────────────────────────────────────────
    Edits a logic node's Exit node: the list of choices (continuations). Each
@@ -15,8 +16,8 @@
     <div class="modal-box enm-box" @onclick:stopPropagation="true">
 
         <div class="modal-header">
-            <span class="modal-title">Exit — choices</span>
-            <button class="modal-close" @onclick="Cancel" title="Close">
+            <span class="modal-title">@Loc.T(Localization.Editor.Modals.Exit.title)</span>
+            <button class="modal-close" @onclick="Cancel" title="@Loc.T(Localization.Common.Buttons.close)">
                 <i class="bi bi-x-lg"></i>
             </button>
         </div>
@@ -27,8 +28,7 @@
             {
                 <div class="modal-note">
                     <i class="bi bi-info-circle"></i>
-                    <span>A variable is wired in — the App shows one button and picks the choice by these conditions.
-                          The <b>last</b> choice is the locked <b>Else</b> fallback.</span>
+                    <span>@((MarkupString)Loc.T(Localization.Editor.Modals.Exit.autoConditionsNote))</span>
                 </div>
             }
 
@@ -40,13 +40,13 @@
                 <div class="enm-choice">
                     <div class="enm-choice-head">
                         <span class="enm-num">@(index + 1)</span>
-                        <input class="modal-input enm-name" type="text" placeholder="Choice name…"
+                        <input class="modal-input enm-name" type="text" placeholder="@Loc.T(Localization.Editor.Modals.Exit.choiceNamePlaceholder)"
                                @bind="row.Name" @bind:event="oninput"/>
                         @if (isElse)
                         {
-                            <span class="enm-else-tag">Else</span>
+                            <span class="enm-else-tag">@Loc.T(Localization.Editor.Modals.Exit.elseTag)</span>
                         }
-                        <button class="enm-del" title="Remove choice" disabled="@(_Rows.Count <= 1)" @onclick="() => RemoveRow(index)">
+                        <button class="enm-del" title="@Loc.T(Localization.Editor.Modals.Exit.removeChoice)" disabled="@(_Rows.Count <= 1)" @onclick="() => RemoveRow(index)">
                             <i class="bi bi-x-lg"></i>
                         </button>
                     </div>
@@ -58,11 +58,11 @@
                             {
                                 Guid vid = d.Id;
                                 <div class="enm-value">
-                                    <label class="enm-value-label">@(string.IsNullOrWhiteSpace(d.Name) ? "(var)" : d.Name)</label>
+                                    <label class="enm-value-label">@(string.IsNullOrWhiteSpace(d.Name) ? Loc.T(Localization.Editor.Modals.Exit.varNameFallback) : d.Name)</label>
                                     <select class="modal-input" value="@row.Value(vid)" @onchange="e => row.SetValue(vid, e.Value?.ToString() ?? string.Empty)">
                                         @foreach (string val in d.PossibleValues)
                                         {
-                                            <option value="@val">@(string.IsNullOrEmpty(val) ? "(empty)" : val)</option>
+                                            <option value="@val">@(string.IsNullOrEmpty(val) ? Loc.T(Localization.Common.Placeholders.empty) : val)</option>
                                         }
                                     </select>
                                 </div>
@@ -78,14 +78,14 @@
             }
 
             <button class="enm-add" @onclick="AddRow">
-                <i class="bi bi-plus-lg"></i> Add choice
+                <i class="bi bi-plus-lg"></i> @Loc.T(Localization.Editor.Modals.Exit.addChoice)
             </button>
 
         </div>
 
         <div class="modal-footer">
-            <button class="modal-btn modal-btn-ghost" @onclick="Cancel">Cancel</button>
-            <button class="modal-btn modal-btn-primary" @onclick="Confirm" disabled="@(_Rows.Count == 0)">Save changes</button>
+            <button class="modal-btn modal-btn-ghost" @onclick="Cancel">@Loc.T(Localization.Common.Buttons.cancel)</button>
+            <button class="modal-btn modal-btn-primary" @onclick="Confirm" disabled="@(_Rows.Count == 0)">@Loc.T(Localization.Common.Buttons.saveChanges)</button>
         </div>
 
     </div>
@@ -131,7 +131,7 @@
                 return string.IsNullOrEmpty(existing) ? DefaultValue(d) : existing;
             })
         }).ToList();
-        if (_Rows.Count == 0) _Rows.Add(NewRow("Continue"));
+        if (_Rows.Count == 0) _Rows.Add(NewRow(Loc.T(Localization.Editor.Modals.Exit.defaultChoiceName)));
         _Visible = true;
         StateHasChanged();
     }

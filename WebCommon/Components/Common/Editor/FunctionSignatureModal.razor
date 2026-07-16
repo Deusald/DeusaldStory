@@ -1,4 +1,5 @@
 @namespace DeusaldStoryWeb.Components.Common
+@inject UiLocalizationService Loc
 @using DeusaldStoryCommon
 
 @* ─────────────────────────────────────────────────────────────────────────
@@ -15,22 +16,22 @@
     <div class="modal-box fsm-box" @onclick:stopPropagation="true">
 
         <div class="modal-header">
-            <span class="modal-title">Function signature — @_Name</span>
-            <button class="modal-close" @onclick="Cancel" title="Close">
+            <span class="modal-title">@Loc.T(Localization.Editor.Modals.FunctionSignature.title, new Dictionary<string, object> { ["name"] = _Name })</span>
+            <button class="modal-close" @onclick="Cancel" title="@Loc.T(Localization.Common.Buttons.close)">
                 <i class="bi bi-x-lg"></i>
             </button>
         </div>
 
         <div class="modal-body fsm-body">
 
-            @Section("Inputs", _Inputs)
-            @Section("Outputs", _Outputs)
+            @Section(Loc.T(Localization.Editor.Modals.FunctionSignature.inputs), Loc.T(Localization.Editor.Modals.FunctionSignature.addInput), _Inputs)
+            @Section(Loc.T(Localization.Editor.Modals.FunctionSignature.outputs), Loc.T(Localization.Editor.Modals.FunctionSignature.addOutput), _Outputs)
 
         </div>
 
         <div class="modal-footer">
-            <button class="modal-btn modal-btn-ghost" @onclick="Cancel">Cancel</button>
-            <button class="modal-btn modal-btn-primary" @onclick="Confirm">Save signature</button>
+            <button class="modal-btn modal-btn-ghost" @onclick="Cancel">@Loc.T(Localization.Common.Buttons.cancel)</button>
+            <button class="modal-btn modal-btn-primary" @onclick="Confirm">@Loc.T(Localization.Editor.Modals.FunctionSignature.saveSignature)</button>
         </div>
 
     </div>
@@ -63,7 +64,7 @@
         StateHasChanged();
     }
 
-    private RenderFragment Section(string title, List<PortRow> rows) =>@<div class="modal-field">
+    private RenderFragment Section(string title, string addLabel, List<PortRow> rows) =>@<div class="modal-field">
         <label class="modal-label">@title</label>
         @for (int i = 0; i < rows.Count; i++)
         {
@@ -71,7 +72,7 @@
             <div class="fsm-row">
                 <input class="modal-input"
                        type="text"
-                       placeholder="name"
+                       placeholder="@Loc.T(Localization.Editor.Modals.FunctionSignature.portNamePlaceholder)"
                        value="@rows[index].Name"
                        @oninput="e => rows[index].Name = e.Value?.ToString() ?? string.Empty"
                        maxlength="60"/>
@@ -83,13 +84,13 @@
                         <option value="@t">@t</option>
                     }
                 </select>
-                <button class="fsm-del" title="Remove" @onclick="() => rows.RemoveAt(index)">
+                <button class="fsm-del" title="@Loc.T(Localization.Common.Buttons.remove)" @onclick="() => rows.RemoveAt(index)">
                     <i class="bi bi-trash"></i>
                 </button>
             </div>
         }
         <button class="fsm-add" @onclick="() => rows.Add(new PortRow())">
-            <i class="bi bi-plus-lg"></i> Add @title.TrimEnd('s').ToLowerInvariant()
+            <i class="bi bi-plus-lg"></i> @addLabel
         </button>
     </div>;
 

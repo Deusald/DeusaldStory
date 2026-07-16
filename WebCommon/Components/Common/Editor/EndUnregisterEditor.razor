@@ -1,5 +1,6 @@
 @namespace DeusaldStoryWeb.Components.Common
 @inject ProjectStateService _ProjectState
+@inject UiLocalizationService Loc
 
 @* ─────────────────────────────────────────────────────────────────────────
    Inspector shown when the story's End node is selected. Lists the registered
@@ -13,10 +14,10 @@
     <div class="eue-header">
         <span class="eue-kind" style="color:var(--danger)">
             <span class="eue-kind-dot" style="background:var(--danger)"></span>
-            END
+            @Loc.T(Localization.Editor.Modals.EndUnregister.endKind)
         </span>
-        <div class="eue-title">The End</div>
-        <div class="eue-sub">Release any storage variables that stay registered through to the end of the story.</div>
+        <div class="eue-title">@Loc.T(Localization.Editor.Modals.EndUnregister.theEndTitle)</div>
+        <div class="eue-sub">@Loc.T(Localization.Editor.Modals.EndUnregister.releaseSubtitle)</div>
     </div>
 
     <div class="eue-body">
@@ -25,11 +26,11 @@
         }
         @if (vars.Count == 0)
         {
-            <div class="eue-empty">No variables remain registered when the story reaches The End — every one is released by an Unregister node.</div>
+            <div class="eue-empty">@Loc.T(Localization.Editor.Modals.EndUnregister.noVariablesEmpty)</div>
         }
         else
         {
-            <div class="eue-section-head">Release at The End</div>
+            <div class="eue-section-head">@Loc.T(Localization.Editor.Modals.EndUnregister.releaseSectionHead)</div>
             @foreach (StoryRegisterVariableNode v in vars)
             {
                 StoryRegisterVariableNode variable = v;
@@ -37,7 +38,7 @@
                     <input type="checkbox"
                            checked="@IsReleased(variable.Id)"
                            @onchange="e => Toggle(variable.Id, (bool)(e.Value ?? false))"/>
-                    <span class="eue-item-name">@(string.IsNullOrWhiteSpace(variable.Name) ? "(unnamed)" : variable.Name)</span>
+                    <span class="eue-item-name">@(string.IsNullOrWhiteSpace(variable.Name) ? Loc.T(Localization.Common.Placeholders.unnamed) : variable.Name)</span>
                     <span class="eue-item-slot">@StorageSlots.Label(variable.Type, variable.SlotIndex)</span>
                 </label>
             }

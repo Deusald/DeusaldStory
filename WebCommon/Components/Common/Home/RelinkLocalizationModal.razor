@@ -1,4 +1,5 @@
 @namespace DeusaldStoryWeb.Components.Common
+@inject UiLocalizationService Loc
 
 @if (_Visible)
 {
@@ -7,32 +8,29 @@
     <div class="rlm-box">
         <div class="rlm-header">
             <i class="bi bi-link-45deg rlm-icon"></i>
-            <span class="rlm-title">@(_ProjectMissing ? "Localization project not found" : "Re-link localization project")</span>
+            <span class="rlm-title">@(_ProjectMissing ? Loc.T(Localization.Home.Relink.notFoundTitle) : Loc.T(Localization.Home.Relink.relinkTitle))</span>
         </div>
 
         <div class="rlm-body">
             @if (_ProjectMissing)
             {
                 <p class="rlm-msg">
-                    <strong>@_StoryName</strong> is linked to a localization project that couldn't be opened —
-                    it may have been moved, deleted, or created on another device. Select a localization
-                    project to continue.
+                    @((MarkupString)Loc.T(Localization.Home.Relink.missingMessage, new Dictionary<string, object> { ["story"] = _StoryName }))
                 </p>
             }
             else
             {
                 <p class="rlm-msg">
-                    Choose the localization project <strong>@_StoryName</strong> should use. Its languages and
-                    text keys will replace the currently linked ones.
+                    @((MarkupString)Loc.T(Localization.Home.Relink.relinkMessage, new Dictionary<string, object> { ["story"] = _StoryName }))
                 </p>
             }
             <LocalizationProjectField @bind-Selected="_SelectedLoc"/>
         </div>
 
         <div class="rlm-footer">
-            <button class="rlm-btn rlm-btn-ghost" @onclick="Cancel">Cancel</button>
+            <button class="rlm-btn rlm-btn-ghost" @onclick="Cancel">@Loc.T(Localization.Common.Buttons.cancel)</button>
             <button class="rlm-btn rlm-btn-primary" @onclick="Confirm" disabled="@(_SelectedLoc is null)">
-                Re-link
+                @Loc.T(Localization.Home.Relink.relink)
             </button>
         </div>
     </div>

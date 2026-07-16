@@ -1,4 +1,5 @@
 @namespace DeusaldStoryWeb.Components.Common
+@inject UiLocalizationService Loc
 
 @* ─────────────────────────────────────────────────────────────────────────
    Edits a FlowText block's per-medium render flags. A FlowText node normally
@@ -13,8 +14,8 @@
     <div class="modal-box fto-box" @onclick:stopPropagation="true">
 
         <div class="modal-header">
-            <span class="modal-title">FlowText options</span>
-            <button class="modal-close" @onclick="Cancel" title="Close">
+            <span class="modal-title">@Loc.T(Localization.Editor.Modals.FlowTextOptions.title)</span>
+            <button class="modal-close" @onclick="Cancel" title="@Loc.T(Localization.Common.Buttons.close)">
                 <i class="bi bi-x-lg"></i>
             </button>
         </div>
@@ -22,14 +23,14 @@
         <div class="modal-body">
 
             <div class="modal-field">
-                <label class="modal-label">Frame style</label>
+                <label class="modal-label">@Loc.T(Localization.Editor.Modals.FlowTextOptions.frameStyleLabel)</label>
                 <select class="modal-input" @bind="_FrameStyle">
                     @foreach (StoryTextFrameStyle style in Enum.GetValues<StoryTextFrameStyle>())
                     {
                         <option value="@style">@StoryStyle.FrameLabel(style)</option>
                     }
                 </select>
-                <span class="modal-label-hint">the coloured frame this block's text is drawn in (normal / success / danger / …)</span>
+                <span class="modal-label-hint">@Loc.T(Localization.Editor.Modals.FlowTextOptions.frameStyleHint)</span>
             </div>
 
             <div class="modal-field">
@@ -38,8 +39,8 @@
                            checked="@_RenderInApp"
                            @onchange="e => _RenderInApp = (bool)(e.Value ?? false)"/>
                     <span>
-                        Render in App
-                        <span class="modal-label-hint">show this block's text in the interactive app preview</span>
+                        @Loc.T(Localization.Editor.Modals.FlowTextOptions.renderInAppLabel)
+                        <span class="modal-label-hint">@Loc.T(Localization.Editor.Modals.FlowTextOptions.renderInAppHint)</span>
                     </span>
                 </label>
             </div>
@@ -50,22 +51,22 @@
                            checked="@_RenderInGamebook"
                            @onchange="e => _RenderInGamebook = (bool)(e.Value ?? false)"/>
                     <span>
-                        Render in Gamebook
-                        <span class="modal-label-hint">show this block's text in the printed gamebook sections</span>
+                        @Loc.T(Localization.Editor.Modals.FlowTextOptions.renderInGamebookLabel)
+                        <span class="modal-label-hint">@Loc.T(Localization.Editor.Modals.FlowTextOptions.renderInGamebookHint)</span>
                     </span>
                 </label>
             </div>
 
             <div class="modal-note">
                 <i class="bi bi-info-circle"></i>
-                <span>Unchecking a medium only hides this block's text there — flow still passes through to the next node.</span>
+                <span>@Loc.T(Localization.Editor.Modals.FlowTextOptions.uncheckMediumHint)</span>
             </div>
 
         </div>
 
         <div class="modal-footer">
-            <button class="modal-btn modal-btn-ghost" @onclick="Cancel">Cancel</button>
-            <button class="modal-btn modal-btn-primary" @onclick="Confirm">Save changes</button>
+            <button class="modal-btn modal-btn-ghost" @onclick="Cancel">@Loc.T(Localization.Common.Buttons.cancel)</button>
+            <button class="modal-btn modal-btn-primary" @onclick="Confirm">@Loc.T(Localization.Common.Buttons.saveChanges)</button>
         </div>
 
     </div>

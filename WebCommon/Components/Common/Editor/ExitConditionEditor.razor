@@ -1,4 +1,5 @@
 @namespace DeusaldStoryWeb.Components.Common
+@inject UiLocalizationService Loc
 
 @* ─────────────────────────────────────────────────────────────────────────
    Recursive editor for one App auto-resolution condition node (a Comparison or
@@ -11,13 +12,13 @@
         <div class="ece-group-head">
             <div class="ece-conn">
                 <button type="button" class="ece-conn-opt @(Expr.Connector == StoryBoolConnector.And ? "active" : "")"
-                        @onclick="() => SetConnector(StoryBoolConnector.And)">AND</button>
+                        @onclick="() => SetConnector(StoryBoolConnector.And)">@Loc.T(Localization.Editor.Modals.ExitCondition.connectorAnd)</button>
                 <button type="button" class="ece-conn-opt @(Expr.Connector == StoryBoolConnector.Or ? "active" : "")"
-                        @onclick="() => SetConnector(StoryBoolConnector.Or)">OR</button>
+                        @onclick="() => SetConnector(StoryBoolConnector.Or)">@Loc.T(Localization.Editor.Modals.ExitCondition.connectorOr)</button>
             </div>
             @if (OnRemove.HasDelegate)
             {
-                <button type="button" class="ece-del" title="Remove group" @onclick="() => OnRemove.InvokeAsync()">
+                <button type="button" class="ece-del" title="@Loc.T(Localization.Editor.Modals.ExitCondition.removeGroup)" @onclick="() => OnRemove.InvokeAsync()">
                     <i class="bi bi-x-lg"></i>
                 </button>
             }
@@ -31,8 +32,8 @@
         }
 
         <div class="ece-add">
-            <button type="button" class="ece-add-btn" @onclick="AddComparison"><i class="bi bi-plus-lg"></i> clause</button>
-            <button type="button" class="ece-add-btn" @onclick="AddGroup"><i class="bi bi-plus-lg"></i> group</button>
+            <button type="button" class="ece-add-btn" @onclick="AddComparison"><i class="bi bi-plus-lg"></i> @Loc.T(Localization.Editor.Modals.ExitCondition.addClause)</button>
+            <button type="button" class="ece-add-btn" @onclick="AddGroup"><i class="bi bi-plus-lg"></i> @Loc.T(Localization.Editor.Modals.ExitCondition.addGroup)</button>
         </div>
     </div>
 }
@@ -46,12 +47,12 @@ else
             }
         </select>
         <select class="modal-input ece-op" value="@Expr.Operator" @onchange="e => SetOp(e.Value?.ToString())">
-            <option value="@StoryConditionOperator.Equal">=</option>
-            <option value="@StoryConditionOperator.NotEqual">≠</option>
-            <option value="@StoryConditionOperator.LessThan">&lt;</option>
-            <option value="@StoryConditionOperator.GreaterThan">&gt;</option>
-            <option value="@StoryConditionOperator.LessOrEqual">≤</option>
-            <option value="@StoryConditionOperator.GreaterOrEqual">≥</option>
+            <option value="@StoryConditionOperator.Equal">@Loc.T(Localization.Editor.Modals.ExitCondition.opEqual)</option>
+            <option value="@StoryConditionOperator.NotEqual">@Loc.T(Localization.Editor.Modals.ExitCondition.opNotEqual)</option>
+            <option value="@StoryConditionOperator.LessThan">@Loc.T(Localization.Editor.Modals.ExitCondition.opLessThan)</option>
+            <option value="@StoryConditionOperator.GreaterThan">@Loc.T(Localization.Editor.Modals.ExitCondition.opGreaterThan)</option>
+            <option value="@StoryConditionOperator.LessOrEqual">@Loc.T(Localization.Editor.Modals.ExitCondition.opLessOrEqual)</option>
+            <option value="@StoryConditionOperator.GreaterOrEqual">@Loc.T(Localization.Editor.Modals.ExitCondition.opGreaterOrEqual)</option>
         </select>
         @if (Expr.RightKind == StoryConditionOperandKind.Variable)
         {
@@ -64,15 +65,15 @@ else
         }
         else
         {
-            <input class="modal-input ece-val" type="text" placeholder="value"
+            <input class="modal-input ece-val" type="text" placeholder="@Loc.T(Localization.Editor.Modals.ExitCondition.valuePlaceholder)"
                    value="@Expr.RightConstant" @oninput="e => SetRightConst(e.Value?.ToString())" maxlength="100"/>
         }
-        <button type="button" class="ece-rhs" title="Toggle constant / variable" @onclick="ToggleRhs">
+        <button type="button" class="ece-rhs" title="@Loc.T(Localization.Editor.Modals.ExitCondition.toggleConstantVariable)" @onclick="ToggleRhs">
             <i class="bi @(Expr.RightKind == StoryConditionOperandKind.Variable ? "bi-braces" : "bi-123")"></i>
         </button>
         @if (OnRemove.HasDelegate)
         {
-            <button type="button" class="ece-del" title="Remove" @onclick="() => OnRemove.InvokeAsync()">
+            <button type="button" class="ece-del" title="@Loc.T(Localization.Common.Buttons.remove)" @onclick="() => OnRemove.InvokeAsync()">
                 <i class="bi bi-x-lg"></i>
             </button>
         }

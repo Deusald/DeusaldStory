@@ -1,4 +1,5 @@
 @namespace DeusaldStoryWeb.Components.Common
+@inject UiLocalizationService Loc
 @inject ILocalizationProjectPicker _Picker
 
 <div class="lpf-root">
@@ -8,7 +9,7 @@
         @if (Selected is null)
         {
             <button class="lpf-browse" @onclick="Browse">
-                <i class="bi bi-folder2-open"></i> Browse for localization project…
+                <i class="bi bi-folder2-open"></i> @Loc.T(Localization.Home.LocalizationField.browse)
             </button>
         }
         else
@@ -16,9 +17,9 @@
             <div class="lpf-selected">
                 <div class="lpf-selected-info">
                     <span class="lpf-selected-name">@Selected.Name</span>
-                    <span class="lpf-selected-meta">@Selected.LanguageCount languages · main @Selected.MainLanguageId</span>
+                    <span class="lpf-selected-meta">@Loc.T(Localization.Home.LocalizationField.meta, new Dictionary<string, object> { ["count"] = Selected.LanguageCount, ["main"] = Selected.MainLanguageId })</span>
                 </div>
-                <button class="lpf-change" @onclick="Browse">Change</button>
+                <button class="lpf-change" @onclick="Browse">@Loc.T(Localization.Home.LocalizationField.change)</button>
             </div>
         }
         @if (_Error is not null)
@@ -31,11 +32,11 @@
         @* Web: pick from the localization projects stored in this browser *@
         @if (_Loading)
         {
-            <div class="lpf-loading"><span class="spinner"></span> Loading…</div>
+            <div class="lpf-loading"><span class="spinner"></span> @Loc.T(Localization.Home.LocalizationField.loading)</div>
         }
         else if (_List.Count == 0)
         {
-            <div class="lpf-empty">No localization projects in this browser.<br/>Create one in Deusald Localizer first.</div>
+            <div class="lpf-empty">@((MarkupString)Loc.T(Localization.Home.LocalizationField.noneInBrowser))</div>
         }
         else
         {
@@ -47,7 +48,7 @@
                     <button class="lpf-item @(active ? "active" : "")" @onclick="() => Select(item)">
                         <div class="lpf-item-info">
                             <span class="lpf-item-name">@item.Name</span>
-                            <span class="lpf-item-meta">@item.LanguageCount languages · main @item.MainLanguageId</span>
+                            <span class="lpf-item-meta">@Loc.T(Localization.Home.LocalizationField.meta, new Dictionary<string, object> { ["count"] = item.LanguageCount, ["main"] = item.MainLanguageId })</span>
                         </div>
                         @if (active)
                         {
@@ -86,7 +87,7 @@
         }
         catch (Exception ex)
         {
-            _Error = $"Not a valid localization project: {ex.Message}";
+            _Error = Loc.T(Localization.Home.LocalizationField.notValid, new Dictionary<string, object> { ["error"] = ex.Message });
         }
     }
 

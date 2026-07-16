@@ -1,4 +1,5 @@
 @namespace DeusaldStoryWeb.Components.Common
+@inject UiLocalizationService Loc
 
 @* ─────────────────────────────────────────────────────────────────────────
    Creates / edits a Comment note — a free-text annotation the author places on
@@ -14,8 +15,8 @@
     <div class="modal-box ncm-box" @onclick:stopPropagation="true">
 
         <div class="modal-header">
-            <span class="modal-title">@(_IsEdit ? "Edit comment" : "Comment")</span>
-            <button class="modal-close" @onclick="Cancel" title="Close">
+            <span class="modal-title">@(_IsEdit ? Loc.T(Localization.Editor.Modals.Comment.editTitle) : Loc.T(Localization.Editor.Modals.Comment.title))</span>
+            <button class="modal-close" @onclick="Cancel" title="@Loc.T(Localization.Common.Buttons.close)">
                 <i class="bi bi-x-lg"></i>
             </button>
         </div>
@@ -23,25 +24,25 @@
         <div class="modal-body">
 
             <div class="modal-field">
-                <label class="modal-label">Note</label>
+                <label class="modal-label">@Loc.T(Localization.Editor.Modals.Comment.noteLabel)</label>
                 <textarea class="modal-input ncm-text"
                           rows="5"
-                          placeholder="Describe how these nodes connect…"
+                          placeholder="@Loc.T(Localization.Editor.Modals.Comment.notePlaceholder)"
                           @bind="_Text"
                           @bind:event="oninput"></textarea>
             </div>
 
             <div class="modal-note">
                 <i class="bi bi-info-circle"></i>
-                <span>A comment is a free-text note only — it has no ports and takes no part in playback.</span>
+                <span>@Loc.T(Localization.Editor.Modals.Comment.noteHint)</span>
             </div>
 
         </div>
 
         <div class="modal-footer">
-            <button class="modal-btn modal-btn-ghost" @onclick="Cancel">Cancel</button>
+            <button class="modal-btn modal-btn-ghost" @onclick="Cancel">@Loc.T(Localization.Common.Buttons.cancel)</button>
             <button class="modal-btn modal-btn-primary" @onclick="Confirm">
-                @(_IsEdit ? "Save changes" : "Add comment")
+                @(_IsEdit ? Loc.T(Localization.Common.Buttons.saveChanges) : Loc.T(Localization.Editor.Modals.Comment.addButton))
             </button>
         </div>
 

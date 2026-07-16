@@ -1,5 +1,6 @@
 @namespace DeusaldStoryWeb.Components.Common
 @inject ProjectStateService _ProjectState
+@inject UiLocalizationService Loc
 
 @* ─────────────────────────────────────────────────────────────────────────
    Picks a single story-wide variable (from the Variables editor). Used by both
@@ -13,8 +14,8 @@
     <div class="modal-box vpk-box" @onclick:stopPropagation="true">
 
         <div class="modal-header">
-            <span class="modal-title">Pick a variable</span>
-            <button class="modal-close" @onclick="Cancel" title="Close">
+            <span class="modal-title">@Loc.T(Localization.Editor.Modals.VariablePicker.title)</span>
+            <button class="modal-close" @onclick="Cancel" title="@Loc.T(Localization.Common.Buttons.close)">
                 <i class="bi bi-x-lg"></i>
             </button>
         </div>
@@ -25,7 +26,7 @@
                 <i class="bi bi-search"></i>
                 <input class="modal-input"
                        type="text"
-                       placeholder="Search variables…"
+                       placeholder="@Loc.T(Localization.Editor.Modals.VariablePicker.searchPlaceholder)"
                        @bind="_Search"
                        @bind:event="oninput"
                        @ref="_SearchInput"/>
@@ -38,7 +39,7 @@
             {
                 <div class="vpk-empty">
                     <i class="bi bi-braces"></i>
-                    <span>No variables match.</span>
+                    <span>@Loc.T(Localization.Editor.Modals.VariablePicker.noMatch)</span>
                 </div>
             }
             else
@@ -51,10 +52,10 @@
                                 @onclick="() => _SelectedVariableId = variable.Id">
                             <div class="vpk-item-name">
                                 <i class="bi bi-braces"></i>
-                                <span>@(string.IsNullOrWhiteSpace(variable.Name) ? "(unnamed)" : variable.Name)</span>
+                                <span>@(string.IsNullOrWhiteSpace(variable.Name) ? Loc.T(Localization.Common.Placeholders.unnamed) : variable.Name)</span>
                             </div>
                             <div class="vpk-item-sub">
-                                @variable.PossibleValues.Count value@(variable.PossibleValues.Count == 1 ? "" : "s")
+                                @Loc.T(Localization.Common.Misc.valueCount, new Dictionary<string, object> { ["count"] = variable.PossibleValues.Count })
                             </div>
                         </button>
                     }
@@ -64,11 +65,11 @@
         </div>
 
         <div class="modal-footer">
-            <button class="modal-btn modal-btn-ghost" @onclick="Cancel">Cancel</button>
+            <button class="modal-btn modal-btn-ghost" @onclick="Cancel">@Loc.T(Localization.Common.Buttons.cancel)</button>
             <button class="modal-btn modal-btn-primary"
                     @onclick="Confirm"
                     disabled="@(_SelectedVariableId == Guid.Empty)">
-                Select variable
+                @Loc.T(Localization.Common.Buttons.selectVariable)
             </button>
         </div>
 
