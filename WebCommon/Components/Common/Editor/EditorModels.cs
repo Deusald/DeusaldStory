@@ -857,6 +857,19 @@ namespace DeusaldStoryWeb
             if (logic.ConstantVariableNodes.Exists(n => n.OutPoint.Id == outputId)) return PortType.CVariable;
             if (StorySelectionResolver.IncomingVariables(project, logic).Exists(d => d.Id == outputId)) return PortType.CVariable;
 
+            // A Function instance's typed output port carries the type of its signature output.
+            foreach (StoryFunctionInstanceNode fi in logic.FunctionInstanceNodes)
+                if (fi.OutputPorts.Find(p => p.Id == outputId) is StoryBlueprintPortMap op
+                 && project.Blueprints.TryGetValue(fi.BlueprintId, out StoryBlueprint? fbp)
+                 && fbp!.Kind == StoryBlueprintKind.Function)
+                    return SignatureType(fbp.Outputs, op.DefinitionPointId);
+
+            // Inside a Function definition graph, the signature inputs are outputs on the "Function in" node.
+            foreach (StoryBlueprint b in project.Blueprints.Values)
+                if (b.Kind == StoryBlueprintKind.Function && b.DefinitionNodeId == logic.Id
+                 && b.Inputs.Find(s => s.Id == outputId) is StorySignaturePort sip)
+                    return sip.Type;
+
             return null;
         }
 

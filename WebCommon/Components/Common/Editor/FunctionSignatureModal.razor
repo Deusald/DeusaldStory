@@ -45,7 +45,10 @@
     private List<PortRow> _Inputs  = new();
     private List<PortRow> _Outputs = new();
 
-    private static readonly PortType[] _Types = (PortType[])Enum.GetValues(typeof(PortType));
+    // A function's signature carries only concrete value types. LFlow is implicit (it drives the function's
+    // execution spine and is always present), plain Flow/VFlow don't cross a function boundary, and Data means
+    // "type unknown" — a signature must commit to a concrete type.
+    private static readonly PortType[] _Types = { PortType.Text, PortType.Icon, PortType.Variable, PortType.CVariable };
 
     /// <summary>Opens the signature editor for a Function blueprint, pre-filled with its current ports.</summary>
     public void Show(Guid blueprintId, string name,
@@ -91,7 +94,7 @@
     </div>;
 
     private static PortType ParseType(object? value) =>
-        Enum.TryParse(value?.ToString(), out PortType t) ? t : PortType.Data;
+        Enum.TryParse(value?.ToString(), out PortType t) ? t : PortType.Text;
 
     private async Task Confirm()
     {
@@ -113,7 +116,7 @@
     {
         public Guid     Id   { get; set; }
         public string   Name { get; set; } = "";
-        public PortType Type { get; set; } = PortType.Data;
+        public PortType Type { get; set; } = PortType.Text;
     }
 
     /// <summary>Result: the blueprint whose signature changed plus its new input/output ports (empty id = new port).</summary>

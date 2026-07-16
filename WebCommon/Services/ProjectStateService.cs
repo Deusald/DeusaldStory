@@ -1144,6 +1144,8 @@ public partial class ProjectStateService(
         //   Text  : Localization / SmartFormat
         //   Icon  : Icon / LightDarkSwitch
         //   Value : External / Get (value + slot) / Constant / Prev Exit
+        //   Function instance output ports (typed value ports produced by the function).
+        //   A Function definition's signature inputs — projected as outputs on its "Function in" node.
         // Only flow outputs (LFlow / VFlow) lead to a single place and get their previous wire replaced below.
         bool multiOutput = logic.LocalizationNodes.Exists(l => l.OutPoint.Id == fromPoint)
                         || logic.SmartFormatNodes.Exists(sf => sf.OutPoint.Id == fromPoint)
@@ -1153,6 +1155,10 @@ public partial class ProjectStateService(
                         || logic.GetVariableNodes.Exists(gv => gv.OutPoint.Id == fromPoint || gv.SlotOutPoint.Id == fromPoint)
                         || logic.ConstantVariableNodes.Exists(cv => cv.OutPoint.Id == fromPoint)
                         || logic.LogicPortalNodes.Exists(p => p.OutPoints.Exists(o => o.Id == fromPoint))
+                        || logic.FunctionInstanceNodes.Exists(fi => fi.OutputPorts.Exists(p => p.Id == fromPoint))
+                        || CurrentProject.Blueprints.Values.Any(b => b.Kind == StoryBlueprintKind.Function
+                                                                  && b.DefinitionNodeId == logic.Id
+                                                                  && b.Inputs.Exists(s => s.Id == fromPoint))
                         || StorySelectionResolver.IncomingVariables(CurrentProject, logic).Exists(d => d.Id == fromPoint);
         logic.ContentConnections.RemoveAll(c => (!multiOutput && c.FromPoint == fromPoint) || (!multiInput && c.ToPoint == toPoint));
 
