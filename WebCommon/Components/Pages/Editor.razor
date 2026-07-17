@@ -137,7 +137,7 @@
                     @* The story End node: choose which whole-story storage variables are released here. *@
                     <EndUnregisterEditor/>
                 }
-                else if (_InLogic && _SelectedNode?.Kind is StoryNodeKind.RegisterVariable or StoryNodeKind.SetVariable or StoryNodeKind.UnregisterVariable)
+                else if (_InLogic && _SelectedNode?.Kind is StoryNodeKind.RegisterVariable or StoryNodeKind.SetVariable or StoryNodeKind.UnregisterVariable or StoryNodeKind.GetVariable)
                 {
                     @* A storage-variable node: show its full configuration. *@
                     <VariableNodeInspector Logic="_CurrentLogicNode" NodeId="_SelectedId"/>

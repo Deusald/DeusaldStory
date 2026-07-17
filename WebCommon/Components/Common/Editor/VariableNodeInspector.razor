@@ -53,6 +53,10 @@
                 @Loc.T(Localization.Editor.Modals.VariableNodeInspector.setVariableKind)
             </span>
             <div class="vni-title">@(target is not null ? Name(target.Name) : Loc.T(Localization.Editor.Modals.VariableNodeInspector.noVariable))</div>
+            @if (target is not null && !string.IsNullOrWhiteSpace(target.Description))
+            {
+                <div class="vni-desc">@target.Description</div>
+            }
         </div>
         <div class="vni-body">
             @if (target is not null)
@@ -64,6 +68,28 @@
             @if (target is not null && ShowsSecret(target.Type, target.Mode))
             {
                 @Row(Loc.T(Localization.Common.Fields.secret), set.Secret ? Loc.T(Localization.Common.Misc.yes) : Loc.T(Localization.Common.Misc.no))
+            }
+        </div>
+    }
+    else if (GetNode is StoryGetVariableNode get)
+    {
+        StoryRegisterVariableNode? target = StoryLogicFlow.TargetOf(_ProjectState.CurrentProject!, Logic!, get);
+        <div class="vni-head">
+            <span class="vni-kind" style="color:@StoryStyle.NodeColor(StoryNodeKind.GetVariable)">
+                <span class="vni-dot" style="background:@StoryStyle.NodeColor(StoryNodeKind.GetVariable)"></span>
+                @Loc.T(Localization.Editor.Modals.VariableNodeInspector.getVariableKind)
+            </span>
+            <div class="vni-title">@(target is not null ? Name(target.Name) : Loc.T(Localization.Editor.Modals.VariableNodeInspector.noVariable))</div>
+            @if (target is not null && !string.IsNullOrWhiteSpace(target.Description))
+            {
+                <div class="vni-desc">@target.Description</div>
+            }
+        </div>
+        <div class="vni-body">
+            @if (target is not null)
+            {
+                @Row(Loc.T(Localization.Common.Fields.slot), StorageSlots.Label(target.Type, target.SlotIndex))
+                @Row(Loc.T(Localization.Common.Fields.storage), TypeLabel(target.Type))
             }
         </div>
     }
@@ -95,6 +121,7 @@
 
     private StoryRegisterVariableNode?   Register   => Logic?.RegisterVariableNodes.Find(n => n.Id == NodeId);
     private StorySetVariableNode?        SetNode    => Logic?.SetVariableNodes.Find(n => n.Id == NodeId);
+    private StoryGetVariableNode?        GetNode    => Logic?.GetVariableNodes.Find(n => n.Id == NodeId);
     private StoryUnregisterVariableNode? Unregister => Logic?.UnregisterVariableNodes.Find(n => n.Id == NodeId);
 
     private RenderFragment Row(string label, string value) =>@<div class="vni-row">

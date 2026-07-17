@@ -850,6 +850,7 @@ namespace DeusaldStoryCommon
                     public static readonly Guid registerVariableKind = new Guid("eb515c3e-ee45-4e03-83b9-1ef6317f288c");
                     public static readonly Guid setVariableKind = new Guid("0cb4d4b1-ee47-4ea2-9ebf-dc2d3b456309");
                     public static readonly Guid unregisterVariableKind = new Guid("daae675f-6ed9-475a-b7d4-8a409971382f");
+                    public static readonly Guid getVariableKind = new Guid("7d2c4f1a-9b3e-4a86-bf21-2c5e8d0a4f77");
                     public static readonly Guid noVariable = new Guid("824c4432-e630-4b56-b72a-4485b9878d26");
                     public static readonly Guid unregisterNote = new Guid("3b601ef9-0b2f-471d-83be-ecbe047407ca");
                     public static readonly Guid typeLabelNumber = new Guid("5c7f26b6-2805-4115-8d0e-9af63b481c0d");
@@ -1681,6 +1682,7 @@ namespace DeusaldStoryCommon
                 { new Guid("eb515c3e-ee45-4e03-83b9-1ef6317f288c"), "REGISTER VARIABLE" },
                 { new Guid("0cb4d4b1-ee47-4ea2-9ebf-dc2d3b456309"), "SET VARIABLE" },
                 { new Guid("daae675f-6ed9-475a-b7d4-8a409971382f"), "UNREGISTER VARIABLE" },
+                { new Guid("7d2c4f1a-9b3e-4a86-bf21-2c5e8d0a4f77"), "GET VARIABLE" },
                 { new Guid("824c4432-e630-4b56-b72a-4485b9878d26"), "(no variable)" },
                 { new Guid("3b601ef9-0b2f-471d-83be-ecbe047407ca"), "Frees the slot and instructs players to clear it." },
                 { new Guid("5c7f26b6-2805-4115-8d0e-9af63b481c0d"), "Number (NA, NB…)" },
