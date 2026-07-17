@@ -170,6 +170,7 @@
 <ConditionFlowModal        @ref="_ConditionFlowModal"       OnConfirm="OnConditionFlowConfirmed"/>
 <NewCommentNodeModal       @ref="_NewCommentNodeModal"      OnConfirm="OnCommentConfirmed"/>
 <FlowTextOptionsModal      @ref="_FlowTextOptionsModal"     OnConfirm="OnFlowTextConfirmed"/>
+<SmartFormatOptionsModal   @ref="_SmartFormatOptionsModal"  OnConfirm="OnSmartFormatConfirmed"/>
 <BlueprintPickerModal      @ref="_BlueprintPicker"          OnSelect="OnBlueprintPicked"/>
 <FunctionSignatureModal    @ref="_FunctionSignatureModal"   OnConfirm="OnSignatureConfirmed"/>
 
@@ -218,6 +219,7 @@
     private ConditionFlowModal?        _ConditionFlowModal;
     private NewCommentNodeModal?       _NewCommentNodeModal;
     private FlowTextOptionsModal?      _FlowTextOptionsModal;
+    private SmartFormatOptionsModal?   _SmartFormatOptionsModal;
     private BlueprintPickerModal?      _BlueprintPicker;
     private FunctionSignatureModal?    _FunctionSignatureModal;
 
@@ -938,6 +940,12 @@
         RebuildNodes();
     }
 
+    private void OnSmartFormatConfirmed(SmartFormatOptionsModal.SmartFormatArgs args)
+    {
+        _ProjectState.UpdateSmartFormatNode(_CurrentId, args.EditNodeId, args.Casing, args.Prefix, args.Suffix);
+        RebuildNodes();
+    }
+
     /// <summary>The comment note with <paramref name="id"/> in the current graph (container graph or logic inner graph).</summary>
     private StoryCommentNode? FindComment(Guid id) =>
         _InLogic
@@ -1301,6 +1309,11 @@
             case StoryNodeKind.FlowText:
                 if (_CurrentLogicNode?.FlowTextNodes.Find(n => n.Id == node.Id) is StoryFlowTextNode ftEdit)
                     _FlowTextOptionsModal?.ShowEdit(ftEdit);
+                break;
+
+            case StoryNodeKind.SmartFormat:
+                if (_CurrentLogicNode?.SmartFormatNodes.Find(n => n.Id == node.Id) is StorySmartFormatNode sfEdit)
+                    _SmartFormatOptionsModal?.ShowEdit(sfEdit);
                 break;
 
             case StoryNodeKind.ConditionFlow:

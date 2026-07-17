@@ -721,6 +721,23 @@ namespace DeusaldStoryCommon
                     public static readonly Guid uncheckMediumHint = new Guid("b90d1a92-ce5d-4af6-86ef-133ffac9aec4");
                 }
 
+                public static class SmartFormatOptions
+                {
+                    public static readonly Guid title = new Guid("f7ce806a-f208-486f-a9d6-706523847898");
+                    public static readonly Guid caseLabel = new Guid("84f48a50-58ec-404c-991e-8cb6a0658655");
+                    public static readonly Guid caseHint = new Guid("ac75e028-abf9-402a-b384-2adf355e7c1e");
+                    public static readonly Guid caseNone = new Guid("4dc213be-4c77-498a-8f80-a643be02b03b");
+                    public static readonly Guid caseUpper = new Guid("4e390526-f98f-4bfc-b5e9-19b4c326e6ed");
+                    public static readonly Guid caseLower = new Guid("4b7c5b8d-b15e-4ae8-b7ef-1fc65d07d1cd");
+                    public static readonly Guid prefixLabel = new Guid("d8d48bfb-1724-4b94-aa2c-2f8b67ad4f65");
+                    public static readonly Guid prefixHint = new Guid("c8939457-c370-4c1f-acfa-6ce63c4ab31f");
+                    public static readonly Guid prefixPlaceholder = new Guid("104a6fd8-08c5-4109-ad50-111fccc841d6");
+                    public static readonly Guid suffixLabel = new Guid("8a65a555-c2fa-4bb6-88c3-e3643cb6a724");
+                    public static readonly Guid suffixHint = new Guid("7ba8db33-7433-4be3-ad2a-18d0d36ef750");
+                    public static readonly Guid suffixPlaceholder = new Guid("f399f0dd-4189-4d18-aae0-07a4c39d25f5");
+                    public static readonly Guid note = new Guid("4f1adc1d-7431-481b-be62-85ffd6377e9b");
+                }
+
                 public static class BlueprintPicker
                 {
                     public static readonly Guid defaultTitle = new Guid("ebc81a5f-35c5-4bd2-be0e-d57abb52f875");
@@ -1586,6 +1603,19 @@ namespace DeusaldStoryCommon
                 { new Guid("06ab683b-c9bf-4d9e-87d2-0caff6769eb1"), "Render in Gamebook" },
                 { new Guid("7b56ef32-d75a-45f2-b193-6f26a05cd023"), "show this block's text in the printed gamebook sections" },
                 { new Guid("b90d1a92-ce5d-4af6-86ef-133ffac9aec4"), "Unchecking a medium only hides this block's text there — flow still passes through to the next node." },
+                { new Guid("f7ce806a-f208-486f-a9d6-706523847898"), "SmartFormat options" },
+                { new Guid("84f48a50-58ec-404c-991e-8cb6a0658655"), "Letter case" },
+                { new Guid("ac75e028-abf9-402a-b384-2adf355e7c1e"), "transform the whole formatted result to upper- or lower-case (the prefix/suffix below are added as-is)" },
+                { new Guid("4dc213be-4c77-498a-8f80-a643be02b03b"), "Unchanged" },
+                { new Guid("4e390526-f98f-4bfc-b5e9-19b4c326e6ed"), "UPPERCASE" },
+                { new Guid("4b7c5b8d-b15e-4ae8-b7ef-1fc65d07d1cd"), "lowercase" },
+                { new Guid("d8d48bfb-1724-4b94-aa2c-2f8b67ad4f65"), "Prefix" },
+                { new Guid("c8939457-c370-4c1f-acfa-6ce63c4ab31f"), "literal text added before the formatted result" },
+                { new Guid("104a6fd8-08c5-4109-ad50-111fccc841d6"), "text before" },
+                { new Guid("8a65a555-c2fa-4bb6-88c3-e3643cb6a724"), "Suffix" },
+                { new Guid("7ba8db33-7433-4be3-ad2a-18d0d36ef750"), "literal text added after the formatted result" },
+                { new Guid("f399f0dd-4189-4d18-aae0-07a4c39d25f5"), "text after" },
+                { new Guid("4f1adc1d-7431-481b-be62-85ffd6377e9b"), "These settings post-process the text after its {tokens} are substituted — the case transform runs first, then the prefix and suffix are wrapped around it." },
                 { new Guid("ebc81a5f-35c5-4bd2-be0e-d57abb52f875"), "Place blueprint" },
                 { new Guid("7e234d0b-6cf9-46b4-a0b5-09e0bb522415"), "No blueprints yet — create one from the Blueprints panel in the left rail." },
                 { new Guid("3c0ce2f4-48db-4dd0-b6e0-5cafe9929af1"), "Pick an icon" },

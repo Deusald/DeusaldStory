@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text;
+using System.Text.RegularExpressions;
 using DeusaldLocalizerCommon;
 using JetBrains.Annotations;
 
@@ -382,10 +384,41 @@ namespace DeusaldStoryCommon
                     errors.Add(hasOmittedVariable
                         ? UiLang.T(Localization.Services.Renderer.smartFormatFailedGamebook, new Dictionary<string, object> { ["error"] = error })
                         : UiLang.T(Localization.Services.Renderer.smartFormatFailed,         new Dictionary<string, object> { ["error"] = error }));
-                return rendered;
+                return ApplySmartFormatTransforms(sf, rendered);
             }
 
             return "";
+        }
+
+        // Matches an embedded markup/pill tag (authored HTML like <b>, or a variable/slot/icon pill like <var=Name> /
+        // <slot=TA>). The case transform skips these so their tag names and by-name lookups survive up/down-casing.
+        private static readonly Regex _EmbeddedTag = new Regex(@"<[^>]+>", RegexOptions.Compiled);
+
+        /// <summary>
+        /// Applies a SmartFormat node's output settings: first the letter-case transform on the formatted result
+        /// (only its plain text — embedded tags are left untouched), then the literal
+        /// <see cref="StorySmartFormatNode.Prefix"/> / <see cref="StorySmartFormatNode.Suffix"/> wrapped around it
+        /// (added verbatim, unaffected by the casing).
+        /// </summary>
+        private static string ApplySmartFormatTransforms(StorySmartFormatNode sf, string text) =>
+            sf.Prefix + ApplyCasing(text, sf.Casing) + sf.Suffix;
+
+        /// <summary>Upper/lower-cases the plain-text runs of <paramref name="text"/>, leaving embedded <c>&lt;…&gt;</c> tags verbatim.</summary>
+        private static string ApplyCasing(string text, StoryTextCasing casing)
+        {
+            if (casing == StoryTextCasing.None || text.Length == 0) return text;
+            Func<string, string> f = casing == StoryTextCasing.Upper ? s => s.ToUpperInvariant() : s => s.ToLowerInvariant();
+
+            StringBuilder sb   = new();
+            int           last = 0;
+            foreach (Match m in _EmbeddedTag.Matches(text))
+            {
+                sb.Append(f(text.Substring(last, m.Index - last)));
+                sb.Append(m.Value);
+                last = m.Index + m.Length;
+            }
+            sb.Append(f(text.Substring(last)));
+            return sb.ToString();
         }
 
         /// <summary>The upstream declared variable (a Prev Exit Variable output) identified by <paramref name="fromPoint"/>, or null.</summary>

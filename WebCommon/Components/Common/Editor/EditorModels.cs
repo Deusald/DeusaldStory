@@ -478,10 +478,11 @@ namespace DeusaldStoryWeb
                     Id        = sf.Id,
                     Kind      = StoryNodeKind.SmartFormat,
                     Title     = UiLang.T(Localization.Editor.Nodes.Titles.smartFormat),
+                    Subtitle  = SmartFormatSummary(sf),
                     X         = sf.X,
                     Y         = sf.Y,
                     Deletable = true,
-                    Editable  = false
+                    Editable  = true
                 };
                 node.Inputs.Add(new EdPort { Id = sf.LocalizationIn.Id, Name = UiLang.T(Localization.Editor.Nodes.Ports.text),      Type = PortType.Text });
                 node.Inputs.Add(new EdPort { Id = sf.VariablesIn.Id,    Name = UiLang.T(Localization.Editor.Nodes.Ports.variables), Type = PortType.Variable });
@@ -838,6 +839,20 @@ namespace DeusaldStoryWeb
         /// <summary>The port type of a function signature port by its definition id, or Data when it no longer exists.</summary>
         private static PortType SignatureType(List<StorySignaturePort> signature, Guid definitionPointId) =>
             signature.Find(p => p.Id == definitionPointId)?.Type ?? PortType.Data;
+
+        /// <summary>A one-line card subtitle summarising a SmartFormat node's output transforms (empty when none are set).</summary>
+        private static string SmartFormatSummary(StorySmartFormatNode sf)
+        {
+            List<string> parts = new();
+            switch (sf.Casing)
+            {
+                case StoryTextCasing.Upper: parts.Add(UiLang.T(Localization.Editor.Modals.SmartFormatOptions.caseUpper)); break;
+                case StoryTextCasing.Lower: parts.Add(UiLang.T(Localization.Editor.Modals.SmartFormatOptions.caseLower)); break;
+            }
+            if (!string.IsNullOrEmpty(sf.Prefix) || !string.IsNullOrEmpty(sf.Suffix))
+                parts.Add($"{sf.Prefix}…{sf.Suffix}");
+            return string.Join(" · ", parts);
+        }
 
         /// <summary>
         /// The concrete port type a logic portal carries — the type of the output wired into its in (following any

@@ -1,0 +1,94 @@
+@namespace DeusaldStoryWeb.Components.Common
+@inject UiLocalizationService Loc
+
+@* ─────────────────────────────────────────────────────────────────────────
+   Edits a SmartFormat node's output settings — post-processing applied after
+   its {tokens} are substituted: a letter-case transform (unchanged / UPPER /
+   lower), then a literal prefix and suffix wrapped around the result.
+   ───────────────────────────────────────────────────────────────────────── *@
+
+@if (_Visible)
+{
+    <div class="modal-backdrop" @onclick="Cancel"></div>
+
+    <div class="modal-box sfo-box" @onclick:stopPropagation="true">
+
+        <div class="modal-header">
+            <span class="modal-title">@Loc.T(Localization.Editor.Modals.SmartFormatOptions.title)</span>
+            <button class="modal-close" @onclick="Cancel" title="@Loc.T(Localization.Common.Buttons.close)">
+                <i class="bi bi-x-lg"></i>
+            </button>
+        </div>
+
+        <div class="modal-body">
+
+            <div class="modal-field">
+                <label class="modal-label">@Loc.T(Localization.Editor.Modals.SmartFormatOptions.caseLabel)</label>
+                <select class="modal-input" @bind="_Casing">
+                    <option value="@StoryTextCasing.None">@Loc.T(Localization.Editor.Modals.SmartFormatOptions.caseNone)</option>
+                    <option value="@StoryTextCasing.Upper">@Loc.T(Localization.Editor.Modals.SmartFormatOptions.caseUpper)</option>
+                    <option value="@StoryTextCasing.Lower">@Loc.T(Localization.Editor.Modals.SmartFormatOptions.caseLower)</option>
+                </select>
+                <span class="modal-label-hint">@Loc.T(Localization.Editor.Modals.SmartFormatOptions.caseHint)</span>
+            </div>
+
+            <div class="modal-field">
+                <label class="modal-label">@Loc.T(Localization.Editor.Modals.SmartFormatOptions.prefixLabel)</label>
+                <input class="modal-input" @bind="_Prefix"
+                       placeholder="@Loc.T(Localization.Editor.Modals.SmartFormatOptions.prefixPlaceholder)"/>
+                <span class="modal-label-hint">@Loc.T(Localization.Editor.Modals.SmartFormatOptions.prefixHint)</span>
+            </div>
+
+            <div class="modal-field">
+                <label class="modal-label">@Loc.T(Localization.Editor.Modals.SmartFormatOptions.suffixLabel)</label>
+                <input class="modal-input" @bind="_Suffix"
+                       placeholder="@Loc.T(Localization.Editor.Modals.SmartFormatOptions.suffixPlaceholder)"/>
+                <span class="modal-label-hint">@Loc.T(Localization.Editor.Modals.SmartFormatOptions.suffixHint)</span>
+            </div>
+
+            <div class="modal-note">
+                <i class="bi bi-info-circle"></i>
+                <span>@Loc.T(Localization.Editor.Modals.SmartFormatOptions.note)</span>
+            </div>
+
+        </div>
+
+        <div class="modal-footer">
+            <button class="modal-btn modal-btn-ghost" @onclick="Cancel">@Loc.T(Localization.Common.Buttons.cancel)</button>
+            <button class="modal-btn modal-btn-primary" @onclick="Confirm">@Loc.T(Localization.Common.Buttons.saveChanges)</button>
+        </div>
+
+    </div>
+}
+
+@code {
+    [Parameter] public EventCallback<SmartFormatArgs> OnConfirm { get; set; }
+
+    private bool            _Visible;
+    private Guid            _EditNodeId;
+    private StoryTextCasing _Casing = StoryTextCasing.None;
+    private string          _Prefix = "";
+    private string          _Suffix = "";
+
+    /// <summary>Opens the modal to edit an existing SmartFormat node's output settings.</summary>
+    public void ShowEdit(StorySmartFormatNode node)
+    {
+        _EditNodeId = node.Id;
+        _Casing     = node.Casing;
+        _Prefix     = node.Prefix;
+        _Suffix     = node.Suffix;
+        _Visible    = true;
+        StateHasChanged();
+    }
+
+    private async Task Confirm()
+    {
+        _Visible = false;
+        await OnConfirm.InvokeAsync(new SmartFormatArgs(_EditNodeId, _Casing, _Prefix, _Suffix));
+    }
+
+    private void Cancel() => _Visible = false;
+
+    /// <summary>Result passed back to the parent — the edited node id plus its new case transform and prefix/suffix.</summary>
+    public record SmartFormatArgs(Guid EditNodeId, StoryTextCasing Casing, string Prefix, string Suffix);
+}

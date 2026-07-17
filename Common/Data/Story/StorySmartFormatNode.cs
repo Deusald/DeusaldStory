@@ -24,5 +24,22 @@ namespace DeusaldStoryCommon
 
         /// <summary>The single output port carrying the formatted text (connects to a Title/text input).</summary>
         public StoryConnectionPoint OutPoint { get; set; } = new() { Name = "Text" };
+
+        /// <summary>Letter-case transform applied to the formatted result before the prefix/suffix are wrapped around it.</summary>
+        public StoryTextCasing Casing { get; set; } = StoryTextCasing.None;
+
+        /// <summary>Literal text prepended to the (case-transformed) formatted result. Empty adds nothing.</summary>
+        public string Prefix { get; set; } = "";
+
+        /// <summary>Literal text appended after the (case-transformed) formatted result. Empty adds nothing.</summary>
+        public string Suffix { get; set; } = "";
+    }
+
+    /// <summary>A letter-case transform a <see cref="StorySmartFormatNode"/> applies to its formatted output.</summary>
+    public enum StoryTextCasing
+    {
+        None,
+        Upper,
+        Lower
     }
 }

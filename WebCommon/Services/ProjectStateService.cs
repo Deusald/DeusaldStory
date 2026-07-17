@@ -442,6 +442,19 @@ public partial class ProjectStateService(
         return node;
     }
 
+    /// <summary>Updates a SmartFormat node's output settings — the letter-case transform plus the literal prefix/suffix wrapped around the formatted text.</summary>
+    public void UpdateSmartFormatNode(Guid logicId, Guid nodeId, StoryTextCasing casing, string prefix, string suffix)
+    {
+        if (!CurrentProject!.LogicNodes.TryGetValue(logicId, out StoryLogicNode? logic)) return;
+        StorySmartFormatNode? node = logic.SmartFormatNodes.Find(n => n.Id == nodeId);
+        if (node is null) return;
+
+        node.Casing = casing;
+        node.Prefix = prefix;
+        node.Suffix = suffix;
+        MarkKeyDirty(logicId);
+    }
+
     /// <summary>Deletes a SmartFormat node and any inner wire that touched its ports.</summary>
     public void DeleteSmartFormatNode(Guid logicId, Guid nodeId)
     {
