@@ -822,9 +822,9 @@ namespace DeusaldStoryWeb
                 node.Inputs.Add(new EdPort { Id = fi.FlowIn.Id, Name = UiLang.T(Localization.Editor.Nodes.Ports.flow), Type = PortType.LFlow });
                 foreach (StoryBlueprintPortMap pm in fi.InputPorts)
                     node.Inputs.Add(new EdPort { Id = pm.Id, Name = pm.Name, Type = found ? SignatureType(fbp!.Inputs, pm.DefinitionPointId) : PortType.Data });
+                node.Outputs.Add(new EdPort { Id = fi.FlowOut.Id, Name = UiLang.T(Localization.Editor.Nodes.Ports.flow), Type = PortType.LFlow });
                 foreach (StoryBlueprintPortMap pm in fi.OutputPorts)
                     node.Outputs.Add(new EdPort { Id = pm.Id, Name = pm.Name, Type = found ? SignatureType(fbp!.Outputs, pm.DefinitionPointId) : PortType.Data });
-                node.Outputs.Add(new EdPort { Id = fi.FlowOut.Id, Name = UiLang.T(Localization.Editor.Nodes.Ports.flow), Type = PortType.LFlow });
                 nodes.Add(node);
             }
 
