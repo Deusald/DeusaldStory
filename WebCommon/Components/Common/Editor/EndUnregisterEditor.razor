@@ -48,7 +48,15 @@
 </div>
 
 @code {
-    private StoryProject Project => _ProjectState.CurrentProject!;
+    /// <summary>
+    /// The blueprint-flattened project: what actually reaches The End is decided by walking forward from Start, and a
+    /// register living inside a blueprint is only on that walk once its instances are spliced in (a definition is out
+    /// of tree, so the authoring graph never reaches it). Ids here are the expander's deterministic per-instance ones,
+    /// so two instances of one blueprint contribute two independently-releasable variables — and they stay stable
+    /// across runs, which is what lets a selection persist in <see cref="StoryProjectMetadata.UnregisterAtEnd"/>
+    /// (shared by reference with the authoring project, so toggling writes straight through).
+    /// </summary>
+    private StoryProject Project => _ProjectState.GetExpandedProject();
 
     // Only variables that actually reach The End still registered are release candidates. Any variable released by
     // an Unregister node on every path never appears here. Currently-selected ids are kept so they can be unchecked.

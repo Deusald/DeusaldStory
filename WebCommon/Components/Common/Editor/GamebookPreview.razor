@@ -161,6 +161,9 @@
 @code {
     [Parameter] public StoryLogicNode Logic { get; set; } = default!;
 
+    /// <summary>The project <see cref="Logic"/> belongs to — the preview session's own (see <see cref="LogicPreview.Project"/>).</summary>
+    [Parameter] public StoryProject Project { get; set; } = default!;
+
     /// <summary>Raised when the user clicks a navigable "go to section" line — the host switches the preview and scrolls.</summary>
     [Parameter] public EventCallback<GamebookNavRequest> OnNavigate { get; set; }
 
@@ -211,10 +214,8 @@
 
     private StoryGamebookPreview.Result Build()
     {
-        // Build against the blueprint-flattened project so function instances inside this node are resolved.
-        StoryProject proj = _ProjectState.GetExpandedProject();
-        StoryLogicNode node = proj.LogicNodes.TryGetValue(Logic.Id, out StoryLogicNode? flat) ? flat : Logic;
-        return StoryGamebookPreview.Build(proj, _ProjectState.CurrentLocalization, node);
+        // Both node and project come from the parent, already in one space — the session decided which.
+        return StoryGamebookPreview.Build(Project, _ProjectState.CurrentLocalization, Logic);
     }
 
     private MarkupString SafeHtml(string text) => (MarkupString)PreviewHtmlSanitizer.ToSafeHtml(text, ResolveImageTag, ResolveVariableTag);
@@ -239,7 +240,8 @@
 
     private StoryRegisterVariableNode? ResolveVariableTag(string name)
     {
-        foreach (StoryLogicNode logic in _ProjectState.CurrentProject!.LogicNodes.Values)
+        // The session's project, so a variable registered inside a blueprint resolves to the slot *this* instance got.
+        foreach (StoryLogicNode logic in Project.LogicNodes.Values)
             if (logic.RegisterVariableNodes.Find(n => string.Equals(n.Name, name, StringComparison.OrdinalIgnoreCase)) is StoryRegisterVariableNode reg)
                 return reg;
         return null;

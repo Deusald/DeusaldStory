@@ -181,6 +181,16 @@ namespace DeusaldStoryCommon
             foreach (StoryBlueprintPortMap pm in inst.EntryPorts.Concat(inst.ExitPorts))
                 map[pm.DefinitionPointId] = pm.Id;
 
+            // A declared variable's id is outward-facing, exactly like a boundary point: a node *downstream* of this
+            // instance stores its Prev-Exit-Variable wires against it, and that node lives outside the definition,
+            // where expansion rewrites nothing. Remapping it would strand those wires on an id no clone offers — the
+            // port would be there and the wire would not reach it — so it survives as authored. Two instances therefore
+            // declare the same variable id, which is safe: a receiver resolves its own upstream through
+            // StorySelectionResolver, never by looking an id up across the project.
+            foreach (StoryLogicNode l in entities.OfType<StoryLogicNode>())
+                foreach (StoryDeclaredVariable d in l.DeclaredVariables)
+                    map[d.Id] = d.Id;
+
             List<StoryBlueprintInstanceNode> nestedInstances = new();
 
             foreach (object e in entities)

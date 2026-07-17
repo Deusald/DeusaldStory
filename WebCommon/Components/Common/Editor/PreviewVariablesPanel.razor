@@ -82,6 +82,13 @@
     [Parameter] public Dictionary<Guid, string>  Values        { get; set; } = new();
     [Parameter] public EventCallback             ValuesChanged { get; set; }
 
+    /// <summary>
+    /// The project <see cref="Logic"/> belongs to — the preview session's own. It must be the one the renderer reads:
+    /// the expander gives each instance's clone its own variable ids, so resolving here against a different project
+    /// seeds every value under a key the renderer never looks up (the dropdown fills, the text never formats).
+    /// </summary>
+    [Parameter] public StoryProject Project { get; set; } = default!;
+
     /// <summary>Gamebook preview: sections are pre-generated, so the panel shows a note instead of editable values.</summary>
     [Parameter] public bool Gamebook { get; set; }
 
@@ -107,7 +114,7 @@
 
         List<StoryVariable> ordered = map.Values.OrderBy(v => v.Name, StringComparer.OrdinalIgnoreCase).ToList();
 
-        foreach (StoryDeclaredVariable d in StorySelectionResolver.IncomingVariables(_ProjectState.CurrentProject!, Logic))
+        foreach (StoryDeclaredVariable d in StorySelectionResolver.IncomingVariables(Project, Logic))
             ordered.Add(new StoryVariable { Id = d.Id, Name = string.IsNullOrWhiteSpace(d.Name) ? Loc.T(Localization.Editor.Panels.PreviewVariables.incoming) : d.Name, PossibleValues = d.PossibleValues });
 
         return ordered;
@@ -130,7 +137,7 @@
         Values.TryGetValue(v.Id, out string? val) ? val : v.PossibleValues.FirstOrDefault() ?? "";
 
     private StoryVariable? Variable(Guid id) =>
-        id != Guid.Empty && _ProjectState.CurrentProject!.Variables.TryGetValue(id, out StoryVariable? v) ? v : null;
+        id != Guid.Empty && Project.Variables.TryGetValue(id, out StoryVariable? v) ? v : null;
 
     private async Task OnValueChanged(Guid variableId, ChangeEventArgs e)
     {

@@ -155,6 +155,13 @@
 @code {
     [Parameter] public StoryLogicNode Logic { get; set; } = default!;
 
+    /// <summary>
+    /// The project <see cref="Logic"/> belongs to — the preview session's own, chosen once by the parent (the flattened
+    /// story, or authoring space with functions inlined for a blueprint definition previewed on its own). Everything
+    /// this component resolves must come from it, so the whole session speaks one set of ids.
+    /// </summary>
+    [Parameter] public StoryProject Project { get; set; } = default!;
+
     /// <summary>A preview-only input field the player would fill for a player-input String variable (min 1 / max 30 chars).</summary>
     private RenderFragment InputField(StorageInstruction field) =>@<div class="lpv-input">
         @* No slot badge here — the App tracks which variable a value writes to automatically; the player only sees the prompt. *@
@@ -208,17 +215,8 @@
 
     private StoryLogicRenderer.RenderedLogic Render()
     {
-        // Render against the blueprint-flattened project so function instances inside this node are resolved; a normal
-        // node keeps the same id there (functions inlined). A drilled-into blueprint definition is out of tree and so
-        // has no clone there — nothing about it resolves — so it renders against the function-only expansion, which
-        // inlines its functions while keeping the instances the resolver walks out through to reach its upstream.
-        StoryProject expanded = _ProjectState.GetExpandedProject();
-        if (expanded.LogicNodes.TryGetValue(Logic.Id, out StoryLogicNode? flat))
-            return StoryLogicRenderer.Render(expanded, _ProjectState.CurrentLocalization, flat, Values, _Paper, StoryRenderTarget.App);
-
-        StoryProject fnExpanded = _ProjectState.GetFunctionExpanded().Project;
-        StoryLogicNode node = fnExpanded.LogicNodes.TryGetValue(Logic.Id, out StoryLogicNode? fn) ? fn : Logic;
-        return StoryLogicRenderer.Render(fnExpanded, _ProjectState.CurrentLocalization, node, Values, _Paper, StoryRenderTarget.App);
+        // Both node and project come from the parent, already in one space — the session decided which.
+        return StoryLogicRenderer.Render(Project, _ProjectState.CurrentLocalization, Logic, Values, _Paper, StoryRenderTarget.App);
     }
 
     /// <summary>
@@ -238,7 +236,8 @@
     /// so it renders as that variable's slot label. Returns null when nothing matches so the tag stays visible.</summary>
     private StoryRegisterVariableNode? ResolveVariableTag(string name)
     {
-        foreach (StoryLogicNode logic in _ProjectState.CurrentProject!.LogicNodes.Values)
+        // The session's project, so a variable registered inside a blueprint resolves to the slot *this* instance got.
+        foreach (StoryLogicNode logic in Project.LogicNodes.Values)
             if (logic.RegisterVariableNodes.Find(n => string.Equals(n.Name, name, StringComparison.OrdinalIgnoreCase)) is StoryRegisterVariableNode reg)
                 return reg;
         return null;
