@@ -31,6 +31,15 @@ namespace DeusaldStoryCommon
         public StoryConnectionPoint GamebookTextIn { get; set; } = new() { Name = "Gamebook Instruction" };
 
         /// <summary>
+        /// Optional <c>Text</c> input wrapping <b>each</b> Gamebook outcome value before it goes into the D12 band table.
+        /// (The App draws a single value, so it needs no per-result format.) The wired text may use
+        /// <c>{<see cref="ResultToken"/>}</c> as the placeholder for the raw value — e.g. <c>&lt;var={RandomResult}&gt;</c>
+        /// turns each outcome into a variable pill. Wire a <b>Constant String</b> node so the placeholder survives to be
+        /// substituted here. When unwired the raw value is used verbatim.
+        /// </summary>
+        public StoryConnectionPoint GamebookResultFormat { get; set; } = new() { Name = "Gamebook Result Format" };
+
+        /// <summary>
         /// Optional <c>CVariable</c> input selecting which range to draw from. When wired, the author defines one
         /// <see cref="StoryRandomRange"/> per possible branch value (instead of the single <see cref="DefaultRange"/>);
         /// the concrete value is resolved per render / Gamebook section.

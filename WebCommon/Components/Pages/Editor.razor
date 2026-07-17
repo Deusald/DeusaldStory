@@ -162,6 +162,7 @@
 <VariablePickerModal       @ref="_VariablePicker"      OnConfirm="OnVariablePicked"/>
 <GetVariableModal          @ref="_GetVariableModal"    OnConfirm="OnGetVariableConfirmed"/>
 <ConstantVariableModal     @ref="_ConstantVariableModal" OnConfirm="OnConstantVariableConfirmed"/>
+<ConstantStringModal       @ref="_ConstantStringModal"   OnConfirm="OnConstantStringConfirmed"/>
 <RandomizedInstructionModal @ref="_RandomizedInstructionModal" OnConfirm="OnRandomizedInstructionConfirmed"/>
 <RegisterVariableModal     @ref="_RegisterVariableModal" Logic="_CurrentLogicNode" OnConfirm="OnRegisterVariableConfirmed"/>
 <SetVariableModal          @ref="_SetVariableModal"      Logic="_CurrentLogicNode" OnConfirm="OnSetVariableConfirmed"/>
@@ -212,6 +213,7 @@
     private VariablePickerModal?       _VariablePicker;
     private GetVariableModal?          _GetVariableModal;
     private ConstantVariableModal?     _ConstantVariableModal;
+    private ConstantStringModal?       _ConstantStringModal;
     private RandomizedInstructionModal? _RandomizedInstructionModal;
     private RegisterVariableModal?     _RegisterVariableModal;
     private SetVariableModal?          _SetVariableModal;
@@ -757,6 +759,7 @@
                 new NodePaletteItem(StoryNodeKind.ExternalVariable, "bi-braces",          Loc.T(Localization.Editor.Palette.Items.externalVariableLabel), Loc.T(Localization.Editor.Palette.Items.externalVariableDesc)),
                 new NodePaletteItem(StoryNodeKind.GetVariable,      "bi-box-arrow-down",  Loc.T(Localization.Editor.Palette.Items.getVariableLabel),           Loc.T(Localization.Editor.Palette.Items.getVariableDesc)),
                 new NodePaletteItem(StoryNodeKind.ConstantVariable, "bi-braces",          Loc.T(Localization.Editor.Palette.Items.constantVariableLabel),      Loc.T(Localization.Editor.Palette.Items.constantVariableDesc)),
+                new NodePaletteItem(StoryNodeKind.ConstantString,   "bi-fonts",           Loc.T(Localization.Editor.Palette.Items.constantStringLabel),        Loc.T(Localization.Editor.Palette.Items.constantStringDesc)),
                 new NodePaletteItem(StoryNodeKind.RandomizedInstruction, "bi-dice-5",     Loc.T(Localization.Editor.Palette.Items.randomizedInstructionLabel), Loc.T(Localization.Editor.Palette.Items.randomizedInstructionDesc)),
                 new NodePaletteItem(StoryNodeKind.FlowText,         "bi-text-paragraph",  Loc.T(Localization.Editor.Palette.Items.flowTextLabel),         Loc.T(Localization.Editor.Palette.Items.flowTextDesc)),
                 new NodePaletteItem(StoryNodeKind.SplitForApp,      "bi-scissors",        Loc.T(Localization.Editor.Palette.Items.splitForAppLabel),         Loc.T(Localization.Editor.Palette.Items.splitForAppDesc)),
@@ -802,6 +805,7 @@
             case StoryNodeKind.ExternalVariable: _VariablePicker?.Show(Guid.Empty, Guid.Empty); break;
             case StoryNodeKind.GetVariable:      _GetVariableModal?.Show();      break;
             case StoryNodeKind.ConstantVariable: _ConstantVariableModal?.Show(); break;
+            case StoryNodeKind.ConstantString:   _ConstantStringModal?.Show();   break;
             case StoryNodeKind.RandomizedInstruction: if (_CurrentLogicNode is not null) _RandomizedInstructionModal?.Show(_CurrentLogicNode); break;
             case StoryNodeKind.FlowText:
                 // No config — create it straight away at the pending position.
@@ -1017,6 +1021,19 @@
             _ProjectState.UpdateConstantVariableNode(_CurrentId, args.EditNodeId, args.Name, args.Value);
         }
         else if (_ProjectState.AddConstantVariableNode(_CurrentId, args.Name, args.Value, _PendingX, _PendingY) is StoryConstantVariableNode node)
+        {
+            _SelectedId = node.Id;
+        }
+        RebuildNodes();
+    }
+
+    private void OnConstantStringConfirmed(ConstantStringModal.ConstantStringArgs args)
+    {
+        if (args.EditNodeId != Guid.Empty)
+        {
+            _ProjectState.UpdateConstantStringNode(_CurrentId, args.EditNodeId, args.Value);
+        }
+        else if (_ProjectState.AddConstantStringNode(_CurrentId, args.Value, _PendingX, _PendingY) is StoryConstantStringNode node)
         {
             _SelectedId = node.Id;
         }
@@ -1298,6 +1315,11 @@
                     _ConstantVariableModal?.ShowEdit(cv);
                 break;
 
+            case StoryNodeKind.ConstantString:
+                if (_CurrentLogicNode?.ConstantStringNodes.Find(n => n.Id == node.Id) is StoryConstantStringNode cs)
+                    _ConstantStringModal?.ShowEdit(cs);
+                break;
+
             case StoryNodeKind.RandomizedInstruction:
                 if (_CurrentLogicNode?.RandomizedInstructionNodes.Find(n => n.Id == node.Id) is StoryRandomizedInstructionNode ri)
                     _RandomizedInstructionModal?.ShowEdit(ri, _CurrentLogicNode);
@@ -1410,6 +1432,7 @@
             case StoryNodeKind.ExternalVariable: _ProjectState.DeleteExternalVariableNode(_CurrentId, node.Id); break;
             case StoryNodeKind.GetVariable:      _ProjectState.DeleteGetVariableNode(_CurrentId, node.Id);      break;
             case StoryNodeKind.ConstantVariable: _ProjectState.DeleteConstantVariableNode(_CurrentId, node.Id); break;
+            case StoryNodeKind.ConstantString:   _ProjectState.DeleteConstantStringNode(_CurrentId, node.Id);   break;
             case StoryNodeKind.RandomizedInstruction: _ProjectState.DeleteRandomizedInstructionNode(_CurrentId, node.Id); break;
             case StoryNodeKind.FlowText:         _ProjectState.DeleteFlowTextNode(_CurrentId, node.Id);        break;
             case StoryNodeKind.SplitForApp:      _ProjectState.DeleteSplitForAppNode(_CurrentId, node.Id);     break;

@@ -61,6 +61,7 @@ namespace DeusaldStoryWeb
         ExternalVariable, // inside a logic node: picks a story variable, feeds a SmartFormat/Exit variables input (teal)
         GetVariable,      // inside a logic node: reads a registered storage variable — App value / Gamebook slot tag (teal)
         ConstantVariable, // inside a logic node: a named constant value fed into a SmartFormat/Exit input (teal)
+        ConstantString,   // inside a logic node: a literal text (verbatim) fed into any text input (teal)
         RandomizedInstruction, // inside a logic node: renders a random choice — App drawn value / Gamebook D12 band table (purple)
         FlowText,         // inside a logic node: on the LFlow chain, renders a text block then continues (amber)
         SplitForApp,      // inside a logic node: on the LFlow chain, breaks the App render into a new "continue" page (purple)
@@ -559,6 +560,22 @@ namespace DeusaldStoryWeb
                 nodes.Add(node);
             }
 
+            // ── Constant String nodes (teal) — a literal text (verbatim) fed into any text input. ──
+            foreach (StoryConstantStringNode cs in logic.ConstantStringNodes)
+            {
+                EdNode node = new()
+                {
+                    Id        = cs.Id,
+                    Kind      = StoryNodeKind.ConstantString,
+                    Title     = string.IsNullOrWhiteSpace(cs.Value) ? UiLang.T(Localization.Editor.Nodes.Titles.constantString) : cs.Value,
+                    X         = cs.X,
+                    Y         = cs.Y,
+                    Deletable = true
+                };
+                node.Outputs.Add(new EdPort { Id = cs.OutPoint.Id, Name = UiLang.T(Localization.Editor.Nodes.Ports.text), Type = PortType.Text });
+                nodes.Add(node);
+            }
+
             // ── Randomized Instruction nodes (purple) — a medium-switching SmartFormat: App drawn value / Gamebook D12 band table. ──
             foreach (StoryRandomizedInstructionNode ri in logic.RandomizedInstructionNodes)
             {
@@ -573,9 +590,10 @@ namespace DeusaldStoryWeb
                     Deletable = true,
                     Editable  = true
                 };
-                node.Inputs.Add(new EdPort { Id = ri.AppTextIn.Id,      Name = UiLang.T(Localization.Editor.Nodes.Ports.appInstruction),      Type = PortType.Text });
-                node.Inputs.Add(new EdPort { Id = ri.GamebookTextIn.Id, Name = UiLang.T(Localization.Editor.Nodes.Ports.gamebookInstruction), Type = PortType.Text });
-                node.Inputs.Add(new EdPort { Id = ri.BranchIn.Id,       Name = UiLang.T(Localization.Editor.Nodes.Ports.branch),               Type = PortType.CVariable });
+                node.Inputs.Add(new EdPort { Id = ri.AppTextIn.Id,            Name = UiLang.T(Localization.Editor.Nodes.Ports.appInstruction),       Type = PortType.Text });
+                node.Inputs.Add(new EdPort { Id = ri.GamebookTextIn.Id,       Name = UiLang.T(Localization.Editor.Nodes.Ports.gamebookInstruction),  Type = PortType.Text });
+                node.Inputs.Add(new EdPort { Id = ri.GamebookResultFormat.Id, Name = UiLang.T(Localization.Editor.Nodes.Ports.gamebookResultFormat), Type = PortType.Text });
+                node.Inputs.Add(new EdPort { Id = ri.BranchIn.Id,            Name = UiLang.T(Localization.Editor.Nodes.Ports.branch),               Type = PortType.CVariable });
                 node.Outputs.Add(new EdPort { Id = ri.OutText.Id,     Name = UiLang.T(Localization.Editor.Nodes.Ports.text),   Type = PortType.Text });
                 node.Outputs.Add(new EdPort { Id = ri.OutVariable.Id, Name = UiLang.T(Localization.Editor.Nodes.Ports.result), Type = PortType.Variable });
                 nodes.Add(node);
@@ -912,6 +930,7 @@ namespace DeusaldStoryWeb
             if (logic.GetVariableNodes.Exists(n => n.OutPoint.Id == outputId))     return PortType.Variable;
             if (logic.GetVariableNodes.Exists(n => n.SlotOutPoint.Id == outputId)) return PortType.CVariable;
             if (logic.ConstantVariableNodes.Exists(n => n.OutPoint.Id == outputId)) return PortType.CVariable;
+            if (logic.ConstantStringNodes.Exists(n => n.OutPoint.Id == outputId))   return PortType.Text;
             if (logic.RandomizedInstructionNodes.Exists(n => n.OutText.Id == outputId))     return PortType.Text;
             if (logic.RandomizedInstructionNodes.Exists(n => n.OutVariable.Id == outputId)) return PortType.Variable;
             if (StorySelectionResolver.IncomingVariables(project, logic).Exists(d => d.Id == outputId)) return PortType.CVariable;
@@ -1118,6 +1137,7 @@ namespace DeusaldStoryWeb
             StoryNodeKind.ExternalVariable => UiLang.T(Localization.Editor.Nodes.Labels.externalVariable),
             StoryNodeKind.GetVariable      => UiLang.T(Localization.Editor.Nodes.Labels.getVariable),
             StoryNodeKind.ConstantVariable => UiLang.T(Localization.Editor.Nodes.Labels.constantVariable),
+            StoryNodeKind.ConstantString   => UiLang.T(Localization.Editor.Nodes.Labels.constantString),
             StoryNodeKind.RandomizedInstruction => UiLang.T(Localization.Editor.Nodes.Labels.randomizedInstruction),
             StoryNodeKind.FlowText         => UiLang.T(Localization.Editor.Nodes.Labels.flowText),
             StoryNodeKind.SplitForApp      => UiLang.T(Localization.Editor.Nodes.Labels.splitForApp),
@@ -1173,6 +1193,7 @@ namespace DeusaldStoryWeb
             StoryNodeKind.ExternalVariable => "bi-braces",
             StoryNodeKind.GetVariable      => "bi-box-arrow-down",
             StoryNodeKind.ConstantVariable => "bi-braces",
+            StoryNodeKind.ConstantString   => "bi-fonts",
             StoryNodeKind.RandomizedInstruction => "bi-dice-5",
             StoryNodeKind.FlowText         => "bi-text-paragraph",
             StoryNodeKind.SplitForApp      => "bi-scissors",
@@ -1244,6 +1265,7 @@ namespace DeusaldStoryWeb
             StoryNodeKind.ExternalVariable => "var(--code-func)",
             StoryNodeKind.GetVariable      => "var(--code-func)",
             StoryNodeKind.ConstantVariable => "var(--code-func)",
+            StoryNodeKind.ConstantString   => "var(--code-func)",
             StoryNodeKind.RandomizedInstruction => "var(--purple)",
             StoryNodeKind.FlowText         => "var(--warning)",
             StoryNodeKind.SplitForApp      => "var(--purple)",

@@ -1,0 +1,91 @@
+@namespace DeusaldStoryWeb.Components.Common
+@inject UiLocalizationService Loc
+
+@* ─────────────────────────────────────────────────────────────────────────
+   Creates / edits a Constant String node: a literal text carried on a Text
+   output, wired into any text input. The value is returned verbatim (no
+   SmartFormat pass), so placeholder tokens the author types survive to be
+   substituted by whatever consumes the wire.
+   ───────────────────────────────────────────────────────────────────────── *@
+
+@if (_Visible)
+{
+    <div class="modal-backdrop" @onclick="Cancel"></div>
+
+    <div class="modal-box cvm-box" @onclick:stopPropagation="true">
+
+        <div class="modal-header">
+            <span class="modal-title">@(_IsEdit ? Loc.T(Localization.Editor.Modals.ConstantString.editTitle) : Loc.T(Localization.Editor.Modals.ConstantString.title))</span>
+            <button class="modal-close" @onclick="Cancel" title="@Loc.T(Localization.Common.Buttons.close)">
+                <i class="bi bi-x-lg"></i>
+            </button>
+        </div>
+
+        <div class="modal-body">
+
+            <div class="modal-field">
+                <label class="modal-label">@Loc.T(Localization.Common.Fields.value)</label>
+                <input class="modal-input"
+                       type="text"
+                       placeholder="@Loc.T(Localization.Editor.Modals.ConstantString.valuePlaceholder)"
+                       @bind="_Value"
+                       @bind:event="oninput"
+                       maxlength="500"/>
+            </div>
+
+            <div class="modal-note">
+                <i class="bi bi-info-circle"></i>
+                <span>@((MarkupString)Loc.T(Localization.Editor.Modals.ConstantString.note))</span>
+            </div>
+
+        </div>
+
+        <div class="modal-footer">
+            <button class="modal-btn modal-btn-ghost" @onclick="Cancel">@Loc.T(Localization.Common.Buttons.cancel)</button>
+            <button class="modal-btn modal-btn-primary" @onclick="Confirm">
+                @(_IsEdit ? Loc.T(Localization.Common.Buttons.saveChanges) : Loc.T(Localization.Editor.Modals.ConstantString.addButton))
+            </button>
+        </div>
+
+    </div>
+}
+
+@code {
+    [Parameter] public EventCallback<ConstantStringArgs> OnConfirm { get; set; }
+
+    private bool   _Visible;
+    private bool   _IsEdit;
+    private Guid   _EditNodeId;
+    private string _Value = "";
+
+    /// <summary>Opens the modal to create a new Constant String node.</summary>
+    public void Show()
+    {
+        _IsEdit     = false;
+        _EditNodeId = Guid.Empty;
+        _Value      = "";
+        _Visible    = true;
+        StateHasChanged();
+    }
+
+    /// <summary>Opens the modal to edit an existing Constant String node.</summary>
+    public void ShowEdit(StoryConstantStringNode node)
+    {
+        _IsEdit     = true;
+        _EditNodeId = node.Id;
+        _Value      = node.Value;
+        _Visible    = true;
+        StateHasChanged();
+    }
+
+    private async Task Confirm()
+    {
+        _Visible = false;
+        await OnConfirm.InvokeAsync(new ConstantStringArgs(_EditNodeId, _Value));
+    }
+
+    private void Cancel() => _Visible = false;
+
+    /// <summary>Result passed back to the parent. <see cref="EditNodeId"/> is empty for a create, set for an edit.</summary>
+    public record ConstantStringArgs(Guid EditNodeId, string Value);
+}

@@ -367,6 +367,7 @@ namespace DeusaldStoryCommon
                     public static readonly Guid splitForAppNode = new Guid("720e0321-5ab5-44e8-8940-7012e652b221");
                     public static readonly Guid setExternalVariableNode = new Guid("f697532b-95d3-47be-b0ff-4b4d67f3a8fe");
                     public static readonly Guid constantVariableNode = new Guid("7a0be8f9-6123-422b-9246-d1c8de051c0a");
+                    public static readonly Guid constantStringNode = new Guid("c88718c7-bee6-4390-9bb2-fcd5e222ab98");
                     public static readonly Guid getVariableNode = new Guid("7676a8bc-808c-4e9e-b3b0-9466a702ade2");
                     public static readonly Guid prevExitVariables = new Guid("9cefa472-9a6f-478e-a301-4dca292dfaa3");
                     public static readonly Guid comment = new Guid("c4fd180a-9288-47a1-82c6-ecd452c5f79b");
@@ -419,6 +420,8 @@ namespace DeusaldStoryCommon
                     public static readonly Guid getVariableDesc = new Guid("c076cc2a-e92f-4cce-aab0-da966bc43346");
                     public static readonly Guid constantVariableLabel = new Guid("21c994b5-f0f5-4a45-9c18-bbf1acd150f3");
                     public static readonly Guid constantVariableDesc = new Guid("3b3bb1dc-c611-426d-a204-f43ce8ee164f");
+                    public static readonly Guid constantStringLabel = new Guid("27fa6a74-a356-4c57-a9cc-b3c88ba321f5");
+                    public static readonly Guid constantStringDesc = new Guid("3b35306e-dcb0-483c-996a-f1dfe7389d1c");
                     public static readonly Guid flowTextLabel = new Guid("6fbf730d-2872-44eb-9c4c-9aa79458f8d2");
                     public static readonly Guid flowTextDesc = new Guid("172ea397-2748-4aeb-87ec-2a892eb517e3");
                     public static readonly Guid splitForAppLabel = new Guid("827e87ac-5122-43e6-a966-3d8f60e9fd8d");
@@ -778,6 +781,16 @@ namespace DeusaldStoryCommon
                     public static readonly Guid addButton = new Guid("582c4d17-0e1e-4d8a-a964-34d06d820d4b");
                 }
 
+                public static class ConstantString
+                {
+                    public static readonly Guid editTitle = new Guid("63c670a9-9331-496f-8384-6fbf9a7bf1b0");
+                    public static readonly Guid title = new Guid("af56ad54-04de-4f9f-911e-371ca1356443");
+                    public static readonly Guid valuePlaceholder = new Guid("923e3895-5511-462c-b210-df3b730b093f");
+                    /// <summary>MarkupString.</summary>
+                    public static readonly Guid note = new Guid("519dae48-92b2-4d90-8820-4dcfcc2249ce");
+                    public static readonly Guid addButton = new Guid("955410c6-81dd-48ca-82bf-95504e407010");
+                }
+
                 public static class GetVariable
                 {
                     public static readonly Guid editTitle = new Guid("18e0aeac-3d6c-4b8d-ab15-27303d5431ae");
@@ -965,6 +978,7 @@ namespace DeusaldStoryCommon
                     public static readonly Guid gamebookInstruction = new Guid("88508fbb-9693-4669-b986-eb68405b0072");
                     public static readonly Guid branch = new Guid("c79d3623-f05d-400b-8191-878789b87fff");
                     public static readonly Guid result = new Guid("7fa3503b-64ee-44d2-b8c9-741d166d5835");
+                    public static readonly Guid gamebookResultFormat = new Guid("725b72f6-beec-47b5-916b-8aaa47d7b080");
                 }
 
                 public static class Titles
@@ -1015,6 +1029,8 @@ namespace DeusaldStoryCommon
                     public static readonly Guid deletedFunction = new Guid("f4fcf4c8-ae8e-45fd-85dd-1e1f40a85db0");
                     /// <summary>Fallback title of a Randomized Instruction node with no result token yet.</summary>
                     public static readonly Guid randomizedInstruction = new Guid("659e53a8-ccc4-41cc-bae3-817b2d43c938");
+                    /// <summary>Fallback title of a Constant String node with no value yet.</summary>
+                    public static readonly Guid constantString = new Guid("1c299a0c-c04c-4de9-8919-3dab830123ee");
                 }
 
                 public static class PortTypes
@@ -1050,6 +1066,7 @@ namespace DeusaldStoryCommon
                     public static readonly Guid externalVariable = new Guid("36a2a1b0-ab3a-433d-aeb1-7a16284968f3");
                     public static readonly Guid getVariable = new Guid("fe32c0de-ca95-4ccd-8168-4b717ed45397");
                     public static readonly Guid constantVariable = new Guid("96a73dcf-9775-4a9f-8945-2384d8d93e45");
+                    public static readonly Guid constantString = new Guid("bbfab2b3-6892-4511-80ef-a8c4103fd12e");
                     public static readonly Guid flowText = new Guid("eebb75ab-50b0-47e3-a1ce-d9938f1c88fb");
                     public static readonly Guid splitForApp = new Guid("b3ad5429-2fc5-48ef-b0a0-177b042d7079");
                     public static readonly Guid registerVariable = new Guid("a694ecae-cb4e-4538-9d72-295fbda4b657");
@@ -1418,6 +1435,7 @@ namespace DeusaldStoryCommon
                 { new Guid("720e0321-5ab5-44e8-8940-7012e652b221"), "split for App node" },
                 { new Guid("f697532b-95d3-47be-b0ff-4b4d67f3a8fe"), "set external variable node" },
                 { new Guid("7a0be8f9-6123-422b-9246-d1c8de051c0a"), "constant variable node" },
+                { new Guid("c88718c7-bee6-4390-9bb2-fcd5e222ab98"), "constant string node" },
                 { new Guid("7676a8bc-808c-4e9e-b3b0-9466a702ade2"), "get variable node" },
                 { new Guid("9cefa472-9a6f-478e-a301-4dca292dfaa3"), "prev exit variables" },
                 { new Guid("c4fd180a-9288-47a1-82c6-ecd452c5f79b"), "comment" },
@@ -1454,6 +1472,8 @@ namespace DeusaldStoryCommon
                 { new Guid("c076cc2a-e92f-4cce-aab0-da966bc43346"), "Reads a registered variable: a Value output (App) and a Slot-tag output (Gamebook)." },
                 { new Guid("21c994b5-f0f5-4a45-9c18-bbf1acd150f3"), "Constant variable" },
                 { new Guid("3b3bb1dc-c611-426d-a204-f43ce8ee164f"), "Supplies a named constant value into a SmartFormat / Exit variables input (never splits Gamebook sections)." },
+                { new Guid("27fa6a74-a356-4c57-a9cc-b3c88ba321f5"), "Constant string" },
+                { new Guid("3b35306e-dcb0-483c-996a-f1dfe7389d1c"), "Supplies a literal text (verbatim) into any text input — e.g. a Randomized Instruction's Result Format." },
                 { new Guid("6fbf730d-2872-44eb-9c4c-9aa79458f8d2"), "FlowText node" },
                 { new Guid("172ea397-2748-4aeb-87ec-2a892eb517e3"), "On the logic chain — renders a connected text block, then continues to the next node." },
                 { new Guid("827e87ac-5122-43e6-a966-3d8f60e9fd8d"), "Split for App" },
@@ -1690,6 +1710,12 @@ namespace DeusaldStoryCommon
                 { new Guid("f65b9de2-0cf9-4911-b2a9-87a70595a62f"), "constant value" },
                 { new Guid("796aed3e-ebb1-4fe9-b2f9-5160b3585120"), "Wire this node's <b>Value</b> output into a SmartFormat variables input (or the Exit node's variables input) to use it." },
                 { new Guid("582c4d17-0e1e-4d8a-a964-34d06d820d4b"), "Add constant variable node" },
+                // Constant String — modal
+                { new Guid("63c670a9-9331-496f-8384-6fbf9a7bf1b0"), "Edit constant string" },
+                { new Guid("af56ad54-04de-4f9f-911e-371ca1356443"), "Constant string" },
+                { new Guid("923e3895-5511-462c-b210-df3b730b093f"), "literal text" },
+                { new Guid("519dae48-92b2-4d90-8820-4dcfcc2249ce"), "Wire this node's <b>Text</b> output into any text input. The text is used <b>verbatim</b> — placeholder tokens you type (e.g. <code>{RandomResult}</code>) survive to be substituted by whatever consumes the wire." },
+                { new Guid("955410c6-81dd-48ca-82bf-95504e407010"), "Add constant string node" },
                 { new Guid("18e0aeac-3d6c-4b8d-ab15-27303d5431ae"), "Edit get variable" },
                 { new Guid("6557909d-2c53-478c-99b2-17ac894e5702"), "Get variable" },
                 { new Guid("265a38df-7db8-4206-a6f6-be628a038353"), "Registered variable" },
@@ -1851,6 +1877,7 @@ namespace DeusaldStoryCommon
                 { new Guid("36a2a1b0-ab3a-433d-aeb1-7a16284968f3"), "EXTERNAL VARIABLE" },
                 { new Guid("fe32c0de-ca95-4ccd-8168-4b717ed45397"), "GET VARIABLE" },
                 { new Guid("96a73dcf-9775-4a9f-8945-2384d8d93e45"), "CONSTANT VARIABLE" },
+                { new Guid("bbfab2b3-6892-4511-80ef-a8c4103fd12e"), "CONSTANT STRING" },
                 { new Guid("eebb75ab-50b0-47e3-a1ce-d9938f1c88fb"), "FLOW TEXT" },
                 { new Guid("b3ad5429-2fc5-48ef-b0a0-177b042d7079"), "SPLIT FOR APP" },
                 { new Guid("a694ecae-cb4e-4538-9d72-295fbda4b657"), "REGISTER VARIABLE" },
@@ -1945,9 +1972,12 @@ namespace DeusaldStoryCommon
                 { new Guid("88508fbb-9693-4669-b986-eb68405b0072"), "Gamebook Instruction" },
                 { new Guid("c79d3623-f05d-400b-8191-878789b87fff"), "Branch" },
                 { new Guid("7fa3503b-64ee-44d2-b8c9-741d166d5835"), "Result" },
+                { new Guid("725b72f6-beec-47b5-916b-8aaa47d7b080"), "Gamebook Result Format" },
                 // Randomized Instruction — node title fallback + label
                 { new Guid("659e53a8-ccc4-41cc-bae3-817b2d43c938"), "Random" },
                 { new Guid("e6106c9a-e349-4007-86a8-143d90d3f687"), "Randomized Instruction" },
+                // Constant String — node title fallback
+                { new Guid("1c299a0c-c04c-4de9-8919-3dab830123ee"), "Empty text" },
                 // Randomized Instruction — palette
                 { new Guid("d7614656-05f0-4a56-8826-455ac5f00617"), "Randomized Instruction" },
                 { new Guid("bd14b3dc-0e4a-449c-9e6d-6def6639fe40"), "A random choice — the app shows the drawn value, the gamebook prints the D12 roll table." },

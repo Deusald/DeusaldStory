@@ -110,6 +110,9 @@ namespace DeusaldStoryCommon
         /// <summary>Constant Variable nodes placed in the inner graph (each supplies a named constant value into a SmartFormat/Exit input).</summary>
         public List<StoryConstantVariableNode> ConstantVariableNodes { get; } = new();
 
+        /// <summary>Constant String nodes placed in the inner graph (each supplies a literal text, verbatim, into any text input).</summary>
+        public List<StoryConstantStringNode> ConstantStringNodes { get; } = new();
+
         /// <summary>FlowText nodes placed in the inner graph — the LFlow chain that renders text blocks in order.</summary>
         public List<StoryFlowTextNode> FlowTextNodes { get; } = new();
 

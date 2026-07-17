@@ -350,6 +350,11 @@ namespace DeusaldStoryCommon
             if (logic.LocalizationNodes.Find(n => n.OutPoint.Id == fromPoint) is StoryLocalizationNode locNode)
                 return LocalizedText(localization, locNode.SelectedKeyId);
 
+            // A Constant String is a literal text source — returned verbatim so any placeholder tokens the author typed
+            // (e.g. {RandomResult}) survive to be substituted by whatever consumes the wire.
+            if (logic.ConstantStringNodes.Find(n => n.OutPoint.Id == fromPoint) is StoryConstantStringNode constStr)
+                return constStr.Value;
+
             if (logic.SmartFormatNodes.Find(n => n.OutPoint.Id == fromPoint) is StorySmartFormatNode sf)
             {
                 string format = ResolveText(project, localization, logic, values, FromPointInto(logic, sf.LocalizationIn.Id), target, depth + 1, errors, extraValues);
@@ -417,12 +422,17 @@ namespace DeusaldStoryCommon
                 string       tokenName = string.IsNullOrWhiteSpace(ri.ResultToken) ? "RandomResult" : ri.ResultToken.Trim();
                 if (target == StoryRenderTarget.App)
                 {
+                    // The App draws a single value — used verbatim (no per-result format needed).
                     tokens[tokenName]           = !string.IsNullOrEmpty(ri.PreviewValue) ? ri.PreviewValue : range.FirstOrDefault() ?? "";
                     tokens["RandomInstruction"] = "";
                 }
                 else
                 {
-                    tokens[tokenName]           = RandomBandList(localization, range, ri.RemainderMode);
+                    // Every outcome, each wrapped through the Gamebook Result Format (identity when unwired), then laid out as the D12 band table.
+                    List<string> formatted = new(range.Count);
+                    foreach (string value in range)
+                        formatted.Add(FormatGamebookResult(project, localization, logic, values, ri, value, tokenName, depth, errors, extraValues));
+                    tokens[tokenName]           = RandomBandList(localization, formatted, ri.RemainderMode);
                     tokens["RandomInstruction"] = StoryCommonLocalizationKeys.Resolve(localization, StoryCommonLocalizationKeys.RandomRollD12);
                 }
 
@@ -433,6 +443,26 @@ namespace DeusaldStoryCommon
             }
 
             return "";
+        }
+
+        /// <summary>
+        /// Wraps a single Gamebook outcome value through the node's Gamebook Result Format input — the wired text
+        /// (typically a Constant String) with the <see cref="StoryRandomizedInstructionNode.ResultToken"/> placeholder
+        /// substituted for the value. Returns the value verbatim when the format input is unwired.
+        /// </summary>
+        private static string FormatGamebookResult(
+            StoryProject project, LocProject? localization, StoryLogicNode logic,
+            IReadOnlyDictionary<Guid, string> values, StoryRandomizedInstructionNode ri, string value, string tokenName,
+            int depth, List<string> errors, IReadOnlyDictionary<string, object>? extraValues)
+        {
+            string format = ResolveText(project, localization, logic, values, FromPointInto(logic, ri.GamebookResultFormat.Id), StoryRenderTarget.Gamebook, depth + 1, errors, extraValues);
+            if (string.IsNullOrEmpty(format)) return value;
+
+            Dictionary<string, object> tokens   = new(StringComparer.OrdinalIgnoreCase) { [tokenName] = value };
+            string                     rendered = StoryConditionPreview.Render(format, tokens, out string? error);
+            if (error is not null)
+                errors.Add(UiLang.T(Localization.Services.Renderer.smartFormatFailed, new Dictionary<string, object> { ["error"] = error }));
+            return rendered;
         }
 
         /// <summary>The range a Randomized Instruction node draws from for this render — the per-branch range when Branch is wired, else the default.</summary>

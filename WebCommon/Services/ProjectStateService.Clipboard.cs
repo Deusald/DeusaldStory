@@ -271,6 +271,8 @@ public partial class ProjectStateService
             ?? logic.ExternalVariableNodes.Find(n => n.Id == edId)
             ?? logic.GetVariableNodes.Find(n => n.Id == edId)
             ?? logic.ConstantVariableNodes.Find(n => n.Id == edId)
+            ?? logic.ConstantStringNodes.Find(n => n.Id == edId)
+            ?? logic.RandomizedInstructionNodes.Find(n => n.Id == edId)
             ?? logic.FlowTextNodes.Find(n => n.Id == edId)
             ?? logic.SplitForAppNodes.Find(n => n.Id == edId)
             ?? logic.RegisterVariableNodes.Find(n => n.Id == edId)

@@ -620,6 +620,7 @@ public partial class ProjectStateService(
         logic.RandomizedInstructionNodes.Remove(node);
         logic.ContentConnections.RemoveAll(c =>
             c.ToPoint == node.AppTextIn.Id || c.ToPoint == node.GamebookTextIn.Id || c.ToPoint == node.BranchIn.Id ||
+            c.ToPoint == node.GamebookResultFormat.Id ||
             c.FromPoint == node.OutText.Id || c.ToPoint == node.OutText.Id ||
             c.FromPoint == node.OutVariable.Id || c.ToPoint == node.OutVariable.Id);
         MarkKeyDirty(logicId);
@@ -655,6 +656,39 @@ public partial class ProjectStateService(
         if (node is null) return;
 
         logic.ConstantVariableNodes.Remove(node);
+        logic.ContentConnections.RemoveAll(c => c.FromPoint == node.OutPoint.Id || c.ToPoint == node.OutPoint.Id);
+        MarkKeyDirty(logicId);
+    }
+
+    /// <summary>Adds a Constant String node (a literal text carried on a Text output) to a logic node's inner graph.</summary>
+    public StoryConstantStringNode? AddConstantStringNode(Guid logicId, string value, double x, double y)
+    {
+        if (!CurrentProject!.LogicNodes.TryGetValue(logicId, out StoryLogicNode? logic)) return null;
+
+        StoryConstantStringNode node = new() { Value = value, X = x, Y = y };
+        logic.ConstantStringNodes.Add(node);
+        MarkKeyDirty(logicId);
+        return node;
+    }
+
+    /// <summary>Updates the value of a Constant String node.</summary>
+    public void UpdateConstantStringNode(Guid logicId, Guid nodeId, string value)
+    {
+        if (!CurrentProject!.LogicNodes.TryGetValue(logicId, out StoryLogicNode? logic)) return;
+        StoryConstantStringNode? node = logic.ConstantStringNodes.Find(n => n.Id == nodeId);
+        if (node is null) return;
+        node.Value = value;
+        MarkKeyDirty(logicId);
+    }
+
+    /// <summary>Deletes a Constant String node and any inner wire that touched its output.</summary>
+    public void DeleteConstantStringNode(Guid logicId, Guid nodeId)
+    {
+        if (!CurrentProject!.LogicNodes.TryGetValue(logicId, out StoryLogicNode? logic)) return;
+        StoryConstantStringNode? node = logic.ConstantStringNodes.Find(n => n.Id == nodeId);
+        if (node is null) return;
+
+        logic.ConstantStringNodes.Remove(node);
         logic.ContentConnections.RemoveAll(c => c.FromPoint == node.OutPoint.Id || c.ToPoint == node.OutPoint.Id);
         MarkKeyDirty(logicId);
     }
@@ -1263,6 +1297,7 @@ public partial class ProjectStateService(
                         || logic.ExternalVariableNodes.Exists(ev => ev.OutPoint.Id == fromPoint)
                         || logic.GetVariableNodes.Exists(gv => gv.OutPoint.Id == fromPoint || gv.SlotOutPoint.Id == fromPoint)
                         || logic.ConstantVariableNodes.Exists(cv => cv.OutPoint.Id == fromPoint)
+                        || logic.ConstantStringNodes.Exists(cs => cs.OutPoint.Id == fromPoint)
                         || logic.RandomizedInstructionNodes.Exists(r => r.OutText.Id == fromPoint || r.OutVariable.Id == fromPoint)
                         || logic.LogicPortalNodes.Exists(p => p.OutPoints.Exists(o => o.Id == fromPoint))
                         || logic.FunctionInstanceNodes.Exists(fi => fi.OutputPorts.Exists(p => p.Id == fromPoint))
@@ -1377,6 +1412,15 @@ public partial class ProjectStateService(
         {
             cv.X = x;
             cv.Y = y;
+            MarkKeyDirty(logicId);
+            return;
+        }
+
+        StoryConstantStringNode? cs = logic.ConstantStringNodes.Find(n => n.Id == movedId);
+        if (cs is not null)
+        {
+            cs.X = x;
+            cs.Y = y;
             MarkKeyDirty(logicId);
             return;
         }
@@ -1812,10 +1856,12 @@ public partial class ProjectStateService(
             valid.Add(n.NameIn.Id);
         }
         foreach (StoryConstantVariableNode n in logic.ConstantVariableNodes) valid.Add(n.OutPoint.Id);
+        foreach (StoryConstantStringNode n in logic.ConstantStringNodes)     valid.Add(n.OutPoint.Id);
         foreach (StoryRandomizedInstructionNode n in logic.RandomizedInstructionNodes)
         {
             valid.Add(n.AppTextIn.Id);
             valid.Add(n.GamebookTextIn.Id);
+            valid.Add(n.GamebookResultFormat.Id);
             valid.Add(n.BranchIn.Id);
             valid.Add(n.OutText.Id);
             valid.Add(n.OutVariable.Id);
