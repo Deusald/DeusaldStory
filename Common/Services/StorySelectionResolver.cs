@@ -23,7 +23,13 @@ namespace DeusaldStoryCommon
         public static StoryLogicNode? SourceNode(StoryProject project, StoryLogicNode logic)
         {
             if (!logic.AcceptVariables) return null;
-            if (!project.ContainerNodes.TryGetValue(logic.ParentContainer, out StoryContainerNode? parent)) return null;
+
+            if (!project.ContainerNodes.TryGetValue(logic.ParentContainer, out StoryContainerNode? parent))
+                // Out of tree: this node is a Logic blueprint's definition body, so the VFlow arrives from outside
+                // through the instances that reference it — they must agree on one source to name one.
+                return logic.ParentContainer == Guid.Empty
+                    ? WalkOutOfTree(project, logic.Id, logic.EntryPoint.Id, new HashSet<Guid>(), 0)
+                    : null;
 
             // The VFlow (variables) arrives at the node's single entry when it accepts variables.
             StoryConnection? wire = parent.Connections.Find(c => c.ToPoint == logic.EntryPoint.Id);
@@ -108,8 +114,10 @@ namespace DeusaldStoryCommon
                 return wire is null ? null : Walk(project, parent, wire.FromPoint, instances, visited, depth + 1);
             }
 
-            // Out of tree: only the instance stack knows which of the definition's instances this walk is inside of.
-            if (instances.Count == 0) return null;
+            // Out of tree: a blueprint definition body. When the walk descended into it, the stack names the one
+            // instance to re-emerge in; when it *started* here (the definition opened on its own) nothing does, so
+            // every instance is a candidate and they must agree.
+            if (instances.Count == 0) return WalkOutOfTree(project, container.Id, entryPoint, visited, depth);
 
             StoryBlueprintInstanceNode instance = instances[^1];
             if (instance.EntryPorts.Find(p => p.DefinitionPointId == entryPoint) is not StoryBlueprintPortMap port) return null;
@@ -121,6 +129,46 @@ namespace DeusaldStoryCommon
             List<StoryBlueprintInstanceNode> popped = new(instances);
             popped.RemoveAt(popped.Count - 1);
             return Walk(project, outer, outerWire.FromPoint, popped, visited, depth + 1);
+        }
+
+        /// <summary>
+        /// Leaves the definition body <paramref name="definitionNodeId"/> through its <paramref name="entryPoint"/> when
+        /// the walk started inside it, so no instance stack says which instance we are in. A definition's graph is shared,
+        /// so the walk emerges in <b>every</b> instance that references it and they must agree on one source — the same
+        /// rule a portal's ins follow. Instances that disagree mean the definition can't name one upstream: that is what
+        /// <see cref="StoryLogicNode.ExpectedVariables"/> contract mode exists for.
+        /// </summary>
+        private static StoryLogicNode? WalkOutOfTree(StoryProject project, Guid definitionNodeId, Guid entryPoint, HashSet<Guid> visited, int depth)
+        {
+            if (depth > _MAX_WALK_DEPTH) return null;
+
+            StoryBlueprint? blueprint = null;
+            foreach (StoryBlueprint b in project.Blueprints.Values)
+                if (b.DefinitionNodeId == definitionNodeId)
+                {
+                    blueprint = b;
+                    break;
+                }
+            if (blueprint is null) return null;
+
+            StoryLogicNode? agreed = null;
+            foreach (StoryBlueprintInstanceNode instance in project.BlueprintInstances.Values)
+            {
+                if (instance.BlueprintId != blueprint.Id) continue;
+                if (instance.EntryPorts.Find(p => p.DefinitionPointId == entryPoint) is not StoryBlueprintPortMap port) continue;
+                if (!project.ContainerNodes.TryGetValue(instance.ParentContainer, out StoryContainerNode? outer)) continue;
+
+                StoryConnection? wire = outer.Connections.Find(c => c.ToPoint == port.Id);
+                if (wire is null) continue;
+
+                // Each instance is its own path back, so it gets its own visited set — one must not block the next.
+                StoryLogicNode? found = Walk(project, outer, wire.FromPoint, new List<StoryBlueprintInstanceNode>(),
+                                             new HashSet<Guid>(visited), depth + 1);
+                if (found is null) continue;
+                if (agreed is not null && agreed.Id != found.Id) return null; // instances disagree — declare a contract instead
+                agreed = found;
+            }
+            return agreed;
         }
 
         /// <summary>A portal relays every in point to its single out, so its ins must agree on one source to name one.</summary>

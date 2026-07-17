@@ -1639,7 +1639,7 @@ public partial class ProjectStateService(
         ReconcileDeclaredVariables(logic, declaredVariables);
         // The AcceptVariables incoming contract (empty when the node adapts live or doesn't accept variables).
         ReconcileVariableList(logic.ExpectedVariables, acceptVariables ? expectedVariables ?? [] : []);
-        PruneContentConnections(logic);
+        PruneContentConnections(CurrentProject, logic);
 
         // Drop container wires that reference outer ports this node no longer exposes after a mode/flag change.
         List<Guid> goneOuterPorts = new();
@@ -1689,7 +1689,7 @@ public partial class ProjectStateService(
     }
 
     /// <summary>Removes inner content connections whose endpoints no longer exist.</summary>
-    private static void PruneContentConnections(StoryLogicNode logic)
+    private static void PruneContentConnections(StoryProject project, StoryLogicNode logic)
     {
         HashSet<Guid> valid = new()
         {
@@ -1697,9 +1697,10 @@ public partial class ProjectStateService(
             logic.ExitLFlowIn.Id, logic.ExitVariablesIn.Id, logic.ExitAutoTextIn.Id
         };
         foreach (StoryChoice c in logic.Choices) valid.Add(c.TextIn.Id);
-        // Prev Exit Variable outputs in contract mode are the node's own ExpectedVariables ids — keep them so inner
-        // wires survive; a removed expected variable's id is absent here, so its wires are correctly pruned.
-        foreach (StoryDeclaredVariable d in logic.ExpectedVariables) valid.Add(d.Id);
+        // Prev Exit Variable output ids are the node's own ExpectedVariables in contract mode and the live upstream's
+        // declared ids otherwise — the resolver knows which, and both must be kept so inner wires survive. A removed
+        // variable's id is absent from what it returns, so its wires are still correctly pruned.
+        foreach (StoryDeclaredVariable d in StorySelectionResolver.IncomingVariables(project, logic)) valid.Add(d.Id);
         foreach (StoryLocalizationNode n in logic.LocalizationNodes) valid.Add(n.OutPoint.Id);
         foreach (StoryIconNode n in logic.IconNodes) valid.Add(n.OutPoint.Id);
         foreach (StoryLightDarkSwitchNode n in logic.LightDarkSwitchNodes)

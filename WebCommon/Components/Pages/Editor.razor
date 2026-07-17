@@ -358,17 +358,18 @@
         // The owner is the node whose choice was clicked; follow that choice's outer flow-out to the next node.
         StoryLogicNode? owner = Project.LogicNodes.Values.FirstOrDefault(l => l.Choices.Any(c => c.Id == choice.ChoiceId));
 
-        StoryFlowNavigator.NextLogicResult result = StoryFlowNavigator.ResolveNextLogic(Project, choice.OuterFlowOut);
+        StoryFlowNavigator.NextLogicResult result = ResolveNext(choice.OuterFlowOut);
         switch (result.Kind)
         {
             case StoryFlowNavigator.NextKind.Logic when result.Logic is not null:
-                _Crumbs[^1]    = new EditorCrumb(result.Logic.Id, result.Logic.Name, EditorScope.Logic);
-                _PreviewVars   = new Dictionary<Guid, string>();
+                if (AuthoringNodeFor(result.Logic) is not StoryLogicNode next) goto default;
+                _PreviewVars = new Dictionary<Guid, string>();
                 // If the next node reads this SinglePath node's variables, pin this choice's values for the preview.
                 if (owner is { ExitMode: StoryLogicExitMode.SinglePath }
-                    && StorySelectionResolver.SourceNode(Project, result.Logic) is StoryLogicNode src && src.Id == owner.Id
+                    && StorySelectionResolver.SourceNode(Project, next) is StoryLogicNode src && src.Id == owner.Id
                     && owner.Choices.Find(c => c.Id == choice.ChoiceId) is StoryChoice picked)
                     _PreviewVars = StorySelectionResolver.ValuesForChoice(owner, picked);
+                OpenLogicForPreview(next, replaceCrumb: true);
                 _PreviewNotice = null;
                 RebuildNodes();
                 break;
@@ -519,28 +520,89 @@
             case StoryNodeKind.Start:
                 PreviewFromEntry(node.Id);
                 break;
+
+            // A Logic blueprint's instance previews the shared definition; a Container one follows its first entry in.
+            case StoryNodeKind.BlueprintInstance
+                when Project.BlueprintInstances.TryGetValue(node.Id, out StoryBlueprintInstanceNode? inst)
+                  && Project.Blueprints.TryGetValue(inst.BlueprintId, out StoryBlueprint? bp):
+                if (bp.Kind == StoryBlueprintKind.Logic && Project.LogicNodes.TryGetValue(bp.DefinitionNodeId, out StoryLogicNode? def))
+                    PreviewLogicNode(def);
+                else if (bp.Kind == StoryBlueprintKind.Container && node.Inputs.Count > 0)
+                    PreviewFromEntry(node.Inputs[0].Id);
+                break;
         }
     }
 
     /// <summary>Resolves the first logic node reached from an entry/Start point and, if any, opens it in Preview.</summary>
     private void PreviewFromEntry(Guid entryPointId)
     {
-        StoryFlowNavigator.NextLogicResult result = StoryFlowNavigator.ResolveNextLogicFromEntry(Project, entryPointId);
-        if (result is { Kind: StoryFlowNavigator.NextKind.Logic, Logic: not null })
-            PreviewLogicNode(result.Logic);
+        StoryFlowNavigator.NextLogicResult result = ResolveNextFromEntry(entryPointId);
+        if (result is { Kind: StoryFlowNavigator.NextKind.Logic, Logic: not null }
+            && AuthoringNodeFor(result.Logic) is StoryLogicNode logic)
+            PreviewLogicNode(logic);
     }
 
     /// <summary>Drills into <paramref name="logic"/> (as a fresh breadcrumb) and switches straight into its Preview.</summary>
     private void PreviewLogicNode(StoryLogicNode logic)
     {
-        _Crumbs.Add(new EditorCrumb(logic.Id, logic.Name, EditorScope.Logic));
+        _PreviewVars = new Dictionary<Guid, string>();
+        OpenLogicForPreview(logic, replaceCrumb: false);
+        RebuildNodes();
+    }
+
+    /// <summary>
+    /// Puts <paramref name="logic"/> on screen in Preview: a story node just gets a breadcrumb, while a blueprint
+    /// definition (reached by navigating through an instance) opens in its own blueprint trail — the same place a
+    /// double-click on the instance lands, since the definition is shared and lives out of the story tree.
+    /// </summary>
+    private void OpenLogicForPreview(StoryLogicNode logic, bool replaceCrumb)
+    {
+        if (logic.ParentContainer == Guid.Empty && BlueprintOf(logic.Id) is StoryBlueprint bp)
+            BeginBlueprintTrail(bp.DefinitionNodeId, bp.Name, EditorScope.Logic);
+        else if (replaceCrumb) _Crumbs[^1] = new EditorCrumb(logic.Id, logic.Name, EditorScope.Logic);
+        else _Crumbs.Add(new EditorCrumb(logic.Id, logic.Name, EditorScope.Logic));
+
         _SelectedId      = Guid.Empty;
-        _PreviewVars     = new Dictionary<Guid, string>();
         _PreviewGamebook = false;
         _PreviewNotice   = null;
         _GbpScrollKey    = null;
         _Mode            = EditorMode.Preview;
-        RebuildNodes();
+    }
+
+    /// <summary>The blueprint whose definition body is <paramref name="definitionNodeId"/>, or null when it is a story node.</summary>
+    private StoryBlueprint? BlueprintOf(Guid definitionNodeId) =>
+        Project.Blueprints.Values.FirstOrDefault(b => b.DefinitionNodeId == definitionNodeId);
+
+    /// <summary>
+    /// Maps a node the navigator returned — which walks the <b>flattened</b> project — back to the authoring node the
+    /// editor can open: a story node is itself, while a blueprint instance's per-instance clone maps to the shared
+    /// definition it was cloned from.
+    /// </summary>
+    private StoryLogicNode? AuthoringNodeFor(StoryLogicNode navigated)
+    {
+        if (Project.LogicNodes.TryGetValue(navigated.Id, out StoryLogicNode? own)) return own;
+        return _ProjectState.GetExpanded().Origin.TryGetValue(navigated.Id, out (Guid InstanceId, Guid DefinitionNodeId) origin)
+            && Project.LogicNodes.TryGetValue(origin.DefinitionNodeId, out StoryLogicNode? definition)
+                ? definition
+                : null;
+    }
+
+    /// <summary>
+    /// Preview navigation runs on the blueprint-flattened project, so flow that crosses a blueprint instance is followed
+    /// instead of dead-ending on a port the raw graph has no node for. A definition previewed on its own is out of tree
+    /// and has no clone there, so that walk falls back to the authoring project.
+    /// </summary>
+    private StoryFlowNavigator.NextLogicResult ResolveNext(Guid fromPoint)
+    {
+        StoryFlowNavigator.NextLogicResult result = StoryFlowNavigator.ResolveNextLogic(_ProjectState.GetExpandedProject(), fromPoint);
+        return result.Kind == StoryFlowNavigator.NextKind.Dangling ? StoryFlowNavigator.ResolveNextLogic(Project, fromPoint) : result;
+    }
+
+    /// <inheritdoc cref="ResolveNext"/>
+    private StoryFlowNavigator.NextLogicResult ResolveNextFromEntry(Guid entryPointId)
+    {
+        StoryFlowNavigator.NextLogicResult result = StoryFlowNavigator.ResolveNextLogicFromEntry(_ProjectState.GetExpandedProject(), entryPointId);
+        return result.Kind == StoryFlowNavigator.NextKind.Dangling ? StoryFlowNavigator.ResolveNextLogicFromEntry(Project, entryPointId) : result;
     }
 
     /// <summary>Wire an output port to an input port in the current graph (container or logic content).</summary>

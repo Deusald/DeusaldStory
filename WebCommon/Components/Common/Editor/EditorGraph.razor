@@ -814,9 +814,10 @@
     private void CloseMenu() => _MenuNode = null;
     private void CloseCanvasMenu() => _CanvasMenu = false;
 
-    /// <summary>Nodes that offer a "Preview" menu item: a logic node (its own preview), a container or the Root's Start
-    /// (previews the first logic node reached from inside).</summary>
-    private static bool CanPreview(EdNode n) => n.Kind is StoryNodeKind.Logic or StoryNodeKind.Container or StoryNodeKind.Start;
+    /// <summary>Nodes that offer a "Preview" menu item: a logic node (its own preview), a blueprint instance (its shared
+    /// definition's), a container or the Root's Start (previews the first logic node reached from inside).</summary>
+    private static bool CanPreview(EdNode n) =>
+        n.Kind is StoryNodeKind.Logic or StoryNodeKind.Container or StoryNodeKind.Start or StoryNodeKind.BlueprintInstance;
 
     /// <summary>True when a portal node is an "in" side (container or logic) — picks the "out"/"in" wording and icons.</summary>
     private static bool IsPortalIn(EdNode n) => n.Kind is StoryNodeKind.PortalIn or StoryNodeKind.LogicPortalIn;
