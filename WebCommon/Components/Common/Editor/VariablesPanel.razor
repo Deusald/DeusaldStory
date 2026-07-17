@@ -88,10 +88,20 @@
                     </div>
 
                     <div class="var-builtin-note">
-                        @((MarkupString)Loc.T(Localization.Editor.Panels.Variables.builtInNote)
-                            .Replace("[appValue]", StoryBuiltInVariables.AppValue)
-                            .Replace("[gamebookValue]", StoryBuiltInVariables.GamebookValue)
-                            .Replace("[sel]", sel.Name))
+                        @if (sel.Id == StoryBuiltInVariables.AppThemeId)
+                        {
+                            @((MarkupString)Loc.T(Localization.Editor.Panels.Variables.builtInNoteTheme)
+                                .Replace("[lightValue]", StoryBuiltInVariables.LightValue)
+                                .Replace("[darkValue]", StoryBuiltInVariables.DarkValue)
+                                .Replace("[sel]", sel.Name))
+                        }
+                        else
+                        {
+                            @((MarkupString)Loc.T(Localization.Editor.Panels.Variables.builtInNote)
+                                .Replace("[appValue]", StoryBuiltInVariables.AppValue)
+                                .Replace("[gamebookValue]", StoryBuiltInVariables.GamebookValue)
+                                .Replace("[sel]", sel.Name))
+                        }
                     </div>
 
                     <div class="modal-field">

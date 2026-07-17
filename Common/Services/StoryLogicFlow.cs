@@ -95,7 +95,7 @@ namespace DeusaldStoryCommon
                 StoryVariable? v = StoryBuiltInVariables.Find(ev.SelectedVariableId)
                     ?? (ev.SelectedVariableId != Guid.Empty && project.Variables.TryGetValue(ev.SelectedVariableId, out StoryVariable? found) ? found : null);
                 if (v is null) return "";
-                if (StoryBuiltInVariables.IsBuiltIn(v.Id)) return StoryBuiltInVariables.ValueFor(target);
+                if (StoryBuiltInVariables.IsBuiltIn(v.Id)) return StoryBuiltInVariables.ValueFor(v.Id, target, values);
                 return values.TryGetValue(v.Id, out string? val) ? val : v.PossibleValues.FirstOrDefault() ?? "";
             }
 

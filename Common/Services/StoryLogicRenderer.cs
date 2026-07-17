@@ -87,6 +87,14 @@ namespace DeusaldStoryCommon
             StoryProject project, LocProject? localization, StoryLogicNode logic,
             IReadOnlyDictionary<Guid, string> values, bool paper, StoryRenderTarget target = StoryRenderTarget.App)
         {
+            // Seed the built-in AppTheme value from the render's theme flag so every sub-resolver (text, choices,
+            // conditions, instructions) reads it like an ordinary pinned External Variable value — Light in the
+            // always-light Gamebook, else the App preview's toggle (paper = the light/paper theme).
+            values = new Dictionary<Guid, string>(values)
+            {
+                [StoryBuiltInVariables.AppThemeId] = paper ? StoryBuiltInVariables.LightValue : StoryBuiltInVariables.DarkValue
+            };
+
             List<string>         errors  = new();
             List<RenderedChoice> choices = ResolveChoices(project, localization, logic, values, target, errors);
 
@@ -359,7 +367,7 @@ namespace DeusaldStoryCommon
                         && Variable(project, ev.SelectedVariableId) is StoryVariable v && !string.IsNullOrWhiteSpace(v.Name))
                     {
                         bool constant = StoryBuiltInVariables.IsBuiltIn(v.Id) || v.IsConstant;
-                        if (StoryBuiltInVariables.IsBuiltIn(v.Id)) vals[v.Name] = StoryBuiltInVariables.ValueFor(target);
+                        if (StoryBuiltInVariables.IsBuiltIn(v.Id)) vals[v.Name] = StoryBuiltInVariables.ValueFor(v.Id, target, values);
                         else if (constant || target == StoryRenderTarget.App) vals[v.Name] = PreviewValue(v, values);
                         else hasOmittedVariable = true; // plain Variable, Gamebook — leave the {token} unresolved
                     }

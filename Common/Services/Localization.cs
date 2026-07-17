@@ -557,6 +557,8 @@ namespace DeusaldStoryCommon
                     public static readonly Guid readOnly = new Guid("1ee79843-ca94-456d-be8a-6c7569d8572c");
                     /// <summary>MarkupString; replace [appValue]/[gamebookValue]/[sel].</summary>
                     public static readonly Guid builtInNote = new Guid("9ffdbf6d-d654-4a69-b0ab-00124f20fb2f");
+                    /// <summary>MarkupString; replace [lightValue]/[darkValue]/[sel].</summary>
+                    public static readonly Guid builtInNoteTheme = new Guid("7c1e9b2a-4d3f-4a61-9b8e-2f5c6a0d1e02");
                     public static readonly Guid possibleValues = new Guid("43b2d684-453a-42b7-8acb-fff12576ed2b");
                     public static readonly Guid noValues = new Guid("2b480e27-3f71-4333-becb-8be5f136da43");
                     public static readonly Guid removeValue = new Guid("858fabfa-19e1-451e-b467-09414d6bc546");
@@ -1549,6 +1551,7 @@ namespace DeusaldStoryCommon
                 { new Guid("a89204c8-9361-4eb4-a5fe-04f6f0d6671a"), "Built-in variable" },
                 { new Guid("1ee79843-ca94-456d-be8a-6c7569d8572c"), "Read-only" },
                 { new Guid("9ffdbf6d-d654-4a69-b0ab-00124f20fb2f"), "This variable is always available and can't be edited or deleted. Its value follows the preview mode — <b>[appValue]</b> in the app and <b>[gamebookValue]</b> in the printed gamebook. Connect it through an External Variable node into a SmartFormat node's Variables input to branch text on the current medium (e.g. <code>{[sel]}</code>)." },
+                { new Guid("7c1e9b2a-4d3f-4a61-9b8e-2f5c6a0d1e02"), "This variable is always available and can't be edited or deleted. Its value follows the App preview's theme toggle — <b>[lightValue]</b> or <b>[darkValue]</b> — and is always <b>[lightValue]</b> in the printed gamebook. Connect it through an External Variable node into a SmartFormat node's Variables input to branch text on the current theme (e.g. <code>{[sel]}</code>)." },
                 { new Guid("43b2d684-453a-42b7-8acb-fff12576ed2b"), "Possible values" },
                 { new Guid("2b480e27-3f71-4333-becb-8be5f136da43"), "No values yet." },
                 { new Guid("858fabfa-19e1-451e-b467-09414d6bc546"), "Remove value" },
