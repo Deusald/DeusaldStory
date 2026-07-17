@@ -16,6 +16,9 @@ public partial class ProjectStateService
     private int                                   _ExpandCacheVersion = -1;
     private int                                   _ExpandVersion;
 
+    private StoryBlueprintExpander.ExpandResult? _FnExpandCache;
+    private int                                   _FnExpandCacheVersion = -1;
+
     /// <summary>
     /// The transient project with every blueprint instance flattened into a per-instance clone of its definition, for
     /// runtime resolution (validation / preview). Cached and rebuilt only after the authoring project changes.
@@ -33,6 +36,22 @@ public partial class ProjectStateService
 
     /// <summary>The flattened project only (see <see cref="GetExpanded"/>).</summary>
     public StoryProject GetExpandedProject() => GetExpanded().Project;
+
+    /// <summary>
+    /// The authoring project with function instances inlined but blueprints/instances left as authored — what a
+    /// blueprint definition previewed on its own resolves and renders against (see
+    /// <see cref="StoryBlueprintExpander.ExpandFunctionsOnly"/>). Cached like <see cref="GetExpanded"/>.
+    /// </summary>
+    public StoryBlueprintExpander.ExpandResult GetFunctionExpanded()
+    {
+        if (CurrentProject is null) return new StoryBlueprintExpander.ExpandResult();
+        if (_FnExpandCache is null || _FnExpandCacheVersion != _ExpandVersion)
+        {
+            _FnExpandCache        = StoryBlueprintExpander.ExpandFunctionsOnly(CurrentProject);
+            _FnExpandCacheVersion = _ExpandVersion;
+        }
+        return _FnExpandCache;
+    }
 
     // ── Blueprint descriptors (library) ────────────────────────────────────────
 

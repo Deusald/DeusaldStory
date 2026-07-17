@@ -210,12 +210,15 @@
     {
         // Render against the blueprint-flattened project so function instances inside this node are resolved; a normal
         // node keeps the same id there (functions inlined). A drilled-into blueprint definition is out of tree and so
-        // has no clone in the flattened project — nothing about it resolves there, so render it against the authoring
-        // project instead, where the resolver can reach its instances.
+        // has no clone there — nothing about it resolves — so it renders against the function-only expansion, which
+        // inlines its functions while keeping the instances the resolver walks out through to reach its upstream.
         StoryProject expanded = _ProjectState.GetExpandedProject();
-        bool isFlattened = expanded.LogicNodes.TryGetValue(Logic.Id, out StoryLogicNode? flat);
-        StoryProject proj = isFlattened ? expanded : _ProjectState.CurrentProject!;
-        return StoryLogicRenderer.Render(proj, _ProjectState.CurrentLocalization, isFlattened ? flat! : Logic, Values, _Paper, StoryRenderTarget.App);
+        if (expanded.LogicNodes.TryGetValue(Logic.Id, out StoryLogicNode? flat))
+            return StoryLogicRenderer.Render(expanded, _ProjectState.CurrentLocalization, flat, Values, _Paper, StoryRenderTarget.App);
+
+        StoryProject fnExpanded = _ProjectState.GetFunctionExpanded().Project;
+        StoryLogicNode node = fnExpanded.LogicNodes.TryGetValue(Logic.Id, out StoryLogicNode? fn) ? fn : Logic;
+        return StoryLogicRenderer.Render(fnExpanded, _ProjectState.CurrentLocalization, node, Values, _Paper, StoryRenderTarget.App);
     }
 
     /// <summary>

@@ -82,6 +82,48 @@ namespace DeusaldStoryCommon
             return result;
         }
 
+        /// <summary>
+        /// A copy of <paramref name="authoring"/> with <b>only the function pass</b> applied: every logic node — the
+        /// story's and the out-of-tree blueprint definition bodies alike — has its function instances inlined, while the
+        /// container/logic instances, blueprints and definitions are left exactly as authored.
+        /// <para>
+        /// This is what previewing a blueprint definition on its own needs, and <see cref="Expand"/> cannot serve it:
+        /// expansion drops definitions (they are unreachable from the root) and consumes the instances that
+        /// <see cref="StorySelectionResolver"/> walks out through to find a definition's upstream. Here both survive, so
+        /// a definition resolves its incoming VFlow *and* renders its functions.
+        /// </para>
+        /// </summary>
+        public static ExpandResult ExpandFunctionsOnly(StoryProject authoring)
+        {
+            ExpandResult result = new()
+            {
+                Project = new StoryProject { Metadata = authoring.Metadata }
+            };
+            StoryProject outProj = result.Project;
+
+            // Never mutated by the function pass — share references.
+            foreach (KeyValuePair<Guid, StoryVariable> kv in authoring.Variables)   outProj.Variables[kv.Key]   = kv.Value;
+            foreach (KeyValuePair<Guid, StoryImage>    kv in authoring.Images)      outProj.Images[kv.Key]      = kv.Value;
+            foreach (KeyValuePair<Guid, StoryBlueprint> kv in authoring.Blueprints) outProj.Blueprints[kv.Key]  = kv.Value;
+
+            // The topology the resolver walks is read, never written — but the logic nodes are inlined into, so those
+            // are cloned to keep the authoring project untouched.
+            foreach (KeyValuePair<Guid, StoryContainerNode> kv in authoring.ContainerNodes)
+                outProj.ContainerNodes[kv.Key] = kv.Value;
+            foreach (KeyValuePair<Guid, StoryPortalNode> kv in authoring.PortalNodes)
+                outProj.PortalNodes[kv.Key] = kv.Value;
+            foreach (KeyValuePair<Guid, StoryBlueprintInstanceNode> kv in authoring.BlueprintInstances)
+                outProj.BlueprintInstances[kv.Key] = kv.Value;
+            foreach (KeyValuePair<Guid, StoryLogicNode> kv in authoring.LogicNodes)
+                outProj.LogicNodes[kv.Key] = DeepClone(kv.Value);
+
+            foreach (StoryLogicNode logic in outProj.LogicNodes.Values.ToList())
+                foreach (StoryFunctionInstanceNode fi in logic.FunctionInstanceNodes.ToList())
+                    InlineFunctionInstance(authoring, logic, fi, new HashSet<Guid>(), 0, result);
+
+            return result;
+        }
+
         // ── Pass 0: copy the reachable tree ───────────────────────────────────────
 
         private static void CopyReachable(StoryProject src, StoryProject dst, Guid containerId, HashSet<Guid> copied)
