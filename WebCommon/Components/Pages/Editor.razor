@@ -357,6 +357,16 @@
         // Entering preview starts the External Variable tweaks fresh (panel re-seeds them to the defaults).
         if (mode == EditorMode.Preview)
         {
+            // The tab always previews what is open right now — a session started earlier may have walked the flow far
+            // from here, and its node must not linger. With a container open there is nothing to preview, so the id is
+            // cleared and the pane falls back to its play-mode placeholder.
+            if (_CurrentLogicNode is StoryLogicNode current)
+            {
+                _PreviewNodeId   = current.Id;
+                _PreviewExpanded = PreviewIsExpanded(current);
+            }
+            else _PreviewNodeId = Guid.Empty;
+
             _PreviewVars     = new Dictionary<Guid, string>();
             _PreviewGamebook = false;
             _PreviewNotice   = null;
@@ -602,13 +612,17 @@
     private void PreviewLogicNode(StoryLogicNode logic)
     {
         _PreviewVars = new Dictionary<Guid, string>();
-        if (_ProjectState.GetExpandedProject().LogicNodes.TryGetValue(logic.Id, out StoryLogicNode? flat))
-            EnterPreview(flat, expanded: true, replaceCrumb: false);
-        else
-            EnterPreview(_ProjectState.GetFunctionExpanded().Project.LogicNodes.GetValueOrDefault(logic.Id) ?? logic,
-                         expanded: false, replaceCrumb: false);
+        EnterPreview(logic, PreviewIsExpanded(logic), replaceCrumb: false);
         RebuildNodes();
     }
+
+    /// <summary>
+    /// Which space an <b>authoring</b> node previews in: expanded when the played story reaches it (expansion keeps a
+    /// story node's id, so the same id names it there), otherwise authoring space with functions inlined — a blueprint
+    /// definition is out of tree and so has no clone to play.
+    /// </summary>
+    private bool PreviewIsExpanded(StoryLogicNode logic) =>
+        _ProjectState.GetExpandedProject().LogicNodes.ContainsKey(logic.Id);
 
     /// <summary>
     /// Starts (or advances) a preview session on <paramref name="logic"/>, a node of the <paramref name="expanded"/>
