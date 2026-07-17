@@ -596,7 +596,7 @@ select.field {
     left: 50%;
     transform: translate(-50%, -50%);
     z-index: 1060;
-    width: 480px;
+    width: min(560px, calc(100vw - 48px));
     height: min(620px, calc(100vh - 64px));
     background: var(--surface-1);
     border: 1px solid var(--border-strong);
