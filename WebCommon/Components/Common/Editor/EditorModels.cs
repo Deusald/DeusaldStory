@@ -940,8 +940,27 @@ namespace DeusaldStoryWeb
             if (logic.ConstantVariableNodes.Find(n => n.OutPoint.Id == fromPoint) is StoryConstantVariableNode cn)
                 return string.IsNullOrWhiteSpace(cn.Name) ? UiLang.T(Localization.Editor.Page.constantNameFallback) : cn.Name;
 
+            // A Function instance's typed output port is named by its signature output (mirrors PortTypeOfOutput).
+            foreach (StoryFunctionInstanceNode fi in logic.FunctionInstanceNodes)
+                if (fi.OutputPorts.Find(p => p.Id == fromPoint) is StoryBlueprintPortMap op
+                 && project.Blueprints.TryGetValue(fi.BlueprintId, out StoryBlueprint? fbp)
+                 && fbp!.Kind == StoryBlueprintKind.Function)
+                    return SignatureName(fbp.Outputs, op.DefinitionPointId);
+
+            // Inside a Function definition graph, the signature inputs are outputs on the "Function in" node.
+            foreach (StoryBlueprint b in project.Blueprints.Values)
+                if (b.Kind == StoryBlueprintKind.Function && b.DefinitionNodeId == logic.Id
+                 && b.Inputs.Find(s => s.Id == fromPoint) is StorySignaturePort sip)
+                    return string.IsNullOrWhiteSpace(sip.Name) ? UiLang.T(Localization.Editor.Page.variableNameFallback) : sip.Name;
+
             return StorySelectionResolver.IncomingVariables(project, logic).Find(d => d.Id == fromPoint)?.Name ?? "";
         }
+
+        /// <summary>The display name of the signature port <paramref name="definitionPointId"/>, falling back when unnamed.</summary>
+        private static string SignatureName(List<StorySignaturePort> signature, Guid definitionPointId) =>
+            signature.Find(p => p.Id == definitionPointId) is { Name: { Length: > 0 } n }
+                ? n
+                : UiLang.T(Localization.Editor.Page.variableNameFallback);
 
         /// <summary>
         /// The outputs wired into the multi-wire variables input <paramref name="variablesIn"/>, as (output id, display
