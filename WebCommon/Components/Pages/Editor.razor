@@ -160,8 +160,8 @@
 <VariablePickerModal       @ref="_VariablePicker"      OnConfirm="OnVariablePicked"/>
 <GetVariableModal          @ref="_GetVariableModal"    OnConfirm="OnGetVariableConfirmed"/>
 <ConstantVariableModal     @ref="_ConstantVariableModal" OnConfirm="OnConstantVariableConfirmed"/>
-<RegisterVariableModal     @ref="_RegisterVariableModal" OnConfirm="OnRegisterVariableConfirmed"/>
-<SetVariableModal          @ref="_SetVariableModal"      OnConfirm="OnSetVariableConfirmed"/>
+<RegisterVariableModal     @ref="_RegisterVariableModal" Logic="_CurrentLogicNode" OnConfirm="OnRegisterVariableConfirmed"/>
+<SetVariableModal          @ref="_SetVariableModal"      Logic="_CurrentLogicNode" OnConfirm="OnSetVariableConfirmed"/>
 <UnregisterVariablePickerModal @ref="_UnregisterPicker"  OnConfirm="OnUnregisterPicked"/>
 <SetExternalVariableModal  @ref="_SetExternalVariableModal" OnConfirm="OnSetExternalVariableConfirmed"/>
 <ExitNodeModal             @ref="_ExitNodeModal"            OnConfirm="OnExitNodeConfirmed"/>
@@ -857,9 +857,9 @@
     {
         if (args.EditNodeId != Guid.Empty)
         {
-            _ProjectState.UpdateGetVariableNode(_CurrentId, args.EditNodeId, args.RegisteredVariableId, args.NameOverride, args.PreviewValue);
+            _ProjectState.UpdateGetVariableNode(_CurrentId, args.EditNodeId, args.RefMode, args.RefType, args.RegisteredVariableId, args.NameOverride, args.PreviewValue);
         }
-        else if (_ProjectState.AddGetVariableNode(_CurrentId, args.RegisteredVariableId, args.NameOverride, args.PreviewValue, _PendingX, _PendingY) is StoryGetVariableNode node)
+        else if (_ProjectState.AddGetVariableNode(_CurrentId, args.RefMode, args.RefType, args.RegisteredVariableId, args.NameOverride, args.PreviewValue, _PendingX, _PendingY) is StoryGetVariableNode node)
         {
             _SelectedId = node.Id;
         }
@@ -964,7 +964,7 @@
             _SelectedId = created.Id;
         }
         _ProjectState.UpdateSetVariableNode(
-            _CurrentId, nodeId, args.RegisteredVariableId, args.Assignment, args.Secret, args.SpecificValue,
+            _CurrentId, nodeId, args.RefMode, args.RefType, args.RegisteredVariableId, args.Assignment, args.Secret, args.SpecificValue,
             args.Placement, args.StringMode, args.StringValue, args.StringInputKind,
             args.MinLength, args.MaxLength, args.LengthErrorKeyId, args.ValidationRule, args.ValidationErrorKeyId);
         RebuildNodes();
@@ -1193,44 +1193,15 @@
         foreach (StoryConnection c in logic.ContentConnections.Where(c => c.ToPoint == cf.VariablesIn.Id))
         {
             if (EditorProjection.PortTypeOfOutput(Project, logic, logic.ResolvePortalSource(c.FromPoint)) != PortType.CVariable) continue;
-            string name = ExitVariableName(logic, c.FromPoint);
+            string name = EditorProjection.VariableSourceName(Project, logic, c.FromPoint);
             if (!string.IsNullOrWhiteSpace(name)) result.Add((c.FromPoint, name));
         }
         return result;
     }
 
     /// <summary>The variables wired into a node's Exit-node Variables input, as (output id, display name) for the auto-resolution condition builder.</summary>
-    private List<(Guid Id, string Name)> AvailableExitVariables(StoryLogicNode logic)
-    {
-        List<(Guid, string)> result = new();
-        foreach (StoryConnection c in logic.ContentConnections.Where(c => c.ToPoint == logic.ExitVariablesIn.Id))
-        {
-            string name = ExitVariableName(logic, c.FromPoint);
-            if (!string.IsNullOrWhiteSpace(name)) result.Add((c.FromPoint, name));
-        }
-        return result;
-    }
-
-    private string ExitVariableName(StoryLogicNode logic, Guid fromPoint)
-    {
-        // A variable may reach the Exit through a portal — resolve to the real source so its name shows in the condition builder.
-        fromPoint = logic.ResolvePortalSource(fromPoint);
-        if (logic.ExternalVariableNodes.Find(n => n.OutPoint.Id == fromPoint) is StoryExternalVariableNode ev)
-            return (StoryBuiltInVariables.Find(ev.SelectedVariableId)
-                    ?? (Project.Variables.TryGetValue(ev.SelectedVariableId, out StoryVariable? v) ? v : null))?.Name ?? Loc.T(Localization.Editor.Page.variableNameFallback);
-        if (logic.GetVariableNodes.Find(n => n.OutPoint.Id == fromPoint || n.SlotOutPoint.Id == fromPoint) is StoryGetVariableNode gv)
-        {
-            if (!string.IsNullOrWhiteSpace(gv.NameOverride)) return gv.NameOverride;
-            string regName = EditorProjection.FindRegister(Project, gv.RegisteredVariableId)?.Name ?? "";
-            bool   slot    = gv.SlotOutPoint.Id == fromPoint;
-            return string.IsNullOrWhiteSpace(regName)
-                ? (slot ? Loc.T(Localization.Editor.Page.slotNameFallback) : Loc.T(Localization.Editor.Page.getNameFallback))
-                : (slot ? Loc.T(Localization.Editor.Page.registerSlotName, new Dictionary<string, object> { ["regName"] = regName }) : regName);
-        }
-        if (logic.ConstantVariableNodes.Find(n => n.OutPoint.Id == fromPoint) is StoryConstantVariableNode cn)
-            return string.IsNullOrWhiteSpace(cn.Name) ? Loc.T(Localization.Editor.Page.constantNameFallback) : cn.Name;
-        return StorySelectionResolver.IncomingVariables(Project, logic).Find(d => d.Id == fromPoint)?.Name ?? "";
-    }
+    private List<(Guid Id, string Name)> AvailableExitVariables(StoryLogicNode logic) =>
+        EditorProjection.WiredVariables(Project, logic, logic.ExitVariablesIn.Id);
 
     /// <summary>Delete from a node's context menu. Deleting a container removes everything nested inside it.</summary>
     private void OnNodeDelete(EdNode node)

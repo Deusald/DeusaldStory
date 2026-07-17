@@ -23,7 +23,20 @@ namespace DeusaldStoryCommon
         public double X  { get; set; }
         public double Y  { get; set; }
 
-        /// <summary>The registered storage variable this reads (a <see cref="StoryRegisterVariableNode.Id"/>). Empty when nothing picked yet.</summary>
+        /// <summary>Whether this reads a variable picked by id (<see cref="RegisteredVariableId"/>) or one named by the wire into <see cref="NameIn"/> (<see cref="RefType"/>).</summary>
+        public StorageVariableRefMode RefMode { get; set; }
+
+        /// <summary>The storage type the wired name must resolve to, when <see cref="RefMode"/> is <see cref="StorageVariableRefMode.ByType"/>.</summary>
+        public StorageVariableType RefType { get; set; }
+
+        /// <summary>
+        /// <see cref="StorageVariableRefMode.ByType"/> only — a <c>CVariable</c> input carrying the <b>name</b> of the
+        /// variable to read. Only constant sources wire in, so the name is known before any Gamebook section is built
+        /// and <see cref="StoryGraphValidator"/> can prove it names a registered variable of <see cref="RefType"/>.
+        /// </summary>
+        public StoryConnectionPoint NameIn { get; set; } = new() { Name = "Name" };
+
+        /// <summary>The registered storage variable this reads (a <see cref="StoryRegisterVariableNode.Id"/>), when <see cref="RefMode"/> is <see cref="StorageVariableRefMode.Specific"/>. Empty when nothing picked yet.</summary>
         public Guid RegisteredVariableId { get; set; }
 
         /// <summary>Optional SmartFormat token name override; empty falls back to the register node's own name.</summary>

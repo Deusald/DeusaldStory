@@ -343,6 +343,7 @@ namespace DeusaldStoryCommon
 
                 ea[logic.Id] = new HashSet<Guid>(incoming);
                 CheckTextReferences(logic, incoming, regById, localization, problems);
+                CheckGetRefs(project, logic, incoming, problems);
                 HashSet<Guid> active = new(incoming);
                 ApplyOps(project, logic, active, regById, problems);
 
@@ -396,14 +397,80 @@ namespace DeusaldStoryCommon
                         break;
 
                     case StorageOpKind.Set:
-                        if (!active.Contains(op.TargetRegisterId))
-                            problems.Add(Inner(logic, op.InnerId, UiLang.T(Localization.Validation.setUnregistered, new Dictionary<string, object> { ["target"] = TargetName(op.TargetRegisterId, regById) })));
+                        CheckSetTarget(project, logic, op, active, regById, problems);
                         break;
 
                     case StorageOpKind.Unregister:
                         if (!active.Remove(op.TargetRegisterId))
                             problems.Add(Inner(logic, op.InnerId, UiLang.T(Localization.Validation.unregisterUnregistered, new Dictionary<string, object> { ["target"] = TargetName(op.TargetRegisterId, regById) })));
                         break;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Checks a Set node's target is registered on this path. A <see cref="StorageVariableRefMode.Specific"/> set
+        /// names its register directly; a <see cref="StorageVariableRefMode.ByType"/> set takes the name from its
+        /// wired Name port, so the wire must carry a constant and <i>every</i> name that constant can take must name a
+        /// registered variable of the chosen type that is active here.
+        /// </summary>
+        private static void CheckSetTarget(
+            StoryProject project, StoryLogicNode logic, StorageOp op, HashSet<Guid> active,
+            Dictionary<Guid, StoryRegisterVariableNode> regById, List<StoryProblem> problems)
+        {
+            StorySetVariableNode set = op.Set!;
+
+            if (set.RefMode == StorageVariableRefMode.Specific)
+            {
+                if (!active.Contains(op.TargetRegisterId))
+                    problems.Add(Inner(logic, op.InnerId, UiLang.T(Localization.Validation.setUnregistered, new Dictionary<string, object> { ["target"] = TargetName(op.TargetRegisterId, regById) })));
+                return;
+            }
+
+            List<string>? names = StoryLogicFlow.PossibleVariableValues(project, logic, StoryLogicFlow.FromInto(logic, set.NameIn.Id));
+            if (names is null)
+            {
+                problems.Add(Inner(logic, set.Id, UiLang.T(Localization.Validation.refNameNotConstant, new Dictionary<string, object> { ["type"] = set.RefType })));
+                return;
+            }
+
+            foreach (string name in names)
+            {
+                StoryRegisterVariableNode? reg = StoryLogicFlow.FindRegisterByName(project, name, set.RefType);
+                if (reg is null)
+                    problems.Add(Inner(logic, set.Id, UiLang.T(Localization.Validation.refNameNotFound, new Dictionary<string, object> { ["name"] = NodeName(name), ["type"] = set.RefType })));
+                else if (!active.Contains(reg.Id))
+                    problems.Add(Inner(logic, set.Id, UiLang.T(Localization.Validation.setUnregistered, new Dictionary<string, object> { ["target"] = NodeName(name) })));
+            }
+        }
+
+        /// <summary>
+        /// Checks every <see cref="StorageVariableRefMode.ByType"/> Get node in this logic node the same way: its Name
+        /// port must carry a constant, and each name that constant can take must be a variable of the chosen type
+        /// available in this node. A Get sits off the flow spine, so — as with the text references below — a variable
+        /// available at any point in the node is accepted.
+        /// </summary>
+        private static void CheckGetRefs(
+            StoryProject project, StoryLogicNode logic, HashSet<Guid> entryActive, List<StoryProblem> problems)
+        {
+            foreach (StoryGetVariableNode gv in logic.GetVariableNodes)
+            {
+                if (gv.RefMode != StorageVariableRefMode.ByType) continue;
+
+                List<string>? names = StoryLogicFlow.PossibleVariableValues(project, logic, StoryLogicFlow.FromInto(logic, gv.NameIn.Id));
+                if (names is null)
+                {
+                    problems.Add(Inner(logic, gv.Id, UiLang.T(Localization.Validation.refNameNotConstant, new Dictionary<string, object> { ["type"] = gv.RefType })));
+                    continue;
+                }
+
+                foreach (string name in names)
+                {
+                    StoryRegisterVariableNode? reg = StoryLogicFlow.FindRegisterByName(project, name, gv.RefType);
+                    if (reg is null)
+                        problems.Add(Inner(logic, gv.Id, UiLang.T(Localization.Validation.refNameNotFound, new Dictionary<string, object> { ["name"] = NodeName(name), ["type"] = gv.RefType })));
+                    else if (!entryActive.Contains(reg.Id) && !logic.RegisterVariableNodes.Exists(n => n.Id == reg.Id))
+                        problems.Add(Inner(logic, gv.Id, UiLang.T(Localization.Validation.refNameUnavailable, new Dictionary<string, object> { ["name"] = NodeName(name), ["node"] = NodeName(logic.Name) })));
                 }
             }
         }

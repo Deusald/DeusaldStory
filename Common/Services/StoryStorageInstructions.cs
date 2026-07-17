@@ -64,7 +64,8 @@ namespace DeusaldStoryCommon
             op.Kind switch
             {
                 StorageOpKind.Register   => RegisterEntry(project, localization, logic, op.Register!, target),
-                StorageOpKind.Set        => SetEntry(project, localization, logic, op.Set!, target),
+                // The op already resolved the target — a ByType set names it through a wire, not by id.
+                StorageOpKind.Set        => SetEntry(project, localization, logic, op.Set!, op.TargetRegisterId, target),
                 StorageOpKind.Unregister => ClearEntry(project, localization, op.Unregister!, target),
                 _                        => null
             };
@@ -83,9 +84,10 @@ namespace DeusaldStoryCommon
         }
 
         private static StorageInstruction? SetEntry(
-            StoryProject project, LocProject? localization, StoryLogicNode logic, StorySetVariableNode set, StoryRenderTarget target)
+            StoryProject project, LocProject? localization, StoryLogicNode logic, StorySetVariableNode set,
+            Guid targetRegisterId, StoryRenderTarget target)
         {
-            StoryRegisterVariableNode? targetReg = FindRegister(project, set.RegisteredVariableId);
+            StoryRegisterVariableNode? targetReg = FindRegister(project, targetRegisterId);
             if (targetReg is null) return null;
 
             if (targetReg.Type == StorageVariableType.String)

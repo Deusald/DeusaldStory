@@ -757,6 +757,9 @@ namespace DeusaldStoryCommon
                     public static readonly Guid editTitle = new Guid("18e0aeac-3d6c-4b8d-ab15-27303d5431ae");
                     public static readonly Guid title = new Guid("6557909d-2c53-478c-99b2-17ac894e5702");
                     public static readonly Guid registeredVariable = new Guid("265a38df-7db8-4206-a6f6-be628a038353");
+                    public static readonly Guid modeSpecific = new Guid("dce0aa15-acb5-4070-bb7c-a194b16fd444");
+                    public static readonly Guid modeByType = new Guid("86584470-96b0-4061-9b91-d46ba60f890f");
+                    public static readonly Guid byTypeHint = new Guid("31388cae-f1d1-4aca-a51a-92ddff2e5637");
                     public static readonly Guid nameOverride = new Guid("c8570651-aae1-403a-b97a-4d91ae07046f");
                     /// <summary>Placeholder fallback for the name-override field.</summary>
                     public static readonly Guid variableNameFallback = new Guid("7af2b110-e3dd-4d15-9ef7-add16d6f6719");
@@ -899,6 +902,8 @@ namespace DeusaldStoryCommon
                     public static readonly Guid slot = new Guid("9c091ce6-ae1d-46c2-9e90-8be7c6a22ded");
                     public static readonly Guid instruction = new Guid("4f557acc-bf40-4ab9-9546-d947d276783e");
                     public static readonly Guid placeholder = new Guid("2a4bed4a-1d51-43b9-ac59-a5950eb4878b");
+                    public static readonly Guid name = new Guid("034adb2e-a4ab-44cb-9478-33690fea76e4");
+                    public static readonly Guid validation = new Guid("04f602aa-3851-4d4b-98b7-713a98ed6db9");
                     public static readonly Guid varFallback = new Guid("0787855a-66e7-4f8a-a5ab-1f417fbd0cdf");
                     public static readonly Guid data = new Guid("2f99926f-553a-4398-966f-7c9dec6b711d");
                     public static readonly Guid conditionTrue = new Guid("f2c9aa38-10a7-4d7f-b714-c39438132dfc");
@@ -922,6 +927,10 @@ namespace DeusaldStoryCommon
                     /// <summary>Tokens: {slot},{type}.</summary>
                     public static readonly Guid slotTypeSubtitle = new Guid("f6f3f5d3-d50f-4b83-9df4-723fec252437");
                     public static readonly Guid unregistered = new Guid("588ab016-ed43-40d0-a93c-f76805d7c5a0");
+                    /// <summary>Token: {type}. Title of a by-type Get/Set node whose wired name doesn't resolve yet.</summary>
+                    public static readonly Guid byTypeTitle = new Guid("451370ac-0e85-4b38-ae6b-91c326cf5cb9");
+                    /// <summary>Token: {type}. Subtitle of a by-type Get/Set node whose wired name doesn't resolve yet.</summary>
+                    public static readonly Guid byTypeSubtitle = new Guid("ec23d59b-5d1e-473e-ac19-7eb797d36bcd");
                     public static readonly Guid flowText = new Guid("8e0cea9a-25ee-479d-880f-a81e80495cd9");
                     public static readonly Guid splitForApp = new Guid("21cbd9dc-d731-4370-bc76-9172d1c6387a");
                     public static readonly Guid splitForAppSubtitle = new Guid("983e6385-3cee-4328-ac95-90ab524302c7");
@@ -1062,6 +1071,12 @@ namespace DeusaldStoryCommon
             public static readonly Guid unregisterUnregistered = new Guid("d6c54f69-df77-4605-802d-b5fa27234996");
             /// <summary>Tokens: {name},{node}.</summary>
             public static readonly Guid textRefUnregistered = new Guid("56a01d54-6056-4ffa-97b4-a293a8f4822e");
+            /// <summary>Token: {type}.</summary>
+            public static readonly Guid refNameNotConstant = new Guid("005eda31-7c34-41cc-9995-f3ecc4b404d3");
+            /// <summary>Tokens: {name},{type}.</summary>
+            public static readonly Guid refNameNotFound = new Guid("c0727b7d-b8e3-4fd9-964f-e7700103bad1");
+            /// <summary>Tokens: {name},{node}.</summary>
+            public static readonly Guid refNameUnavailable = new Guid("5ca24eed-75e6-45ac-b43e-40e7390d88d8");
             /// <summary>Token: {target}.</summary>
             public static readonly Guid variableNotReleasedAtEnd = new Guid("fb3d55d2-8aad-462c-9872-25f0c73879ad");
             /// <summary>Fallback for an unknown target variable.</summary>
@@ -1584,6 +1599,9 @@ namespace DeusaldStoryCommon
                 { new Guid("18e0aeac-3d6c-4b8d-ab15-27303d5431ae"), "Edit get variable" },
                 { new Guid("6557909d-2c53-478c-99b2-17ac894e5702"), "Get variable" },
                 { new Guid("265a38df-7db8-4206-a6f6-be628a038353"), "Registered variable" },
+                { new Guid("dce0aa15-acb5-4070-bb7c-a194b16fd444"), "A specific variable" },
+                { new Guid("86584470-96b0-4061-9b91-d46ba60f890f"), "A variable of this type, named by a wire" },
+                { new Guid("31388cae-f1d1-4aca-a51a-92ddff2e5637"), "Wire a constant carrying the variable's name into the node's Name port. The name must belong to a registered variable of this type." },
                 { new Guid("c8570651-aae1-403a-b97a-4d91ae07046f"), "Name override" },
                 { new Guid("7af2b110-e3dd-4d15-9ef7-add16d6f6719"), "variable name" },
                 { new Guid("f56b05f3-070a-41d1-baf2-6d4b7955fc56"), "the <code>{token}</code> the <b>Value</b> port fills (App) — blank uses the variable's own name. The <b>Slot</b> port (Gamebook slot tag) fills <code>[slotToken]</code>." },
@@ -1671,6 +1689,8 @@ namespace DeusaldStoryCommon
                 { new Guid("9c091ce6-ae1d-46c2-9e90-8be7c6a22ded"), "Slot" },
                 { new Guid("4f557acc-bf40-4ab9-9546-d947d276783e"), "Instruction" },
                 { new Guid("2a4bed4a-1d51-43b9-ac59-a5950eb4878b"), "Placeholder" },
+                { new Guid("034adb2e-a4ab-44cb-9478-33690fea76e4"), "Name" },
+                { new Guid("04f602aa-3851-4d4b-98b7-713a98ed6db9"), "Validation" },
                 { new Guid("0787855a-66e7-4f8a-a5ab-1f417fbd0cdf"), "(var)" },
                 { new Guid("2f99926f-553a-4398-966f-7c9dec6b711d"), "Data" },
                 { new Guid("f2c9aa38-10a7-4d7f-b714-c39438132dfc"), "Condition true" },
@@ -1689,6 +1709,8 @@ namespace DeusaldStoryCommon
                 { new Guid("e1d21807-4a0f-48f2-9240-90e55a8623e1"), "(no variable)" },
                 { new Guid("f6f3f5d3-d50f-4b83-9df4-723fec252437"), "{slot} · {type}" },
                 { new Guid("588ab016-ed43-40d0-a93c-f76805d7c5a0"), "unregistered" },
+                { new Guid("451370ac-0e85-4b38-ae6b-91c326cf5cb9"), "Any {type}" },
+                { new Guid("ec23d59b-5d1e-473e-ac19-7eb797d36bcd"), "{type} · by name" },
                 { new Guid("8e0cea9a-25ee-479d-880f-a81e80495cd9"), "FlowText" },
                 { new Guid("21cbd9dc-d731-4370-bc76-9172d1c6387a"), "Split For App" },
                 { new Guid("983e6385-3cee-4328-ac95-90ab524302c7"), "App page break" },
@@ -1776,6 +1798,9 @@ namespace DeusaldStoryCommon
                 { new Guid("1dd6d7e2-77b1-4e7b-8395-3bebb7de9127"), "Set of variable '{target}' that isn't registered on this path." },
                 { new Guid("d6c54f69-df77-4605-802d-b5fa27234996"), "Unregister of variable '{target}' that isn't registered on this path." },
                 { new Guid("56a01d54-6056-4ffa-97b4-a293a8f4822e"), "Text references variable '{name}' that isn't registered where '{node}' is shown." },
+                { new Guid("005eda31-7c34-41cc-9995-f3ecc4b404d3"), "Wire a constant name into the Name port — a by-type {type} variable node can't tell which variable it means without one." },
+                { new Guid("c0727b7d-b8e3-4fd9-964f-e7700103bad1"), "No {type} variable named '{name}' is registered anywhere in the story." },
+                { new Guid("5ca24eed-75e6-45ac-b43e-40e7390d88d8"), "Reads variable '{name}' that isn't registered where '{node}' is played." },
                 { new Guid("fb3d55d2-8aad-462c-9872-25f0c73879ad"), "Variable '{target}' is still registered when the story reaches The End — unregister it first (or release it on the End node)." },
                 { new Guid("b8c99e70-5a04-4ae2-a40e-bd7b24a4be8f"), "(unknown)" },
                 { new Guid("9d75a2bc-34c1-48b1-857e-8b43b7ab62de"), "Blueprint nesting is too deep — expansion stopped." },

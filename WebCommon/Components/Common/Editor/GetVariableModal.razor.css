@@ -3,6 +3,14 @@
     max-width: 92vw;
 }
 
+.gvm-mode {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    cursor: pointer;
+    font-size: 0.85rem;
+}
+
 .gvm-list {
     display: flex;
     flex-direction: column;

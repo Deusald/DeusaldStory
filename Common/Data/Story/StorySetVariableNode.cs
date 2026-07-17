@@ -15,7 +15,20 @@ namespace DeusaldStoryCommon
         public double X  { get; set; }
         public double Y  { get; set; }
 
-        /// <summary>The registered variable this sets (a <see cref="StoryRegisterVariableNode.Id"/>). Empty when nothing picked yet.</summary>
+        /// <summary>Whether this sets a variable picked by id (<see cref="RegisteredVariableId"/>) or one named by the wire into <see cref="NameIn"/> (<see cref="RefType"/>).</summary>
+        public StorageVariableRefMode RefMode { get; set; }
+
+        /// <summary>The storage type the wired name must resolve to, when <see cref="RefMode"/> is <see cref="StorageVariableRefMode.ByType"/>.</summary>
+        public StorageVariableType RefType { get; set; }
+
+        /// <summary>
+        /// <see cref="StorageVariableRefMode.ByType"/> only — a <c>CVariable</c> input carrying the <b>name</b> of the
+        /// variable to set. Only constant sources wire in, so <see cref="StoryGraphValidator"/> can prove the name
+        /// belongs to a variable of <see cref="RefType"/> that is registered on this path.
+        /// </summary>
+        public StoryConnectionPoint NameIn { get; set; } = new() { Name = "Name" };
+
+        /// <summary>The registered variable this sets (a <see cref="StoryRegisterVariableNode.Id"/>), when <see cref="RefMode"/> is <see cref="StorageVariableRefMode.Specific"/>. Empty when nothing picked yet.</summary>
         public Guid RegisteredVariableId { get; set; }
 
         /// <summary>How the value is assigned (Unset clears it back to "not set").</summary>
@@ -47,6 +60,12 @@ namespace DeusaldStoryCommon
         /// <summary>String / <see cref="StringValueMode.PlayerInput"/> — Text input port carrying the App input field's placeholder hint (a Localization output). Empty falls back to a default.</summary>
         public StoryConnectionPoint PlaceholderIn { get; set; } = new() { Name = "Placeholder" };
 
+        /// <summary>
+        /// String / <see cref="StringValueMode.PlayerInput"/> — a <b>multi-wire</b> Variable input whose sources become
+        /// extra operands of <see cref="ValidationRule"/>, each referenced by its connection <c>FromPoint</c> id.
+        /// </summary>
+        public StoryConnectionPoint ValidationIn { get; set; } = new() { Name = "Validation" };
+
         /// <summary>String / <see cref="StringValueMode.PlayerInput"/> — smallest accepted entry length in characters (default 1).</summary>
         public int MinLength { get; set; } = 1;
 
@@ -56,7 +75,7 @@ namespace DeusaldStoryCommon
         /// <summary>String / <see cref="StringValueMode.PlayerInput"/> — localization key for the message shown when the entry is outside <see cref="MinLength"/>…<see cref="MaxLength"/>. Empty = a default message.</summary>
         public Guid LengthErrorKeyId { get; set; }
 
-        /// <summary>String / <see cref="StringValueMode.PlayerInput"/> — an <b>App-only</b> validation rule the entry must satisfy (a boolean Group tree; null = no rule). Operands reference <see cref="StorageValidation.ThisEntryRef"/> and other register-node ids. The Gamebook cannot enforce it.</summary>
+        /// <summary>String / <see cref="StringValueMode.PlayerInput"/> — an <b>App-only</b> validation rule the entry must satisfy (a boolean Group tree; null = no rule). Operands reference <see cref="StorageValidation.ThisEntryRef"/>, other register-node ids, and the outputs wired into <see cref="ValidationIn"/> (by connection <c>FromPoint</c> id). The Gamebook cannot enforce it.</summary>
         public StoryConditionExpr? ValidationRule { get; set; }
 
         /// <summary>String / <see cref="StringValueMode.PlayerInput"/> — localization key for the message shown when <see cref="ValidationRule"/> is not met. Empty = a default message.</summary>

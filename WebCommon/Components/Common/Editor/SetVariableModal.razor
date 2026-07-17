@@ -22,10 +22,28 @@
 
         <div class="modal-body svm-body">
 
+            @* ── Which variable: one picked here, or one named by the wired Name port ── *@
+            <div class="modal-field">
+                <label class="svm-mode">
+                    <input type="radio"
+                           name="svm-mode"
+                           checked="@(_RefMode == StorageVariableRefMode.Specific)"
+                           @onchange="() => _RefMode = StorageVariableRefMode.Specific"/>
+                    <span>@Loc.T(Localization.Editor.Modals.GetVariable.modeSpecific)</span>
+                </label>
+                <label class="svm-mode">
+                    <input type="radio"
+                           name="svm-mode"
+                           checked="@(_RefMode == StorageVariableRefMode.ByType)"
+                           @onchange="() => _RefMode = StorageVariableRefMode.ByType"/>
+                    <span>@Loc.T(Localization.Editor.Modals.GetVariable.modeByType)</span>
+                </label>
+            </div>
+
             @{
                 List<StoryRegisterVariableNode> vars = RegisteredVariables();
             }
-            @if (vars.Count == 0)
+            @if (_RefMode == StorageVariableRefMode.Specific && vars.Count == 0)
             {
                 <div class="svm-empty">
                     <i class="bi bi-box-seam"></i>
@@ -34,22 +52,37 @@
             }
             else
             {
-                <div class="modal-field">
-                    <label class="modal-label">@Loc.T(Localization.Common.Fields.variable)</label>
-                    <div class="svm-list">
-                        @foreach (StoryRegisterVariableNode v in vars)
-                        {
-                            StoryRegisterVariableNode variable = v;
-                            <button class="svm-item @(_RegisteredVariableId == variable.Id ? "selected" : "")"
-                                    @onclick="() => _RegisteredVariableId = variable.Id">
-                                <span class="svm-item-name">@(string.IsNullOrWhiteSpace(variable.Name) ? Loc.T(Localization.Common.Placeholders.unnamed) : variable.Name)</span>
-                                <span class="svm-item-slot">@StorageSlots.Label(variable.Type, variable.SlotIndex)</span>
-                            </button>
-                        }
+                @if (_RefMode == StorageVariableRefMode.Specific)
+                {
+                    <div class="modal-field">
+                        <label class="modal-label">@Loc.T(Localization.Common.Fields.variable)</label>
+                        <div class="svm-list">
+                            @foreach (StoryRegisterVariableNode v in vars)
+                            {
+                                StoryRegisterVariableNode variable = v;
+                                <button class="svm-item @(_RegisteredVariableId == variable.Id ? "selected" : "")"
+                                        @onclick="() => _RegisteredVariableId = variable.Id">
+                                    <span class="svm-item-name">@(string.IsNullOrWhiteSpace(variable.Name) ? Loc.T(Localization.Common.Placeholders.unnamed) : variable.Name)</span>
+                                    <span class="svm-item-slot">@StorageSlots.Label(variable.Type, variable.SlotIndex)</span>
+                                </button>
+                            }
+                        </div>
                     </div>
-                </div>
+                }
+                else
+                {
+                    <div class="modal-field">
+                        <label class="modal-label">@Loc.T(Localization.Editor.Modals.RegisterVariable.storageType)</label>
+                        <select class="modal-input" @bind="_RefType">
+                            <option value="@StorageVariableType.Number">@Loc.T(Localization.Editor.Modals.RegisterVariable.storageTypeNumber)</option>
+                            <option value="@StorageVariableType.Dial">@Loc.T(Localization.Common.Misc.dialRange)</option>
+                            <option value="@StorageVariableType.String">@Loc.T(Localization.Common.Misc.stringWritten)</option>
+                        </select>
+                        <span class="modal-label-hint">@Loc.T(Localization.Editor.Modals.GetVariable.byTypeHint)</span>
+                    </div>
+                }
 
-                @if (Selected is StoryRegisterVariableNode sel && sel.Type is StorageVariableType.Number or StorageVariableType.Dial)
+                @if (EffectiveType is StorageVariableType.Number or StorageVariableType.Dial)
                 {
                     <div class="modal-field">
                         <label class="modal-label">@Loc.T(Localization.Common.Fields.newValue)</label>
@@ -66,15 +99,17 @@
                             <label class="modal-label">@Loc.T(Localization.Common.Fields.value)</label>
                             <input class="modal-input"
                                    type="number"
-                                   min="@ValueMin(sel)"
-                                   max="@ValueMax(sel)"
+                                   min="@ValueMin"
+                                   max="@ValueMax"
                                    @bind="_SpecificValue"
                                    @bind:event="oninput"/>
                         </div>
                     }
 
-                    @if (sel.Type == StorageVariableType.Dial ||
-                        (sel.Type == StorageVariableType.Number && sel.Mode == NumberStorageMode.Token))
+                    @* A ByType set can't know the target's storage mode, so it always offers the secret option. *@
+                    @if (EffectiveType == StorageVariableType.Dial
+                      || Selected is null
+                      || Selected.Mode == NumberStorageMode.Token)
                     {
                         <div class="modal-field">
                             <label class="svm-check">
@@ -87,7 +122,7 @@
                     }
                 }
 
-                @if (Selected is StoryRegisterVariableNode strSel && strSel.Type == StorageVariableType.String)
+                @if (EffectiveType == StorageVariableType.String)
                 {
                     <div class="modal-field">
                         <label class="modal-label">@Loc.T(Localization.Common.Fields.newValue)</label>
@@ -120,7 +155,7 @@
                                 <option value="@StringInputKind.Number">@Loc.T(Localization.Common.InputKind.number)</option>
                             </select>
                             <span class="modal-label-hint">
-                                @((MarkupString)Loc.T(Localization.Common.VariableInput.playerInputHint).Replace("[slotToken]", "{" + StoryLogicRenderer.SlotTokenName(strSel.Name) + "}"))
+                                @((MarkupString)Loc.T(Localization.Common.VariableInput.playerInputHint).Replace("[slotToken]", _SlotToken))
                             </span>
                         </div>
 
@@ -177,7 +212,7 @@
                                 @((MarkupString)Loc.T(Localization.Common.VariableInput.validationRuleExplain))
                             </span>
                             <div class="svm-rule">
-                                <ExitConditionEditor Expr="_ValidationRule" Vars="RuleVars(strSel.Id)" OnChanged="StateHasChanged"/>
+                                <ExitConditionEditor Expr="_ValidationRule" Vars="RuleVars()" OnChanged="StateHasChanged"/>
                             </div>
                         </div>
 
@@ -201,7 +236,7 @@
                     }
                 }
 
-                @if (Selected is not null)
+                @if (EffectiveType is not null)
                 {
                     <div class="modal-field">
                         <label class="modal-label">@Loc.T(Localization.Common.Fields.placement)</label>
@@ -219,7 +254,7 @@
             <button class="modal-btn modal-btn-ghost" @onclick="Cancel">@Loc.T(Localization.Common.Buttons.cancel)</button>
             <button class="modal-btn modal-btn-primary"
                     @onclick="Confirm"
-                    disabled="@(_RegisteredVariableId == Guid.Empty)">
+                    disabled="@(!_CanConfirm)">
                 @(_IsEdit ? Loc.T(Localization.Common.Buttons.saveChanges) : Loc.T(Localization.Editor.Modals.SetVariable.confirm))
             </button>
         </div>
@@ -233,14 +268,19 @@
 @code {
     [Parameter] public EventCallback<SetVariableArgs> OnConfirm { get; set; }
 
+    /// <summary>The logic node whose inner graph holds the node being edited — the source of the validation rule's wired operands.</summary>
+    [Parameter] public StoryLogicNode? Logic { get; set; }
+
     private bool _Visible;
     private bool _IsEdit;
     private Guid _EditNodeId;
 
-    private Guid             _RegisteredVariableId;
-    private NumberAssignment _Assignment = NumberAssignment.SetSpecific;
-    private bool             _Secret;
-    private int              _SpecificValue = 1;
+    private StorageVariableRefMode _RefMode;
+    private StorageVariableType    _RefType;
+    private Guid                   _RegisteredVariableId;
+    private NumberAssignment       _Assignment = NumberAssignment.SetSpecific;
+    private bool                   _Secret;
+    private int                    _SpecificValue = 1;
 
     private StorageInstructionPlacement _Placement;
     private StringValueMode             _StringMode;
@@ -262,6 +302,8 @@
     {
         _IsEdit               = false;
         _EditNodeId           = Guid.Empty;
+        _RefMode              = StorageVariableRefMode.Specific;
+        _RefType              = StorageVariableType.Number;
         _RegisteredVariableId = Guid.Empty;
         _Assignment           = NumberAssignment.SetSpecific;
         _Secret               = false;
@@ -284,6 +326,8 @@
     {
         _IsEdit               = true;
         _EditNodeId           = node.Id;
+        _RefMode              = node.RefMode;
+        _RefType              = node.RefType;
         _RegisteredVariableId = node.RegisteredVariableId;
         _Assignment           = node.Assignment;
         _Secret               = node.Secret;
@@ -301,8 +345,49 @@
         StateHasChanged();
     }
 
+    /// <summary>The picked register — always null in ByType mode, where the target is named by a wire instead.</summary>
     private StoryRegisterVariableNode? Selected =>
-        _RegisteredVariableId == Guid.Empty ? null : EditorProjection.FindRegister(_ProjectState.CurrentProject!, _RegisteredVariableId);
+        _RefMode == StorageVariableRefMode.ByType || _RegisteredVariableId == Guid.Empty
+            ? null
+            : EditorProjection.FindRegister(_ProjectState.CurrentProject!, _RegisteredVariableId);
+
+    /// <summary>The storage type this node writes — chosen up front in ByType mode, else the picked register's. Null when nothing is picked yet.</summary>
+    private StorageVariableType? EffectiveType =>
+        _RefMode == StorageVariableRefMode.ByType ? _RefType : Selected?.Type;
+
+    /// <summary>A ByType set can't know the target's value count, so it allows the full range its storage type can hold.</summary>
+    private int ValueMin => EffectiveType == StorageVariableType.Dial ? -7 : 1;
+    private int ValueMax => EffectiveType == StorageVariableType.Dial ? 7
+                          : Selected is StoryRegisterVariableNode sel ? StorageSlots.ToNumber(sel.ValueCount)
+                          : StorageSlots.ToNumber(NumberValueCount.Six);
+
+    /// <summary>
+    /// The target as the renderer will resolve it: the picked register, or — in ByType mode — whatever the Name wire
+    /// currently names (only on an existing node; a create has no wire yet).
+    /// </summary>
+    private StoryRegisterVariableNode? ResolvedTarget
+    {
+        get
+        {
+            if (_RefMode == StorageVariableRefMode.Specific) return Selected;
+            if (Logic is null || _ProjectState.CurrentProject is null) return null;
+            if (Logic.SetVariableNodes.Find(n => n.Id == _EditNodeId) is not StorySetVariableNode node) return null;
+
+            // Resolve against the type currently chosen in the modal, not the one last saved on the node.
+            string name = StoryLogicFlow.ResolveVariableValue(
+                _ProjectState.CurrentProject, Logic, StoryLogicFlow.FromInto(Logic, node.NameIn.Id),
+                new Dictionary<Guid, string>(), StoryRenderTarget.App);
+            return StoryLogicFlow.FindRegisterByName(_ProjectState.CurrentProject, name, _RefType);
+        }
+    }
+
+    /// <summary>The <c>{token}</c> the target's slot pill fills in the instruction text — <c>{slot}</c> when the name isn't known here (mirrors <c>StoryLogicRenderer</c>).</summary>
+    private string _SlotToken =>
+        ResolvedTarget is { Name: { Length: > 0 } n } ? "{" + StoryLogicRenderer.SlotTokenName(n) + "}" : "{slot}";
+
+    /// <summary>A ByType node names its variable through a wire, so only a Specific node needs a pick before it can be saved.</summary>
+    private bool _CanConfirm =>
+        _RefMode == StorageVariableRefMode.ByType || _RegisteredVariableId != Guid.Empty;
 
     private List<StoryRegisterVariableNode> RegisteredVariables()
     {
@@ -312,21 +397,26 @@
         return list.OrderBy(v => v.Name, StringComparer.OrdinalIgnoreCase).ToList();
     }
 
-    private static int ValueMin(StoryRegisterVariableNode v) => v.Type == StorageVariableType.Dial ? -7 : 1;
-    private static int ValueMax(StoryRegisterVariableNode v) => v.Type == StorageVariableType.Dial ? 7  : StorageSlots.ToNumber(v.ValueCount);
-
     // ── Player-input String validation helpers ─────────────────────────────
 
-    /// <summary>The operands the validation rule can reference: "This entry" plus every other registered variable (excluding the one being set).</summary>
-    private List<(Guid Id, string Name)> RuleVars(Guid selfId)
+    /// <summary>
+    /// The operands the validation rule can reference: "This entry", everything wired into this node's Validation port
+    /// (only on an existing node — a create has no wires yet), and every other registered variable.
+    /// </summary>
+    private List<(Guid Id, string Name)> RuleVars()
     {
         List<(Guid, string)> vars = new() { (StorageValidation.ThisEntryRef, Loc.T(Localization.Common.VariableInput.thisEntry)) };
+        vars.AddRange(EditorProjection.WiredVariables(_ProjectState.CurrentProject!, Logic, ValidationInId));
         foreach (StoryLogicNode logic in _ProjectState.CurrentProject!.LogicNodes.Values)
             foreach (StoryRegisterVariableNode reg in logic.RegisterVariableNodes.OrderBy(v => v.Name, StringComparer.OrdinalIgnoreCase))
-                if (reg.Id != selfId)
+                if (reg.Id != Selected?.Id)
                     vars.Add((reg.Id, $"{(string.IsNullOrWhiteSpace(reg.Name) ? Loc.T(Localization.Common.Placeholders.unnamed) : reg.Name)} [{StorageSlots.Label(reg.Type, reg.SlotIndex)}]"));
         return vars;
     }
+
+    /// <summary>The Validation port of the node being edited (empty on a create — nothing can be wired into it yet).</summary>
+    private Guid ValidationInId =>
+        Logic?.SetVariableNodes.Find(n => n.Id == _EditNodeId)?.ValidationIn.Id ?? Guid.Empty;
 
     private string KeyLabel(Guid keyId)
     {
@@ -355,18 +445,18 @@
 
     private async Task Confirm()
     {
-        if (_RegisteredVariableId == Guid.Empty) return;
+        if (!_CanConfirm) return;
         _Visible = false;
 
-        int specific = Selected is StoryRegisterVariableNode sel
-            ? Math.Clamp(_SpecificValue, ValueMin(sel), ValueMax(sel))
-            : _SpecificValue;
+        int specific = EffectiveType is null ? _SpecificValue : Math.Clamp(_SpecificValue, ValueMin, ValueMax);
+        int maxLen   = Math.Clamp(_MaxLength, 1, 500);
+        int minLen   = Math.Clamp(_MinLength, 0, maxLen);
 
-        int maxLen = Math.Clamp(_MaxLength, 1, 500);
-        int minLen = Math.Clamp(_MinLength, 0, maxLen);
+        // A ByType node takes its target from the Name wire, so it keeps no register id.
+        Guid registered = _RefMode == StorageVariableRefMode.ByType ? Guid.Empty : _RegisteredVariableId;
 
         await OnConfirm.InvokeAsync(new SetVariableArgs(
-            _EditNodeId, _RegisteredVariableId, _Assignment, _Secret, specific,
+            _EditNodeId, _RefMode, _RefType, registered, _Assignment, _Secret, specific,
             _Placement, _StringMode, _StringValue.Trim(), _StringInputKind,
             minLen, maxLen, _LengthErrorKeyId,
             _ValidationRule.Children.Count > 0 ? _ValidationRule.Clone() : null,
@@ -378,6 +468,8 @@
     /// <summary>Result passed back to the parent. <see cref="EditNodeId"/> is empty for a create, set for an edit.</summary>
     public record SetVariableArgs(
         Guid                        EditNodeId,
+        StorageVariableRefMode      RefMode,
+        StorageVariableType         RefType,
         Guid                        RegisteredVariableId,
         NumberAssignment            Assignment,
         bool                        Secret,

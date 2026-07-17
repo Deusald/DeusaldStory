@@ -59,6 +59,14 @@
     text-align: center;
 }
 
+.svm-mode {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    cursor: pointer;
+    font-size: 0.85rem;
+}
+
 .svm-check {
     display: flex;
     align-items: center;

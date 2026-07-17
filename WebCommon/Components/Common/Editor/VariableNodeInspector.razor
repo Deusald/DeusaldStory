@@ -46,7 +46,7 @@
     }
     else if (SetNode is StorySetVariableNode set)
     {
-        StoryRegisterVariableNode? target = EditorProjection.FindRegister(_ProjectState.CurrentProject!, set.RegisteredVariableId);
+        StoryRegisterVariableNode? target = StoryLogicFlow.TargetOf(_ProjectState.CurrentProject!, Logic!, set);
         <div class="vni-head">
             <span class="vni-kind" style="color:@StoryStyle.NodeColor(StoryNodeKind.SetVariable)">
                 <span class="vni-dot" style="background:@StoryStyle.NodeColor(StoryNodeKind.SetVariable)"></span>

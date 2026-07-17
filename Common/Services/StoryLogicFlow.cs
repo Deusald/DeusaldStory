@@ -13,23 +13,44 @@ namespace DeusaldStoryCommon
         Unregister
     }
 
-    /// <summary>One storage operation encountered while walking a logic node's inner LFlow chain, in flow order.</summary>
+    /// <summary>
+    /// One storage operation encountered while walking a logic node's inner LFlow chain, in flow order. Build one
+    /// through <see cref="For(StoryRegisterVariableNode)"/> / <see cref="For(StoryProject,StoryLogicNode,StorySetVariableNode,IReadOnlyDictionary{Guid,string},StoryRenderTarget)"/>
+    /// / <see cref="For(StoryUnregisterVariableNode)"/> — a Set resolves its target against the graph, so it can't be
+    /// derived from the node alone.
+    /// </summary>
     public sealed class StorageOp
     {
-        public StorageOpKind                Kind       { get; set; }
-        public StoryRegisterVariableNode?   Register   { get; set; }
-        public StorySetVariableNode?        Set        { get; set; }
-        public StoryUnregisterVariableNode? Unregister { get; set; }
+        public StorageOpKind                Kind       { get; private set; }
+        public StoryRegisterVariableNode?   Register   { get; private set; }
+        public StorySetVariableNode?        Set        { get; private set; }
+        public StoryUnregisterVariableNode? Unregister { get; private set; }
 
-        /// <summary>The register-node id this operation acts on (the registered variable's identity).</summary>
-        public Guid TargetRegisterId =>
-            Kind switch
+        /// <summary>
+        /// The register-node id this operation acts on (the registered variable's identity), resolved when the op was
+        /// built — a Set in <see cref="StorageVariableRefMode.ByType"/> mode names its target through a wire, so it can
+        /// only be resolved with the graph at hand. <see cref="Guid.Empty"/> when the target doesn't resolve.
+        /// </summary>
+        public Guid TargetRegisterId { get; private set; }
+
+        /// <summary>A register operation — it acts on the variable it defines.</summary>
+        public static StorageOp For(StoryRegisterVariableNode reg) =>
+            new() { Kind = StorageOpKind.Register, Register = reg, TargetRegisterId = reg.Id };
+
+        /// <summary>A set operation, resolving the variable it writes (picked by id, or named by the wire into its Name port).</summary>
+        public static StorageOp For(
+            StoryProject project, StoryLogicNode logic, StorySetVariableNode set,
+            IReadOnlyDictionary<Guid, string>? values = null, StoryRenderTarget target = StoryRenderTarget.App) =>
+            new()
             {
-                StorageOpKind.Register   => Register?.Id                     ?? Guid.Empty,
-                StorageOpKind.Set        => Set?.RegisteredVariableId        ?? Guid.Empty,
-                StorageOpKind.Unregister => Unregister?.RegisteredVariableId ?? Guid.Empty,
-                _                        => Guid.Empty
+                Kind             = StorageOpKind.Set,
+                Set              = set,
+                TargetRegisterId = StoryLogicFlow.TargetOf(project, logic, set, values, target)?.Id ?? Guid.Empty
             };
+
+        /// <summary>An unregister operation — it acts on the variable it names by id.</summary>
+        public static StorageOp For(StoryUnregisterVariableNode unreg) =>
+            new() { Kind = StorageOpKind.Unregister, Unregister = unreg, TargetRegisterId = unreg.RegisteredVariableId };
 
         /// <summary>The inner node's own id (for selecting/navigating to it).</summary>
         public Guid InnerId =>
@@ -83,7 +104,7 @@ namespace DeusaldStoryCommon
             if (logic.GetVariableNodes.Find(n => n.OutPoint.Id == fromPoint) is StoryGetVariableNode gv)
                 return !string.IsNullOrEmpty(gv.PreviewValue)
                     ? gv.PreviewValue
-                    : FindRegister(project, gv.RegisteredVariableId)?.PreviewValue ?? "";
+                    : TargetOf(project, logic, gv, values, target)?.PreviewValue ?? "";
 
             if (logic.ConstantVariableNodes.Find(n => n.OutPoint.Id == fromPoint) is StoryConstantVariableNode cv)
                 return cv.Value;
@@ -107,7 +128,8 @@ namespace DeusaldStoryCommon
             return cf.Negate ? !result : result;
         }
 
-        private static Guid FromInto(StoryLogicNode logic, Guid toPoint) =>
+        /// <summary>The output wired into <paramref name="toPoint"/>, or <see cref="Guid.Empty"/> when the input is unconnected.</summary>
+        public static Guid FromInto(StoryLogicNode logic, Guid toPoint) =>
             logic.ContentConnections.Find(c => c.ToPoint == toPoint)?.FromPoint ?? Guid.Empty;
 
         /// <summary>Finds a registered storage variable (a Register node) anywhere in the project by its id.</summary>
@@ -118,6 +140,70 @@ namespace DeusaldStoryCommon
                 if (l.RegisterVariableNodes.Find(n => n.Id == id) is StoryRegisterVariableNode found)
                     return found;
             return null;
+        }
+
+        /// <summary>
+        /// Finds a registered storage variable of <paramref name="type"/> by <paramref name="name"/> (case-insensitive)
+        /// anywhere in the project — how a <see cref="StorageVariableRefMode.ByType"/> Get/Set names its target. Null
+        /// when no variable of that type carries the name. When several registers share the name and type they are
+        /// interchangeable for this lookup (only one can be active on any path), so the first is returned.
+        /// </summary>
+        public static StoryRegisterVariableNode? FindRegisterByName(StoryProject project, string name, StorageVariableType type)
+        {
+            if (string.IsNullOrWhiteSpace(name)) return null;
+            name = name.Trim();
+            foreach (StoryLogicNode l in project.LogicNodes.Values)
+                if (l.RegisterVariableNodes.Find(n => n.Type == type && string.Equals(n.Name, name, StringComparison.OrdinalIgnoreCase))
+                    is StoryRegisterVariableNode found)
+                    return found;
+            return null;
+        }
+
+        /// <summary>
+        /// Every value the constant output wired at <paramref name="fromPoint"/> can carry — one entry for a Constant
+        /// Variable node, one per possible value for a constant External Variable. Null when the wire is missing or its
+        /// source isn't constant, so the value cannot be known before play. Used to validate a
+        /// <see cref="StorageVariableRefMode.ByType"/> Get/Set's wired name against <i>every</i> name it might take.
+        /// </summary>
+        public static List<string>? PossibleVariableValues(StoryProject project, StoryLogicNode logic, Guid fromPoint)
+        {
+            if (fromPoint == Guid.Empty) return null;
+            fromPoint = logic.ResolvePortalSource(fromPoint);
+
+            if (logic.ConstantVariableNodes.Find(n => n.OutPoint.Id == fromPoint) is StoryConstantVariableNode cv)
+                return new List<string> { cv.Value };
+
+            if (logic.ExternalVariableNodes.Find(n => n.OutPoint.Id == fromPoint) is StoryExternalVariableNode ev)
+            {
+                StoryVariable? v = StoryBuiltInVariables.Find(ev.SelectedVariableId)
+                    ?? (project.Variables.TryGetValue(ev.SelectedVariableId, out StoryVariable? found) ? found : null);
+                // A built-in's value is the render target, never a variable name — not a usable name source.
+                if (v is null || StoryBuiltInVariables.IsBuiltIn(v.Id) || !v.IsConstant) return null;
+                return new List<string>(v.PossibleValues);
+            }
+
+            return null;
+        }
+
+        /// <summary>The storage variable a Get node reads — the picked register, or the one its wired name selects.</summary>
+        public static StoryRegisterVariableNode? TargetOf(
+            StoryProject project, StoryLogicNode logic, StoryGetVariableNode gv,
+            IReadOnlyDictionary<Guid, string>? values = null, StoryRenderTarget target = StoryRenderTarget.App) =>
+            TargetOf(project, logic, gv.RefMode, gv.RefType, gv.RegisteredVariableId, gv.NameIn.Id, values, target);
+
+        /// <summary>The storage variable a Set node writes — the picked register, or the one its wired name selects.</summary>
+        public static StoryRegisterVariableNode? TargetOf(
+            StoryProject project, StoryLogicNode logic, StorySetVariableNode set,
+            IReadOnlyDictionary<Guid, string>? values = null, StoryRenderTarget target = StoryRenderTarget.App) =>
+            TargetOf(project, logic, set.RefMode, set.RefType, set.RegisteredVariableId, set.NameIn.Id, values, target);
+
+        private static StoryRegisterVariableNode? TargetOf(
+            StoryProject project, StoryLogicNode logic, StorageVariableRefMode mode, StorageVariableType type,
+            Guid registeredVariableId, Guid nameIn, IReadOnlyDictionary<Guid, string>? values, StoryRenderTarget target)
+        {
+            if (mode == StorageVariableRefMode.Specific) return FindRegister(project, registeredVariableId);
+            string name = ResolveVariableValue(project, logic, FromInto(logic, nameIn), values ?? _EmptyValues, target);
+            return FindRegisterByName(project, name, type);
         }
 
         public static List<StorageOp> StorageOps(
@@ -142,19 +228,19 @@ namespace DeusaldStoryCommon
 
                     if (logic.RegisterVariableNodes.Find(n => n.FlowIn.Id == to) is StoryRegisterVariableNode reg)
                     {
-                        ops.Add(new StorageOp { Kind = StorageOpKind.Register, Register = reg });
+                        ops.Add(StorageOp.For(reg));
                         visited.Add(reg.Id);
                         from = reg.FlowOut.Id;
                     }
                     else if (logic.SetVariableNodes.Find(n => n.FlowIn.Id == to) is StorySetVariableNode set)
                     {
-                        ops.Add(new StorageOp { Kind = StorageOpKind.Set, Set = set });
+                        ops.Add(StorageOp.For(project, logic, set, values, target));
                         visited.Add(set.Id);
                         from = set.FlowOut.Id;
                     }
                     else if (logic.UnregisterVariableNodes.Find(n => n.FlowIn.Id == to) is StoryUnregisterVariableNode unreg)
                     {
-                        ops.Add(new StorageOp { Kind = StorageOpKind.Unregister, Unregister = unreg });
+                        ops.Add(StorageOp.For(unreg));
                         visited.Add(unreg.Id);
                         from = unreg.FlowOut.Id;
                     }
@@ -193,13 +279,13 @@ namespace DeusaldStoryCommon
 
             foreach (StoryRegisterVariableNode reg in logic.RegisterVariableNodes)
                 if (!visited.Contains(reg.Id) && !Wired(reg.FlowIn, reg.FlowOut))
-                    ops.Add(new StorageOp { Kind = StorageOpKind.Register, Register = reg });
+                    ops.Add(StorageOp.For(reg));
             foreach (StorySetVariableNode set in logic.SetVariableNodes)
                 if (!visited.Contains(set.Id) && !Wired(set.FlowIn, set.FlowOut))
-                    ops.Add(new StorageOp { Kind = StorageOpKind.Set, Set = set });
+                    ops.Add(StorageOp.For(project, logic, set, values, target));
             foreach (StoryUnregisterVariableNode unreg in logic.UnregisterVariableNodes)
                 if (!visited.Contains(unreg.Id) && !Wired(unreg.FlowIn, unreg.FlowOut))
-                    ops.Add(new StorageOp { Kind = StorageOpKind.Unregister, Unregister = unreg });
+                    ops.Add(StorageOp.For(unreg));
 
             return ops;
         }

@@ -296,6 +296,9 @@
 @code {
     [Parameter] public EventCallback<RegisterVariableArgs> OnConfirm { get; set; }
 
+    /// <summary>The logic node whose inner graph holds the node being edited — the source of the validation rule's wired operands.</summary>
+    [Parameter] public StoryLogicNode? Logic { get; set; }
+
     /// <summary>Free slot indices per type at the target node, supplied when opening. Null for a type = list every slot.</summary>
     private IReadOnlyDictionary<StorageVariableType, IReadOnlyList<int>>? FreeSlots;
 
@@ -419,17 +422,26 @@
 
     // ── Player-input String validation helpers ─────────────────────────────
 
-    /// <summary>The operands the validation rule can reference: "This entry" plus every other registered variable.</summary>
+    /// <summary>
+    /// The operands the validation rule can reference: "This entry", everything wired into this node's Validation port
+    /// (only on an existing node — a create has no wires yet), and every other registered variable.
+    /// </summary>
     private List<(Guid Id, string Name)> RuleVars()
     {
         List<(Guid, string)> vars = new() { (StorageValidation.ThisEntryRef, Loc.T(Localization.Common.VariableInput.thisEntry)) };
-        if (_ProjectState.CurrentProject is not null)
-            foreach (StoryLogicNode logic in _ProjectState.CurrentProject.LogicNodes.Values)
-                foreach (StoryRegisterVariableNode reg in logic.RegisterVariableNodes.OrderBy(v => v.Name, StringComparer.OrdinalIgnoreCase))
-                    if (reg.Id != _EditNodeId)
-                        vars.Add((reg.Id, $"{(string.IsNullOrWhiteSpace(reg.Name) ? Loc.T(Localization.Common.Placeholders.unnamed) : reg.Name)} [{StorageSlots.Label(reg.Type, reg.SlotIndex)}]"));
+        if (_ProjectState.CurrentProject is null) return vars;
+
+        vars.AddRange(EditorProjection.WiredVariables(_ProjectState.CurrentProject, Logic, ValidationInId));
+        foreach (StoryLogicNode logic in _ProjectState.CurrentProject.LogicNodes.Values)
+            foreach (StoryRegisterVariableNode reg in logic.RegisterVariableNodes.OrderBy(v => v.Name, StringComparer.OrdinalIgnoreCase))
+                if (reg.Id != _EditNodeId)
+                    vars.Add((reg.Id, $"{(string.IsNullOrWhiteSpace(reg.Name) ? Loc.T(Localization.Common.Placeholders.unnamed) : reg.Name)} [{StorageSlots.Label(reg.Type, reg.SlotIndex)}]"));
         return vars;
     }
+
+    /// <summary>The Validation port of the node being edited (empty on a create — nothing can be wired into it yet).</summary>
+    private Guid ValidationInId =>
+        Logic?.RegisterVariableNodes.Find(n => n.Id == _EditNodeId)?.ValidationIn.Id ?? Guid.Empty;
 
     /// <summary>The localization key's display name, or a placeholder when none is picked.</summary>
     private string KeyLabel(Guid keyId)

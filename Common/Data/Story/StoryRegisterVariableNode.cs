@@ -68,6 +68,12 @@ namespace DeusaldStoryCommon
         /// <summary>String / <see cref="StringValueMode.PlayerInput"/> — Text input port carrying the App input field's placeholder hint (a Localization output). Empty falls back to a default.</summary>
         public StoryConnectionPoint PlaceholderIn { get; set; } = new() { Name = "Placeholder" };
 
+        /// <summary>
+        /// String / <see cref="StringValueMode.PlayerInput"/> — a <b>multi-wire</b> Variable input whose sources become
+        /// extra operands of <see cref="ValidationRule"/>, each referenced by its connection <c>FromPoint</c> id.
+        /// </summary>
+        public StoryConnectionPoint ValidationIn { get; set; } = new() { Name = "Validation" };
+
         /// <summary>String / <see cref="StringValueMode.PlayerInput"/> — smallest accepted entry length in characters (default 1).</summary>
         public int MinLength { get; set; } = 1;
 
@@ -77,7 +83,7 @@ namespace DeusaldStoryCommon
         /// <summary>String / <see cref="StringValueMode.PlayerInput"/> — localization key for the message shown when the entry is outside <see cref="MinLength"/>…<see cref="MaxLength"/>. Empty = a default message.</summary>
         public Guid LengthErrorKeyId { get; set; }
 
-        /// <summary>String / <see cref="StringValueMode.PlayerInput"/> — an <b>App-only</b> validation rule the entry must satisfy (a boolean Group tree; null = no rule). Operands reference <see cref="StorageValidation.ThisEntryRef"/> and other register-node ids. The Gamebook cannot enforce it.</summary>
+        /// <summary>String / <see cref="StringValueMode.PlayerInput"/> — an <b>App-only</b> validation rule the entry must satisfy (a boolean Group tree; null = no rule). Operands reference <see cref="StorageValidation.ThisEntryRef"/>, other register-node ids, and the outputs wired into <see cref="ValidationIn"/> (by connection <c>FromPoint</c> id). The Gamebook cannot enforce it.</summary>
         public StoryConditionExpr? ValidationRule { get; set; }
 
         /// <summary>String / <see cref="StringValueMode.PlayerInput"/> — localization key for the message shown when <see cref="ValidationRule"/> is not met. Empty = a default message.</summary>

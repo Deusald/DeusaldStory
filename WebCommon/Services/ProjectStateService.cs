@@ -489,13 +489,17 @@ public partial class ProjectStateService(
         MarkKeyDirty(logicId);
     }
 
-    /// <summary>Adds a Get Variable node (reads registered variable <paramref name="registeredVariableId"/>) to a logic node's inner graph.</summary>
-    public StoryGetVariableNode? AddGetVariableNode(Guid logicId, Guid registeredVariableId, string nameOverride, string previewValue, double x, double y)
+    /// <summary>Adds a Get Variable node (reading a variable picked by id, or one named by its wired Name port) to a logic node's inner graph.</summary>
+    public StoryGetVariableNode? AddGetVariableNode(
+        Guid logicId, StorageVariableRefMode refMode, StorageVariableType refType, Guid registeredVariableId,
+        string nameOverride, string previewValue, double x, double y)
     {
         if (!CurrentProject!.LogicNodes.TryGetValue(logicId, out StoryLogicNode? logic)) return null;
 
         StoryGetVariableNode node = new()
         {
+            RefMode              = refMode,
+            RefType              = refType,
             RegisteredVariableId = registeredVariableId,
             NameOverride         = nameOverride,
             PreviewValue         = previewValue,
@@ -507,19 +511,27 @@ public partial class ProjectStateService(
         return node;
     }
 
-    /// <summary>Updates the registered variable, name override and preview value a Get Variable node reads.</summary>
-    public void UpdateGetVariableNode(Guid logicId, Guid nodeId, Guid registeredVariableId, string nameOverride, string previewValue)
+    /// <summary>Updates which variable a Get Variable node reads (by id or by type + wired name), its name override and preview value.</summary>
+    public void UpdateGetVariableNode(
+        Guid logicId, Guid nodeId, StorageVariableRefMode refMode, StorageVariableType refType,
+        Guid registeredVariableId, string nameOverride, string previewValue)
     {
         if (!CurrentProject!.LogicNodes.TryGetValue(logicId, out StoryLogicNode? logic)) return;
         StoryGetVariableNode? node = logic.GetVariableNodes.Find(n => n.Id == nodeId);
         if (node is null) return;
+        node.RefMode              = refMode;
+        node.RefType              = refType;
         node.RegisteredVariableId = registeredVariableId;
         node.NameOverride         = nameOverride;
         node.PreviewValue         = previewValue;
+
+        // The Name port only exists in ByType mode — drop its wire when the node goes back to a specific variable.
+        if (refMode != StorageVariableRefMode.ByType)
+            logic.ContentConnections.RemoveAll(c => c.ToPoint == node.NameIn.Id);
         MarkKeyDirty(logicId);
     }
 
-    /// <summary>Deletes a Get Variable node and any inner wire that touched its output.</summary>
+    /// <summary>Deletes a Get Variable node and any inner wire that touched its ports.</summary>
     public void DeleteGetVariableNode(Guid logicId, Guid nodeId)
     {
         if (!CurrentProject!.LogicNodes.TryGetValue(logicId, out StoryLogicNode? logic)) return;
@@ -529,7 +541,8 @@ public partial class ProjectStateService(
         logic.GetVariableNodes.Remove(node);
         logic.ContentConnections.RemoveAll(c =>
             c.FromPoint == node.OutPoint.Id || c.ToPoint == node.OutPoint.Id ||
-            c.FromPoint == node.SlotOutPoint.Id || c.ToPoint == node.SlotOutPoint.Id);
+            c.FromPoint == node.SlotOutPoint.Id || c.ToPoint == node.SlotOutPoint.Id ||
+            c.ToPoint == node.NameIn.Id);
         MarkKeyDirty(logicId);
     }
 
@@ -906,9 +919,9 @@ public partial class ProjectStateService(
         node.ValidationRule       = playerInput ? validationRule : null;
         node.ValidationErrorKeyId = playerInput ? validationErrorKeyId : Guid.Empty;
 
-        // The Instruction / Placeholder ports only exist for a player-input String — drop any stale wire when they no longer apply.
-        if (type != StorageVariableType.String || stringMode != StringValueMode.PlayerInput)
-            logic.ContentConnections.RemoveAll(c => c.ToPoint == node.InstructionIn.Id || c.ToPoint == node.PlaceholderIn.Id);
+        // The Instruction / Placeholder / Validation ports only exist for a player-input String — drop any stale wire when they no longer apply.
+        if (!playerInput)
+            logic.ContentConnections.RemoveAll(c => c.ToPoint == node.InstructionIn.Id || c.ToPoint == node.PlaceholderIn.Id || c.ToPoint == node.ValidationIn.Id);
         MarkKeyDirty(logicId);
     }
 
@@ -923,7 +936,8 @@ public partial class ProjectStateService(
         logic.ContentConnections.RemoveAll(c =>
             c.FromPoint == node.FlowOut.Id || c.ToPoint == node.FlowOut.Id ||
             c.FromPoint == node.FlowIn.Id  || c.ToPoint == node.FlowIn.Id  ||
-            c.ToPoint   == node.InstructionIn.Id || c.ToPoint == node.PlaceholderIn.Id);
+            c.ToPoint   == node.InstructionIn.Id || c.ToPoint == node.PlaceholderIn.Id ||
+            c.ToPoint   == node.ValidationIn.Id);
         MarkKeyDirty(logicId);
     }
 
@@ -938,9 +952,10 @@ public partial class ProjectStateService(
         return node;
     }
 
-    /// <summary>Updates a Set-variable node's target and value assignment.</summary>
+    /// <summary>Updates which variable a Set-variable node writes (by id or by type + wired name) and its value assignment.</summary>
     public void UpdateSetVariableNode(
-        Guid logicId, Guid nodeId, Guid registeredVariableId, NumberAssignment assignment, bool secret, int specificValue,
+        Guid logicId, Guid nodeId, StorageVariableRefMode refMode, StorageVariableType refType, Guid registeredVariableId,
+        NumberAssignment assignment, bool secret, int specificValue,
         StorageInstructionPlacement placement, StringValueMode stringMode, string stringValue, StringInputKind stringInputKind,
         int minLength, int maxLength, Guid lengthErrorKeyId, StoryConditionExpr? validationRule, Guid validationErrorKeyId)
     {
@@ -948,6 +963,8 @@ public partial class ProjectStateService(
         StorySetVariableNode? node = logic.SetVariableNodes.Find(n => n.Id == nodeId);
         if (node is null) return;
 
+        node.RefMode              = refMode;
+        node.RefType              = refType;
         node.RegisteredVariableId = registeredVariableId;
         node.Assignment           = assignment;
         node.Secret               = secret;
@@ -957,11 +974,18 @@ public partial class ProjectStateService(
         node.StringValue          = stringValue;
         node.StringInputKind      = stringInputKind;
 
-        // The Instruction / Placeholder ports only exist for a player-input String target — drop any stale wire when they no longer apply.
-        StoryRegisterVariableNode? target = EditorProjection.FindRegister(CurrentProject!, registeredVariableId);
-        bool playerInput = target is { Type: StorageVariableType.String } && stringMode == StringValueMode.PlayerInput;
+        // The Name port only exists in ByType mode — drop its wire when the node goes back to a specific variable.
+        if (refMode != StorageVariableRefMode.ByType)
+            logic.ContentConnections.RemoveAll(c => c.ToPoint == node.NameIn.Id);
+
+        // The Instruction / Placeholder / Validation ports only exist for a player-input String target — drop any stale
+        // wire when they no longer apply. A ByType set knows its type up front; a specific one takes it from its target.
+        StorageVariableType? type = refMode == StorageVariableRefMode.ByType
+            ? refType
+            : EditorProjection.FindRegister(CurrentProject!, registeredVariableId)?.Type;
+        bool playerInput = type == StorageVariableType.String && stringMode == StringValueMode.PlayerInput;
         if (!playerInput)
-            logic.ContentConnections.RemoveAll(c => c.ToPoint == node.InstructionIn.Id || c.ToPoint == node.PlaceholderIn.Id);
+            logic.ContentConnections.RemoveAll(c => c.ToPoint == node.InstructionIn.Id || c.ToPoint == node.PlaceholderIn.Id || c.ToPoint == node.ValidationIn.Id);
 
         node.MinLength            = minLength;
         node.MaxLength            = maxLength;
@@ -982,7 +1006,8 @@ public partial class ProjectStateService(
         logic.ContentConnections.RemoveAll(c =>
             c.FromPoint == node.FlowOut.Id || c.ToPoint == node.FlowOut.Id ||
             c.FromPoint == node.FlowIn.Id  || c.ToPoint == node.FlowIn.Id  ||
-            c.ToPoint   == node.InstructionIn.Id || c.ToPoint == node.PlaceholderIn.Id);
+            c.ToPoint   == node.InstructionIn.Id || c.ToPoint == node.PlaceholderIn.Id ||
+            c.ToPoint   == node.ValidationIn.Id  || c.ToPoint == node.NameIn.Id);
         MarkKeyDirty(logicId);
     }
 
@@ -1136,10 +1161,13 @@ public partial class ProjectStateService(
         if (!CurrentProject!.LogicNodes.TryGetValue(logicId, out StoryLogicNode? logic)) return null;
         if (logic.ContentConnections.Exists(c => c.FromPoint == fromPoint && c.ToPoint == toPoint)) return null;
 
-        // The variables inputs (SmartFormat, the Exit node's auto-resolution, a Condition node's operands) aggregate many variable outputs.
+        // The variables inputs (SmartFormat, the Exit node's auto-resolution, a Condition node's operands, and a
+        // player-input String's validation-rule operands) aggregate many variable outputs.
         bool multiInput  = logic.SmartFormatNodes.Exists(sf => sf.VariablesIn.Id == toPoint)
                         || logic.ExitVariablesIn.Id == toPoint
-                        || logic.ConditionFlowNodes.Exists(cf => cf.VariablesIn.Id == toPoint);
+                        || logic.ConditionFlowNodes.Exists(cf => cf.VariablesIn.Id == toPoint)
+                        || logic.RegisterVariableNodes.Exists(rv => rv.ValidationIn.Id == toPoint)
+                        || logic.SetVariableNodes.Exists(sv => sv.ValidationIn.Id == toPoint);
         // Every non-flow content output is one-in-many-out — it keeps all its wires:
         //   Text  : Localization / SmartFormat
         //   Icon  : Icon / LightDarkSwitch
@@ -1688,6 +1716,7 @@ public partial class ProjectStateService(
         {
             valid.Add(n.OutPoint.Id);
             valid.Add(n.SlotOutPoint.Id);
+            valid.Add(n.NameIn.Id);
         }
         foreach (StoryConstantVariableNode n in logic.ConstantVariableNodes) valid.Add(n.OutPoint.Id);
         foreach (StoryFlowTextNode n in logic.FlowTextNodes)
@@ -1707,6 +1736,7 @@ public partial class ProjectStateService(
             valid.Add(n.FlowOut.Id);
             valid.Add(n.InstructionIn.Id);
             valid.Add(n.PlaceholderIn.Id);
+            valid.Add(n.ValidationIn.Id);
         }
         foreach (StorySetVariableNode n in logic.SetVariableNodes)
         {
@@ -1714,6 +1744,8 @@ public partial class ProjectStateService(
             valid.Add(n.FlowOut.Id);
             valid.Add(n.InstructionIn.Id);
             valid.Add(n.PlaceholderIn.Id);
+            valid.Add(n.ValidationIn.Id);
+            valid.Add(n.NameIn.Id);
         }
         foreach (StoryUnregisterVariableNode n in logic.UnregisterVariableNodes)
         {
