@@ -119,6 +119,22 @@
                     </div>
                 }
 
+                @if (_Assignment == NumberAssignment.Randomize)
+                {
+                    <div class="modal-field">
+                        <label class="modal-label">@Loc.T(Localization.Common.Assignment.randomMode)</label>
+                        <select class="modal-input" @bind="_RandomMode">
+                            <option value="@RandomMode.Saved">@Loc.T(Localization.Common.Assignment.randomModeSaved)</option>
+                            <option value="@RandomMode.Pure">@Loc.T(Localization.Common.Assignment.randomModePure)</option>
+                        </select>
+                        <span class="modal-label-hint">
+                            @Loc.T(_RandomMode == RandomMode.Pure
+                                ? Localization.Common.Assignment.randomModePureHint
+                                : Localization.Common.Assignment.randomModeSavedHint)
+                        </span>
+                    </div>
+                }
+
                 @if (_Type == StorageVariableType.Dial ||
                     (_Type == StorageVariableType.Number && _Mode == NumberStorageMode.Token))
                 {
@@ -315,6 +331,7 @@
     private bool                _Secret;
     private NumberAssignment    _Assignment  = NumberAssignment.Unset;
     private int                 _SpecificValue;
+    private RandomMode          _RandomMode  = RandomMode.Saved;
     private Guid                _ConditionKeyId;
 
     private StorageInstructionPlacement _Placement;
@@ -348,6 +365,7 @@
         _Secret         = false;
         _Assignment     = NumberAssignment.Unset;
         _SpecificValue  = 1;
+        _RandomMode     = RandomMode.Saved;
         _ConditionKeyId = Guid.Empty;
         _Placement       = StorageInstructionPlacement.Below;
         _StringMode      = StringValueMode.Unset;
@@ -378,6 +396,7 @@
         _Secret         = node.Secret;
         _Assignment     = node.Assignment;
         _SpecificValue  = node.SpecificValue;
+        _RandomMode     = node.RandomMode;
         _ConditionKeyId = node.ConditionKeyId;
         _Placement       = node.Placement;
         _StringMode      = node.StringMode;
@@ -495,6 +514,7 @@
             _Secret,
             _Assignment,
             specific,
+            _RandomMode,
             _ConditionKeyId,
             _Placement,
             _StringMode,
@@ -522,6 +542,7 @@
         bool                        Secret,
         NumberAssignment            Assignment,
         int                         SpecificValue,
+        RandomMode                  RandomMode,
         Guid                        ConditionKeyId,
         StorageInstructionPlacement Placement,
         StringValueMode             StringMode,

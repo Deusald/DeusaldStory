@@ -100,6 +100,20 @@ namespace DeusaldStoryCommon
     }
 
     /// <summary>
+    /// When a Number/Dial value is assigned with <see cref="NumberAssignment.Randomize"/>, how the App re-evaluates
+    /// the draw as the player walks the story back and forth in play mode. Ignored by the printed Gamebook (where the
+    /// player physically rolls/draws) and by any non-random assignment.
+    /// </summary>
+    public enum RandomMode
+    {
+        /// <summary>The first draw is remembered — undoing past the node and returning yields the same value (the default).</summary>
+        Saved,
+
+        /// <summary>The value is drawn afresh every time flow reaches the node — returning after an undo can give a different value.</summary>
+        Pure
+    }
+
+    /// <summary>
     /// The bucket of distinct outcomes a Number variable represents. Fewer values are read off a full D6 by
     /// parity/band; 4 and 5 reroll out-of-range; a token draw uses tokens <c>1…N</c>.
     /// </summary>

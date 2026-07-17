@@ -1088,7 +1088,7 @@
         }
         _ProjectState.UpdateRegisterVariableNode(
             _CurrentId, nodeId, args.Name, args.Description, args.Type, args.SlotIndex,
-            args.Mode, args.ValueCount, args.Secret, args.Assignment, args.SpecificValue, args.ConditionKeyId,
+            args.Mode, args.ValueCount, args.Secret, args.Assignment, args.SpecificValue, args.RandomMode, args.ConditionKeyId,
             args.Placement, args.StringMode, args.StringValue, args.StringInputKind, args.PreviewValue,
             args.MinLength, args.MaxLength, args.LengthErrorKeyId, args.ValidationRule, args.ValidationErrorKeyId);
         RebuildNodes();
@@ -1104,7 +1104,7 @@
             _SelectedId = created.Id;
         }
         _ProjectState.UpdateSetVariableNode(
-            _CurrentId, nodeId, args.RefMode, args.RefType, args.RegisteredVariableId, args.Assignment, args.Secret, args.SpecificValue,
+            _CurrentId, nodeId, args.RefMode, args.RefType, args.RegisteredVariableId, args.Assignment, args.Secret, args.SpecificValue, args.RandomMode,
             args.Placement, args.StringMode, args.StringValue, args.StringInputKind,
             args.MinLength, args.MaxLength, args.LengthErrorKeyId, args.ValidationRule, args.ValidationErrorKeyId);
         RebuildNodes();

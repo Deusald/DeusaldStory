@@ -42,6 +42,9 @@ namespace DeusaldStoryCommon
         /// <summary>The value used when <see cref="Assignment"/> is <see cref="NumberAssignment.SetSpecific"/>.</summary>
         public int SpecificValue { get; set; }
 
+        /// <summary>When <see cref="Assignment"/> is <see cref="NumberAssignment.Randomize"/>, whether the App keeps the first draw across undo/redo (Saved) or re-draws each time (Pure). Unused otherwise and by the Gamebook.</summary>
+        public RandomMode RandomMode { get; set; }
+
         /// <summary>Optional "gamebook condition" localization key used to phrase a reveal/branch on this variable. Empty = none.</summary>
         public Guid ConditionKeyId { get; set; }
 

@@ -106,6 +106,22 @@
                         </div>
                     }
 
+                    @if (_Assignment == NumberAssignment.Randomize)
+                    {
+                        <div class="modal-field">
+                            <label class="modal-label">@Loc.T(Localization.Common.Assignment.randomMode)</label>
+                            <select class="modal-input" @bind="_RandomMode">
+                                <option value="@RandomMode.Saved">@Loc.T(Localization.Common.Assignment.randomModeSaved)</option>
+                                <option value="@RandomMode.Pure">@Loc.T(Localization.Common.Assignment.randomModePure)</option>
+                            </select>
+                            <span class="modal-label-hint">
+                                @Loc.T(_RandomMode == RandomMode.Pure
+                                    ? Localization.Common.Assignment.randomModePureHint
+                                    : Localization.Common.Assignment.randomModeSavedHint)
+                            </span>
+                        </div>
+                    }
+
                     @* A ByType set can't know the target's storage mode, so it always offers the secret option. *@
                     @if (EffectiveType == StorageVariableType.Dial
                       || Selected is null
@@ -281,6 +297,7 @@
     private NumberAssignment       _Assignment = NumberAssignment.SetSpecific;
     private bool                   _Secret;
     private int                    _SpecificValue = 1;
+    private RandomMode             _RandomMode = RandomMode.Saved;
 
     private StorageInstructionPlacement _Placement;
     private StringValueMode             _StringMode;
@@ -308,6 +325,7 @@
         _Assignment           = NumberAssignment.SetSpecific;
         _Secret               = false;
         _SpecificValue        = 1;
+        _RandomMode           = RandomMode.Saved;
         _Placement            = StorageInstructionPlacement.Below;
         _StringMode           = StringValueMode.Unset;
         _StringValue          = "";
@@ -332,6 +350,7 @@
         _Assignment           = node.Assignment;
         _Secret               = node.Secret;
         _SpecificValue        = node.SpecificValue;
+        _RandomMode           = node.RandomMode;
         _Placement            = node.Placement;
         _StringMode           = node.StringMode;
         _StringValue          = node.StringValue;
@@ -456,7 +475,7 @@
         Guid registered = _RefMode == StorageVariableRefMode.ByType ? Guid.Empty : _RegisteredVariableId;
 
         await OnConfirm.InvokeAsync(new SetVariableArgs(
-            _EditNodeId, _RefMode, _RefType, registered, _Assignment, _Secret, specific,
+            _EditNodeId, _RefMode, _RefType, registered, _Assignment, _Secret, specific, _RandomMode,
             _Placement, _StringMode, _StringValue.Trim(), _StringInputKind,
             minLen, maxLen, _LengthErrorKeyId,
             _ValidationRule.Children.Count > 0 ? _ValidationRule.Clone() : null,
@@ -474,6 +493,7 @@
         NumberAssignment            Assignment,
         bool                        Secret,
         int                         SpecificValue,
+        RandomMode                  RandomMode,
         StorageInstructionPlacement Placement,
         StringValueMode             StringMode,
         string                      StringValue,

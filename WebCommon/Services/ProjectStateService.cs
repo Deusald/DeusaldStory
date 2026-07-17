@@ -903,7 +903,7 @@ public partial class ProjectStateService(
     public void UpdateRegisterVariableNode(
         Guid logicId, Guid nodeId, string name, string description, StorageVariableType type, int slotIndex,
         NumberStorageMode mode, NumberValueCount valueCount, bool secret, NumberAssignment assignment,
-        int specificValue, Guid conditionKeyId, StorageInstructionPlacement placement, StringValueMode stringMode,
+        int specificValue, RandomMode randomMode, Guid conditionKeyId, StorageInstructionPlacement placement, StringValueMode stringMode,
         string stringValue, StringInputKind stringInputKind, string previewValue,
         int minLength, int maxLength, Guid lengthErrorKeyId, StoryConditionExpr? validationRule, Guid validationErrorKeyId)
     {
@@ -920,6 +920,7 @@ public partial class ProjectStateService(
         node.Secret          = secret;
         node.Assignment      = assignment;
         node.SpecificValue   = specificValue;
+        node.RandomMode      = randomMode;
         node.ConditionKeyId  = conditionKeyId;
         node.Placement       = placement;
         node.StringMode      = stringMode;
@@ -970,7 +971,7 @@ public partial class ProjectStateService(
     /// <summary>Updates which variable a Set-variable node writes (by id or by type + wired name) and its value assignment.</summary>
     public void UpdateSetVariableNode(
         Guid logicId, Guid nodeId, StorageVariableRefMode refMode, StorageVariableType refType, Guid registeredVariableId,
-        NumberAssignment assignment, bool secret, int specificValue,
+        NumberAssignment assignment, bool secret, int specificValue, RandomMode randomMode,
         StorageInstructionPlacement placement, StringValueMode stringMode, string stringValue, StringInputKind stringInputKind,
         int minLength, int maxLength, Guid lengthErrorKeyId, StoryConditionExpr? validationRule, Guid validationErrorKeyId)
     {
@@ -984,6 +985,7 @@ public partial class ProjectStateService(
         node.Assignment           = assignment;
         node.Secret               = secret;
         node.SpecificValue        = specificValue;
+        node.RandomMode           = randomMode;
         node.Placement            = placement;
         node.StringMode           = stringMode;
         node.StringValue          = stringValue;

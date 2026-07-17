@@ -196,6 +196,11 @@ namespace DeusaldStoryCommon
             {
                 public static readonly Guid setSpecific = new Guid("c4c0a72a-ab7a-4f26-8bd7-e5717847a9fe");
                 public static readonly Guid randomize = new Guid("5fb8b39e-9d6b-4766-85c6-5b2829f1ca48");
+                public static readonly Guid randomMode = new Guid("7a3e1c94-5b2d-4e18-9f6a-2c8b1d0e4f37");
+                public static readonly Guid randomModeSaved = new Guid("b1f4d268-9c0a-4573-8e21-6a3f5c9b7d40");
+                public static readonly Guid randomModePure = new Guid("3d5a7f81-6e2c-49b0-8a14-9c7b0d2e6f53");
+                public static readonly Guid randomModeSavedHint = new Guid("e8c2b6a4-1f0d-4e93-a75b-2c8f4d6a1b90");
+                public static readonly Guid randomModePureHint = new Guid("f2a9d743-8b5e-40c1-9e26-7d3a0f5c8b14");
             }
         }
 
@@ -1257,6 +1262,11 @@ namespace DeusaldStoryCommon
                 { new Guid("d9c6cc9f-53ff-437a-9cbf-76e1a185b7ca"), "App shows an input field. Wire a Localization node into the node's Instruction port to tell the player what to write, and into its Placeholder port to set the hint shown inside the field. Reference this variable's slot in the instruction text as <code>[slotToken]</code>." },
                 { new Guid("c4c0a72a-ab7a-4f26-8bd7-e5717847a9fe"), "Set to a specific value" },
                 { new Guid("5fb8b39e-9d6b-4766-85c6-5b2829f1ca48"), "Randomize (roll / draw)" },
+                { new Guid("7a3e1c94-5b2d-4e18-9f6a-2c8b1d0e4f37"), "Random behaviour" },
+                { new Guid("b1f4d268-9c0a-4573-8e21-6a3f5c9b7d40"), "Saved random" },
+                { new Guid("3d5a7f81-6e2c-49b0-8a14-9c7b0d2e6f53"), "Pure random" },
+                { new Guid("e8c2b6a4-1f0d-4e93-a75b-2c8f4d6a1b90"), "The App remembers the drawn value — undoing back past this point and returning gives the same result." },
+                { new Guid("f2a9d743-8b5e-40c1-9e26-7d3a0f5c8b14"), "The App draws again every time flow reaches this point — returning after an undo can give a different result." },
                 { new Guid("a9d8fbce-2fac-407a-9c9d-f0b961a09f82"), "New project" },
                 { new Guid("5529474a-2a44-4c4a-bc37-b2c72f9873ab"), "Project name" },
                 { new Guid("1fda7b9a-80d0-46a7-8700-cca50249d20c"), "My Awesome Game" },

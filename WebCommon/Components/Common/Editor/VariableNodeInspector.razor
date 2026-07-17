@@ -36,7 +36,7 @@
 
             @if (reg.Type is StorageVariableType.Number or StorageVariableType.Dial)
             {
-                @Row(Loc.T(Localization.Common.Fields.initialValue), AssignmentLabel(reg.Assignment, reg.SpecificValue))
+                @Row(Loc.T(Localization.Common.Fields.initialValue), AssignmentLabel(reg.Assignment, reg.SpecificValue, reg.RandomMode))
                 @if (ShowsSecret(reg.Type, reg.Mode))
                 {
                     @Row(Loc.T(Localization.Common.Fields.secret), reg.Secret ? Loc.T(Localization.Common.Misc.yes) : Loc.T(Localization.Common.Misc.no))
@@ -64,7 +64,7 @@
                 @Row(Loc.T(Localization.Common.Fields.slot), StorageSlots.Label(target.Type, target.SlotIndex))
                 @Row(Loc.T(Localization.Common.Fields.storage), TypeLabel(target.Type))
             }
-            @Row(Loc.T(Localization.Common.Fields.newValue), AssignmentLabel(set.Assignment, set.SpecificValue))
+            @Row(Loc.T(Localization.Common.Fields.newValue), AssignmentLabel(set.Assignment, set.SpecificValue, set.RandomMode))
             @if (target is not null && ShowsSecret(target.Type, target.Mode))
             {
                 @Row(Loc.T(Localization.Common.Fields.secret), set.Secret ? Loc.T(Localization.Common.Misc.yes) : Loc.T(Localization.Common.Misc.no))
@@ -150,11 +150,11 @@
         _                      => count.ToString()
     };
 
-    private string AssignmentLabel(NumberAssignment assignment, int specificValue) => assignment switch
+    private string AssignmentLabel(NumberAssignment assignment, int specificValue, RandomMode randomMode) => assignment switch
     {
         NumberAssignment.Unset       => Loc.T(Localization.Editor.Modals.VariableNodeInspector.assignmentUnsetNoValue),
         NumberAssignment.SetSpecific => Loc.T(Localization.Editor.Modals.VariableNodeInspector.assignmentSetTo, new Dictionary<string, object> { ["value"] = specificValue }),
-        NumberAssignment.Randomize   => Loc.T(Localization.Common.Assignment.randomize),
+        NumberAssignment.Randomize   => $"{Loc.T(Localization.Common.Assignment.randomize)} · {Loc.T(randomMode == RandomMode.Pure ? Localization.Common.Assignment.randomModePure : Localization.Common.Assignment.randomModeSaved)}",
         _                            => assignment.ToString()
     };
 
