@@ -130,7 +130,7 @@ namespace DeusaldStoryCommon
                     string slotTag = PreviewHtmlSanitizer.SlotTag(slot);
                     string prompt   = StoryLogicRenderer.ResolvePortText(project, localization, logic, instructionPortId, target, slotTag, StoryLogicRenderer.SlotTokenName(variableName));
                     if (string.IsNullOrEmpty(prompt))
-                        prompt = Resolve(localization, StoryCommonLocalizationKeys.StorageStringWrite, slotTag);
+                        prompt = Resolve(localization, StoryCommonLocalizationKeys.StorageStringWrite, slot); // Resolve wraps the slot itself
 
                     if (target != StoryRenderTarget.App)
                         return Line(prompt, placement);
@@ -207,9 +207,11 @@ namespace DeusaldStoryCommon
             return Resolve(localization, StoryCommonLocalizationKeys.StorageClearSlot, slot);
         }
 
+        // The slot is injected as a <slot=NA> tag so previews render it as a styled pill (mirrors the String
+        // player-input path); the sanitizer turns it into the pill markup before display.
         private static string Resolve(LocProject? localization, Guid keyId, string slot, int? max = null, object? value = null)
         {
-            Dictionary<string, object> vals = new(StringComparer.OrdinalIgnoreCase) { ["slot"] = slot };
+            Dictionary<string, object> vals = new(StringComparer.OrdinalIgnoreCase) { ["slot"] = PreviewHtmlSanitizer.SlotTag(slot) };
             if (max is int m)          vals["max"]   = m;
             if (value is not null)     vals["value"] = value;
             return StoryCommonLocalizationKeys.Resolve(localization, keyId, vals);
