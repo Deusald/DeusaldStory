@@ -929,9 +929,11 @@ namespace DeusaldStoryWeb
 
             if (logic.GetVariableNodes.Find(n => n.OutPoint.Id == fromPoint || n.SlotOutPoint.Id == fromPoint) is StoryGetVariableNode gv)
             {
-                if (!string.IsNullOrWhiteSpace(gv.NameOverride)) return gv.NameOverride;
+                bool slot = gv.SlotOutPoint.Id == fromPoint;
+                if (slot && !string.IsNullOrWhiteSpace(gv.SlotNameOverride)) return gv.SlotNameOverride;
+                if (!string.IsNullOrWhiteSpace(gv.NameOverride))
+                    return slot ? UiLang.T(Localization.Editor.Page.registerSlotName, new Dictionary<string, object> { ["regName"] = gv.NameOverride }) : gv.NameOverride;
                 string regName = StoryLogicFlow.TargetOf(project, logic, gv)?.Name ?? "";
-                bool   slot    = gv.SlotOutPoint.Id == fromPoint;
                 return string.IsNullOrWhiteSpace(regName)
                     ? (slot ? UiLang.T(Localization.Editor.Page.slotNameFallback) : UiLang.T(Localization.Editor.Page.getNameFallback))
                     : (slot ? UiLang.T(Localization.Editor.Page.registerSlotName, new Dictionary<string, object> { ["regName"] = regName }) : regName);

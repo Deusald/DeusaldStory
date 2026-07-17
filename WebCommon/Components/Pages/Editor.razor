@@ -857,9 +857,9 @@
     {
         if (args.EditNodeId != Guid.Empty)
         {
-            _ProjectState.UpdateGetVariableNode(_CurrentId, args.EditNodeId, args.RefMode, args.RefType, args.RegisteredVariableId, args.NameOverride, args.PreviewValue);
+            _ProjectState.UpdateGetVariableNode(_CurrentId, args.EditNodeId, args.RefMode, args.RefType, args.RegisteredVariableId, args.NameOverride, args.SlotNameOverride, args.PreviewValue);
         }
-        else if (_ProjectState.AddGetVariableNode(_CurrentId, args.RefMode, args.RefType, args.RegisteredVariableId, args.NameOverride, args.PreviewValue, _PendingX, _PendingY) is StoryGetVariableNode node)
+        else if (_ProjectState.AddGetVariableNode(_CurrentId, args.RefMode, args.RefType, args.RegisteredVariableId, args.NameOverride, args.SlotNameOverride, args.PreviewValue, _PendingX, _PendingY) is StoryGetVariableNode node)
         {
             _SelectedId = node.Id;
         }

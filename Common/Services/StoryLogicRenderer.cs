@@ -422,11 +422,13 @@ namespace DeusaldStoryCommon
             return StoryLogicFlow.TargetOf(project, logic, gv, values, target)?.Name ?? "";
         }
 
-        /// <summary>The SmartFormat token name a Get Variable node's Slot port supplies under — the Value token plus a <c>Slot</c> suffix, so the two ports never collide in one format (empty when unresolved).</summary>
+        /// <summary>The SmartFormat token name a Get Variable node's Slot port supplies under — its own override, else the Value token plus a <c>Slot</c> suffix, so the two ports never collide in one format (empty when unresolved).</summary>
         private static string GetVariableSlotName(
             StoryProject project, StoryLogicNode logic, StoryGetVariableNode gv,
             IReadOnlyDictionary<Guid, string> values, StoryRenderTarget target) =>
-            SlotTokenName(GetVariableName(project, logic, gv, values, target));
+            !string.IsNullOrWhiteSpace(gv.SlotNameOverride)
+                ? gv.SlotNameOverride.Trim()
+                : SlotTokenName(GetVariableName(project, logic, gv, values, target));
 
         /// <summary>The SmartFormat token a storage variable's slot tag fills — its name plus a <c>Slot</c> suffix (empty when unnamed). Shared by the Get Variable slot port and Register/Set instruction text.</summary>
         public static string SlotTokenName(string variableName) =>

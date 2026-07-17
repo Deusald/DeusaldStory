@@ -4,7 +4,7 @@
 
 @* ─────────────────────────────────────────────────────────────────────────
    Creates / edits a Get Variable node: picks a registered storage variable to
-   read, optionally overrides the SmartFormat token name, and sets the preview
+   read, optionally overrides the Value / Slot SmartFormat token names, and sets the preview
    value shown in the App preview (the App tracks the live value at runtime; the
    Gamebook prints the variable's slot tag instead). Used by create and edit.
    ───────────────────────────────────────────────────────────────────────── *@
@@ -97,6 +97,17 @@
             </div>
 
             <div class="modal-field">
+                <label class="modal-label">@Loc.T(Localization.Editor.Modals.GetVariable.slotNameOverride)</label>
+                <input class="modal-input"
+                       type="text"
+                       placeholder="@_DefaultSlotName"
+                       @bind="_SlotNameOverride"
+                       @bind:event="oninput"
+                       maxlength="100"/>
+                <span class="modal-label-hint">@((MarkupString)Loc.T(Localization.Editor.Modals.GetVariable.slotNameOverrideHint).Replace("[defaultSlotToken]", "{" + _DefaultSlotName + "}"))</span>
+            </div>
+
+            <div class="modal-field">
                 <label class="modal-label">@Loc.T(Localization.Common.Fields.previewValue)</label>
                 <input class="modal-input"
                        type="text"
@@ -130,8 +141,9 @@
     private StorageVariableRefMode _RefMode;
     private StorageVariableType    _RefType;
     private Guid                   _RegisteredVariableId;
-    private string                 _NameOverride = "";
-    private string                 _PreviewValue = "";
+    private string                 _NameOverride     = "";
+    private string                 _SlotNameOverride = "";
+    private string                 _PreviewValue     = "";
 
     /// <summary>The picked register's name, used as the name-override placeholder ("" when nothing picked).</summary>
     private string _RegisteredName =>
@@ -141,9 +153,13 @@
     private bool _CanConfirm =>
         _RefMode == StorageVariableRefMode.ByType || _RegisteredVariableId != Guid.Empty;
 
-    /// <summary>The <c>{token}</c> the Slot port fills — the Value token plus a <c>Slot</c> suffix (mirrors <c>StoryLogicRenderer.GetVariableSlotName</c>).</summary>
+    /// <summary>The Slot port's default token name — the Value token plus a <c>Slot</c> suffix (mirrors <c>StoryLogicRenderer.SlotTokenName</c>).</summary>
+    private string _DefaultSlotName =>
+        (string.IsNullOrWhiteSpace(_NameOverride) ? _RegisteredName : _NameOverride.Trim()) + "Slot";
+
+    /// <summary>The <c>{token}</c> the Slot port actually fills — its override, else the default (mirrors <c>StoryLogicRenderer.GetVariableSlotName</c>).</summary>
     private string _SlotToken =>
-        "{" + (string.IsNullOrWhiteSpace(_NameOverride) ? _RegisteredName : _NameOverride) + "Slot}";
+        "{" + (string.IsNullOrWhiteSpace(_SlotNameOverride) ? _DefaultSlotName : _SlotNameOverride.Trim()) + "}";
 
     /// <summary>Opens the modal to create a new Get Variable node.</summary>
     public void Show()
@@ -154,6 +170,7 @@
         _RefType              = StorageVariableType.Number;
         _RegisteredVariableId = Guid.Empty;
         _NameOverride         = "";
+        _SlotNameOverride     = "";
         _PreviewValue         = "";
         _Visible              = true;
         StateHasChanged();
@@ -168,6 +185,7 @@
         _RefType              = node.RefType;
         _RegisteredVariableId = node.RegisteredVariableId;
         _NameOverride         = node.NameOverride;
+        _SlotNameOverride     = node.SlotNameOverride;
         _PreviewValue         = node.PreviewValue;
         _Visible              = true;
         StateHasChanged();
@@ -187,7 +205,7 @@
         _Visible = false;
         // A ByType node takes its target from the Name wire, so it keeps no register id.
         Guid registered = _RefMode == StorageVariableRefMode.ByType ? Guid.Empty : _RegisteredVariableId;
-        await OnConfirm.InvokeAsync(new GetVariableArgs(_EditNodeId, _RefMode, _RefType, registered, _NameOverride.Trim(), _PreviewValue.Trim()));
+        await OnConfirm.InvokeAsync(new GetVariableArgs(_EditNodeId, _RefMode, _RefType, registered, _NameOverride.Trim(), _SlotNameOverride.Trim(), _PreviewValue.Trim()));
     }
 
     private void Cancel() => _Visible = false;
@@ -199,5 +217,6 @@
         StorageVariableType    RefType,
         Guid                   RegisteredVariableId,
         string                 NameOverride,
+        string                 SlotNameOverride,
         string                 PreviewValue);
 }

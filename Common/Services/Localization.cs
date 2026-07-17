@@ -765,6 +765,9 @@ namespace DeusaldStoryCommon
                     public static readonly Guid variableNameFallback = new Guid("7af2b110-e3dd-4d15-9ef7-add16d6f6719");
                     /// <summary>MarkupString; {token} literal, replace [slotToken].</summary>
                     public static readonly Guid nameOverrideHint = new Guid("f56b05f3-070a-41d1-baf2-6d4b7955fc56");
+                    public static readonly Guid slotNameOverride = new Guid("545c3bd2-9613-4fe1-9967-84e351af0dd5");
+                    /// <summary>MarkupString; {token} literal, replace [defaultSlotToken].</summary>
+                    public static readonly Guid slotNameOverrideHint = new Guid("a8707616-6ac5-40be-b2eb-3b5b070a1306");
                     public static readonly Guid previewValuePlaceholder = new Guid("488bba7d-046c-42ba-8928-0a8259cd007f");
                     public static readonly Guid previewValueHint = new Guid("eea5b7a7-40f7-4ba2-8e79-64307d997ba4");
                     public static readonly Guid addButton = new Guid("7fa0a2d8-b194-4b69-a417-1f50e4f045b0");
@@ -1605,6 +1608,8 @@ namespace DeusaldStoryCommon
                 { new Guid("c8570651-aae1-403a-b97a-4d91ae07046f"), "Name override" },
                 { new Guid("7af2b110-e3dd-4d15-9ef7-add16d6f6719"), "variable name" },
                 { new Guid("f56b05f3-070a-41d1-baf2-6d4b7955fc56"), "the <code>{token}</code> the <b>Value</b> port fills (App) — blank uses the variable's own name. The <b>Slot</b> port (Gamebook slot tag) fills <code>[slotToken]</code>." },
+                { new Guid("545c3bd2-9613-4fe1-9967-84e351af0dd5"), "Slot name override" },
+                { new Guid("a8707616-6ac5-40be-b2eb-3b5b070a1306"), "the <code>{token}</code> the <b>Slot</b> port fills (the slot tag, both mediums) — blank uses <code>[defaultSlotToken]</code>." },
                 { new Guid("488bba7d-046c-42ba-8928-0a8259cd007f"), "value shown in the App preview" },
                 { new Guid("eea5b7a7-40f7-4ba2-8e79-64307d997ba4"), "shown in the App preview; blank falls back to the registered variable's preview value. The Gamebook prints the slot tag instead of a value." },
                 { new Guid("7fa0a2d8-b194-4b69-a417-1f50e4f045b0"), "Add get variable node" },

@@ -13,7 +13,8 @@ namespace DeusaldStoryCommon
     /// can be wired into one format (e.g. behind an <c>AppGamebook:choose(...)</c>):
     /// <see cref="OutPoint"/> — a <c>Variable</c> port carrying the live value (App only; the preview substitutes
     /// <see cref="PreviewValue"/>) under the token <c>{Name}</c>; and <see cref="SlotOutPoint"/> — a <c>CVariable</c>
-    /// port carrying the variable's slot tag (e.g. <c>TA</c>/<c>NA</c>/<c>DA</c>) under the token <c>{Name}Slot</c>, so
+    /// port carrying the variable's slot tag (e.g. <c>TA</c>/<c>NA</c>/<c>DA</c>) under the token <c>{Name}Slot</c>
+    /// (or <see cref="SlotNameOverride"/> when set), so
     /// the Gamebook can print which slot to read. Wire the value port for App formatting and the slot port for Gamebook text.
     /// </para>
     /// </summary>
@@ -41,6 +42,9 @@ namespace DeusaldStoryCommon
 
         /// <summary>Optional SmartFormat token name override; empty falls back to the register node's own name.</summary>
         public string NameOverride { get; set; } = string.Empty;
+
+        /// <summary>Optional SmartFormat token name override for the <see cref="SlotOutPoint"/>; empty falls back to the value token plus a <c>Slot</c> suffix.</summary>
+        public string SlotNameOverride { get; set; } = string.Empty;
 
         /// <summary>The value used in the App preview (the App tracks the live value at runtime); also used to evaluate conditions in the preview.</summary>
         public string PreviewValue { get; set; } = string.Empty;

@@ -492,7 +492,7 @@ public partial class ProjectStateService(
     /// <summary>Adds a Get Variable node (reading a variable picked by id, or one named by its wired Name port) to a logic node's inner graph.</summary>
     public StoryGetVariableNode? AddGetVariableNode(
         Guid logicId, StorageVariableRefMode refMode, StorageVariableType refType, Guid registeredVariableId,
-        string nameOverride, string previewValue, double x, double y)
+        string nameOverride, string slotNameOverride, string previewValue, double x, double y)
     {
         if (!CurrentProject!.LogicNodes.TryGetValue(logicId, out StoryLogicNode? logic)) return null;
 
@@ -502,6 +502,7 @@ public partial class ProjectStateService(
             RefType              = refType,
             RegisteredVariableId = registeredVariableId,
             NameOverride         = nameOverride,
+            SlotNameOverride     = slotNameOverride,
             PreviewValue         = previewValue,
             X                    = x,
             Y                    = y
@@ -511,10 +512,10 @@ public partial class ProjectStateService(
         return node;
     }
 
-    /// <summary>Updates which variable a Get Variable node reads (by id or by type + wired name), its name override and preview value.</summary>
+    /// <summary>Updates which variable a Get Variable node reads (by id or by type + wired name), its name overrides and preview value.</summary>
     public void UpdateGetVariableNode(
         Guid logicId, Guid nodeId, StorageVariableRefMode refMode, StorageVariableType refType,
-        Guid registeredVariableId, string nameOverride, string previewValue)
+        Guid registeredVariableId, string nameOverride, string slotNameOverride, string previewValue)
     {
         if (!CurrentProject!.LogicNodes.TryGetValue(logicId, out StoryLogicNode? logic)) return;
         StoryGetVariableNode? node = logic.GetVariableNodes.Find(n => n.Id == nodeId);
@@ -523,6 +524,7 @@ public partial class ProjectStateService(
         node.RefType              = refType;
         node.RegisteredVariableId = registeredVariableId;
         node.NameOverride         = nameOverride;
+        node.SlotNameOverride     = slotNameOverride;
         node.PreviewValue         = previewValue;
 
         // The Name port only exists in ByType mode — drop its wire when the node goes back to a specific variable.
