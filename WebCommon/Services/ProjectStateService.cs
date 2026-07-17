@@ -561,6 +561,70 @@ public partial class ProjectStateService(
         MarkKeyDirty(logicId);
     }
 
+    /// <summary>Adds a Randomized Instruction node (a medium-switching random choice) to a logic node's inner graph.</summary>
+    public StoryRandomizedInstructionNode? AddRandomizedInstructionNode(
+        Guid logicId, string resultToken, RandomMode randomMode, RandomRemainderMode remainderMode,
+        IEnumerable<string> defaultRange, IEnumerable<StoryRandomRange> branchRanges, string previewValue, double x, double y)
+    {
+        if (!CurrentProject!.LogicNodes.TryGetValue(logicId, out StoryLogicNode? logic)) return null;
+
+        StoryRandomizedInstructionNode node = new()
+        {
+            ResultToken   = resultToken,
+            RandomMode    = randomMode,
+            RemainderMode = remainderMode,
+            PreviewValue  = previewValue,
+            X             = x,
+            Y             = y
+        };
+        node.DefaultRange.AddRange(defaultRange);
+        node.BranchRanges.AddRange(branchRanges);
+        logic.RandomizedInstructionNodes.Add(node);
+        MarkKeyDirty(logicId);
+        return node;
+    }
+
+    /// <summary>Updates a Randomized Instruction node's config and ranges, reconciling per-branch ranges against the live Branch wiring.</summary>
+    public void UpdateRandomizedInstructionNode(
+        Guid logicId, Guid nodeId, string resultToken, RandomMode randomMode, RandomRemainderMode remainderMode,
+        IEnumerable<string> defaultRange, IEnumerable<StoryRandomRange> branchRanges, string previewValue)
+    {
+        if (!CurrentProject!.LogicNodes.TryGetValue(logicId, out StoryLogicNode? logic)) return;
+        StoryRandomizedInstructionNode? node = logic.RandomizedInstructionNodes.Find(n => n.Id == nodeId);
+        if (node is null) return;
+        node.ResultToken   = resultToken;
+        node.RandomMode    = randomMode;
+        node.RemainderMode = remainderMode;
+        node.PreviewValue  = previewValue;
+        node.DefaultRange.Clear();
+        node.DefaultRange.AddRange(defaultRange);
+        node.BranchRanges.Clear();
+
+        // Per-branch ranges only apply while Branch is wired to an enumerable source; drop them otherwise, and keep
+        // only the ranges whose branch value is still possible.
+        List<string>? branchValues = StoryLogicFlow.BranchValues(CurrentProject!, logic, StoryLogicFlow.FromInto(logic, node.BranchIn.Id));
+        if (branchValues is { Count: > 0 })
+            foreach (StoryRandomRange range in branchRanges)
+                if (branchValues.Contains(range.BranchValue))
+                    node.BranchRanges.Add(range);
+        MarkKeyDirty(logicId);
+    }
+
+    /// <summary>Deletes a Randomized Instruction node and any inner wire that touched its ports.</summary>
+    public void DeleteRandomizedInstructionNode(Guid logicId, Guid nodeId)
+    {
+        if (!CurrentProject!.LogicNodes.TryGetValue(logicId, out StoryLogicNode? logic)) return;
+        StoryRandomizedInstructionNode? node = logic.RandomizedInstructionNodes.Find(n => n.Id == nodeId);
+        if (node is null) return;
+
+        logic.RandomizedInstructionNodes.Remove(node);
+        logic.ContentConnections.RemoveAll(c =>
+            c.ToPoint == node.AppTextIn.Id || c.ToPoint == node.GamebookTextIn.Id || c.ToPoint == node.BranchIn.Id ||
+            c.FromPoint == node.OutText.Id || c.ToPoint == node.OutText.Id ||
+            c.FromPoint == node.OutVariable.Id || c.ToPoint == node.OutVariable.Id);
+        MarkKeyDirty(logicId);
+    }
+
     /// <summary>Adds a Constant Variable node (a named constant value) to a logic node's inner graph.</summary>
     public StoryConstantVariableNode? AddConstantVariableNode(Guid logicId, string name, string value, double x, double y)
     {
@@ -1199,6 +1263,7 @@ public partial class ProjectStateService(
                         || logic.ExternalVariableNodes.Exists(ev => ev.OutPoint.Id == fromPoint)
                         || logic.GetVariableNodes.Exists(gv => gv.OutPoint.Id == fromPoint || gv.SlotOutPoint.Id == fromPoint)
                         || logic.ConstantVariableNodes.Exists(cv => cv.OutPoint.Id == fromPoint)
+                        || logic.RandomizedInstructionNodes.Exists(r => r.OutText.Id == fromPoint || r.OutVariable.Id == fromPoint)
                         || logic.LogicPortalNodes.Exists(p => p.OutPoints.Exists(o => o.Id == fromPoint))
                         || logic.FunctionInstanceNodes.Exists(fi => fi.OutputPorts.Exists(p => p.Id == fromPoint))
                         || CurrentProject.Blueprints.Values.Any(b => b.Kind == StoryBlueprintKind.Function
@@ -1312,6 +1377,15 @@ public partial class ProjectStateService(
         {
             cv.X = x;
             cv.Y = y;
+            MarkKeyDirty(logicId);
+            return;
+        }
+
+        StoryRandomizedInstructionNode? ri = logic.RandomizedInstructionNodes.Find(n => n.Id == movedId);
+        if (ri is not null)
+        {
+            ri.X = x;
+            ri.Y = y;
             MarkKeyDirty(logicId);
             return;
         }
@@ -1738,6 +1812,14 @@ public partial class ProjectStateService(
             valid.Add(n.NameIn.Id);
         }
         foreach (StoryConstantVariableNode n in logic.ConstantVariableNodes) valid.Add(n.OutPoint.Id);
+        foreach (StoryRandomizedInstructionNode n in logic.RandomizedInstructionNodes)
+        {
+            valid.Add(n.AppTextIn.Id);
+            valid.Add(n.GamebookTextIn.Id);
+            valid.Add(n.BranchIn.Id);
+            valid.Add(n.OutText.Id);
+            valid.Add(n.OutVariable.Id);
+        }
         foreach (StoryFlowTextNode n in logic.FlowTextNodes)
         {
             valid.Add(n.FlowIn.Id);

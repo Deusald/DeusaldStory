@@ -294,3 +294,17 @@
     background: color-mix(in srgb, #5e7a3a 22%, transparent);
     border: 1px solid color-mix(in srgb, #5e7a3a 55%, transparent);
 }
+
+/* ── Randomized Instruction callout (<randomised-instruction> → the D12 roll table).
+   pre-line preserves the newline-separated band lines. */
+.gbp-section ::deep .lpv-randomised-instruction {
+    display: block;
+    white-space: pre-line;
+    margin: 0.4em 0;
+    padding: 0.5em 0.7em;
+    border-left: 3px solid color-mix(in srgb, var(--purple) 65%, transparent);
+    border-radius: 0.3em;
+    background: color-mix(in srgb, var(--purple) 12%, transparent);
+    font-family: var(--font-mono, monospace);
+    font-size: 0.95em;
+}

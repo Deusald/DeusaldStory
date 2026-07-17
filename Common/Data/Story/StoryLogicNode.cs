@@ -140,6 +140,9 @@ namespace DeusaldStoryCommon
         /// <summary>Function-blueprint instances on the LFlow chain — each inlines a reusable pure-computation subgraph.</summary>
         public List<StoryFunctionInstanceNode> FunctionInstanceNodes { get; } = new();
 
+        /// <summary>Randomized Instruction nodes placed in the inner graph — each renders a random choice (App drawn value / Gamebook D12 band table).</summary>
+        public List<StoryRandomizedInstructionNode> RandomizedInstructionNodes { get; } = new();
+
         /// <summary>Wires between the inner graph's connection points (Entry/Exit ports and content-node ports).</summary>
         public List<StoryConnection> ContentConnections { get; } = new();
 

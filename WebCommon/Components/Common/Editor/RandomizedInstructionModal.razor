@@ -1,0 +1,220 @@
+@namespace DeusaldStoryWeb.Components.Common
+@inject UiLocalizationService Loc
+@inject ProjectStateService _ProjectState
+
+@* ─────────────────────────────────────────────────────────────────────────
+   Creates / edits a Randomized Instruction node: the result token the drawn
+   value fills, the App re-draw behaviour (Saved/Pure), how an uneven range
+   splits the D12, the App-preview value, and the random range — a single range
+   when Branch is unwired, or one range per possible Branch value when it is.
+   ───────────────────────────────────────────────────────────────────────── *@
+
+@if (_Visible)
+{
+    <div class="modal-backdrop" @onclick="Cancel"></div>
+
+    <div class="modal-box rim-box" @onclick:stopPropagation="true">
+
+        <div class="modal-header">
+            <span class="modal-title">@(_IsEdit ? Loc.T(Localization.Editor.Modals.RandomizedInstruction.editTitle) : Loc.T(Localization.Editor.Modals.RandomizedInstruction.title))</span>
+            <button class="modal-close" @onclick="Cancel" title="@Loc.T(Localization.Common.Buttons.close)">
+                <i class="bi bi-x-lg"></i>
+            </button>
+        </div>
+
+        <div class="modal-body rim-body">
+
+            <div class="modal-field">
+                <label class="modal-label">@Loc.T(Localization.Editor.Modals.RandomizedInstruction.resultToken)</label>
+                <input class="modal-input"
+                       type="text"
+                       placeholder="@Loc.T(Localization.Editor.Modals.RandomizedInstruction.resultTokenPlaceholder)"
+                       @bind="_ResultToken"
+                       @bind:event="oninput"
+                       maxlength="100"/>
+                <span class="modal-label-hint">@Loc.T(Localization.Editor.Modals.RandomizedInstruction.resultTokenHint)</span>
+            </div>
+
+            <div class="modal-field">
+                <label class="modal-label">@Loc.T(Localization.Common.Assignment.randomMode)</label>
+                <select class="modal-input" @bind="_RandomMode">
+                    <option value="@RandomMode.Saved">@Loc.T(Localization.Common.Assignment.randomModeSaved)</option>
+                    <option value="@RandomMode.Pure">@Loc.T(Localization.Common.Assignment.randomModePure)</option>
+                </select>
+                <span class="modal-label-hint">@Loc.T(_RandomMode == RandomMode.Pure ? Localization.Common.Assignment.randomModePureHint : Localization.Common.Assignment.randomModeSavedHint)</span>
+            </div>
+
+            <div class="modal-field">
+                <label class="modal-label">@Loc.T(Localization.Editor.Modals.RandomizedInstruction.remainderMode)</label>
+                <select class="modal-input" @bind="_RemainderMode">
+                    <option value="@RandomRemainderMode.Reroll">@Loc.T(Localization.Editor.Modals.RandomizedInstruction.remainderReroll)</option>
+                    <option value="@RandomRemainderMode.Fill">@Loc.T(Localization.Editor.Modals.RandomizedInstruction.remainderFill)</option>
+                </select>
+                <span class="modal-label-hint">@Loc.T(Localization.Editor.Modals.RandomizedInstruction.remainderHint)</span>
+            </div>
+
+            <div class="modal-field">
+                <label class="modal-label">@Loc.T(Localization.Common.Fields.previewValue)</label>
+                <input class="modal-input"
+                       type="text"
+                       placeholder="@Loc.T(Localization.Editor.Modals.RandomizedInstruction.previewValuePlaceholder)"
+                       @bind="_PreviewValue"
+                       @bind:event="oninput"
+                       maxlength="100"/>
+                <span class="modal-label-hint">@Loc.T(Localization.Editor.Modals.RandomizedInstruction.previewValueHint)</span>
+            </div>
+
+            @{
+                RenderFragment RangeEditor(List<string> list) =>
+                    @<div class="rim-range">
+                        @for (int i = 0; i < list.Count; ++i)
+                        {
+                            int row = i;
+                            <div class="rim-range-row">
+                                <input class="modal-input"
+                                       placeholder="@Loc.T(Localization.Editor.Modals.RandomizedInstruction.valuePlaceholder)"
+                                       value="@list[row]"
+                                       @onchange="e => list[row] = e.Value?.ToString() ?? string.Empty"/>
+                                <button class="rim-del" title="@Loc.T(Localization.Common.Buttons.remove)" @onclick="() => list.RemoveAt(row)">
+                                    <i class="bi bi-x-lg"></i>
+                                </button>
+                            </div>
+                        }
+                        <button class="modal-btn modal-btn-ghost rim-range-add" @onclick="() => list.Add(string.Empty)">
+                            <i class="bi bi-plus-lg"></i> @Loc.T(Localization.Editor.Modals.RandomizedInstruction.addValue)
+                        </button>
+                    </div>;
+            }
+
+            @if (_BranchValues is { Count: > 0 })
+            {
+                @foreach (string value in _BranchValues)
+                {
+                    string bv = value;
+                    <div class="modal-field">
+                        <label class="modal-label">@Loc.T(Localization.Editor.Modals.RandomizedInstruction.branchRangeHeader, new Dictionary<string, object> { ["value"] = bv })</label>
+                        @RangeEditor(BranchRange(bv))
+                    </div>
+                }
+            }
+            else
+            {
+                <div class="modal-field">
+                    <label class="modal-label">@Loc.T(Localization.Editor.Modals.RandomizedInstruction.rangeHeader)</label>
+                    @RangeEditor(_DefaultRange)
+                    <span class="modal-label-hint">@Loc.T(Localization.Editor.Modals.RandomizedInstruction.rangeHint) @Loc.T(Localization.Editor.Modals.RandomizedInstruction.branchUnwiredHint)</span>
+                </div>
+            }
+
+        </div>
+
+        <div class="modal-footer">
+            <button class="modal-btn modal-btn-ghost" @onclick="Cancel">@Loc.T(Localization.Common.Buttons.cancel)</button>
+            <button class="modal-btn modal-btn-primary" @onclick="Confirm" disabled="@(!_CanConfirm)">
+                @(_IsEdit ? Loc.T(Localization.Common.Buttons.saveChanges) : Loc.T(Localization.Editor.Modals.RandomizedInstruction.addButton))
+            </button>
+        </div>
+
+    </div>
+}
+
+@code {
+    [Parameter] public EventCallback<RandomizedInstructionArgs> OnConfirm { get; set; }
+
+    private bool                _Visible;
+    private bool                _IsEdit;
+    private Guid                _EditNodeId;
+    private StoryLogicNode?     _Logic;
+    private string              _ResultToken   = "RandomResult";
+    private RandomMode          _RandomMode    = RandomMode.Saved;
+    private RandomRemainderMode _RemainderMode = RandomRemainderMode.Reroll;
+    private string              _PreviewValue  = "";
+    private List<string>        _DefaultRange  = new();
+    private List<string>?       _BranchValues;                                    // null/empty ⇒ Branch unwired
+    private Dictionary<string, List<string>> _BranchRangeMap = new();
+
+    private bool _CanConfirm => !string.IsNullOrWhiteSpace(_ResultToken);
+
+    /// <summary>The editable range list for one branch value (created empty on first access).</summary>
+    private List<string> BranchRange(string value)
+    {
+        if (!_BranchRangeMap.TryGetValue(value, out List<string>? list))
+            _BranchRangeMap[value] = list = new List<string>();
+        return list;
+    }
+
+    /// <summary>Opens the modal to create a new Randomized Instruction node in <paramref name="logic"/>.</summary>
+    public void Show(StoryLogicNode logic)
+    {
+        _IsEdit        = false;
+        _EditNodeId    = Guid.Empty;
+        _Logic         = logic;
+        _ResultToken   = "RandomResult";
+        _RandomMode    = RandomMode.Saved;
+        _RemainderMode = RandomRemainderMode.Reroll;
+        _PreviewValue  = "";
+        _DefaultRange  = new List<string> { "" };
+        _BranchRangeMap = new Dictionary<string, List<string>>();
+        _BranchValues  = null; // a freshly created node has no Branch wire yet
+        _Visible       = true;
+        StateHasChanged();
+    }
+
+    /// <summary>Opens the modal to edit an existing Randomized Instruction node.</summary>
+    public void ShowEdit(StoryRandomizedInstructionNode node, StoryLogicNode logic)
+    {
+        _IsEdit        = true;
+        _EditNodeId    = node.Id;
+        _Logic         = logic;
+        _ResultToken   = node.ResultToken;
+        _RandomMode    = node.RandomMode;
+        _RemainderMode = node.RemainderMode;
+        _PreviewValue  = node.PreviewValue;
+        _DefaultRange  = node.DefaultRange.Count > 0 ? new List<string>(node.DefaultRange) : new List<string> { "" };
+
+        _BranchValues = StoryLogicFlow.BranchValues(_ProjectState.CurrentProject!, logic, StoryLogicFlow.FromInto(logic, node.BranchIn.Id));
+        _BranchRangeMap = new Dictionary<string, List<string>>();
+        if (_BranchValues is { Count: > 0 })
+            foreach (string value in _BranchValues)
+            {
+                StoryRandomRange? existing = node.BranchRanges.Find(r => string.Equals(r.BranchValue, value, StringComparison.OrdinalIgnoreCase));
+                _BranchRangeMap[value] = existing is { Values.Count: > 0 } ? new List<string>(existing.Values) : new List<string> { "" };
+            }
+        _Visible = true;
+        StateHasChanged();
+    }
+
+    private async Task Confirm()
+    {
+        if (!_CanConfirm) return;
+        _Visible = false;
+
+        List<string> defaultRange = _BranchValues is { Count: > 0 }
+            ? new List<string>()
+            : _DefaultRange.Select(v => v.Trim()).Where(v => v.Length > 0).ToList();
+
+        List<StoryRandomRange> branchRanges = new();
+        if (_BranchValues is { Count: > 0 })
+            foreach (string value in _BranchValues)
+            {
+                StoryRandomRange range = new() { BranchValue = value };
+                range.Values.AddRange(BranchRange(value).Select(v => v.Trim()).Where(v => v.Length > 0));
+                branchRanges.Add(range);
+            }
+
+        await OnConfirm.InvokeAsync(new RandomizedInstructionArgs(
+            _EditNodeId, _ResultToken.Trim(), _RandomMode, _RemainderMode, defaultRange, branchRanges, _PreviewValue.Trim()));
+    }
+
+    private void Cancel() => _Visible = false;
+
+    /// <summary>Result passed back to the parent. <see cref="EditNodeId"/> is empty for a create, set for an edit.</summary>
+    public record RandomizedInstructionArgs(
+        Guid                   EditNodeId,
+        string                 ResultToken,
+        RandomMode             RandomMode,
+        RandomRemainderMode    RemainderMode,
+        List<string>           DefaultRange,
+        List<StoryRandomRange> BranchRanges,
+        string                 PreviewValue);
+}

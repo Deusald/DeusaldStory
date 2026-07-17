@@ -185,6 +185,22 @@ namespace DeusaldStoryCommon
             return null;
         }
 
+        /// <summary>
+        /// Every value the branch source wired at <paramref name="fromPoint"/> can carry, for a Randomized Instruction
+        /// node's per-value ranges. Extends <see cref="PossibleVariableValues"/> to also cover an upstream
+        /// <b>Prev Exit</b> declared variable — the one branch source the Gamebook actually fans a section out per value
+        /// for. Null when the wire is missing or the source cannot be enumerated before play.
+        /// </summary>
+        public static List<string>? BranchValues(StoryProject project, StoryLogicNode logic, Guid fromPoint)
+        {
+            if (PossibleVariableValues(project, logic, fromPoint) is List<string> constant) return constant;
+            if (fromPoint == Guid.Empty) return null;
+
+            Guid src = logic.ResolvePortalSource(fromPoint);
+            StoryDeclaredVariable? incoming = StorySelectionResolver.IncomingVariables(project, logic).Find(d => d.Id == src);
+            return incoming is not null ? new List<string>(incoming.PossibleValues) : null;
+        }
+
         /// <summary>The storage variable a Get node reads — the picked register, or the one its wired name selects.</summary>
         public static StoryRegisterVariableNode? TargetOf(
             StoryProject project, StoryLogicNode logic, StoryGetVariableNode gv,

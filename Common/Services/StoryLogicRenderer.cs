@@ -375,6 +375,15 @@ namespace DeusaldStoryCommon
                     else if (logic.ConstantVariableNodes.Find(n => n.OutPoint.Id == src) is StoryConstantVariableNode cv
                         && !string.IsNullOrWhiteSpace(cv.Name))
                         vals[cv.Name] = cv.Value;
+                    else if (logic.RandomizedInstructionNodes.Find(n => n.OutVariable.Id == src) is StoryRandomizedInstructionNode riVar
+                        && !string.IsNullOrWhiteSpace(riVar.ResultToken))
+                    {
+                        if (target == StoryRenderTarget.App)
+                            vals[riVar.ResultToken.Trim()] = !string.IsNullOrEmpty(riVar.PreviewValue)
+                                ? riVar.PreviewValue
+                                : RandomActiveRange(project, logic, riVar, values, target).FirstOrDefault() ?? "";
+                        else hasOmittedVariable = true; // live App-drawn value, unknown in the Gamebook
+                    }
                     else if (IncomingVariable(project, logic, src) is StoryDeclaredVariable dv && !string.IsNullOrWhiteSpace(dv.Name))
                         vals[dv.Name] = StorySelectionResolver.IncomingValue(project, logic, src, values);
                 }
@@ -387,7 +396,96 @@ namespace DeusaldStoryCommon
                 return ApplySmartFormatTransforms(sf, rendered);
             }
 
+            if (logic.RandomizedInstructionNodes.Find(n => n.OutText.Id == fromPoint) is StoryRandomizedInstructionNode ri)
+            {
+                Guid   fmtPort = target == StoryRenderTarget.App ? ri.AppTextIn.Id : ri.GamebookTextIn.Id;
+                string format  = ResolveText(project, localization, logic, values, FromPointInto(logic, fmtPort), target, depth + 1, errors, extraValues);
+
+                Dictionary<string, object> tokens = new(StringComparer.OrdinalIgnoreCase);
+                if (extraValues is not null)
+                    foreach (KeyValuePair<string, object> kv in extraValues) tokens[kv.Key] = kv.Value;
+
+                List<string> range     = RandomActiveRange(project, logic, ri, values, target);
+                string       tokenName = string.IsNullOrWhiteSpace(ri.ResultToken) ? "RandomResult" : ri.ResultToken.Trim();
+                if (target == StoryRenderTarget.App)
+                {
+                    tokens[tokenName]           = !string.IsNullOrEmpty(ri.PreviewValue) ? ri.PreviewValue : range.FirstOrDefault() ?? "";
+                    tokens["RandomInstruction"] = "";
+                }
+                else
+                {
+                    tokens[tokenName]           = RandomBandList(localization, range, ri.RemainderMode);
+                    tokens["RandomInstruction"] = StoryCommonLocalizationKeys.Resolve(localization, StoryCommonLocalizationKeys.RandomRollD12);
+                }
+
+                string rendered = StoryConditionPreview.Render(format, tokens, out string? error);
+                if (error is not null)
+                    errors.Add(UiLang.T(Localization.Services.Renderer.smartFormatFailed, new Dictionary<string, object> { ["error"] = error }));
+                return target == StoryRenderTarget.Gamebook ? $"<randomised-instruction>{rendered}</randomised-instruction>" : rendered;
+            }
+
             return "";
+        }
+
+        /// <summary>The range a Randomized Instruction node draws from for this render — the per-branch range when Branch is wired, else the default.</summary>
+        private static List<string> RandomActiveRange(
+            StoryProject project, StoryLogicNode logic, StoryRandomizedInstructionNode ri,
+            IReadOnlyDictionary<Guid, string> values, StoryRenderTarget target)
+        {
+            Guid branchFrom = FromPointInto(logic, ri.BranchIn.Id);
+            if (branchFrom == Guid.Empty) return ri.DefaultRange;
+            string branch = StoryLogicFlow.ResolveVariableValue(project, logic, branchFrom, values, target);
+            return ri.BranchRanges.Find(r => string.Equals(r.BranchValue, branch, StringComparison.OrdinalIgnoreCase))?.Values ?? ri.DefaultRange;
+        }
+
+        /// <summary>The Gamebook D12 roll-to-outcome table for a range — one localized "rolled a–b → value" line per outcome, newline-separated.</summary>
+        private static string RandomBandList(LocProject? localization, IReadOnlyList<string> range, RandomRemainderMode mode)
+        {
+            List<(int From, int To)> bands = D12Bands(range.Count, mode);
+            StringBuilder            sb    = new();
+            for (int i = 0; i < bands.Count && i < range.Count; ++i)
+            {
+                if (i > 0) sb.Append('\n');
+                sb.Append(StoryCommonLocalizationKeys.Resolve(localization, StoryCommonLocalizationKeys.RandomRollBand,
+                    new Dictionary<string, object> { ["from"] = bands[i].From, ["to"] = bands[i].To, ["value"] = range[i] }));
+            }
+            return sb.ToString();
+        }
+
+        /// <summary>
+        /// Splits a D12 (faces 1..12) into <paramref name="count"/> contiguous roll bands. When count divides 12 the
+        /// bands are equal; otherwise <see cref="RandomRemainderMode.Reroll"/> keeps equal <c>floor(12/count)</c> bands
+        /// (the top out-of-range faces are rerolled, so fewer than 12 faces are covered) and
+        /// <see cref="RandomRemainderMode.Fill"/> spreads the remainder across the first bands so all twelve map.
+        /// </summary>
+        public static List<(int From, int To)> D12Bands(int count, RandomRemainderMode mode)
+        {
+            List<(int From, int To)> bands = new();
+            if (count <= 0) return bands;
+            if (count > 12) count = 12;
+
+            int start = 1;
+            if (12 % count == 0 || mode == RandomRemainderMode.Reroll)
+            {
+                int band = 12 / count;
+                for (int i = 0; i < count; ++i)
+                {
+                    bands.Add((start, start + band - 1));
+                    start += band;
+                }
+            }
+            else
+            {
+                int baseSize = 12 / count;
+                int rem      = 12 % count;
+                for (int i = 0; i < count; ++i)
+                {
+                    int size = baseSize + (i < rem ? 1 : 0);
+                    bands.Add((start, start + size - 1));
+                    start += size;
+                }
+            }
+            return bands;
         }
 
         // Matches an embedded markup/pill tag (authored HTML like <b>, or a variable/slot/icon pill like <var=Name> /

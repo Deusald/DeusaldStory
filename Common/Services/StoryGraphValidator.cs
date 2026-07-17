@@ -344,6 +344,7 @@ namespace DeusaldStoryCommon
                 ea[logic.Id] = new HashSet<Guid>(incoming);
                 CheckTextReferences(logic, incoming, regById, localization, problems);
                 CheckGetRefs(project, logic, incoming, problems);
+                CheckRandomizedInstruction(project, logic, problems);
                 HashSet<Guid> active = new(incoming);
                 ApplyOps(project, logic, active, regById, problems);
 
@@ -472,6 +473,41 @@ namespace DeusaldStoryCommon
                     else if (!entryActive.Contains(reg.Id) && !logic.RegisterVariableNodes.Exists(n => n.Id == reg.Id))
                         problems.Add(Inner(logic, gv.Id, UiLang.T(Localization.Validation.refNameUnavailable, new Dictionary<string, object> { ["name"] = NodeName(name), ["node"] = NodeName(logic.Name) })));
                 }
+            }
+        }
+
+        /// <summary>
+        /// Checks every Randomized Instruction node: it must name a result token and have a non-empty range. When its
+        /// Branch input is wired the source must be enumerable (constant or an incoming declared variable) and every
+        /// value it can take must have a configured, non-empty range.
+        /// </summary>
+        private static void CheckRandomizedInstruction(StoryProject project, StoryLogicNode logic, List<StoryProblem> problems)
+        {
+            foreach (StoryRandomizedInstructionNode ri in logic.RandomizedInstructionNodes)
+            {
+                string nodeName = NodeName(string.IsNullOrWhiteSpace(ri.ResultToken)
+                    ? UiLang.T(Localization.Editor.Nodes.Labels.randomizedInstruction) : ri.ResultToken);
+
+                if (string.IsNullOrWhiteSpace(ri.ResultToken))
+                    problems.Add(Inner(logic, ri.Id, UiLang.T(Localization.Validation.randomResultTokenEmpty, new Dictionary<string, object> { ["node"] = nodeName })));
+
+                Guid          branchFrom   = StoryLogicFlow.FromInto(logic, ri.BranchIn.Id);
+                List<string>? branchValues = branchFrom == Guid.Empty ? null : StoryLogicFlow.BranchValues(project, logic, branchFrom);
+
+                if (branchFrom == Guid.Empty)
+                {
+                    if (ri.DefaultRange.Count == 0)
+                        problems.Add(Inner(logic, ri.Id, UiLang.T(Localization.Validation.randomRangeEmpty, new Dictionary<string, object> { ["node"] = nodeName })));
+                }
+                else if (branchValues is null)
+                    problems.Add(Inner(logic, ri.Id, UiLang.T(Localization.Validation.randomBranchNotConstant, new Dictionary<string, object> { ["node"] = nodeName })));
+                else
+                    foreach (string value in branchValues)
+                    {
+                        StoryRandomRange? range = ri.BranchRanges.Find(r => string.Equals(r.BranchValue, value, StringComparison.OrdinalIgnoreCase));
+                        if (range is null || range.Values.Count == 0)
+                            problems.Add(Inner(logic, ri.Id, UiLang.T(Localization.Validation.randomBranchMissingRange, new Dictionary<string, object> { ["node"] = nodeName, ["value"] = NodeName(value) })));
+                    }
             }
         }
 

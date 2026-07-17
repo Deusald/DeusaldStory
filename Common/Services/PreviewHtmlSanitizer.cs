@@ -17,6 +17,11 @@ namespace DeusaldStoryCommon
     /// <c>&lt;sprite=Name&gt;</c> renders it as a standalone picture. Both resolve their
     /// name against the project's image library; a name that does not resolve is left
     /// escaped so the author sees the unresolved tag.
+    ///
+    /// Storage-variable pills (<c>&lt;var=Name&gt;</c> / <c>&lt;slot=TA&gt;</c>) and the
+    /// <c>&lt;randomised-instruction&gt;…&lt;/randomised-instruction&gt;</c> wrapper (a
+    /// Randomized Instruction node's Gamebook roll table, rendered as a styled callout that
+    /// preserves its line breaks) are also recognised.
     /// </summary>
     public static class PreviewHtmlSanitizer
     {
@@ -47,6 +52,13 @@ namespace DeusaldStoryCommon
             @"&lt;slot=([^&]+?)&gt;",
             RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
+        // Matches an encoded "&lt;randomised-instruction&gt;…&lt;/randomised-instruction&gt;" wrapper a Randomized
+        // Instruction node emits around its Gamebook roll table. Singleline so the inner multi-line band list is
+        // captured whole; it is rendered as a styled callout whose CSS preserves the newlines.
+        private static readonly Regex _RandomisedInstruction = new Regex(
+            @"&lt;randomised-instruction&gt;(.*?)&lt;/randomised-instruction&gt;",
+            RegexOptions.IgnoreCase | RegexOptions.Singleline | RegexOptions.Compiled);
+
         /// <summary>Wraps a storage-slot label (e.g. <c>TA</c>) in the tag <see cref="ToSafeHtml"/> renders as a styled pill.</summary>
         public static string SlotTag(string label) => $"<slot={label}>";
 
@@ -73,6 +85,9 @@ namespace DeusaldStoryCommon
 
             // Slot labels carry no lookup — always render them as the String-kind pill.
             result = _SlotTag.Replace(result, RestoreSlot);
+
+            // The randomised-instruction wrapper is applied last so its inner pills/line breaks are already restored.
+            result = _RandomisedInstruction.Replace(result, m => $"<span class=\"lpv-randomised-instruction\">{m.Groups[1].Value}</span>");
 
             return result;
         }

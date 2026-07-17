@@ -447,6 +447,8 @@ namespace DeusaldStoryCommon
                     public static readonly Guid portalDesc = new Guid("844b4eb5-6cbd-4fb2-93aa-3c933696d964");
                     public static readonly Guid blueprintInstanceLabel = new Guid("35fad3a1-6a23-4716-a28d-39dd0b75fc69");
                     public static readonly Guid blueprintInstanceDesc = new Guid("89ed77d7-8440-47ab-a7e5-7644b9e0e6cb");
+                    public static readonly Guid randomizedInstructionLabel = new Guid("d7614656-05f0-4a56-8826-455ac5f00617");
+                    public static readonly Guid randomizedInstructionDesc = new Guid("bd14b3dc-0e4a-449c-9e6d-6def6639fe40");
                 }
             }
 
@@ -795,6 +797,30 @@ namespace DeusaldStoryCommon
                     public static readonly Guid addButton = new Guid("7fa0a2d8-b194-4b69-a417-1f50e4f045b0");
                 }
 
+                public static class RandomizedInstruction
+                {
+                    public static readonly Guid title = new Guid("5cdfa544-e09f-485f-b40d-1e8b79bdf278");
+                    public static readonly Guid editTitle = new Guid("927da6d1-2c88-4c1f-8bf7-bcc207b51bd6");
+                    public static readonly Guid resultToken = new Guid("3a8e4b8b-72ab-41b0-9352-adb226cccb04");
+                    public static readonly Guid resultTokenPlaceholder = new Guid("e2db49cc-9106-484c-988e-8f981bab2c79");
+                    /// <summary>MarkupString; {token} literal, replace [resultToken].</summary>
+                    public static readonly Guid resultTokenHint = new Guid("d6329c13-81ce-40e4-811b-80f60214b087");
+                    public static readonly Guid remainderMode = new Guid("3619dab9-82ed-4837-8d20-ef5831f44314");
+                    public static readonly Guid remainderReroll = new Guid("b8d76d3c-9197-4fe4-8707-2296cfe00082");
+                    public static readonly Guid remainderFill = new Guid("2d653860-aa5a-4647-bbec-ffad9f8f9575");
+                    public static readonly Guid remainderHint = new Guid("a0b27ae9-ace7-4e41-a60c-11e39705c3c8");
+                    public static readonly Guid previewValuePlaceholder = new Guid("19ca3721-e6dc-47d0-8600-39669c231c9a");
+                    public static readonly Guid previewValueHint = new Guid("6f90ce01-3836-4972-bffa-c6110637b8ce");
+                    public static readonly Guid rangeHeader = new Guid("d337562d-2081-46d5-91da-bbfb147c42dc");
+                    public static readonly Guid rangeHint = new Guid("89f60b8c-0d83-487b-87ce-26d5dc160910");
+                    /// <summary>Token: {value}.</summary>
+                    public static readonly Guid branchRangeHeader = new Guid("7adc0de0-ac42-49bb-8e74-1f0d3fdf4dc6");
+                    public static readonly Guid addValue = new Guid("6faa2eaf-6080-48aa-87e5-24bb9ecb3a64");
+                    public static readonly Guid valuePlaceholder = new Guid("4354ea39-bef1-44a9-af6b-fe908111f088");
+                    public static readonly Guid addButton = new Guid("84077509-1d4b-44f3-9297-75c0eb9ef9da");
+                    public static readonly Guid branchUnwiredHint = new Guid("7c784c32-424b-4eee-a8c6-9c85e25e1017");
+                }
+
                 public static class RegisterVariable
                 {
                     public static readonly Guid editTitle = new Guid("d63e2030-c933-4d83-ae21-59f02ceb684b");
@@ -933,6 +959,10 @@ namespace DeusaldStoryCommon
                     public static readonly Guid varFallback = new Guid("0787855a-66e7-4f8a-a5ab-1f417fbd0cdf");
                     public static readonly Guid data = new Guid("2f99926f-553a-4398-966f-7c9dec6b711d");
                     public static readonly Guid conditionTrue = new Guid("f2c9aa38-10a7-4d7f-b714-c39438132dfc");
+                    public static readonly Guid appInstruction = new Guid("176bae7d-d1ee-4d8b-bd8a-45c628793521");
+                    public static readonly Guid gamebookInstruction = new Guid("88508fbb-9693-4669-b986-eb68405b0072");
+                    public static readonly Guid branch = new Guid("c79d3623-f05d-400b-8191-878789b87fff");
+                    public static readonly Guid result = new Guid("7fa3503b-64ee-44d2-b8c9-741d166d5835");
                 }
 
                 public static class Titles
@@ -981,6 +1011,8 @@ namespace DeusaldStoryCommon
                     public static readonly Guid missingFunction = new Guid("1e33cfbd-83ab-42f7-bf41-3221abae5f9e");
                     public static readonly Guid functionSubtitle = new Guid("871f5f41-8bbf-4dbe-ac0b-9ba1da6f5995");
                     public static readonly Guid deletedFunction = new Guid("f4fcf4c8-ae8e-45fd-85dd-1e1f40a85db0");
+                    /// <summary>Fallback title of a Randomized Instruction node with no result token yet.</summary>
+                    public static readonly Guid randomizedInstruction = new Guid("659e53a8-ccc4-41cc-bae3-817b2d43c938");
                 }
 
                 public static class PortTypes
@@ -1028,6 +1060,7 @@ namespace DeusaldStoryCommon
                     public static readonly Guid comment = new Guid("b47c53d7-518f-4e83-9737-e354b08d263e");
                     public static readonly Guid blueprint = new Guid("80491317-5df3-49c6-8fba-46eb854553ff");
                     public static readonly Guid function = new Guid("79558655-29c2-4eed-9a6a-c598017a5cc9");
+                    public static readonly Guid randomizedInstruction = new Guid("e6106c9a-e349-4007-86a8-143d90d3f687");
                 }
 
                 public static class Frames
@@ -1115,6 +1148,14 @@ namespace DeusaldStoryCommon
             public static readonly Guid functionMissing = new Guid("ed0ea96f-1b86-43ef-b616-effb832fc534");
             /// <summary>Token: {name}.</summary>
             public static readonly Guid functionRecursive = new Guid("a73ad660-0182-4f7e-959c-073f4de83d35");
+            /// <summary>Token: {node}. A Randomized Instruction node with a blank result token.</summary>
+            public static readonly Guid randomResultTokenEmpty = new Guid("997bf7b0-f4de-4e48-869a-11f0546a8ba7");
+            /// <summary>Token: {node}. A Randomized Instruction node with an empty random range.</summary>
+            public static readonly Guid randomRangeEmpty = new Guid("82f3604e-2f94-44c5-8d72-526dcd2babfb");
+            /// <summary>Token: {node}. A Randomized Instruction node whose Branch source isn't enumerable.</summary>
+            public static readonly Guid randomBranchNotConstant = new Guid("fb1a891e-3dfa-4b6f-9299-6009ec737e55");
+            /// <summary>Tokens: {node},{value}. A branch value with no configured range.</summary>
+            public static readonly Guid randomBranchMissingRange = new Guid("a240839b-049a-4447-8995-c704b49d1552");
         }
 
         public static class Services
@@ -1182,6 +1223,10 @@ namespace DeusaldStoryCommon
             public static readonly Guid StorageStringWrite = new Guid("a1b2c3d4-001b-4000-8000-00000000001b");
             public static readonly Guid StorageNumberDiceSpecific = new Guid("a1b2c3d4-001c-4000-8000-00000000001c");
             public static readonly Guid StorageStringWriteSpecific = new Guid("a1b2c3d4-001d-4000-8000-00000000001d");
+            /// <summary>Gamebook "Roll a D12" phrase filling the {RandomInstruction} token.</summary>
+            public static readonly Guid RandomRollD12 = new Guid("a1b2c3d4-0020-4000-8000-000000000020");
+            /// <summary>Gamebook random-outcome band line. Tokens: {from},{to},{value}.</summary>
+            public static readonly Guid RandomRollBand = new Guid("a1b2c3d4-0021-4000-8000-000000000021");
         }
 
         public static readonly Dictionary<string, Dictionary<Guid, string>> Translations = new Dictionary<string, Dictionary<Guid, string>>
@@ -1888,6 +1933,43 @@ namespace DeusaldStoryCommon
                 { new Guid("a1b2c3d4-001b-4000-8000-00000000001b"), "Write the required value on sheet slot {slot}." },
                 { new Guid("a1b2c3d4-001c-4000-8000-00000000001c"), "Place a D6 showing {value} on slot {slot}." },
                 { new Guid("a1b2c3d4-001d-4000-8000-00000000001d"), "Write \"{value}\" on sheet slot {slot}." },
+                { new Guid("a1b2c3d4-0020-4000-8000-000000000020"), "Roll a D12" },
+                { new Guid("a1b2c3d4-0021-4000-8000-000000000021"), "rolled {from}–{to} → {value}" },
+                // Randomized Instruction — port names
+                { new Guid("176bae7d-d1ee-4d8b-bd8a-45c628793521"), "App Instruction" },
+                { new Guid("88508fbb-9693-4669-b986-eb68405b0072"), "Gamebook Instruction" },
+                { new Guid("c79d3623-f05d-400b-8191-878789b87fff"), "Branch" },
+                { new Guid("7fa3503b-64ee-44d2-b8c9-741d166d5835"), "Result" },
+                // Randomized Instruction — node title fallback + label
+                { new Guid("659e53a8-ccc4-41cc-bae3-817b2d43c938"), "Random" },
+                { new Guid("e6106c9a-e349-4007-86a8-143d90d3f687"), "Randomized Instruction" },
+                // Randomized Instruction — palette
+                { new Guid("d7614656-05f0-4a56-8826-455ac5f00617"), "Randomized Instruction" },
+                { new Guid("bd14b3dc-0e4a-449c-9e6d-6def6639fe40"), "A random choice — the app shows the drawn value, the gamebook prints the D12 roll table." },
+                // Randomized Instruction — modal
+                { new Guid("5cdfa544-e09f-485f-b40d-1e8b79bdf278"), "Randomized Instruction" },
+                { new Guid("927da6d1-2c88-4c1f-8bf7-bcc207b51bd6"), "Edit Randomized Instruction" },
+                { new Guid("3a8e4b8b-72ab-41b0-9352-adb226cccb04"), "Result token" },
+                { new Guid("e2db49cc-9106-484c-988e-8f981bab2c79"), "RandomResult" },
+                { new Guid("d6329c13-81ce-40e4-811b-80f60214b087"), "The SmartFormat token the drawn value fills in the instruction text (and the downstream Result port)." },
+                { new Guid("3619dab9-82ed-4837-8d20-ef5831f44314"), "Uneven range split" },
+                { new Guid("b8d76d3c-9197-4fe4-8707-2296cfe00082"), "Reroll extra faces" },
+                { new Guid("2d653860-aa5a-4647-bbec-ffad9f8f9575"), "Fill all 12 (uneven bands)" },
+                { new Guid("a0b27ae9-ace7-4e41-a60c-11e39705c3c8"), "Only used when the number of outcomes doesn't divide 12 evenly." },
+                { new Guid("19ca3721-e6dc-47d0-8600-39669c231c9a"), "App preview value" },
+                { new Guid("6f90ce01-3836-4972-bffa-c6110637b8ce"), "Shown in the app preview; the app draws the live value at runtime." },
+                { new Guid("d337562d-2081-46d5-91da-bbfb147c42dc"), "Random range" },
+                { new Guid("89f60b8c-0d83-487b-87ce-26d5dc160910"), "The outcomes to draw from, in roll order." },
+                { new Guid("7adc0de0-ac42-49bb-8e74-1f0d3fdf4dc6"), "Range for \"{value}\"" },
+                { new Guid("6faa2eaf-6080-48aa-87e5-24bb9ecb3a64"), "Add value" },
+                { new Guid("4354ea39-bef1-44a9-af6b-fe908111f088"), "Value" },
+                { new Guid("84077509-1d4b-44f3-9297-75c0eb9ef9da"), "Add" },
+                { new Guid("7c784c32-424b-4eee-a8c6-9c85e25e1017"), "Wire a constant into Branch to define a range per branch value." },
+                // Randomized Instruction — validation
+                { new Guid("997bf7b0-f4de-4e48-869a-11f0546a8ba7"), "Randomized Instruction \"{node}\" has no result token." },
+                { new Guid("82f3604e-2f94-44c5-8d72-526dcd2babfb"), "Randomized Instruction \"{node}\" has an empty random range." },
+                { new Guid("fb1a891e-3dfa-4b6f-9299-6009ec737e55"), "Randomized Instruction \"{node}\" has a Branch input that isn't a constant/enumerable value." },
+                { new Guid("a240839b-049a-4447-8995-c704b49d1552"), "Randomized Instruction \"{node}\" has no range for branch value \"{value}\"." },
             } },
         };
 

@@ -44,6 +44,8 @@ namespace DeusaldStoryCommon
         public static readonly Guid StorageStringWrite               = Localization.Story.StorageStringWrite;
         public static readonly Guid StorageNumberDiceSpecific        = Localization.Story.StorageNumberDiceSpecific;
         public static readonly Guid StorageStringWriteSpecific       = Localization.Story.StorageStringWriteSpecific;
+        public static readonly Guid RandomRollD12                    = Localization.Story.RandomRollD12;
+        public static readonly Guid RandomRollBand                   = Localization.Story.RandomRollBand;
 
         /// <summary>
         /// Resolves one of the common keys to display text: the main-language translation of the key in
