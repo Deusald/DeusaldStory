@@ -1648,10 +1648,11 @@ public partial class ProjectStateService(
         else
             goneOuterPorts.Add(logic.VFlowOut.Id);                                 // the shared VFlow output is gone
 
-        // The entry's type (Flow vs VFlow) follows acceptVariables — drop an incoming wire whose source type no longer matches.
+        // The entry's type (Flow vs VFlow) follows acceptVariables — drop an incoming wire whose source type no longer
+        // matches. The source is whatever the VFlow traces back to, however many containers/blueprints in between.
         if (CurrentProject.ContainerNodes.TryGetValue(containerId, out StoryContainerNode? parent)
             && parent.Connections.Find(c => c.ToPoint == logic.EntryPoint.Id) is StoryConnection entryWire
-            && CurrentProject.LogicNodes.Values.Any(l => l.VFlowOut.Id == entryWire.FromPoint) != acceptVariables)
+            && StorySelectionResolver.ResolveVFlowSource(CurrentProject, parent, entryWire.FromPoint) is not null != acceptVariables)
             goneOuterPorts.Add(logic.EntryPoint.Id);
 
         RemoveConnectionsFor(containerId, goneOuterPorts);
