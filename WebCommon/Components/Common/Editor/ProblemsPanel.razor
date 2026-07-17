@@ -81,7 +81,7 @@
         // the expander's own structural problems (missing / recursive blueprints). A definition bug reports once per
         // instance, so collapse identical messages.
         StoryBlueprintExpander.ExpandResult expanded = _ProjectState.GetExpanded();
-        StoryValidationResult result = StoryGraphValidator.Validate(expanded.Project, _ProjectState.CurrentLocalization);
+        StoryValidationResult result = StoryGraphValidator.Validate(expanded.Project, _ProjectState.CurrentLocalization, _ProjectState.CurrentProject);
         _Problems = expanded.Problems
             .Concat(result.Problems)
             .GroupBy(p => p.Message)

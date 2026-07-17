@@ -29,9 +29,12 @@ namespace DeusaldStoryCommon
 
         /// <summary>
         /// Validates the whole story. Pass <paramref name="localization"/> to additionally check inline
-        /// <c>&lt;var=Name&gt;</c> text references against the variables active where the text is shown.
+        /// <c>&lt;var=Name&gt;</c> text references against the variables active where the text is shown. Pass
+        /// <paramref name="authoring"/> — the un-expanded project — when <paramref name="project"/> is the
+        /// blueprint-flattened one, so the blueprint-register check can see the out-of-tree definitions that
+        /// expansion strips out; when omitted it falls back to <paramref name="project"/>.
         /// </summary>
-        public static StoryValidationResult Validate(StoryProject project, LocProject? localization = null)
+        public static StoryValidationResult Validate(StoryProject project, LocProject? localization = null, StoryProject? authoring = null)
         {
             List<StoryProblem>                    problems = new();
             Dictionary<Guid, StoryRegisterVariableNode> regById = BuildRegisterIndex(project);
@@ -42,6 +45,7 @@ namespace DeusaldStoryCommon
             CheckConditionFlows(project, problems);
             CheckIncomingVariableContract(project, problems);
             CheckGamebookText(project, localization, problems);
+            CheckBlueprintRegisters(authoring ?? project, problems);
             CheckVariableBalance(project, lk, regById, localization, problems,
                 out Dictionary<Guid, HashSet<Guid>> entryActive, out HashSet<Guid> endActive);
 
@@ -291,6 +295,63 @@ namespace DeusaldStoryCommon
                         if (seen.Add(error))
                             problems.Add(Node(logic, UiLang.T(Localization.Validation.gamebookTextPrefix, new Dictionary<string, object> { ["node"] = NodeName(logic.Name), ["error"] = error })));
             }
+        }
+
+        // ── Blueprints must not register storage variables ─────────────────────
+
+        /// <summary>
+        /// Forbids storage-variable <b>registration</b> inside a blueprint definition. Blueprints are reusable blocks:
+        /// a Register Variable node in one would claim the same physical slot on every instance, and its register id is
+        /// reminted per instance on expansion — so it can't be referenced across the blueprint boundary (see the two
+        /// id-spaces). Reports one error per Register node found in any blueprint's definition body. Runs on the
+        /// <b>authoring</b> project, since expansion strips the out-of-tree definitions.
+        /// </summary>
+        private static void CheckBlueprintRegisters(StoryProject project, List<StoryProblem> problems)
+        {
+            foreach (StoryBlueprint blueprint in project.Blueprints.Values)
+                foreach (StoryLogicNode logic in BlueprintDefinitionLogic(project, blueprint))
+                    foreach (StoryRegisterVariableNode reg in logic.RegisterVariableNodes)
+                        problems.Add(new StoryProblem
+                        {
+                            Severity    = StoryProblemSeverity.Error,
+                            Message     = UiLang.T(Localization.Validation.blueprintRegistersVariable, new Dictionary<string, object> { ["blueprint"] = NodeName(blueprint.Name), ["node"] = NodeName(reg.Name) }),
+                            ContainerId = logic.ParentContainer,
+                            LogicNodeId = logic.Id,
+                            InnerNodeId = reg.Id
+                        });
+        }
+
+        /// <summary>Every logic node in a blueprint's definition body — the node itself for a Logic/Function blueprint,
+        /// or all logic nodes nested in the definition container's subtree for a Container blueprint.</summary>
+        private static IEnumerable<StoryLogicNode> BlueprintDefinitionLogic(StoryProject project, StoryBlueprint blueprint)
+        {
+            switch (blueprint.Kind)
+            {
+                case StoryBlueprintKind.Logic:
+                case StoryBlueprintKind.Function:
+                    if (project.LogicNodes.TryGetValue(blueprint.DefinitionNodeId, out StoryLogicNode? logic))
+                        yield return logic;
+                    break;
+                case StoryBlueprintKind.Container:
+                    if (project.ContainerNodes.TryGetValue(blueprint.DefinitionNodeId, out StoryContainerNode? container))
+                        foreach (StoryLogicNode l in ContainerLogicSubtree(project, container))
+                            yield return l;
+                    break;
+            }
+        }
+
+        /// <summary>Every logic node in a container's subtree (the container's own logic plus that of every nested
+        /// child container). Nested blueprint <i>instances</i> are skipped — each referenced blueprint is checked on
+        /// its own definition by the top-level loop.</summary>
+        private static IEnumerable<StoryLogicNode> ContainerLogicSubtree(StoryProject project, StoryContainerNode container)
+        {
+            foreach (Guid logicId in container.Logic)
+                if (project.LogicNodes.TryGetValue(logicId, out StoryLogicNode? logic))
+                    yield return logic;
+            foreach (Guid childId in container.Containers)
+                if (project.ContainerNodes.TryGetValue(childId, out StoryContainerNode? child))
+                    foreach (StoryLogicNode l in ContainerLogicSubtree(project, child))
+                        yield return l;
         }
 
         private static Guid FromInto(StoryLogicNode logic, Guid toPoint) =>

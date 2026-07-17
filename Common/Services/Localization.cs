@@ -1156,6 +1156,8 @@ namespace DeusaldStoryCommon
             public static readonly Guid randomBranchNotConstant = new Guid("fb1a891e-3dfa-4b6f-9299-6009ec737e55");
             /// <summary>Tokens: {node},{value}. A branch value with no configured range.</summary>
             public static readonly Guid randomBranchMissingRange = new Guid("a240839b-049a-4447-8995-c704b49d1552");
+            /// <summary>Tokens: {blueprint},{node}. A Register Variable node found inside a blueprint definition.</summary>
+            public static readonly Guid blueprintRegistersVariable = new Guid("b1e7c4a2-9f36-4d81-a5c0-3e2d6f8a17b4");
         }
 
         public static class Services
@@ -1970,6 +1972,7 @@ namespace DeusaldStoryCommon
                 { new Guid("82f3604e-2f94-44c5-8d72-526dcd2babfb"), "Randomized Instruction \"{node}\" has an empty random range." },
                 { new Guid("fb1a891e-3dfa-4b6f-9299-6009ec737e55"), "Randomized Instruction \"{node}\" has a Branch input that isn't a constant/enumerable value." },
                 { new Guid("a240839b-049a-4447-8995-c704b49d1552"), "Randomized Instruction \"{node}\" has no range for branch value \"{value}\"." },
+                { new Guid("b1e7c4a2-9f36-4d81-a5c0-3e2d6f8a17b4"), "Blueprint '{blueprint}' registers storage variable '{node}' — blueprints are reusable blocks and must not register variables. Move the Register Variable node out of the blueprint." },
             } },
         };
 
