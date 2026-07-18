@@ -21,10 +21,9 @@ namespace DeusaldStoryCommon
 
         public sealed class Result
         {
-            public List<Section>      Sections          { get; set; } = new();
-            public List<ContinueLine> Continue          { get; set; } = new();
-            public int                TotalCombinations { get; set; }
-            public bool               Truncated         { get; set; }
+            public List<Section> Sections          { get; set; } = new();
+            public int           TotalCombinations { get; set; }
+            public bool          Truncated         { get; set; }
         }
 
         /// <summary>One printed section — the node rendered for a single combination of incoming variable values.</summary>
@@ -38,6 +37,10 @@ namespace DeusaldStoryCommon
             public List<string>                     InstructionLines { get; set; } = new();
             /// <summary>The composed "go to section …" phrase and navigation target for each inline <c>&lt;choice=Name&gt;</c> in the text, keyed by name (see <see cref="BuildInlineLinks"/>).</summary>
             public List<InlineLink>                 InlineLinks      { get; set; } = new();
+            /// <summary>This section's own continue-instruction lines. Per-section because Choice Visibility gates each option against the incoming variable values pinned in <see cref="Values"/> — different sections can offer different continuations. Empty when the text carries inline <c>&lt;choice&gt;</c> links (they replace the standalone lines).</summary>
+            public List<ContinueLine>               Continue         { get; set; } = new();
+            /// <summary>The incoming declared-variable values pinned for this section (declared-var id → value); the basis for its per-section Choice-Visibility filtering.</summary>
+            public Dictionary<Guid, string>         Values           { get; set; } = new();
         }
 
         /// <summary>
@@ -74,13 +77,17 @@ namespace DeusaldStoryCommon
                                     .Select(values => BuildSection(project, localization, logic, incoming, values))
                                     .ToList();
 
-            // When the text references choices inline (<choice=Name>), those links replace the standalone continue lines.
-            bool hasInline = sections.Exists(s => s.Rendered.InlineChoices.Count > 0);
+            // When the text references choices inline (<choice=Name>), those links replace the standalone continue lines
+            // — a whole-node decision (matching the App), so one inline section suppresses the standalone lines everywhere.
+            // Otherwise each section builds its own lines against its pinned values, so Choice Visibility can hide the
+            // options a section's incoming variables rule out (App parity — previously the Gamebook showed them all).
+            if (!sections.Exists(s => s.Rendered.InlineChoices.Count > 0))
+                foreach (Section section in sections)
+                    section.Continue = BuildContinueLines(project, localization, logic, section.Values);
 
             return new Result
             {
                 Sections          = sections,
-                Continue          = hasInline ? new List<ContinueLine>() : BuildContinueLines(project, localization, logic),
                 TotalCombinations = total,
                 Truncated         = total > valueMaps.Count
             };
@@ -98,7 +105,7 @@ namespace DeusaldStoryCommon
             string                           key      = SectionToken(logic, incoming, values);
 
             if (!logic.GamebookInstructions)
-                return new Section { Label = label, Key = key, Rendered = rendered, InlineLinks = inline };
+                return new Section { Label = label, Key = key, Rendered = rendered, InlineLinks = inline, Values = values };
 
             return new Section
             {
@@ -106,6 +113,7 @@ namespace DeusaldStoryCommon
                 Key              = key,
                 Rendered         = rendered,
                 InlineLinks      = inline,
+                Values           = values,
                 IsInstructions   = true,
                 InstructionLines = incoming.Select(dv => $"{(string.IsNullOrWhiteSpace(dv.Name) ? UiLang.T(Localization.Services.Gamebook.instructionVariableFallback) : dv.Name)} = {(values.TryGetValue(dv.Id, out string? v) ? v : "")}").ToList()
             };
@@ -152,11 +160,11 @@ namespace DeusaldStoryCommon
 
         // ── Continue instructions ────────────────────────────────────────────────
 
-        private static List<ContinueLine> BuildContinueLines(StoryProject project, LocProject? localization, StoryLogicNode logic)
+        private static List<ContinueLine> BuildContinueLines(StoryProject project, LocProject? localization, StoryLogicNode logic, IReadOnlyDictionary<Guid, string> values)
         {
             List<ContinueLine> lines = new();
             List<StoryLogicRenderer.RenderedChoice> choices =
-                StoryLogicRenderer.Choices(project, localization, logic, new Dictionary<Guid, string>(), StoryRenderTarget.Gamebook);
+                StoryLogicRenderer.Choices(project, localization, logic, values, StoryRenderTarget.Gamebook);
 
             if (choices.Count == 0)
             {

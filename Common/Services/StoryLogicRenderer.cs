@@ -501,8 +501,8 @@ namespace DeusaldStoryCommon
             List<RenderedChoice> result = new();
             if (logic.Choices.Count == 0) return result;
 
-            // Auto-resolution is App-only and needs a variable wired into the Exit node. Hub Paths always uses
-            // Choice Visibility; otherwise the node's own ExitAutoMode decides.
+            // Auto-resolution needs a variable wired into the Exit node. Automatic Choice is App-only; Choice Visibility
+            // resolves in both mediums. Hub Paths always uses Choice Visibility; otherwise the node's own ExitAutoMode decides.
             (bool varsWired, StoryExitAutoMode mode) = ExitResolution(logic, target);
 
             if (varsWired && mode == StoryExitAutoMode.AutomaticChoice)
@@ -519,7 +519,7 @@ namespace DeusaldStoryCommon
                 return result;
             }
 
-            // Choice Visibility (App, vars wired) — show each choice only when its condition is empty (always) or true.
+            // Choice Visibility (vars wired) — show each choice only when its condition is empty (always) or true.
             // An empty Group evaluates true, so the "empty ⇒ always shown" rule collapses to `?? true`.
             if (varsWired && mode == StoryExitAutoMode.ChoiceVisibility)
             {
@@ -547,11 +547,15 @@ namespace DeusaldStoryCommon
             return result;
         }
 
-        /// <summary>Whether Exit auto-resolution is active (App target with a variable wired into the Exit node) and the effective mode — Hub Paths always resolves as Choice Visibility, otherwise the node's own <see cref="StoryLogicNode.ExitAutoMode"/>.</summary>
+        /// <summary>Whether Exit auto-resolution is active (a variable is wired into the Exit node and the medium supports the mode) and the effective mode — Hub Paths always resolves as Choice Visibility, otherwise the node's own <see cref="StoryLogicNode.ExitAutoMode"/>.</summary>
         private static (bool varsWired, StoryExitAutoMode mode) ExitResolution(StoryLogicNode logic, StoryRenderTarget target)
         {
-            bool              varsWired = target == StoryRenderTarget.App && FromPointInto(logic, logic.ExitVariablesIn.Id) != Guid.Empty;
-            StoryExitAutoMode mode      = logic.ExitMode == StoryLogicExitMode.HubPaths ? StoryExitAutoMode.ChoiceVisibility : logic.ExitAutoMode;
+            StoryExitAutoMode mode = logic.ExitMode == StoryLogicExitMode.HubPaths ? StoryExitAutoMode.ChoiceVisibility : logic.ExitAutoMode;
+            // Choice Visibility resolves in BOTH mediums: the Gamebook pins the incoming declared-variable values per
+            // section (see StoryGamebookPreview), so each printed section can hide the options its variables rule out.
+            // Automatic Choice collapses to a single live pick, so it stays App-only.
+            bool mediumOk  = target == StoryRenderTarget.App || mode == StoryExitAutoMode.ChoiceVisibility;
+            bool varsWired = mediumOk && FromPointInto(logic, logic.ExitVariablesIn.Id) != Guid.Empty;
             return (varsWired, mode);
         }
 
