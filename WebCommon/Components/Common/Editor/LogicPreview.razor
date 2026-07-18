@@ -280,12 +280,16 @@
             else if (owner.InlineChoices.FirstOrDefault(c => string.Equals(c.Name, parts[i].Trim(), StringComparison.OrdinalIgnoreCase)) is { } ic)
             {
                 StoryLogicRenderer.RenderedInlineChoice choice = ic;
+                @* Named choice with no label ⇒ "Click here"; a bare <choice> (empty Name) ⇒ the "Click here…" auto-continue default. *@
+                MarkupString label = !string.IsNullOrEmpty(choice.Text)
+                    ? SafeHtml(choice.Text)
+                    : (MarkupString)Loc.T(choice.Name.Length == 0 ? Localization.Editor.Preview.Logic.inlineClickHere : Localization.Editor.Preview.Logic.hubClickHere);
                 <a class="lpv-choice-link @(choice.OuterFlowOut == Guid.Empty ? "disabled" : "")"
-                   @onclick="() => OnInlineChoice(choice)">[@(string.IsNullOrEmpty(choice.Text) ? (MarkupString)Loc.T(Localization.Editor.Preview.Logic.hubClickHere) : SafeHtml(choice.Text))]</a>
+                   @onclick="() => OnInlineChoice(choice)">[@label]</a>
             }
             else
             {
-                @SafeHtml($"<choice={parts[i]}>")
+                @SafeHtml(parts[i].Length == 0 ? "<choice>" : $"<choice={parts[i]}>")
             }
         }
     </text>;

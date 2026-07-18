@@ -938,6 +938,7 @@ namespace DeusaldStoryCommon
                     public static readonly Guid pageTag = new Guid("45ba2f19-8e35-4c54-b654-5b8944bacb1f");
                     public static readonly Guid addChoiceOnExit = new Guid("930ad916-950a-44ce-aafa-ba9361b61008");
                     public static readonly Guid hubClickHere = new Guid("7085ee68-11db-43a7-b9e7-d3c56641ee3d");
+                    public static readonly Guid inlineClickHere = new Guid("c4e8b0d1-6a2f-4b3c-9e7d-1f5a8c0b3d62");
                     public static readonly Guid hubLeadsNowhere = new Guid("99a5db72-f639-4c63-9162-a2eb5b8405b0");
                     public static readonly Guid hubToEnd = new Guid("0e8e79ed-354b-4ec1-8c0a-ea63fe374f78");
                     public static readonly Guid noInstructionConnected = new Guid("0998d28e-5e25-4c43-aa39-f639ad0f9eb0");
@@ -1815,6 +1816,7 @@ namespace DeusaldStoryCommon
                 { new Guid("45ba2f19-8e35-4c54-b654-5b8944bacb1f"), "Page {page} / {total}" },
                 { new Guid("930ad916-950a-44ce-aafa-ba9361b61008"), "Add a choice on the Exit node" },
                 { new Guid("7085ee68-11db-43a7-b9e7-d3c56641ee3d"), "Click here" },
+                { new Guid("c4e8b0d1-6a2f-4b3c-9e7d-1f5a8c0b3d62"), "Click here..." },
                 { new Guid("99a5db72-f639-4c63-9162-a2eb5b8405b0"), "This route isn't connected to anything" },
                 { new Guid("0e8e79ed-354b-4ec1-8c0a-ea63fe374f78"), "This route ends the story" },
                 { new Guid("0998d28e-5e25-4c43-aa39-f639ad0f9eb0"), "(no instruction connected)" },

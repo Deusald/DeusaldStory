@@ -113,7 +113,7 @@ namespace DeusaldStoryCommon
         /// <summary>One choice referenced inline from the node's text via a <c>&lt;choice=Name&gt;</c> tag.</summary>
         public sealed class RenderedInlineChoice
         {
-            /// <summary>The name written in the tag — how a text occurrence maps back to this entry (case-insensitive).</summary>
+            /// <summary>The name written in the tag — how a text occurrence maps back to this entry (case-insensitive). Empty for a bare <c>&lt;choice&gt;</c> (the node's automatic continue).</summary>
             public string Name { get; set; } = "";
 
             /// <summary>The <see cref="StoryChoice.Id"/> this resolved to.</summary>
@@ -126,8 +126,13 @@ namespace DeusaldStoryCommon
             public Guid OuterFlowOut { get; set; }
         }
 
-        /// <summary>Matches an inline choice reference <c>&lt;choice=Name&gt;</c> in raw (pre-sanitized) node text; the name runs up to the closing <c>&gt;</c>.</summary>
-        public static readonly Regex InlineChoiceTag = new Regex(@"<choice=([^>]+?)>", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        /// <summary>
+        /// Matches an inline choice reference in raw (pre-sanitized) node text: named <c>&lt;choice=Name&gt;</c> (group 1 is the
+        /// name) or bare <c>&lt;choice&gt;</c> (the node's automatic continue). The empty second alternative <c>()</c> keeps a
+        /// capture participating for the bare form so <see cref="Regex.Split(string)"/> emits exactly one token per match — a
+        /// non-participating group is dropped by Split, which would break the even-text / odd-tag indexing in the App renderer.
+        /// </summary>
+        public static readonly Regex InlineChoiceTag = new Regex(@"<choice(?:=([^>]+?)|())>", RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
         /// <summary>
         /// Resolves <paramref name="logic"/> against <paramref name="values"/> (variable id → value). <paramref name="paper"/>
@@ -166,7 +171,7 @@ namespace DeusaldStoryCommon
 
             // Choices referenced inline from the text via <choice=Name>. When present they replace the standalone
             // choice buttons / continue lines with links embedded in the prose.
-            List<RenderedInlineChoice> inlineChoices = ResolveInlineChoices(project, localization, logic, values, blocks, target, errors);
+            List<RenderedInlineChoice> inlineChoices = ResolveInlineChoices(project, localization, logic, values, blocks, choices, target, errors);
 
             // Hub Paths (App only) — render each visible choice's destination inline as a sub-card. renderSubHubs is
             // passed false into the nested render so a hub pointing at another hub cannot recurse past one level.
@@ -193,10 +198,14 @@ namespace DeusaldStoryCommon
         /// Collects the choices referenced by a <c>&lt;choice=Name&gt;</c> tag anywhere in the node's text blocks,
         /// resolving each name (case-insensitive) to one of <paramref name="logic"/>'s choices. A name that matches no
         /// choice is skipped (its tag is left visible). The label is the choice's own Text input resolved for the medium.
+        /// A bare <c>&lt;choice&gt;</c> (no name) is the node's automatic "continue" link — App only, resolved against the
+        /// already-computed <paramref name="choices"/> via <see cref="TryBareContinueTarget"/>, and defaulting to a
+        /// "Click here…" label (it carries no Text of its own).
         /// </summary>
         private static List<RenderedInlineChoice> ResolveInlineChoices(
             StoryProject project, LocProject? localization, StoryLogicNode logic,
-            IReadOnlyDictionary<Guid, string> values, List<RenderedBlock> blocks, StoryRenderTarget target, List<string> errors)
+            IReadOnlyDictionary<Guid, string> values, List<RenderedBlock> blocks, List<RenderedChoice> choices,
+            StoryRenderTarget target, List<string> errors)
         {
             List<RenderedInlineChoice> result = new();
             HashSet<string>            seen   = new(StringComparer.OrdinalIgnoreCase);
@@ -205,6 +214,16 @@ namespace DeusaldStoryCommon
                 {
                     string name = m.Groups[1].Value.Trim();
                     if (!seen.Add(name)) continue;
+
+                    if (name.Length == 0)
+                    {
+                        // Bare <choice>: the automatic continue. App only, and only when the node's exit is unambiguous;
+                        // otherwise leave the tag literal (a non-App medium or a many-choice node with no auto-resolution).
+                        if (target != StoryRenderTarget.App) continue;
+                        if (!TryBareContinueTarget(logic, choices, out Guid bareOut, out Guid bareChoiceId)) continue;
+                        result.Add(new RenderedInlineChoice { Name = "", ChoiceId = bareChoiceId, Text = "", OuterFlowOut = bareOut });
+                        continue;
+                    }
                     if (logic.Choices.Find(c => string.Equals(c.Name, name, StringComparison.OrdinalIgnoreCase)) is not StoryChoice choice) continue;
                     result.Add(new RenderedInlineChoice
                     {
@@ -215,6 +234,40 @@ namespace DeusaldStoryCommon
                     });
                 }
             return result;
+        }
+
+        /// <summary>
+        /// The exit a bare inline <c>&lt;choice&gt;</c> continues from (and the choice id that carries its variable
+        /// values, when known): the App auto-resolved pick, the single shared Single-path exit, or a lone authored
+        /// choice. Ambiguous — many choices with no auto-resolution — yields no target, so the tag stays literal.
+        /// </summary>
+        private static bool TryBareContinueTarget(StoryLogicNode logic, List<RenderedChoice> choices, out Guid outerFlowOut, out Guid choiceId)
+        {
+            outerFlowOut = Guid.Empty;
+            choiceId     = Guid.Empty;
+
+            // App auto-resolution already collapsed the exits to a single pick — follow exactly that (it knows the id).
+            (bool varsWired, StoryExitAutoMode mode) = ExitResolution(logic, StoryRenderTarget.App);
+            if (varsWired && mode == StoryExitAutoMode.AutomaticChoice && choices.Count == 1)
+            {
+                outerFlowOut = choices[0].OuterFlowOut;
+                choiceId     = choices[0].ChoiceId;
+                return true;
+            }
+            // Single-path — one shared exit whichever choice rides it (values can't be pinned without a named choice).
+            if (logic.ExitMode == StoryLogicExitMode.SinglePath)
+            {
+                outerFlowOut = logic.VFlowOut.Id;
+                return true;
+            }
+            // Many-paths with a single authored choice — unambiguous.
+            if (logic.ExitMode == StoryLogicExitMode.ManyPaths && logic.Choices.Count == 1)
+            {
+                outerFlowOut = OuterFlowOut(logic, logic.Choices[0]);
+                choiceId     = logic.Choices[0].Id;
+                return true;
+            }
+            return false;
         }
 
         /// <summary>
@@ -450,8 +503,7 @@ namespace DeusaldStoryCommon
 
             // Auto-resolution is App-only and needs a variable wired into the Exit node. Hub Paths always uses
             // Choice Visibility; otherwise the node's own ExitAutoMode decides.
-            bool varsWired = target == StoryRenderTarget.App && FromPointInto(logic, logic.ExitVariablesIn.Id) != Guid.Empty;
-            StoryExitAutoMode mode = logic.ExitMode == StoryLogicExitMode.HubPaths ? StoryExitAutoMode.ChoiceVisibility : logic.ExitAutoMode;
+            (bool varsWired, StoryExitAutoMode mode) = ExitResolution(logic, target);
 
             if (varsWired && mode == StoryExitAutoMode.AutomaticChoice)
             {
@@ -493,6 +545,14 @@ namespace DeusaldStoryCommon
                     OuterFlowOut = OuterFlowOut(logic, choice)
                 });
             return result;
+        }
+
+        /// <summary>Whether Exit auto-resolution is active (App target with a variable wired into the Exit node) and the effective mode — Hub Paths always resolves as Choice Visibility, otherwise the node's own <see cref="StoryLogicNode.ExitAutoMode"/>.</summary>
+        private static (bool varsWired, StoryExitAutoMode mode) ExitResolution(StoryLogicNode logic, StoryRenderTarget target)
+        {
+            bool              varsWired = target == StoryRenderTarget.App && FromPointInto(logic, logic.ExitVariablesIn.Id) != Guid.Empty;
+            StoryExitAutoMode mode      = logic.ExitMode == StoryLogicExitMode.HubPaths ? StoryExitAutoMode.ChoiceVisibility : logic.ExitAutoMode;
+            return (varsWired, mode);
         }
 
         /// <summary>The outer connection point a choice continues from — its own Flow output (ManyPaths) or the node's shared VFlow output (SinglePath).</summary>
