@@ -95,6 +95,9 @@ namespace DeusaldStoryCommon
             public RenderedChoice                    Link    { get; set; } = new();
             public RenderedLogic?                    Content { get; set; }
             public StoryFlowNavigator.NextKind       Status  { get; set; } = StoryFlowNavigator.NextKind.Dangling;
+
+            /// <summary>The destination logic node's id (Empty for End/dangling/unwired). Used to spot a hub pointing at itself.</summary>
+            public Guid TargetLogicId { get; set; }
         }
 
         /// <summary>
@@ -170,8 +173,9 @@ namespace DeusaldStoryCommon
                 StoryFlowNavigator.NextLogicResult next = StoryFlowNavigator.ResolveNextLogic(project, choice.OuterFlowOut);
                 result.Add(new RenderedSubHub
                 {
-                    Link    = choice,
-                    Status  = next.Kind,
+                    Link          = choice,
+                    Status        = next.Kind,
+                    TargetLogicId = next.Logic?.Id ?? Guid.Empty,
                     Content = next.Kind == StoryFlowNavigator.NextKind.Logic && next.Logic is not null
                         ? Render(project, localization, next.Logic, _EmptyValues, paper, StoryRenderTarget.App, renderSubHubs: false)
                         : null

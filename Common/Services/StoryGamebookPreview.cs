@@ -179,14 +179,14 @@ namespace DeusaldStoryCommon
         }
 
         /// <summary>
-        /// Hub Paths continue lines: a single "Gather Hub Cards: …" line listing one placeholder Hub Card token per
-        /// destination, plus an error line for any unwired / dangling choice. An End destination lists as THE END.
-        /// Real per-card numbering awaits the not-yet-built global section numbering / PDF export.
+        /// Hub Paths continue lines: one "Gather Hub Card …" line per destination — each on its own line and prefixed
+        /// with the choice's text (it may carry the instruction that decides whether the card is gathered) — plus an
+        /// error line for any unwired / dangling choice. An End destination lists as THE END. Real per-card numbering
+        /// awaits the not-yet-built global section numbering / PDF export.
         /// </summary>
         private static List<ContinueLine> BuildHubCardLines(StoryProject project, LocProject? localization, List<StoryLogicRenderer.RenderedChoice> choices)
         {
-            List<ContinueLine> lines  = new();
-            List<string>       tokens = new();
+            List<ContinueLine> lines = new();
             foreach (StoryLogicRenderer.RenderedChoice rc in choices)
             {
                 bool hasText = !string.IsNullOrWhiteSpace(rc.Text);
@@ -199,11 +199,21 @@ namespace DeusaldStoryCommon
                 switch (next.Kind)
                 {
                     case StoryFlowNavigator.NextKind.Logic when next.Logic is not null:
-                        tokens.Add(HubCardToken(next.Logic));
+                        string card = HubCardToken(next.Logic);
+                        lines.Add(new ContinueLine
+                        {
+                            Text = hasText
+                                ? StoryCommonLocalizationKeys.Resolve(localization, StoryCommonLocalizationKeys.GamebookGatherHubCardChoice,
+                                    new Dictionary<string, object> { ["choice"] = rc.Text, ["card"] = card })
+                                : StoryCommonLocalizationKeys.Resolve(localization, StoryCommonLocalizationKeys.GamebookGatherHubCard,
+                                    new Dictionary<string, object> { ["card"] = card }),
+                            TargetLogicId = next.Logic.Id
+                        });
                         break;
 
                     case StoryFlowNavigator.NextKind.End:
-                        tokens.Add(StoryCommonLocalizationKeys.Resolve(localization, StoryCommonLocalizationKeys.GamebookTheEnd));
+                        string theEnd = StoryCommonLocalizationKeys.Resolve(localization, StoryCommonLocalizationKeys.GamebookTheEnd);
+                        lines.Add(new ContinueLine { Text = hasText ? UiLang.T(Localization.Services.Gamebook.choiceToEnd, new Dictionary<string, object> { ["label"] = rc.Text, ["theEnd"] = theEnd }) : theEnd });
                         break;
 
                     case StoryFlowNavigator.NextKind.Dangling:
@@ -211,12 +221,6 @@ namespace DeusaldStoryCommon
                         break;
                 }
             }
-            if (tokens.Count > 0)
-                lines.Insert(0, new ContinueLine
-                {
-                    Text = StoryCommonLocalizationKeys.Resolve(localization, StoryCommonLocalizationKeys.GamebookGatherHubCards,
-                        new Dictionary<string, object> { ["cards"] = string.Join(", ", tokens) })
-                });
             return lines;
         }
 

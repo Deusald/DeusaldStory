@@ -68,7 +68,6 @@
             int  pageIndex = Math.Clamp(_Page, 0, pageCount - 1);
             bool lastPage  = pageIndex >= pageCount - 1;
             StoryLogicRenderer.RenderedPage page = pageIndex < _Rendered.Pages.Count ? _Rendered.Pages[pageIndex] : new();
-            bool nodeHasBlocks = _Rendered.Pages.Any(p => p.Blocks.Count > 0);
         }
 
         @if (pageCount > 1)
@@ -82,29 +81,22 @@
             @InputField(field)
         }
 
-        @if (!nodeHasBlocks)
+        @foreach (StoryLogicRenderer.RenderedBlock block in page.Blocks)
         {
-            <div class="lpv-block lpv-placeholder">@Loc.T(Localization.Editor.Preview.Logic.noTextBlocks)</div>
-        }
-        else
-        {
-            @foreach (StoryLogicRenderer.RenderedBlock block in page.Blocks)
+            @if (string.IsNullOrEmpty(block.Text))
             {
-                @if (string.IsNullOrEmpty(block.Text))
-                {
-                    <div class="lpv-block lpv-placeholder">@Loc.T(Localization.Editor.Preview.Logic.emptyText)</div>
-                }
-                else
-                {
-                    StoryTextFrameStyle style = block.FrameStyle;
-                    <div class="lpv-block @FrameClass(style)">
-                        @if (StoryStyle.FrameIcon(style) is { Length: > 0 } frameIcon)
-                        {
-                            <i class="lpv-block-icon bi @frameIcon" title="@StoryStyle.FrameLabel(style)"></i>
-                        }
-                        <span class="lpv-block-text">@SafeHtml(block.Text)</span>
-                    </div>
-                }
+                <div class="lpv-block lpv-placeholder">@Loc.T(Localization.Editor.Preview.Logic.emptyText)</div>
+            }
+            else
+            {
+                StoryTextFrameStyle style = block.FrameStyle;
+                <div class="lpv-block @FrameClass(style)">
+                    @if (StoryStyle.FrameIcon(style) is { Length: > 0 } frameIcon)
+                    {
+                        <i class="lpv-block-icon bi @frameIcon" title="@StoryStyle.FrameLabel(style)"></i>
+                    }
+                    <span class="lpv-block-text">@SafeHtml(block.Text)</span>
+                </div>
             }
         }
 
@@ -252,14 +244,19 @@
             <div class="lpv-subhub-note lpv-placeholder">@Loc.T(Localization.Editor.Preview.Logic.hubLeadsNowhere)</div>
         }
 
-        <div class="lpv-subhub-foot">
-            <button class="lpv-subhub-btn"
-                    disabled="@(sub.Link.OuterFlowOut == Guid.Empty || sub.Status == StoryFlowNavigator.NextKind.Dangling)"
-                    @onclick="() => OnContinue.InvokeAsync(sub.Link)">
-                <span>@(string.IsNullOrEmpty(sub.Link.Text) ? Loc.T(Localization.Editor.Preview.Logic.hubClickHere) : SafeHtml(sub.Link.Text))</span>
-                <i class="bi bi-arrow-right"></i>
-            </button>
-        </div>
+        @* The whole destination node is already shown inline, so a button that just jumps back to this same hub is
+           pointless — hide it when the route leads to the hub itself. *@
+        @if (sub.TargetLogicId != Logic.Id)
+        {
+            <div class="lpv-subhub-foot">
+                <button class="lpv-subhub-btn"
+                        disabled="@(sub.Link.OuterFlowOut == Guid.Empty || sub.Status == StoryFlowNavigator.NextKind.Dangling)"
+                        @onclick="() => OnContinue.InvokeAsync(sub.Link)">
+                    <span>@(string.IsNullOrEmpty(sub.Link.Text) ? Loc.T(Localization.Editor.Preview.Logic.hubClickHere) : SafeHtml(sub.Link.Text))</span>
+                    <i class="bi bi-arrow-right"></i>
+                </button>
+            </div>
+        }
     </div>;
 
     /// <summary>External Variable values driving SmartFormat blocks (variable id → value); owned by the parent.</summary>

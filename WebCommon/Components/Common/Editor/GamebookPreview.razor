@@ -104,10 +104,6 @@
                     }
                 </div>
             }
-            else if (sec.Rendered.Blocks.Count == 0)
-            {
-                <div class="gbp-block gbp-placeholder">@Loc.T(Localization.Editor.Preview.Gamebook.noTextBlocks)</div>
-            }
             else
             {
                 @foreach (StoryLogicRenderer.RenderedBlock block in sec.Rendered.Blocks)
