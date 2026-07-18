@@ -591,6 +591,12 @@ namespace DeusaldStoryCommon
                 if (extraValues is not null)
                     foreach (KeyValuePair<string, object> kv in extraValues) vals[kv.Key] = kv.Value;
 
+                // The read-only built-ins are always available to every SmartFormat node without wiring an External
+                // Variable node — their values follow the render (medium/theme), never dimension sections, and a wired
+                // built-in below just overwrites with the same value.
+                foreach (StoryVariable builtIn in StoryBuiltInVariables.All)
+                    vals[builtIn.Name] = StoryBuiltInVariables.ValueFor(builtIn.Id, target, values);
+
                 bool hasOmittedVariable = false; // a plain Variable dropped in the Gamebook (probable SmartFormat-error cause)
                 foreach (StoryConnection c in logic.ContentConnections.Where(c => c.ToPoint == sf.VariablesIn.Id))
                 {
