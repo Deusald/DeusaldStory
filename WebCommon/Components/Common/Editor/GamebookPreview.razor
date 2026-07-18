@@ -136,14 +136,14 @@
                     {
                         <button type="button" class="gbp-continue-line gbp-continue-link" @onclick="() => Navigate(line)">
                             <i class="bi bi-arrow-return-right"></i>
-                            <span>@line.Text</span>
+                            <span>@SafeHtml(line.Text)</span>
                         </button>
                     }
                     else
                     {
                         <div class="gbp-continue-line @(line.IsError ? "error" : "")">
                             <i class="bi @(line.IsError ? "bi-exclamation-triangle-fill" : "bi-arrow-return-right")"></i>
-                            <span>@line.Text</span>
+                            <span>@SafeHtml(line.Text)</span>
                         </div>
                     }
                 }
