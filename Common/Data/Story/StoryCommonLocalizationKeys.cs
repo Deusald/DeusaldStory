@@ -32,6 +32,7 @@ namespace DeusaldStoryCommon
         public static readonly Guid GamebookChoiceToSection          = Localization.Story.GamebookChoiceToSection;
         public static readonly Guid GamebookGatherHubCard            = Localization.Story.GamebookGatherHubCard;
         public static readonly Guid GamebookGatherHubCardChoice      = Localization.Story.GamebookGatherHubCardChoice;
+        public static readonly Guid GamebookGoToSection              = Localization.Story.GamebookGoToSection;
         public static readonly Guid StorageClearSlot                 = Localization.Story.StorageClearSlot;
         public static readonly Guid StorageNumberDiceFull            = Localization.Story.StorageNumberDiceFull;
         public static readonly Guid StorageNumberDiceReroll          = Localization.Story.StorageNumberDiceReroll;

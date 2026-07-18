@@ -57,10 +57,13 @@ namespace DeusaldStoryCommon
                                     .Select(values => BuildSection(project, localization, logic, incoming, values))
                                     .ToList();
 
+            // When the text references choices inline (<choice=Name>), those links replace the standalone continue lines.
+            bool hasInline = sections.Exists(s => s.Rendered.InlineChoices.Count > 0);
+
             return new Result
             {
                 Sections          = sections,
-                Continue          = BuildContinueLines(project, localization, logic),
+                Continue          = hasInline ? new List<ContinueLine>() : BuildContinueLines(project, localization, logic),
                 TotalCombinations = total,
                 Truncated         = total > valueMaps.Count
             };
@@ -73,6 +76,7 @@ namespace DeusaldStoryCommon
             List<StoryDeclaredVariable> incoming, Dictionary<Guid, string> values)
         {
             StoryLogicRenderer.RenderedLogic rendered = StoryLogicRenderer.Render(project, localization, logic, values, paper: true, StoryRenderTarget.Gamebook);
+            ReplaceInlineChoiceTags(project, localization, rendered);
             string                           label    = ComboLabel(incoming, values);
             string                           key      = SectionToken(logic, incoming, values);
 
@@ -229,6 +233,43 @@ namespace DeusaldStoryCommon
         {
             string name = string.IsNullOrWhiteSpace(node.Name) ? UiLang.T(Localization.Common.Placeholders.unnamed) : node.Name;
             return UiLang.T(Localization.Services.Gamebook.hubCardToken, new Dictionary<string, object> { ["name"] = name });
+        }
+
+        /// <summary>
+        /// Rewrites each <c>&lt;choice=Name&gt;</c> tag in the rendered block text into an inline "go to section …" phrase
+        /// (prefixed with the choice's own text when it has any, mirroring the standalone continue line). An unresolved
+        /// name is left as-is so the author sees it. Mutates the rendered blocks in place (Gamebook only).
+        /// </summary>
+        private static void ReplaceInlineChoiceTags(StoryProject project, LocProject? localization, StoryLogicRenderer.RenderedLogic rendered)
+        {
+            if (rendered.InlineChoices.Count == 0) return;
+
+            foreach (StoryLogicRenderer.RenderedBlock block in rendered.Blocks)
+                block.Text = StoryLogicRenderer.InlineChoiceTag.Replace(block.Text, m =>
+                {
+                    string name = m.Groups[1].Value.Trim();
+                    StoryLogicRenderer.RenderedInlineChoice? ic = rendered.InlineChoices.Find(c => string.Equals(c.Name, name, StringComparison.OrdinalIgnoreCase));
+                    if (ic is null) return m.Value; // unresolved — keep the tag visible
+
+                    bool hasText = !string.IsNullOrWhiteSpace(ic.Text);
+                    if (ic.OuterFlowOut == Guid.Empty) return ic.Text; // unwired — nothing to point at
+
+                    StoryFlowNavigator.NextLogicResult next = StoryFlowNavigator.ResolveNextLogic(project, ic.OuterFlowOut);
+                    return next.Kind switch
+                    {
+                        StoryFlowNavigator.NextKind.Logic when next.Logic is not null => hasText
+                            ? StoryCommonLocalizationKeys.Resolve(localization, StoryCommonLocalizationKeys.GamebookChoiceToSection,
+                                new Dictionary<string, object> { ["choice"] = ic.Text, ["section"] = SectionToken(next.Logic, new List<StoryDeclaredVariable>(), new Dictionary<Guid, string>()) })
+                            : StoryCommonLocalizationKeys.Resolve(localization, StoryCommonLocalizationKeys.GamebookGoToSection,
+                                new Dictionary<string, object> { ["section"] = SectionToken(next.Logic, new List<StoryDeclaredVariable>(), new Dictionary<Guid, string>()) }),
+
+                        StoryFlowNavigator.NextKind.End => hasText
+                            ? UiLang.T(Localization.Services.Gamebook.choiceToEnd, new Dictionary<string, object> { ["label"] = ic.Text, ["theEnd"] = StoryCommonLocalizationKeys.Resolve(localization, StoryCommonLocalizationKeys.GamebookTheEnd) })
+                            : StoryCommonLocalizationKeys.Resolve(localization, StoryCommonLocalizationKeys.GamebookTheEnd),
+
+                        _ => ic.Text
+                    };
+                });
         }
 
         /// <summary>

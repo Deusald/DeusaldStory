@@ -396,3 +396,20 @@
 }
 .lpv-subhub-btn:hover:not(:disabled) { background: color-mix(in srgb, var(--accent) 14%, transparent); }
 .lpv-subhub-btn:disabled { opacity: .5; cursor: default; }
+
+/* ── Inline <choice> links ─────────────────────────────────────────────────── */
+
+.lpv-choice-link {
+    color: var(--accent);
+    font-weight: 600;
+    cursor: pointer;
+    text-decoration: none;
+    border-bottom: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
+}
+.lpv-choice-link:hover { filter: brightness(1.12); border-bottom-color: var(--accent); }
+.lpv-choice-link.disabled {
+    color: var(--text-faint);
+    border-bottom-color: transparent;
+    cursor: default;
+    pointer-events: none;
+}

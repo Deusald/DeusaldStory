@@ -95,7 +95,7 @@
                     {
                         <i class="lpv-block-icon bi @frameIcon" title="@StoryStyle.FrameLabel(style)"></i>
                     }
-                    <span class="lpv-block-text">@SafeHtml(block.Text)</span>
+                    <span class="lpv-block-text">@BlockBody(block.Text, _Rendered)</span>
                 </div>
             }
         }
@@ -135,6 +135,10 @@
                     }
                 </div>
             }
+        }
+        else if (_Rendered.InlineChoices.Count > 0)
+        {
+            @* The text carries the choices inline (<choice=Name> links) — no standalone buttons. *@
         }
         else if (_Rendered.Choices.Count > 0)
         {
@@ -230,7 +234,7 @@
                         {
                             <i class="lpv-block-icon bi @frameIcon" title="@StoryStyle.FrameLabel(block.FrameStyle)"></i>
                         }
-                        <span class="lpv-block-text">@SafeHtml(block.Text)</span>
+                        <span class="lpv-block-text">@BlockBody(block.Text, sub.Content)</span>
                     </div>
                 }
             }
@@ -244,9 +248,10 @@
             <div class="lpv-subhub-note lpv-placeholder">@Loc.T(Localization.Editor.Preview.Logic.hubLeadsNowhere)</div>
         }
 
-        @* The whole destination node is already shown inline, so a button that just jumps back to this same hub is
-           pointless — hide it when the route leads to the hub itself. *@
-        @if (sub.TargetLogicId != Logic.Id)
+        @* The whole destination node is already shown inline, so a button that just loops back to this hub (directly or
+           through the destination's own exit) is pointless — as is a button when the destination carries its own inline
+           <choice> links. Hide it in both cases. *@
+        @if (!sub.LoopsToHub && (sub.Content?.InlineChoices.Count ?? 0) == 0)
         {
             <div class="lpv-subhub-foot">
                 <button class="lpv-subhub-btn"
@@ -258,6 +263,39 @@
             </div>
         }
     </div>;
+
+    /// <summary>
+    /// Renders a text block, turning each <c>&lt;choice=Name&gt;</c> tag into an inline clickable link (resolved against
+    /// <paramref name="owner"/>'s inline choices) and every other segment into safe HTML. An unresolved name is left
+    /// visible as its raw tag.
+    /// </summary>
+    private RenderFragment BlockBody(string text, StoryLogicRenderer.RenderedLogic owner) =>@<text>
+        @{ string[] parts = StoryLogicRenderer.InlineChoiceTag.Split(text); }
+        @for (int i = 0; i < parts.Length; i++)
+        {
+            @if (i % 2 == 0)
+            {
+                @SafeHtml(parts[i])
+            }
+            else if (owner.InlineChoices.FirstOrDefault(c => string.Equals(c.Name, parts[i].Trim(), StringComparison.OrdinalIgnoreCase)) is { } ic)
+            {
+                StoryLogicRenderer.RenderedInlineChoice choice = ic;
+                <a class="lpv-choice-link @(choice.OuterFlowOut == Guid.Empty ? "disabled" : "")"
+                   @onclick="() => OnInlineChoice(choice)">[@(string.IsNullOrEmpty(choice.Text) ? (MarkupString)Loc.T(Localization.Editor.Preview.Logic.hubClickHere) : SafeHtml(choice.Text))]</a>
+            }
+            else
+            {
+                @SafeHtml($"<choice={parts[i]}>")
+            }
+        }
+    </text>;
+
+    /// <summary>Follows an inline <c>&lt;choice&gt;</c> link — navigates like a standalone choice button.</summary>
+    private void OnInlineChoice(StoryLogicRenderer.RenderedInlineChoice ic)
+    {
+        if (ic.OuterFlowOut == Guid.Empty) return;
+        OnContinue.InvokeAsync(new StoryLogicRenderer.RenderedChoice { ChoiceId = ic.ChoiceId, Text = ic.Text, OuterFlowOut = ic.OuterFlowOut });
+    }
 
     /// <summary>External Variable values driving SmartFormat blocks (variable id → value); owned by the parent.</summary>
     [Parameter] public Dictionary<Guid, string> Values { get; set; } = new();

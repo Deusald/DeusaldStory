@@ -1248,6 +1248,8 @@ namespace DeusaldStoryCommon
             public static readonly Guid GamebookGatherHubCard = new Guid("a1b2c3d4-0006-4000-8000-000000000006");
             /// <summary>Gamebook hub gather line with instruction. Tokens: {choice},{card}.</summary>
             public static readonly Guid GamebookGatherHubCardChoice = new Guid("a1b2c3d4-0007-4000-8000-000000000007");
+            /// <summary>Gamebook inline "go to section" phrase (no "To continue" prefix). Token: {section}.</summary>
+            public static readonly Guid GamebookGoToSection = new Guid("a1b2c3d4-0008-4000-8000-000000000008");
             public static readonly Guid StorageClearSlot = new Guid("a1b2c3d4-0010-4000-8000-000000000010");
             public static readonly Guid StorageNumberDiceFull = new Guid("a1b2c3d4-0011-4000-8000-000000000011");
             public static readonly Guid StorageNumberDiceReroll = new Guid("a1b2c3d4-0012-4000-8000-000000000012");
@@ -1983,6 +1985,7 @@ namespace DeusaldStoryCommon
                 { new Guid("a1b2c3d4-0005-4000-8000-000000000005"), "{choice} go to section {section}" },
                 { new Guid("a1b2c3d4-0006-4000-8000-000000000006"), "Gather Hub Card {card}" },
                 { new Guid("a1b2c3d4-0007-4000-8000-000000000007"), "{choice} — gather Hub Card {card}" },
+                { new Guid("a1b2c3d4-0008-4000-8000-000000000008"), "go to section {section}" },
                 { new Guid("a1b2c3d4-0010-4000-8000-000000000010"), "Clear slot {slot} and return its component." },
                 { new Guid("a1b2c3d4-0011-4000-8000-000000000011"), "Roll a D6 and place it on slot {slot}." },
                 { new Guid("a1b2c3d4-0012-4000-8000-000000000012"), "Roll a D6, rerolling until it shows 1–{max}, and place it on slot {slot}." },

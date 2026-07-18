@@ -36,6 +36,13 @@ namespace DeusaldStoryCommon
             public List<RenderedChoice> Choices { get; set; } = new();
 
             /// <summary>
+            /// The choices referenced inline from the node's text with a <c>&lt;choice=Name&gt;</c> tag, resolved by name.
+            /// When non-empty the standalone choice buttons / continue lines are suppressed — the inline links carry the
+            /// navigation instead. The label <see cref="RenderedInlineChoice.Text"/> is medium-appropriate.
+            /// </summary>
+            public List<RenderedInlineChoice> InlineChoices { get; set; } = new();
+
+            /// <summary>
             /// App-only, Hub Paths mode — one entry per visible choice, carrying the inline-rendered destination node so
             /// the preview draws it as a sub-card. Empty in every other mode / medium.
             /// </summary>
@@ -98,7 +105,29 @@ namespace DeusaldStoryCommon
 
             /// <summary>The destination logic node's id (Empty for End/dangling/unwired). Used to spot a hub pointing at itself.</summary>
             public Guid TargetLogicId { get; set; }
+
+            /// <summary>The route just loops back to the hub (directly or through the destination's own exit), so the "click here" button is hidden.</summary>
+            public bool LoopsToHub { get; set; }
         }
+
+        /// <summary>One choice referenced inline from the node's text via a <c>&lt;choice=Name&gt;</c> tag.</summary>
+        public sealed class RenderedInlineChoice
+        {
+            /// <summary>The name written in the tag — how a text occurrence maps back to this entry (case-insensitive).</summary>
+            public string Name { get; set; } = "";
+
+            /// <summary>The <see cref="StoryChoice.Id"/> this resolved to.</summary>
+            public Guid ChoiceId { get; set; }
+
+            /// <summary>The choice's own label (its Text input), resolved for the medium; empty ⇒ the default "Click here…".</summary>
+            public string Text { get; set; } = "";
+
+            /// <summary>The outer connection point the story continues from — as <see cref="RenderedChoice.OuterFlowOut"/>. Empty when unwired.</summary>
+            public Guid OuterFlowOut { get; set; }
+        }
+
+        /// <summary>Matches an inline choice reference <c>&lt;choice=Name&gt;</c> in raw (pre-sanitized) node text; the name runs up to the closing <c>&gt;</c>.</summary>
+        public static readonly Regex InlineChoiceTag = new Regex(@"<choice=([^>]+?)>", RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
         /// <summary>
         /// Resolves <paramref name="logic"/> against <paramref name="values"/> (variable id → value). <paramref name="paper"/>
@@ -135,10 +164,14 @@ namespace DeusaldStoryCommon
                 pages  = new();
             }
 
+            // Choices referenced inline from the text via <choice=Name>. When present they replace the standalone
+            // choice buttons / continue lines with links embedded in the prose.
+            List<RenderedInlineChoice> inlineChoices = ResolveInlineChoices(project, localization, logic, values, blocks, target, errors);
+
             // Hub Paths (App only) — render each visible choice's destination inline as a sub-card. renderSubHubs is
             // passed false into the nested render so a hub pointing at another hub cannot recurse past one level.
             List<RenderedSubHub> subHubs = target == StoryRenderTarget.App && logic.ExitMode == StoryLogicExitMode.HubPaths && renderSubHubs
-                ? BuildSubHubs(project, localization, choices, paper)
+                ? BuildSubHubs(project, localization, logic, choices, paper)
                 : new();
 
             return new RenderedLogic
@@ -146,13 +179,42 @@ namespace DeusaldStoryCommon
                 Title        = ResolveText(project, localization, logic, values, FromPointInto(logic, logic.TitleIn.Id),    target, 0, errors),
                 Subtitle     = ResolveText(project, localization, logic, values, FromPointInto(logic, logic.SubtitleIn.Id), target, 0, errors),
                 IconData     = ResolveIconImage(project, logic, FromPointInto(logic, logic.IconIn.Id), paper, 0),
-                Blocks       = blocks,
-                Pages        = pages,
-                Choices      = choices,
-                SubHubs      = subHubs,
-                Instructions = StoryStorageInstructions.For(project, localization, logic, target, values),
-                Errors       = errors
+                Blocks        = blocks,
+                Pages         = pages,
+                Choices       = choices,
+                InlineChoices = inlineChoices,
+                SubHubs       = subHubs,
+                Instructions  = StoryStorageInstructions.For(project, localization, logic, target, values),
+                Errors        = errors
             };
+        }
+
+        /// <summary>
+        /// Collects the choices referenced by a <c>&lt;choice=Name&gt;</c> tag anywhere in the node's text blocks,
+        /// resolving each name (case-insensitive) to one of <paramref name="logic"/>'s choices. A name that matches no
+        /// choice is skipped (its tag is left visible). The label is the choice's own Text input resolved for the medium.
+        /// </summary>
+        private static List<RenderedInlineChoice> ResolveInlineChoices(
+            StoryProject project, LocProject? localization, StoryLogicNode logic,
+            IReadOnlyDictionary<Guid, string> values, List<RenderedBlock> blocks, StoryRenderTarget target, List<string> errors)
+        {
+            List<RenderedInlineChoice> result = new();
+            HashSet<string>            seen   = new(StringComparer.OrdinalIgnoreCase);
+            foreach (RenderedBlock block in blocks)
+                foreach (Match m in InlineChoiceTag.Matches(block.Text))
+                {
+                    string name = m.Groups[1].Value.Trim();
+                    if (!seen.Add(name)) continue;
+                    if (logic.Choices.Find(c => string.Equals(c.Name, name, StringComparison.OrdinalIgnoreCase)) is not StoryChoice choice) continue;
+                    result.Add(new RenderedInlineChoice
+                    {
+                        Name         = name,
+                        ChoiceId     = choice.Id,
+                        Text         = ResolveText(project, localization, logic, values, FromPointInto(logic, choice.TextIn.Id), target, 0, errors),
+                        OuterFlowOut = OuterFlowOut(logic, choice)
+                    });
+                }
+            return result;
         }
 
         /// <summary>
@@ -160,7 +222,7 @@ namespace DeusaldStoryCommon
         /// another logic node, renders that node's content inline (with its own sub-hubs suppressed, bounding recursion).
         /// A fresh navigation seeds no live variables, so sub-card content is resolved against an empty value set.
         /// </summary>
-        private static List<RenderedSubHub> BuildSubHubs(StoryProject project, LocProject? localization, List<RenderedChoice> choices, bool paper)
+        private static List<RenderedSubHub> BuildSubHubs(StoryProject project, LocProject? localization, StoryLogicNode hub, List<RenderedChoice> choices, bool paper)
         {
             List<RenderedSubHub> result = new();
             foreach (RenderedChoice choice in choices)
@@ -176,12 +238,34 @@ namespace DeusaldStoryCommon
                     Link          = choice,
                     Status        = next.Kind,
                     TargetLogicId = next.Logic?.Id ?? Guid.Empty,
+                    LoopsToHub    = next.Kind == StoryFlowNavigator.NextKind.Logic && next.Logic is not null && DestinationLoopsBack(project, hub, next.Logic),
                     Content = next.Kind == StoryFlowNavigator.NextKind.Logic && next.Logic is not null
                         ? Render(project, localization, next.Logic, _EmptyValues, paper, StoryRenderTarget.App, renderSubHubs: false)
                         : null
                 });
             }
             return result;
+        }
+
+        /// <summary>
+        /// Whether a sub-card's destination just loops back to the hub — either it <b>is</b> the hub, or following any of
+        /// its own exits reaches the hub. The whole destination node is already shown inline, so such a route offers the
+        /// player nothing new and its "click here" button is hidden. (The loop is usually two hops through a container:
+        /// <c>Hub → destination → Hub</c>.)
+        /// </summary>
+        private static bool DestinationLoopsBack(StoryProject project, StoryLogicNode hub, StoryLogicNode dest)
+        {
+            if (dest.Id == hub.Id) return true;
+
+            IEnumerable<Guid> exits = dest.ExitMode == StoryLogicExitMode.SinglePath
+                ? new[] { dest.VFlowOut.Id }
+                : dest.Choices.Select(c => c.OuterFlowOut.Id);
+            foreach (Guid exit in exits)
+            {
+                StoryFlowNavigator.NextLogicResult next = StoryFlowNavigator.ResolveNextLogic(project, exit);
+                if (next.Kind == StoryFlowNavigator.NextKind.Logic && next.Logic?.Id == hub.Id) return true;
+            }
+            return false;
         }
 
         /// <summary>The choices the node's Exit node offers for <paramref name="target"/>.</summary>
