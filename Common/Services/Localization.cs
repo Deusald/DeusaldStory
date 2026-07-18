@@ -618,6 +618,8 @@ namespace DeusaldStoryCommon
                     public static readonly Guid manyPathsDesc = new Guid("2ff8d987-7be0-48ae-999b-08a04188a233");
                     public static readonly Guid singlePathTitle = new Guid("babf8bbe-e7db-4124-b373-9d5283b5841c");
                     public static readonly Guid singlePathDesc = new Guid("5ececfe9-cc26-4ccc-b991-aaf66b21b405");
+                    public static readonly Guid hubPathsTitle = new Guid("fc453dc7-48a9-4694-9937-7a60e52f1b7a");
+                    public static readonly Guid hubPathsDesc = new Guid("1cccbe79-9c12-4c6a-8652-fcd9ad9f208d");
                     public static readonly Guid declaredVariablesLabel = new Guid("0550e663-55bd-43d0-8aee-94033be7a396");
                     public static readonly Guid declaredVariablesHint = new Guid("548479de-0aa4-4106-8bf6-d64b45e92560");
                     public static readonly Guid variableNamePlaceholder = new Guid("514eee1c-851b-4b72-a9db-e3ec0184679d");
@@ -665,6 +667,13 @@ namespace DeusaldStoryCommon
                     public static readonly Guid addChoice = new Guid("94daa38a-e627-419c-8057-9fe6db2181df");
                     /// <summary>Default name seeded for a new choice.</summary>
                     public static readonly Guid defaultChoiceName = new Guid("a62ec9c6-66f6-432c-a540-3523dd6acf37");
+                    public static readonly Guid autoModeLabel = new Guid("01974fe4-e226-4811-8b7b-fc39e721bd9a");
+                    public static readonly Guid automaticChoiceTitle = new Guid("7bd6615b-20b2-4b62-9b1d-98fbb1cd5cad");
+                    public static readonly Guid automaticChoiceDesc = new Guid("73eced40-104b-499a-aafa-ee5ffd683dbc");
+                    public static readonly Guid choiceVisibilityTitle = new Guid("da2fe52c-8bd0-4352-8ee7-f4f47b918698");
+                    public static readonly Guid choiceVisibilityDesc = new Guid("f6a75e5f-d991-4c62-9713-ce5b05f81d06");
+                    /// <summary>MarkupString.</summary>
+                    public static readonly Guid visibilityConditionsNote = new Guid("7524b979-0e27-491c-95ba-1928dac8093f");
                 }
 
                 public static class FunctionSignature
@@ -928,6 +937,9 @@ namespace DeusaldStoryCommon
                     /// <summary>Tokens: {page},{total}.</summary>
                     public static readonly Guid pageTag = new Guid("45ba2f19-8e35-4c54-b654-5b8944bacb1f");
                     public static readonly Guid addChoiceOnExit = new Guid("930ad916-950a-44ce-aafa-ba9361b61008");
+                    public static readonly Guid hubClickHere = new Guid("7085ee68-11db-43a7-b9e7-d3c56641ee3d");
+                    public static readonly Guid hubLeadsNowhere = new Guid("99a5db72-f639-4c63-9162-a2eb5b8405b0");
+                    public static readonly Guid hubToEnd = new Guid("0e8e79ed-354b-4ec1-8c0a-ea63fe374f78");
                     public static readonly Guid noInstructionConnected = new Guid("0998d28e-5e25-4c43-aa39-f639ad0f9eb0");
                     public static readonly Guid inputEnterNumber = new Guid("54689a1d-5e72-434a-9c5f-f8b212ac87a2");
                     public static readonly Guid inputEnterText = new Guid("f802b04c-c007-4f0f-806d-2f1a813e02fc");
@@ -1195,6 +1207,8 @@ namespace DeusaldStoryCommon
                 public static readonly Guid sectionTokenBare = new Guid("b748f349-835b-47c2-84c4-a4eff6b7d2f8");
                 /// <summary>Tokens: {name},{summary}.</summary>
                 public static readonly Guid sectionToken = new Guid("2881a087-b1fa-41ff-a252-3746a5ec2f7a");
+                /// <summary>Hub Card placeholder token. Token: {name}.</summary>
+                public static readonly Guid hubCardToken = new Guid("0556e2f5-ae9d-40da-83fe-7ff16a5bf33c");
             }
 
             public static class Renderer
@@ -1230,6 +1244,8 @@ namespace DeusaldStoryCommon
             public static readonly Guid GamebookTheEnd = new Guid("a1b2c3d4-0004-4000-8000-000000000004");
             /// <summary>Gamebook choice line. Tokens: {choice},{section}.</summary>
             public static readonly Guid GamebookChoiceToSection = new Guid("a1b2c3d4-0005-4000-8000-000000000005");
+            /// <summary>Gamebook hub gather line. Token: {cards}.</summary>
+            public static readonly Guid GamebookGatherHubCards = new Guid("a1b2c3d4-0006-4000-8000-000000000006");
             public static readonly Guid StorageClearSlot = new Guid("a1b2c3d4-0010-4000-8000-000000000010");
             public static readonly Guid StorageNumberDiceFull = new Guid("a1b2c3d4-0011-4000-8000-000000000011");
             public static readonly Guid StorageNumberDiceReroll = new Guid("a1b2c3d4-0012-4000-8000-000000000012");
@@ -1613,6 +1629,8 @@ namespace DeusaldStoryCommon
                 { new Guid("2ff8d987-7be0-48ae-999b-08a04188a233"), "one Flow output per choice" },
                 { new Guid("babf8bbe-e7db-4124-b373-9d5283b5841c"), "Single path + Variables" },
                 { new Guid("5ececfe9-cc26-4ccc-b991-aaf66b21b405"), "one VFlow output carrying declared variables" },
+                { new Guid("fc453dc7-48a9-4694-9937-7a60e52f1b7a"), "Hub paths" },
+                { new Guid("1cccbe79-9c12-4c6a-8652-fcd9ad9f208d"), "each exit shown as a sub-card the player can enter" },
                 { new Guid("0550e663-55bd-43d0-8aee-94033be7a396"), "Declared variables" },
                 { new Guid("548479de-0aa4-4106-8bf6-d64b45e92560"), "handed to the next node; their possible-value combinations become its Gamebook sections" },
                 { new Guid("514eee1c-851b-4b72-a9db-e3ec0184679d"), "A" },
@@ -1645,6 +1663,12 @@ namespace DeusaldStoryCommon
                 { new Guid("28470ae3-f0a2-43a7-9bd1-e237dbcf73e3"), "(var)" },
                 { new Guid("94daa38a-e627-419c-8057-9fe6db2181df"), "Add choice" },
                 { new Guid("a62ec9c6-66f6-432c-a540-3523dd6acf37"), "Continue" },
+                { new Guid("01974fe4-e226-4811-8b7b-fc39e721bd9a"), "When a variable is wired in" },
+                { new Guid("7bd6615b-20b2-4b62-9b1d-98fbb1cd5cad"), "Automatic choice" },
+                { new Guid("73eced40-104b-499a-aafa-ee5ffd683dbc"), "the app picks one choice from the conditions" },
+                { new Guid("da2fe52c-8bd0-4352-8ee7-f4f47b918698"), "Choice visibility" },
+                { new Guid("f6a75e5f-d991-4c62-9713-ce5b05f81d06"), "each condition decides if its choice is shown" },
+                { new Guid("7524b979-0e27-491c-95ba-1928dac8093f"), "A variable is wired in — each choice is shown only when its condition matches. Leave a condition empty to always show that choice." },
                 { new Guid("5f41850d-33fb-4cf1-8233-d1a36bab353f"), "Function signature — {name}" },
                 { new Guid("efcec7ba-3e6d-4a7b-8250-86ded5914997"), "Inputs" },
                 { new Guid("153e7cdf-be75-42f8-8806-174ffd64ab6f"), "Outputs" },
@@ -1786,6 +1810,9 @@ namespace DeusaldStoryCommon
                 { new Guid("a3d65d4b-b145-470f-86da-fe6fb450b1d5"), "(empty text)" },
                 { new Guid("45ba2f19-8e35-4c54-b654-5b8944bacb1f"), "Page {page} / {total}" },
                 { new Guid("930ad916-950a-44ce-aafa-ba9361b61008"), "Add a choice on the Exit node" },
+                { new Guid("7085ee68-11db-43a7-b9e7-d3c56641ee3d"), "Click here" },
+                { new Guid("99a5db72-f639-4c63-9162-a2eb5b8405b0"), "This route isn't connected to anything" },
+                { new Guid("0e8e79ed-354b-4ec1-8c0a-ea63fe374f78"), "This route ends the story" },
                 { new Guid("0998d28e-5e25-4c43-aa39-f639ad0f9eb0"), "(no instruction connected)" },
                 { new Guid("54689a1d-5e72-434a-9c5f-f8b212ac87a2"), "Enter a number…" },
                 { new Guid("f802b04c-c007-4f0f-806d-2f1a813e02fc"), "Enter text…" },
@@ -1940,6 +1967,7 @@ namespace DeusaldStoryCommon
                 { new Guid("04686742-983f-402d-aa2f-cc8538a09d80"), "Choice “{label}” leads nowhere." },
                 { new Guid("b748f349-835b-47c2-84c4-a4eff6b7d2f8"), "[§ {name}]" },
                 { new Guid("2881a087-b1fa-41ff-a252-3746a5ec2f7a"), "[§ {name} · {summary}]" },
+                { new Guid("0556e2f5-ae9d-40da-83fe-7ff16a5bf33c"), "[Hub Card · {name}]" },
                 { new Guid("ec342acc-58db-45c8-94e3-27803dd01c47"), "SmartFormat failed to render: {error} (probable cause: a Variable is wired here and is unavailable in the Gamebook)." },
                 { new Guid("35948422-2430-421d-a1dd-201a460ee6f5"), "SmartFormat failed to render: {error}" },
                 { new Guid("949c0645-cea2-4916-9f6c-859d5b749645"), "'{file}' not found — this does not appear to be a valid project." },
@@ -1951,6 +1979,7 @@ namespace DeusaldStoryCommon
                 { new Guid("a1b2c3d4-0003-4000-8000-000000000003"), "To continue {condition} go to section {section}" },
                 { new Guid("a1b2c3d4-0004-4000-8000-000000000004"), "The End" },
                 { new Guid("a1b2c3d4-0005-4000-8000-000000000005"), "{choice} go to section {section}" },
+                { new Guid("a1b2c3d4-0006-4000-8000-000000000006"), "To continue, gather Hub Cards: {cards}" },
                 { new Guid("a1b2c3d4-0010-4000-8000-000000000010"), "Clear slot {slot} and return its component." },
                 { new Guid("a1b2c3d4-0011-4000-8000-000000000011"), "Roll a D6 and place it on slot {slot}." },
                 { new Guid("a1b2c3d4-0012-4000-8000-000000000012"), "Roll a D6, rerolling until it shows 1–{max}, and place it on slot {slot}." },

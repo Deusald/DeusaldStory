@@ -1221,10 +1221,13 @@ public partial class ProjectStateService(
     /// </summary>
     public void UpdateExitNode(
         Guid logicId,
+        StoryExitAutoMode autoMode,
         List<(Guid Id, string Name, bool IsElse, StoryConditionExpr? Condition, List<StoryChoiceVarValue> Values)> choices)
     {
         using var _ = Edit(); // choices + the parent container's outer wires change together
         if (!CurrentProject!.LogicNodes.TryGetValue(logicId, out StoryLogicNode? logic)) return;
+
+        logic.ExitAutoMode = autoMode;
 
         HashSet<Guid>     kept    = new();
         List<StoryChoice> rebuilt = new();

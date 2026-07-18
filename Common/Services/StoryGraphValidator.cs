@@ -158,8 +158,11 @@ namespace DeusaldStoryCommon
                     continue;
                 }
 
-                bool autoMode = FromInto(logic, logic.ExitVariablesIn.Id) != Guid.Empty;
-                if (autoMode)
+                // The Else-fallback + per-choice-condition rules only apply to Automatic Choice. Choice Visibility (and
+                // Hub Paths, which is always visibility-driven) has no Else and treats conditions as optional.
+                bool varsWired    = FromInto(logic, logic.ExitVariablesIn.Id) != Guid.Empty;
+                StoryExitAutoMode mode = logic.ExitMode == StoryLogicExitMode.HubPaths ? StoryExitAutoMode.ChoiceVisibility : logic.ExitAutoMode;
+                if (varsWired && mode == StoryExitAutoMode.AutomaticChoice)
                 {
                     int elseCount = logic.Choices.Count(c => c.IsElse);
                     if (elseCount != 1)

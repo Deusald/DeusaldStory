@@ -388,6 +388,9 @@ namespace DeusaldStoryWeb
             //    per choice, one Variables input (wire it to auto-resolve the choice in the App), and — in auto mode —
             //    a single Auto-text input overriding the default "Click here to continue…" label. ──
             bool autoMode = funcBp is null && logic.ContentConnections.Exists(c => c.ToPoint == logic.ExitVariablesIn.Id);
+            // The single Auto-text port only applies to Automatic Choice — Choice Visibility and Hub Paths label each
+            // choice from its own per-choice Text input instead.
+            bool autoChoiceText = autoMode && logic.ExitMode != StoryLogicExitMode.HubPaths && logic.ExitAutoMode == StoryExitAutoMode.AutomaticChoice;
             (double xx, double xy) = PointPos(logic.ExitLFlowIn, _LOGIC_EXIT_X, _LOGIC_EXIT_Y0);
             EdNode exit = new()
             {
@@ -407,7 +410,7 @@ namespace DeusaldStoryWeb
             if (funcBp is null)
             {
                 exit.Inputs.Add(new EdPort { Id = logic.ExitVariablesIn.Id, Name = UiLang.T(Localization.Editor.Nodes.Ports.variables), Type = PortType.Variable });
-                if (autoMode)
+                if (autoChoiceText)
                     exit.Inputs.Add(new EdPort { Id = logic.ExitAutoTextIn.Id, Name = UiLang.T(Localization.Editor.Nodes.Ports.text), Type = PortType.Text });
                 foreach (StoryChoice choice in logic.Choices)
                 {

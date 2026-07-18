@@ -1159,7 +1159,7 @@
 
     private void OnExitNodeConfirmed(ExitNodeModal.ExitNodeArgs args)
     {
-        _ProjectState.UpdateExitNode(_CurrentId,
+        _ProjectState.UpdateExitNode(_CurrentId, args.AutoMode,
             args.Choices.Select(c => (c.Id, c.Name, c.IsElse, c.Condition, c.Values)).ToList());
         RebuildNodes();
     }

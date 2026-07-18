@@ -30,6 +30,7 @@ namespace DeusaldStoryCommon
         public static readonly Guid GamebookContinueConditional      = Localization.Story.GamebookContinueConditional;
         public static readonly Guid GamebookTheEnd                   = Localization.Story.GamebookTheEnd;
         public static readonly Guid GamebookChoiceToSection          = Localization.Story.GamebookChoiceToSection;
+        public static readonly Guid GamebookGatherHubCards           = Localization.Story.GamebookGatherHubCards;
         public static readonly Guid StorageClearSlot                 = Localization.Story.StorageClearSlot;
         public static readonly Guid StorageNumberDiceFull            = Localization.Story.StorageNumberDiceFull;
         public static readonly Guid StorageNumberDiceReroll          = Localization.Story.StorageNumberDiceReroll;

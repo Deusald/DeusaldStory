@@ -123,6 +123,27 @@
                 </button>
             </div>
         }
+        else if (Logic.ExitMode == StoryLogicExitMode.HubPaths)
+        {
+            @* Hub Paths — each visible exit's destination is rendered inline as a sub-card the player can enter. *@
+            @if (_Rendered.SubHubs.Count == 0)
+            {
+                <div class="lpv-continue">
+                    <button class="lpv-continue-btn" disabled>
+                        <span class="lpv-placeholder">@Loc.T(Localization.Editor.Preview.Logic.addChoiceOnExit)</span>
+                    </button>
+                </div>
+            }
+            else
+            {
+                <div class="lpv-subhubs">
+                    @foreach (StoryLogicRenderer.RenderedSubHub s in _Rendered.SubHubs)
+                    {
+                        @SubHubCard(s)
+                    }
+                </div>
+            }
+        }
         else if (_Rendered.Choices.Count > 0)
         {
             @* Choice buttons — each advances the preview along that choice's continuation. *@
@@ -180,6 +201,65 @@
                minlength="1"
                maxlength="@(field.MaxLength > 0 ? field.MaxLength : 30)"
                placeholder="@(!string.IsNullOrEmpty(field.Placeholder) ? field.Placeholder : field.InputKind == StringInputKind.Number ? Loc.T(Localization.Editor.Preview.Logic.inputEnterNumber) : Loc.T(Localization.Editor.Preview.Logic.inputEnterText))"/>
+    </div>;
+
+    /// <summary>A Hub Paths sub-card — the destination node rendered inline plus a "click here" link that enters it.</summary>
+    private RenderFragment SubHubCard(StoryLogicRenderer.RenderedSubHub sub) =>@<div class="lpv-subhub">
+        @if (sub.Content is not null)
+        {
+            <div class="lpv-subhub-head">
+                @if (sub.Content.IconData is not null)
+                {
+                    <div class="lpv-subhub-icon">
+                        <img src="data:image/png;base64,@sub.Content.IconData" alt="@Loc.T(Localization.Editor.Preview.iconAlt)"/>
+                    </div>
+                }
+                <div class="lpv-titles">
+                    @if (string.IsNullOrEmpty(sub.Content.Title))
+                    {
+                        <div class="lpv-subhub-title lpv-placeholder">@Loc.T(Localization.Editor.Preview.noTitleConnected)</div>
+                    }
+                    else
+                    {
+                        <div class="lpv-subhub-title">@SafeHtml(sub.Content.Title)</div>
+                    }
+                    @if (!string.IsNullOrEmpty(sub.Content.Subtitle))
+                    {
+                        <div class="lpv-subtitle">@SafeHtml(sub.Content.Subtitle)</div>
+                    }
+                </div>
+            </div>
+            @foreach (StoryLogicRenderer.RenderedBlock block in sub.Content.Blocks)
+            {
+                @if (!string.IsNullOrEmpty(block.Text))
+                {
+                    <div class="lpv-block @FrameClass(block.FrameStyle)">
+                        @if (StoryStyle.FrameIcon(block.FrameStyle) is { Length: > 0 } frameIcon)
+                        {
+                            <i class="lpv-block-icon bi @frameIcon" title="@StoryStyle.FrameLabel(block.FrameStyle)"></i>
+                        }
+                        <span class="lpv-block-text">@SafeHtml(block.Text)</span>
+                    </div>
+                }
+            }
+        }
+        else if (sub.Status == StoryFlowNavigator.NextKind.End)
+        {
+            <div class="lpv-subhub-note">@Loc.T(Localization.Editor.Preview.Logic.hubToEnd)</div>
+        }
+        else
+        {
+            <div class="lpv-subhub-note lpv-placeholder">@Loc.T(Localization.Editor.Preview.Logic.hubLeadsNowhere)</div>
+        }
+
+        <div class="lpv-subhub-foot">
+            <button class="lpv-subhub-btn"
+                    disabled="@(sub.Link.OuterFlowOut == Guid.Empty || sub.Status == StoryFlowNavigator.NextKind.Dangling)"
+                    @onclick="() => OnContinue.InvokeAsync(sub.Link)">
+                <span>@(string.IsNullOrEmpty(sub.Link.Text) ? Loc.T(Localization.Editor.Preview.Logic.hubClickHere) : SafeHtml(sub.Link.Text))</span>
+                <i class="bi bi-arrow-right"></i>
+            </button>
+        </div>
     </div>;
 
     /// <summary>External Variable values driving SmartFormat blocks (variable id → value); owned by the parent.</summary>

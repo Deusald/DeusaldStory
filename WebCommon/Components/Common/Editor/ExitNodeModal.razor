@@ -26,9 +26,33 @@
 
             @if (_Auto)
             {
+                @* When variables are wired, choose how they drive the exit. Hub Paths always uses Choice Visibility. *@
+                @if (_ExitMode != StoryLogicExitMode.HubPaths)
+                {
+                    <div class="modal-field">
+                        <label class="modal-label">@Loc.T(Localization.Editor.Modals.Exit.autoModeLabel)</label>
+                        <div class="enm-mode">
+                            <button type="button"
+                                    class="enm-mode-opt @(_AutoMode == StoryExitAutoMode.AutomaticChoice ? "active" : "")"
+                                    @onclick="() => _AutoMode = StoryExitAutoMode.AutomaticChoice">
+                                <span class="enm-mode-title">@Loc.T(Localization.Editor.Modals.Exit.automaticChoiceTitle)</span>
+                                <span class="enm-mode-desc">@Loc.T(Localization.Editor.Modals.Exit.automaticChoiceDesc)</span>
+                            </button>
+                            <button type="button"
+                                    class="enm-mode-opt @(_AutoMode == StoryExitAutoMode.ChoiceVisibility ? "active" : "")"
+                                    @onclick="() => _AutoMode = StoryExitAutoMode.ChoiceVisibility">
+                                <span class="enm-mode-title">@Loc.T(Localization.Editor.Modals.Exit.choiceVisibilityTitle)</span>
+                                <span class="enm-mode-desc">@Loc.T(Localization.Editor.Modals.Exit.choiceVisibilityDesc)</span>
+                            </button>
+                        </div>
+                    </div>
+                }
+
                 <div class="modal-note">
                     <i class="bi bi-info-circle"></i>
-                    <span>@((MarkupString)Loc.T(Localization.Editor.Modals.Exit.autoConditionsNote))</span>
+                    <span>@((MarkupString)Loc.T(_AutoMode == StoryExitAutoMode.AutomaticChoice
+                        ? Localization.Editor.Modals.Exit.autoConditionsNote
+                        : Localization.Editor.Modals.Exit.visibilityConditionsNote))</span>
                 </div>
             }
 
@@ -36,7 +60,7 @@
             {
                 int  index  = i;
                 Row  row    = _Rows[i];
-                bool isElse = _Auto && index == _Rows.Count - 1;
+                bool isElse = _Auto && _AutoMode == StoryExitAutoMode.AutomaticChoice && index == _Rows.Count - 1;
                 <div class="enm-choice">
                     <div class="enm-choice-head">
                         <span class="enm-num">@(index + 1)</span>
@@ -97,6 +121,8 @@
     private bool                          _Visible;
     private bool                          _SinglePath;
     private bool                          _Auto;
+    private StoryLogicExitMode            _ExitMode;
+    private StoryExitAutoMode             _AutoMode;
     private List<StoryDeclaredVariable>   _Declared      = new();
     private List<(Guid Id, string Name)>  _AvailableVars = new();
     private List<Row>                     _Rows          = new();
@@ -118,6 +144,9 @@
     {
         _SinglePath    = logic.ExitMode == StoryLogicExitMode.SinglePath;
         _Auto          = availableVars.Count > 0;
+        _ExitMode      = logic.ExitMode;
+        // Hub Paths is always visibility-driven; otherwise honour the node's stored auto mode.
+        _AutoMode      = logic.ExitMode == StoryLogicExitMode.HubPaths ? StoryExitAutoMode.ChoiceVisibility : logic.ExitAutoMode;
         _AvailableVars = availableVars;
         _Declared      = logic.DeclaredVariables.ToList();
         _Rows = logic.Choices.Select(c => new Row
@@ -160,23 +189,26 @@
         for (int i = 0; i < _Rows.Count; i++)
         {
             Row  r      = _Rows[i];
-            bool isElse = _Auto && i == _Rows.Count - 1;
+            bool isElse = _Auto && _AutoMode == StoryExitAutoMode.AutomaticChoice && i == _Rows.Count - 1;
+            // Automatic Choice: a condition on every non-Else row. Choice Visibility: a condition on every row
+            // (an empty one means "always visible"). Non-auto nodes carry no conditions.
+            bool wantsCondition = _Auto && (_AutoMode == StoryExitAutoMode.ChoiceVisibility || !isElse);
             specs.Add(new ChoiceSpec(
                 r.Id,
                 r.Name.Trim(),
                 isElse,
-                (_Auto && !isElse) ? r.Condition : null,
+                wantsCondition ? r.Condition : null,
                 _SinglePath
                     ? _Declared.Select(d => new StoryChoiceVarValue { DeclaredVarId = d.Id, Value = r.Value(d.Id).Trim() }).ToList()
                     : new List<StoryChoiceVarValue>()));
         }
 
-        await OnConfirm.InvokeAsync(new ExitNodeArgs(specs));
+        await OnConfirm.InvokeAsync(new ExitNodeArgs(_AutoMode, specs));
     }
 
     private void Cancel() => _Visible = false;
 
     public record ChoiceSpec(Guid Id, string Name, bool IsElse, StoryConditionExpr? Condition, List<StoryChoiceVarValue> Values);
 
-    public record ExitNodeArgs(List<ChoiceSpec> Choices);
+    public record ExitNodeArgs(StoryExitAutoMode AutoMode, List<ChoiceSpec> Choices);
 }

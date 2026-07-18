@@ -32,6 +32,14 @@ namespace DeusaldStoryCommon
         /// </summary>
         public StoryLogicExitMode ExitMode { get; set; }
 
+        /// <summary>
+        /// When a variable is wired into <see cref="ExitVariablesIn"/>, whether the App auto-picks one choice
+        /// (<see cref="StoryExitAutoMode.AutomaticChoice"/>) or uses each choice's condition to gate its visibility
+        /// (<see cref="StoryExitAutoMode.ChoiceVisibility"/>). Ignored when no variable is wired. Forced to
+        /// ChoiceVisibility when <see cref="ExitMode"/> is <see cref="StoryLogicExitMode.HubPaths"/>.
+        /// </summary>
+        public StoryExitAutoMode ExitAutoMode { get; set; }
+
         /// <summary>The continuations offered by this node's single Exit node (replaces the old per-exit points + Choice node).</summary>
         public List<StoryChoice> Choices { get; } = new();
 

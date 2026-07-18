@@ -142,6 +142,10 @@ namespace DeusaldStoryCommon
                 return lines;
             }
 
+            // Hub Paths — destinations are presented as Hub Cards to gather, not sections to jump to.
+            if (logic.ExitMode == StoryLogicExitMode.HubPaths)
+                return BuildHubCardLines(project, localization, choices);
+
             foreach (StoryLogicRenderer.RenderedChoice rc in choices)
             {
                 bool   hasText = !string.IsNullOrWhiteSpace(rc.Text);
@@ -172,6 +176,55 @@ namespace DeusaldStoryCommon
             }
 
             return lines;
+        }
+
+        /// <summary>
+        /// Hub Paths continue lines: a single "Gather Hub Cards: …" line listing one placeholder Hub Card token per
+        /// destination, plus an error line for any unwired / dangling choice. An End destination lists as THE END.
+        /// Real per-card numbering awaits the not-yet-built global section numbering / PDF export.
+        /// </summary>
+        private static List<ContinueLine> BuildHubCardLines(StoryProject project, LocProject? localization, List<StoryLogicRenderer.RenderedChoice> choices)
+        {
+            List<ContinueLine> lines  = new();
+            List<string>       tokens = new();
+            foreach (StoryLogicRenderer.RenderedChoice rc in choices)
+            {
+                bool hasText = !string.IsNullOrWhiteSpace(rc.Text);
+                if (rc.OuterFlowOut == Guid.Empty)
+                {
+                    lines.Add(new ContinueLine { Text = UiLang.T(Localization.Services.Gamebook.choiceNotConnected, new Dictionary<string, object> { ["label"] = hasText ? rc.Text : "?" }), IsError = true });
+                    continue;
+                }
+                StoryFlowNavigator.NextLogicResult next = StoryFlowNavigator.ResolveNextLogic(project, rc.OuterFlowOut);
+                switch (next.Kind)
+                {
+                    case StoryFlowNavigator.NextKind.Logic when next.Logic is not null:
+                        tokens.Add(HubCardToken(next.Logic));
+                        break;
+
+                    case StoryFlowNavigator.NextKind.End:
+                        tokens.Add(StoryCommonLocalizationKeys.Resolve(localization, StoryCommonLocalizationKeys.GamebookTheEnd));
+                        break;
+
+                    case StoryFlowNavigator.NextKind.Dangling:
+                        lines.Add(new ContinueLine { Text = UiLang.T(Localization.Services.Gamebook.choiceLeadsNowhere, new Dictionary<string, object> { ["label"] = hasText ? rc.Text : "?" }), IsError = true });
+                        break;
+                }
+            }
+            if (tokens.Count > 0)
+                lines.Insert(0, new ContinueLine
+                {
+                    Text = StoryCommonLocalizationKeys.Resolve(localization, StoryCommonLocalizationKeys.GamebookGatherHubCards,
+                        new Dictionary<string, object> { ["cards"] = string.Join(", ", tokens) })
+                });
+            return lines;
+        }
+
+        /// <summary>Placeholder Hub Card reference token, e.g. <c>[Hub Card · Forest Path]</c>.</summary>
+        private static string HubCardToken(StoryLogicNode node)
+        {
+            string name = string.IsNullOrWhiteSpace(node.Name) ? UiLang.T(Localization.Common.Placeholders.unnamed) : node.Name;
+            return UiLang.T(Localization.Services.Gamebook.hubCardToken, new Dictionary<string, object> { ["name"] = name });
         }
 
         /// <summary>

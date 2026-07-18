@@ -60,6 +60,12 @@
                         <span class="nlm-mode-title">@Loc.T(Localization.Editor.Modals.Logic.singlePathTitle)</span>
                         <span class="nlm-mode-desc">@Loc.T(Localization.Editor.Modals.Logic.singlePathDesc)</span>
                     </button>
+                    <button type="button"
+                            class="nlm-mode-opt @(_ExitMode == StoryLogicExitMode.HubPaths ? "active" : "")"
+                            @onclick="() => _ExitMode = StoryLogicExitMode.HubPaths">
+                        <span class="nlm-mode-title">@Loc.T(Localization.Editor.Modals.Logic.hubPathsTitle)</span>
+                        <span class="nlm-mode-desc">@Loc.T(Localization.Editor.Modals.Logic.hubPathsDesc)</span>
+                    </button>
                 </div>
             </div>
 

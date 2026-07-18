@@ -326,3 +326,73 @@
     color: var(--lpv-text);
     opacity: 0.6;
 }
+
+/* ── Hub Paths sub-cards ───────────────────────────────────────────────────── */
+
+.lpv-subhubs {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    margin-top: 4px;
+}
+.lpv-subhub {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 16px 18px;
+    background: var(--lpv-frame-bg);
+    border: 1px solid var(--lpv-frame-border);
+    border-radius: var(--r-md);
+}
+.lpv-subhub-head {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+}
+.lpv-subhub-title {
+    font-size: 18px;
+    font-weight: 700;
+    letter-spacing: -.02em;
+    color: var(--lpv-title);
+    line-height: 1.25;
+}
+.lpv-subhub-icon {
+    flex: none;
+    width: 44px;
+    height: 44px;
+    padding: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--lpv-icon-bg);
+    border: 1px solid var(--lpv-frame-border);
+    border-radius: var(--r-sm);
+}
+.lpv-subhub-icon img {
+    max-width: 100%;
+    max-height: 100%;
+    image-rendering: pixelated;
+}
+.lpv-subhub-note {
+    font-size: 14px;
+    color: var(--lpv-text);
+}
+.lpv-subhub-foot {
+    display: flex;
+}
+.lpv-subhub-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 9px 14px;
+    background: transparent;
+    color: var(--accent);
+    border: 1px solid var(--accent);
+    border-radius: var(--r-md);
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background var(--dur) var(--ease), filter var(--dur) var(--ease);
+}
+.lpv-subhub-btn:hover:not(:disabled) { background: color-mix(in srgb, var(--accent) 14%, transparent); }
+.lpv-subhub-btn:disabled { opacity: .5; cursor: default; }

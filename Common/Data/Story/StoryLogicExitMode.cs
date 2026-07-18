@@ -14,6 +14,16 @@ namespace DeusaldStoryCommon
         /// (<see cref="StoryLogicNode.DeclaredVariables"/>); each choice pins the variables' values. The consuming node
         /// reads them via its Prev Exit Variable node, and the Gamebook expands into one section per choice.
         /// </summary>
-        SinglePath
+        SinglePath,
+
+        /// <summary>
+        /// Like <see cref="ManyPaths"/> structurally — each choice has its own outer <c>Flow</c> output wired to a next
+        /// logic node — but the destinations are presented as a <b>hub</b>. In the App each destination renders inline
+        /// as a sub-card (its own content plus a "click here" link that navigates into it); in the Gamebook the hub
+        /// prints "Gather Hub Cards: …" and the destinations become numbered Hub Cards. Always uses
+        /// <see cref="StoryExitAutoMode.ChoiceVisibility"/> when variables are wired (each condition gates whether its
+        /// sub-card is shown).
+        /// </summary>
+        HubPaths
     }
 }
