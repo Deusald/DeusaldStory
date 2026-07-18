@@ -114,7 +114,7 @@
                         {
                             <i class="gbp-block-icon bi @frameIcon" title="@StoryStyle.FrameLabel(style)"></i>
                         }
-                        <span class="gbp-block-text">@SafeHtml(block.Text)</span>
+                        <span class="gbp-block-text">@BlockBody(block.Text, sec)</span>
                     </div>
                 }
             }
@@ -174,6 +174,41 @@
 
     private Task Navigate(StoryGamebookPreview.ContinueLine line) =>
         OnNavigate.InvokeAsync(new GamebookNavRequest(line.TargetLogicId, line.TargetSectionKey));
+
+    /// <summary>Follows an inline <c>&lt;choice&gt;</c> "go to section" link — navigates like a standalone continue line.</summary>
+    private Task NavigateInline(StoryGamebookPreview.InlineLink link) =>
+        OnNavigate.InvokeAsync(new GamebookNavRequest(link.TargetLogicId, link.TargetSectionKey));
+
+    /// <summary>
+    /// Renders a block's text, splicing each inline <c>&lt;choice=Name&gt;</c> tag into its resolved "go to section …"
+    /// phrase — a clickable link when it leads to a real section (<paramref name="sec"/>'s inline links), plain text for
+    /// End / unwired references, and the raw tag left visible when the name resolved to nothing.
+    /// </summary>
+    private RenderFragment BlockBody(string text, StoryGamebookPreview.Section sec) =>@<text>
+        @{ string[] parts = StoryLogicRenderer.InlineChoiceTag.Split(text); }
+        @for (int i = 0; i < parts.Length; i++)
+        {
+            @if (i % 2 == 0)
+            {
+                @SafeHtml(parts[i])
+            }
+            else if (sec.InlineLinks.FirstOrDefault(l => string.Equals(l.Name, parts[i].Trim(), StringComparison.OrdinalIgnoreCase)) is { } link)
+            {
+                @if (link.TargetLogicId != Guid.Empty)
+                {
+                    <button type="button" class="gbp-inline-link" @onclick="() => NavigateInline(link)">@SafeHtml(link.Text)</button>
+                }
+                else
+                {
+                    @SafeHtml(link.Text)
+                }
+            }
+            else
+            {
+                @SafeHtml(parts[i].Length == 0 ? "<choice>" : $"<choice={parts[i]}>")
+            }
+        }
+    </text>;
 
     /// <summary>The section the last "go to section" click jumped to — flagged transiently, never persisted.</summary>
     private bool IsSelected(StoryGamebookPreview.Section sec) =>

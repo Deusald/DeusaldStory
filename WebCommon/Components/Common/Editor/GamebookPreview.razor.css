@@ -220,6 +220,23 @@
 .gbp-continue-link:hover { background-color: #efe7d4; }
 .gbp-continue-link:hover span { text-decoration-color: #55442a; }
 
+/* An inline "go to section" link spliced into a block's prose (see BlockBody) — a clickable <choice> reference.
+   `font: inherit` matches the surrounding paper text (unlike the continue line, the block sets no size/weight to lose). */
+.gbp-inline-link {
+    display: inline;
+    background: none;
+    border: none;
+    padding: 0;
+    margin: 0;
+    font: inherit;
+    color: #7a5a2a;
+    cursor: pointer;
+    text-decoration: underline;
+    text-decoration-color: #b89b6a;
+    text-underline-offset: 2px;
+}
+.gbp-inline-link:hover { text-decoration-color: #7a5a2a; background-color: #efe7d4; }
+
 /* Inline / standalone project images inside blocks (see LogicPreview for the tags). */
 .gbp-section ::deep .lpv-inline-icon {
     display: inline-block;

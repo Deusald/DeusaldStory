@@ -36,6 +36,23 @@ namespace DeusaldStoryCommon
             public StoryLogicRenderer.RenderedLogic Rendered         { get; set; } = new();
             public bool                             IsInstructions   { get; set; }
             public List<string>                     InstructionLines { get; set; } = new();
+            /// <summary>The composed "go to section …" phrase and navigation target for each inline <c>&lt;choice=Name&gt;</c> in the text, keyed by name (see <see cref="BuildInlineLinks"/>).</summary>
+            public List<InlineLink>                 InlineLinks      { get; set; } = new();
+        }
+
+        /// <summary>
+        /// An inline <c>&lt;choice=Name&gt;</c> reference resolved for the Gamebook: the composed "<i>{choice}</i> go to
+        /// section …" phrase the tag expands to, plus — when it leads to a real section — the navigation target so the
+        /// preview can render it as a clickable link (like a continue line). End / unwired / unresolved references carry
+        /// only text (<see cref="TargetLogicId"/> stays <see cref="Guid.Empty"/>, so they render as plain phrases).
+        /// </summary>
+        public sealed class InlineLink
+        {
+            /// <summary>The name written in the tag — how a text occurrence maps back to this entry (case-insensitive).</summary>
+            public string Name             { get; set; } = "";
+            public string Text             { get; set; } = "";
+            public Guid   TargetLogicId    { get; set; }
+            public string TargetSectionKey { get; set; } = "";
         }
 
         /// <summary>One continue-instruction line at the bottom of every section (shared across a node's sections).</summary>
@@ -76,18 +93,19 @@ namespace DeusaldStoryCommon
             List<StoryDeclaredVariable> incoming, Dictionary<Guid, string> values)
         {
             StoryLogicRenderer.RenderedLogic rendered = StoryLogicRenderer.Render(project, localization, logic, values, paper: true, StoryRenderTarget.Gamebook);
-            ReplaceInlineChoiceTags(project, localization, rendered);
+            List<InlineLink>                 inline   = BuildInlineLinks(project, localization, rendered);
             string                           label    = ComboLabel(incoming, values);
             string                           key      = SectionToken(logic, incoming, values);
 
             if (!logic.GamebookInstructions)
-                return new Section { Label = label, Key = key, Rendered = rendered };
+                return new Section { Label = label, Key = key, Rendered = rendered, InlineLinks = inline };
 
             return new Section
             {
                 Label            = label,
                 Key              = key,
                 Rendered         = rendered,
+                InlineLinks      = inline,
                 IsInstructions   = true,
                 InstructionLines = incoming.Select(dv => $"{(string.IsNullOrWhiteSpace(dv.Name) ? UiLang.T(Localization.Services.Gamebook.instructionVariableFallback) : dv.Name)} = {(values.TryGetValue(dv.Id, out string? v) ? v : "")}").ToList()
             };
@@ -236,40 +254,50 @@ namespace DeusaldStoryCommon
         }
 
         /// <summary>
-        /// Rewrites each <c>&lt;choice=Name&gt;</c> tag in the rendered block text into an inline "go to section …" phrase
-        /// (prefixed with the choice's own text when it has any, mirroring the standalone continue line). An unresolved
-        /// name is left as-is so the author sees it. Mutates the rendered blocks in place (Gamebook only).
+        /// Resolves each inline <c>&lt;choice=Name&gt;</c> reference into the "go to section …" phrase it expands to
+        /// (prefixed with the choice's own text when it has any, mirroring the standalone continue line) and, when it
+        /// leads to a real section, the navigation target that lets the preview make it a clickable link. The raw tags
+        /// stay in the block text — the host splices these links in at render time (Gamebook only). An unresolved name
+        /// yields no link, so its tag is left visible.
         /// </summary>
-        private static void ReplaceInlineChoiceTags(StoryProject project, LocProject? localization, StoryLogicRenderer.RenderedLogic rendered)
+        private static List<InlineLink> BuildInlineLinks(StoryProject project, LocProject? localization, StoryLogicRenderer.RenderedLogic rendered)
         {
-            if (rendered.InlineChoices.Count == 0) return;
-
-            foreach (StoryLogicRenderer.RenderedBlock block in rendered.Blocks)
-                block.Text = StoryLogicRenderer.InlineChoiceTag.Replace(block.Text, m =>
+            List<InlineLink> links = new();
+            foreach (StoryLogicRenderer.RenderedInlineChoice ic in rendered.InlineChoices)
+            {
+                bool hasText = !string.IsNullOrWhiteSpace(ic.Text);
+                if (ic.OuterFlowOut == Guid.Empty)
                 {
-                    string name = m.Groups[1].Value.Trim();
-                    StoryLogicRenderer.RenderedInlineChoice? ic = rendered.InlineChoices.Find(c => string.Equals(c.Name, name, StringComparison.OrdinalIgnoreCase));
-                    if (ic is null) return m.Value; // unresolved — keep the tag visible
+                    links.Add(new InlineLink { Name = ic.Name, Text = ic.Text }); // unwired — just the label, not navigable
+                    continue;
+                }
 
-                    bool hasText = !string.IsNullOrWhiteSpace(ic.Text);
-                    if (ic.OuterFlowOut == Guid.Empty) return ic.Text; // unwired — nothing to point at
-
-                    StoryFlowNavigator.NextLogicResult next = StoryFlowNavigator.ResolveNextLogic(project, ic.OuterFlowOut);
-                    return next.Kind switch
-                    {
-                        StoryFlowNavigator.NextKind.Logic when next.Logic is not null => hasText
+                StoryFlowNavigator.NextLogicResult next = StoryFlowNavigator.ResolveNextLogic(project, ic.OuterFlowOut);
+                switch (next.Kind)
+                {
+                    case StoryFlowNavigator.NextKind.Logic when next.Logic is not null:
+                        string section = SectionToken(next.Logic, new List<StoryDeclaredVariable>(), new Dictionary<Guid, string>());
+                        string text    = hasText
                             ? StoryCommonLocalizationKeys.Resolve(localization, StoryCommonLocalizationKeys.GamebookChoiceToSection,
-                                new Dictionary<string, object> { ["choice"] = ic.Text, ["section"] = SectionToken(next.Logic, new List<StoryDeclaredVariable>(), new Dictionary<Guid, string>()) })
+                                new Dictionary<string, object> { ["choice"] = ic.Text, ["section"] = section })
                             : StoryCommonLocalizationKeys.Resolve(localization, StoryCommonLocalizationKeys.GamebookGoToSection,
-                                new Dictionary<string, object> { ["section"] = SectionToken(next.Logic, new List<StoryDeclaredVariable>(), new Dictionary<Guid, string>()) }),
+                                new Dictionary<string, object> { ["section"] = section });
+                        links.Add(new InlineLink { Name = ic.Name, Text = text, TargetLogicId = next.Logic.Id, TargetSectionKey = section });
+                        break;
 
-                        StoryFlowNavigator.NextKind.End => hasText
+                    case StoryFlowNavigator.NextKind.End:
+                        string endText = hasText
                             ? UiLang.T(Localization.Services.Gamebook.choiceToEnd, new Dictionary<string, object> { ["label"] = ic.Text, ["theEnd"] = StoryCommonLocalizationKeys.Resolve(localization, StoryCommonLocalizationKeys.GamebookTheEnd) })
-                            : StoryCommonLocalizationKeys.Resolve(localization, StoryCommonLocalizationKeys.GamebookTheEnd),
+                            : StoryCommonLocalizationKeys.Resolve(localization, StoryCommonLocalizationKeys.GamebookTheEnd);
+                        links.Add(new InlineLink { Name = ic.Name, Text = endText }); // End — no section to navigate to
+                        break;
 
-                        _ => ic.Text
-                    };
-                });
+                    default:
+                        links.Add(new InlineLink { Name = ic.Name, Text = ic.Text });
+                        break;
+                }
+            }
+            return links;
         }
 
         /// <summary>
