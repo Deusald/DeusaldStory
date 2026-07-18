@@ -1071,7 +1071,8 @@ public partial class ProjectStateService(
         Guid logicId, Guid nodeId, StorageVariableRefMode refMode, StorageVariableType refType, Guid registeredVariableId,
         NumberAssignment assignment, bool secret, int specificValue, RandomMode randomMode,
         StorageInstructionPlacement placement, StringValueMode stringMode, string stringValue, StringInputKind stringInputKind,
-        int minLength, int maxLength, Guid lengthErrorKeyId, StoryConditionExpr? validationRule, Guid validationErrorKeyId)
+        int minLength, int maxLength, Guid lengthErrorKeyId, StoryConditionExpr? validationRule, Guid validationErrorKeyId,
+        bool wireValue)
     {
         if (!CurrentProject!.LogicNodes.TryGetValue(logicId, out StoryLogicNode? logic)) return;
         StorySetVariableNode? node = logic.SetVariableNodes.Find(n => n.Id == nodeId);
@@ -1088,6 +1089,7 @@ public partial class ProjectStateService(
         node.StringMode           = stringMode;
         node.StringValue          = stringValue;
         node.StringInputKind      = stringInputKind;
+        node.WireValue            = wireValue;
 
         // The Name port only exists in ByType mode — drop its wire when the node goes back to a specific variable.
         if (refMode != StorageVariableRefMode.ByType)
@@ -1101,6 +1103,13 @@ public partial class ProjectStateService(
         bool playerInput = type == StorageVariableType.String && stringMode == StringValueMode.PlayerInput;
         if (!playerInput)
             logic.ContentConnections.RemoveAll(c => c.ToPoint == node.InstructionIn.Id || c.ToPoint == node.PlaceholderIn.Id || c.ToPoint == node.ValidationIn.Id);
+
+        // The wired-value ports only exist when the specific value is wired for the current target type — drop stale wires.
+        bool wireSpecific = wireValue && (type == StorageVariableType.String
+            ? stringMode == StringValueMode.Specific
+            : type is StorageVariableType.Number or StorageVariableType.Dial && assignment == NumberAssignment.SetSpecific);
+        if (!wireSpecific)
+            logic.ContentConnections.RemoveAll(c => c.ToPoint == node.ValueIn.Id || c.ToPoint == node.ValueTextIn.Id);
 
         node.MinLength            = minLength;
         node.MaxLength            = maxLength;
@@ -1122,7 +1131,8 @@ public partial class ProjectStateService(
             c.FromPoint == node.FlowOut.Id || c.ToPoint == node.FlowOut.Id ||
             c.FromPoint == node.FlowIn.Id  || c.ToPoint == node.FlowIn.Id  ||
             c.ToPoint   == node.InstructionIn.Id || c.ToPoint == node.PlaceholderIn.Id ||
-            c.ToPoint   == node.ValidationIn.Id  || c.ToPoint == node.NameIn.Id);
+            c.ToPoint   == node.ValidationIn.Id  || c.ToPoint == node.NameIn.Id ||
+            c.ToPoint   == node.ValueIn.Id       || c.ToPoint == node.ValueTextIn.Id);
         MarkKeyDirty(logicId);
     }
 
@@ -1896,6 +1906,8 @@ public partial class ProjectStateService(
             valid.Add(n.PlaceholderIn.Id);
             valid.Add(n.ValidationIn.Id);
             valid.Add(n.NameIn.Id);
+            valid.Add(n.ValueIn.Id);
+            valid.Add(n.ValueTextIn.Id);
         }
         foreach (StoryUnregisterVariableNode n in logic.UnregisterVariableNodes)
         {

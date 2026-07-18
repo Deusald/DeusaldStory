@@ -40,6 +40,21 @@ namespace DeusaldStoryCommon
         /// <summary>The value used when <see cref="Assignment"/> is <see cref="NumberAssignment.SetSpecific"/>.</summary>
         public int SpecificValue { get; set; }
 
+        /// <summary>
+        /// When the value is specific (<see cref="NumberAssignment.SetSpecific"/> for Number/Dial, or
+        /// <see cref="StringValueMode.Specific"/> for String), take it from the wired <see cref="ValueIn"/> (the value the
+        /// App assigns at runtime) and <see cref="ValueTextIn"/> (the Gamebook display of what to write) instead of the
+        /// baked <see cref="SpecificValue"/>/<see cref="StringValue"/>. The App stores the value silently either way, so
+        /// only the Gamebook text differs.
+        /// </summary>
+        public bool WireValue { get; set; }
+
+        /// <summary><see cref="WireValue"/> only — a <c>Variable</c> input carrying the value the App assigns at runtime.</summary>
+        public StoryConnectionPoint ValueIn { get; set; } = new() { Name = "App Value" };
+
+        /// <summary><see cref="WireValue"/> only — a <c>Text</c> input carrying the Gamebook display of what to write.</summary>
+        public StoryConnectionPoint ValueTextIn { get; set; } = new() { Name = "Gamebook Text" };
+
         /// <summary>When <see cref="Assignment"/> is <see cref="NumberAssignment.Randomize"/>, whether the App keeps the first draw across undo/redo (Saved) or re-draws each time (Pure). Unused otherwise and by the Gamebook.</summary>
         public RandomMode RandomMode { get; set; }
 

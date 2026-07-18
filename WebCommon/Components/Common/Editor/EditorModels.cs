@@ -695,6 +695,17 @@ namespace DeusaldStoryWeb
                     node.Inputs.Add(new EdPort { Id = set.PlaceholderIn.Id, Name = UiLang.T(Localization.Editor.Nodes.Ports.placeholder), Type = PortType.Text });
                     node.Inputs.Add(new EdPort { Id = set.ValidationIn.Id,  Name = UiLang.T(Localization.Editor.Nodes.Ports.validation),  Type = PortType.Variable });
                 }
+                // A wired specific value takes it from a Variable port (the App's runtime value) and a Text port (the
+                // Gamebook display of what to write) — mirrors Get Variable's Value/Slot split, but as inputs.
+                bool wireSpecific = set.WireValue
+                                 && (setType == StorageVariableType.String
+                                        ? set.StringMode == StringValueMode.Specific
+                                        : setType is StorageVariableType.Number or StorageVariableType.Dial && set.Assignment == NumberAssignment.SetSpecific);
+                if (wireSpecific)
+                {
+                    node.Inputs.Add(new EdPort { Id = set.ValueIn.Id,     Name = UiLang.T(Localization.Editor.Nodes.Ports.appValue),     Type = PortType.Variable });
+                    node.Inputs.Add(new EdPort { Id = set.ValueTextIn.Id, Name = UiLang.T(Localization.Editor.Nodes.Ports.gamebookText), Type = PortType.Text });
+                }
                 node.Outputs.Add(new EdPort { Id = set.FlowOut.Id, Name = UiLang.T(Localization.Editor.Nodes.Ports.flow), Type = PortType.LFlow });
                 nodes.Add(node);
             }

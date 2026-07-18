@@ -91,11 +91,22 @@ namespace DeusaldStoryCommon
             if (targetReg is null) return null;
 
             if (targetReg.Type == StorageVariableType.String)
-                return StringEntry(project, localization, logic, targetReg.SlotIndex, set.StringMode, set.StringValue,
+            {
+                // A wired specific value takes its Gamebook display from the Value text port instead of the baked string
+                // (the App stores it silently either way, so only the printed text differs).
+                string stringVal = set.WireValue && set.StringMode == StringValueMode.Specific
+                    ? StoryLogicRenderer.ResolvePortText(project, localization, logic, set.ValueTextIn.Id, target)
+                    : set.StringValue;
+                return StringEntry(project, localization, logic, targetReg.SlotIndex, set.StringMode, stringVal,
                     set.StringInputKind, set.InstructionIn.Id, set.PlaceholderIn.Id, set.Placement, target, targetReg.Name, set.MaxLength);
+            }
 
             if (target == StoryRenderTarget.App) return null;
-            string? line = AssignmentLine(localization, targetReg.Type, targetReg.SlotIndex, targetReg.Mode, targetReg.ValueCount, set.Assignment, set.Secret, set.SpecificValue);
+            // A wired specific value prints the Gamebook display text in place of the fixed number.
+            object? specificDisplay = set.WireValue && set.Assignment == NumberAssignment.SetSpecific
+                ? StoryLogicRenderer.ResolvePortText(project, localization, logic, set.ValueTextIn.Id, target)
+                : null;
+            string? line = AssignmentLine(localization, targetReg.Type, targetReg.SlotIndex, targetReg.Mode, targetReg.ValueCount, set.Assignment, set.Secret, set.SpecificValue, specificDisplay);
             return Line(line, set.Placement);
         }
 
@@ -151,9 +162,12 @@ namespace DeusaldStoryCommon
         /// <summary>The instruction for assigning (or clearing) a Number/Dial value on a slot — shared by Register and Set.</summary>
         private static string? AssignmentLine(
             LocProject? localization, StorageVariableType type, int slotIndex, NumberStorageMode mode,
-            NumberValueCount valueCount, NumberAssignment assignment, bool secret, int specificValue)
+            NumberValueCount valueCount, NumberAssignment assignment, bool secret, int specificValue, object? specificDisplay = null)
         {
             string slot = StorageSlots.Label(type, slotIndex);
+
+            // A wired Set displays this text where the fixed value would print; a baked one prints the number itself.
+            object value = specificDisplay ?? specificValue;
 
             // Unset produces no instruction — the slot is claimed but left empty.
             if (type is StorageVariableType.Number or StorageVariableType.Dial && assignment == NumberAssignment.Unset)
@@ -164,10 +178,10 @@ namespace DeusaldStoryCommon
                 case StorageVariableType.Dial:
                     return assignment == NumberAssignment.Randomize
                         ? Resolve(localization, StoryCommonLocalizationKeys.StorageDialRandom, slot)
-                        : Resolve(localization, secret ? StoryCommonLocalizationKeys.StorageDialSetSecret : StoryCommonLocalizationKeys.StorageDialSet, slot, value: specificValue);
+                        : Resolve(localization, secret ? StoryCommonLocalizationKeys.StorageDialSetSecret : StoryCommonLocalizationKeys.StorageDialSet, slot, value: value);
 
                 case StorageVariableType.Number:
-                    return NumberLine(localization, slot, mode, valueCount, assignment, secret, specificValue);
+                    return NumberLine(localization, slot, mode, valueCount, assignment, secret, specificValue, specificDisplay);
             }
 
             return null;
@@ -175,8 +189,10 @@ namespace DeusaldStoryCommon
 
         private static string NumberLine(
             LocProject? localization, string slot, NumberStorageMode mode, NumberValueCount valueCount,
-            NumberAssignment assignment, bool secret, int specificValue)
+            NumberAssignment assignment, bool secret, int specificValue, object? specificDisplay = null)
         {
+            // A wired Set displays this text where the fixed value would print; a baked one prints the number itself.
+            object value = specificDisplay ?? specificValue;
             int max = StorageSlots.ToNumber(valueCount);
 
             // A one-value presence flag is just "mark the slot as set", regardless of die/token.
@@ -186,7 +202,7 @@ namespace DeusaldStoryCommon
             if (mode == NumberStorageMode.Dice)
             {
                 if (assignment == NumberAssignment.SetSpecific)
-                    return Resolve(localization, StoryCommonLocalizationKeys.StorageNumberDiceSpecific, slot, value: specificValue);
+                    return Resolve(localization, StoryCommonLocalizationKeys.StorageNumberDiceSpecific, slot, value: value);
 
                 return max is 4 or 5
                     ? Resolve(localization, StoryCommonLocalizationKeys.StorageNumberDiceReroll, slot, max: max)
@@ -197,7 +213,7 @@ namespace DeusaldStoryCommon
             if (assignment == NumberAssignment.Randomize)
                 return Resolve(localization, secret ? StoryCommonLocalizationKeys.StorageNumberTokenRandomSecret : StoryCommonLocalizationKeys.StorageNumberTokenRandom, slot, max: max);
 
-            return Resolve(localization, secret ? StoryCommonLocalizationKeys.StorageNumberTokenSpecificSecret : StoryCommonLocalizationKeys.StorageNumberTokenSpecific, slot, value: specificValue);
+            return Resolve(localization, secret ? StoryCommonLocalizationKeys.StorageNumberTokenSpecificSecret : StoryCommonLocalizationKeys.StorageNumberTokenSpecific, slot, value: value);
         }
 
         private static string ClearLine(StoryProject project, LocProject? localization, Guid registeredVariableId)

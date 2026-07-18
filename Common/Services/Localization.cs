@@ -870,6 +870,9 @@ namespace DeusaldStoryCommon
                     public static readonly Guid title = new Guid("bcba8c3a-8da1-4571-8ce7-e95124aed1cc");
                     public static readonly Guid unsetClear = new Guid("6d54f669-1553-46af-9bf2-452ba41a5f11");
                     public static readonly Guid confirm = new Guid("88fed975-665f-496d-8886-d487b69d5f83");
+                    public static readonly Guid wireValue = new Guid("c9b86727-c0b2-48e4-938b-d6a18b9b8f73");
+                    /// <summary>MarkupString.</summary>
+                    public static readonly Guid wireValueHint = new Guid("8b327c31-c4b5-4d17-904c-d34a572163a2");
                 }
 
                 public static class SetExternalVariable
@@ -992,6 +995,8 @@ namespace DeusaldStoryCommon
                     public static readonly Guid branch = new Guid("c79d3623-f05d-400b-8191-878789b87fff");
                     public static readonly Guid result = new Guid("7fa3503b-64ee-44d2-b8c9-741d166d5835");
                     public static readonly Guid gamebookResultFormat = new Guid("725b72f6-beec-47b5-916b-8aaa47d7b080");
+                    public static readonly Guid appValue = new Guid("b6e4a58f-6544-4aa6-b273-4a56d134eb3f");
+                    public static readonly Guid gamebookText = new Guid("95d69b04-cc92-41a2-ac4b-fb51458aa5af");
                 }
 
                 public static class Titles
@@ -1777,6 +1782,8 @@ namespace DeusaldStoryCommon
                 { new Guid("bcba8c3a-8da1-4571-8ce7-e95124aed1cc"), "Set variable" },
                 { new Guid("6d54f669-1553-46af-9bf2-452ba41a5f11"), "Unset (clear it)" },
                 { new Guid("88fed975-665f-496d-8886-d487b69d5f83"), "Add set node" },
+                { new Guid("c9b86727-c0b2-48e4-938b-d6a18b9b8f73"), "Wire the value" },
+                { new Guid("8b327c31-c4b5-4d17-904c-d34a572163a2"), "The value comes from the node's <b>App Value</b> (variable) and <b>Gamebook Text</b> ports instead of a fixed value." },
                 { new Guid("7e73dc5e-0c47-4eec-b2d5-2b8a7c89dda1"), "Edit set external variable" },
                 { new Guid("19649210-a1cb-41a1-9826-de7015ab3ca4"), "Set external variable" },
                 { new Guid("bd5fc888-d141-4139-98c4-276db31a207a"), "No variables yet — add some in the Variables panel first." },
@@ -2010,6 +2017,8 @@ namespace DeusaldStoryCommon
                 { new Guid("c79d3623-f05d-400b-8191-878789b87fff"), "Branch" },
                 { new Guid("7fa3503b-64ee-44d2-b8c9-741d166d5835"), "Result" },
                 { new Guid("725b72f6-beec-47b5-916b-8aaa47d7b080"), "Gamebook Result Format" },
+                { new Guid("b6e4a58f-6544-4aa6-b273-4a56d134eb3f"), "App Value" },
+                { new Guid("95d69b04-cc92-41a2-ac4b-fb51458aa5af"), "Gamebook Text" },
                 // Randomized Instruction — node title fallback + label
                 { new Guid("659e53a8-ccc4-41cc-bae3-817b2d43c938"), "Random" },
                 { new Guid("e6106c9a-e349-4007-86a8-143d90d3f687"), "Randomized Instruction" },

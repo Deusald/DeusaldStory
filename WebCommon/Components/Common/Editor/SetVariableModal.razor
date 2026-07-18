@@ -96,14 +96,33 @@
                     @if (_Assignment == NumberAssignment.SetSpecific)
                     {
                         <div class="modal-field">
-                            <label class="modal-label">@Loc.T(Localization.Common.Fields.value)</label>
-                            <input class="modal-input"
-                                   type="number"
-                                   min="@ValueMin"
-                                   max="@ValueMax"
-                                   @bind="_SpecificValue"
-                                   @bind:event="oninput"/>
+                            <label class="svm-check">
+                                <input type="checkbox"
+                                       checked="@_WireValue"
+                                       @onchange="e => _WireValue = (bool)(e.Value ?? false)"/>
+                                <span>@Loc.T(Localization.Editor.Modals.SetVariable.wireValue)</span>
+                            </label>
                         </div>
+
+                        @if (_WireValue)
+                        {
+                            <div class="modal-note">
+                                <i class="bi bi-info-circle"></i>
+                                <span>@((MarkupString)Loc.T(Localization.Editor.Modals.SetVariable.wireValueHint))</span>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="modal-field">
+                                <label class="modal-label">@Loc.T(Localization.Common.Fields.value)</label>
+                                <input class="modal-input"
+                                       type="number"
+                                       min="@ValueMin"
+                                       max="@ValueMax"
+                                       @bind="_SpecificValue"
+                                       @bind:event="oninput"/>
+                            </div>
+                        }
                     }
 
                     @if (_Assignment == NumberAssignment.Randomize)
@@ -152,14 +171,33 @@
                     @if (_StringMode == StringValueMode.Specific)
                     {
                         <div class="modal-field">
-                            <label class="modal-label">@Loc.T(Localization.Common.VariableInput.writtenValue)</label>
-                            <input class="modal-input"
-                                   type="text"
-                                   placeholder="@Loc.T(Localization.Common.VariableInput.writtenValuePlaceholder)"
-                                   @bind="_StringValue"
-                                   @bind:event="oninput"
-                                   maxlength="30"/>
+                            <label class="svm-check">
+                                <input type="checkbox"
+                                       checked="@_WireValue"
+                                       @onchange="e => _WireValue = (bool)(e.Value ?? false)"/>
+                                <span>@Loc.T(Localization.Editor.Modals.SetVariable.wireValue)</span>
+                            </label>
                         </div>
+
+                        @if (_WireValue)
+                        {
+                            <div class="modal-note">
+                                <i class="bi bi-info-circle"></i>
+                                <span>@((MarkupString)Loc.T(Localization.Editor.Modals.SetVariable.wireValueHint))</span>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="modal-field">
+                                <label class="modal-label">@Loc.T(Localization.Common.VariableInput.writtenValue)</label>
+                                <input class="modal-input"
+                                       type="text"
+                                       placeholder="@Loc.T(Localization.Common.VariableInput.writtenValuePlaceholder)"
+                                       @bind="_StringValue"
+                                       @bind:event="oninput"
+                                       maxlength="30"/>
+                            </div>
+                        }
                     }
 
                     @if (_StringMode == StringValueMode.PlayerInput)
@@ -297,6 +335,7 @@
     private NumberAssignment       _Assignment = NumberAssignment.SetSpecific;
     private bool                   _Secret;
     private int                    _SpecificValue = 1;
+    private bool                   _WireValue;
     private RandomMode             _RandomMode = RandomMode.Saved;
 
     private StorageInstructionPlacement _Placement;
@@ -325,6 +364,7 @@
         _Assignment           = NumberAssignment.SetSpecific;
         _Secret               = false;
         _SpecificValue        = 1;
+        _WireValue            = false;
         _RandomMode           = RandomMode.Saved;
         _Placement            = StorageInstructionPlacement.Below;
         _StringMode           = StringValueMode.Unset;
@@ -350,6 +390,7 @@
         _Assignment           = node.Assignment;
         _Secret               = node.Secret;
         _SpecificValue        = node.SpecificValue;
+        _WireValue            = node.WireValue;
         _RandomMode           = node.RandomMode;
         _Placement            = node.Placement;
         _StringMode           = node.StringMode;
@@ -479,7 +520,7 @@
             _Placement, _StringMode, _StringValue.Trim(), _StringInputKind,
             minLen, maxLen, _LengthErrorKeyId,
             _ValidationRule.Children.Count > 0 ? _ValidationRule.Clone() : null,
-            _ValidationErrorKeyId));
+            _ValidationErrorKeyId, _WireValue));
     }
 
     private void Cancel() => _Visible = false;
@@ -502,5 +543,6 @@
         int                         MaxLength,
         Guid                        LengthErrorKeyId,
         StoryConditionExpr?         ValidationRule,
-        Guid                        ValidationErrorKeyId);
+        Guid                        ValidationErrorKeyId,
+        bool                        WireValue);
 }
