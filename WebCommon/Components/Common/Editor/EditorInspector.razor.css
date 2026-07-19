@@ -72,25 +72,32 @@
     margin-top: 14px;
 }
 
-.ins-section-head {
+/* ── Shared controls ─────────────────────────────────────────────────────── */
+/* Everything from here down is also emitted by the sub-editors in Inspectors/
+   (TextConfigEditor, IconSlotEditor, VariablePicker, ChoiceDefinitionsEditor).
+   CSS isolation stamps the scope attribute only on this component's own markup,
+   so these rules go through ::deep to reach the children's elements too. They
+   all render inside .ins-root, which keeps the reach bounded to the inspector. */
+
+.ins-root ::deep .ins-section-head {
     display: flex;
     align-items: baseline;
     justify-content: space-between;
     margin-bottom: 10px;
 }
-.ins-section-head:not(:first-child) { margin-top: 20px; }
-.ins-section-label {
+.ins-root ::deep .ins-section-head:not(:first-child) { margin-top: 20px; }
+.ins-root ::deep .ins-section-label {
     font-size: 10.5px;
     font-weight: 600;
     letter-spacing: .07em;
     text-transform: uppercase;
     color: var(--text-dim);
 }
-.ins-section-count { font-size: 11px; color: var(--text-faint); }
+.ins-root ::deep .ins-section-count { font-size: 11px; color: var(--text-faint); }
 
 /* ── Connected text (SmartFormat / FlowText) ─────────────────────────────── */
 
-.ins-text {
+.ins-root ::deep .ins-text {
     font-size: 12.5px;
     line-height: 1.5;
     color: var(--text-bright);
@@ -104,7 +111,7 @@
 
 /* ── Thumbnail (Icon node preview) ───────────────────────────────────────── */
 
-.ins-thumb {
+.ins-root ::deep .ins-thumb {
     display: flex;
     align-items: center;
     justify-content: center;
@@ -114,7 +121,7 @@
     border: 1px solid var(--border);
     border-radius: var(--r-md);
 }
-.ins-thumb img {
+.ins-root ::deep .ins-thumb img {
     max-width: 100%;
     max-height: 120px;
     object-fit: contain;
@@ -123,7 +130,7 @@
 
 /* ── Ports ───────────────────────────────────────────────────────────────── */
 
-.ins-port {
+.ins-root ::deep .ins-port {
     display: flex;
     align-items: center;
     gap: 9px;
@@ -133,18 +140,18 @@
     border: 1px solid var(--border);
     border-radius: var(--r-md);
 }
-.ins-port-dot {
+.ins-root ::deep .ins-port-dot {
     flex: none;
     width: 8px;
     height: 8px;
     border-radius: 50%;
 }
-.ins-port-name {
+.ins-root ::deep .ins-port-name {
     flex: 1;
     font-size: 12.5px;
     color: var(--text-soft);
 }
-.ins-port-type {
+.ins-root ::deep .ins-port-type {
     font-family: var(--font-mono);
     font-size: 10.5px;
     color: var(--text-ghost);
@@ -156,9 +163,9 @@
 /* The inspector is now the editing surface for every node kind, so it carries
    the form controls that used to live in the per-node modals. */
 
-.ins-field { margin-bottom: 14px; }
+.ins-root ::deep .ins-field { margin-bottom: 14px; }
 
-.ins-label {
+.ins-root ::deep .ins-label {
     display: block;
     margin-bottom: 5px;
     font-size: 11px;
@@ -168,7 +175,7 @@
     color: var(--text-dim);
 }
 
-.ins-input {
+.ins-root ::deep .ins-input {
     width: 100%;
     padding: 7px 9px;
     font-size: 12.5px;
@@ -179,27 +186,27 @@
     border-radius: var(--r-md);
     outline: none;
 }
-.ins-input:focus { border-color: var(--accent); }
-.ins-input-sm { flex: 1; min-width: 0; }
-.ins-input-xs { width: 68px; flex: none; }
+.ins-root ::deep .ins-input:focus { border-color: var(--accent); }
+.ins-root ::deep .ins-input-sm { flex: 1; min-width: 0; }
+.ins-root ::deep .ins-input-xs { width: 68px; flex: none; }
 
-.ins-textarea { resize: vertical; line-height: 1.5; }
+.ins-root ::deep .ins-textarea { resize: vertical; line-height: 1.5; }
 
-.ins-inline-row {
+.ins-root ::deep .ins-inline-row {
     display: flex;
     align-items: center;
     gap: 6px;
     margin-bottom: 8px;
 }
 
-.ins-hint {
+.ins-root ::deep .ins-hint {
     margin-top: 5px;
     font-size: 11.5px;
     line-height: 1.45;
     color: var(--text-faint);
 }
 
-.ins-check {
+.ins-root ::deep .ins-check {
     display: flex;
     align-items: center;
     gap: 8px;
@@ -208,11 +215,11 @@
     color: var(--text-soft);
     cursor: pointer;
 }
-.ins-check input { accent-color: var(--accent); }
+.ins-root ::deep .ins-check input { accent-color: var(--accent); }
 
 /* ── Buttons ─────────────────────────────────────────────────────────────── */
 
-.ins-icon-btn {
+.ins-root ::deep .ins-icon-btn {
     flex: none;
     display: inline-flex;
     align-items: center;
@@ -225,9 +232,9 @@
     border-radius: var(--r-md);
     cursor: pointer;
 }
-.ins-icon-btn:hover { color: var(--danger); border-color: var(--danger); }
+.ins-root ::deep .ins-icon-btn:hover { color: var(--danger); border-color: var(--danger); }
 
-.ins-add {
+.ins-root ::deep .ins-add {
     display: inline-flex;
     align-items: center;
     gap: 6px;
@@ -240,13 +247,13 @@
     border-radius: var(--r-md);
     cursor: pointer;
 }
-.ins-add:hover { color: var(--accent); border-color: var(--accent); }
+.ins-root ::deep .ins-add:hover { color: var(--accent); border-color: var(--accent); }
 
 /* ── Localization key row ────────────────────────────────────────────────── */
 
-.ins-key-row { display: flex; align-items: center; gap: 6px; }
+.ins-root ::deep .ins-key-row { display: flex; align-items: center; gap: 6px; }
 
-.ins-key-btn {
+.ins-root ::deep .ins-key-btn {
     flex: 1;
     display: flex;
     align-items: center;
@@ -261,11 +268,11 @@
     border-radius: var(--r-md);
     cursor: pointer;
 }
-.ins-key-btn:hover { border-color: var(--accent); }
-.ins-key-btn i { flex: none; color: var(--text-dim); }
-.ins-key-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ins-root ::deep .ins-key-btn:hover { border-color: var(--accent); }
+.ins-root ::deep .ins-key-btn i { flex: none; color: var(--text-dim); }
+.ins-root ::deep .ins-key-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-.ins-key-preview {
+.ins-root ::deep .ins-key-preview {
     margin-top: 6px;
     padding: 7px 9px;
     font-size: 12px;
@@ -280,11 +287,11 @@
 
 /* ── Icon slots (light / dark) ───────────────────────────────────────────── */
 
-.ins-icon-slots { display: flex; gap: 10px; }
-.ins-icon-slot { flex: 1; min-width: 0; }
-.ins-icon-row { display: flex; align-items: center; gap: 6px; }
+.ins-root ::deep .ins-icon-slots { display: flex; gap: 10px; }
+.ins-root ::deep .ins-icon-slot { flex: 1; min-width: 0; }
+.ins-root ::deep .ins-icon-row { display: flex; align-items: center; gap: 6px; }
 
-.ins-icon-preview {
+.ins-root ::deep .ins-icon-preview {
     flex: 1;
     display: flex;
     align-items: center;
@@ -296,8 +303,8 @@
     border-radius: var(--r-md);
     cursor: pointer;
 }
-.ins-icon-preview:hover { border-color: var(--accent); }
-.ins-icon-preview img {
+.ins-root ::deep .ins-icon-preview:hover { border-color: var(--accent); }
+.ins-root ::deep .ins-icon-preview img {
     max-width: 100%;
     max-height: 52px;
     object-fit: contain;
@@ -306,7 +313,7 @@
 
 /* ── Grouped rows (choices, ranges, options) ─────────────────────────────── */
 
-.ins-card {
+.ins-root ::deep .ins-card {
     padding: 11px;
     margin-bottom: 10px;
     background: var(--surface-2);
@@ -314,7 +321,7 @@
     border-radius: var(--r-md);
 }
 
-.ins-subcard {
+.ins-root ::deep .ins-subcard {
     padding: 9px;
     margin-bottom: 8px;
     background: var(--surface-sunken, rgba(255, 255, 255, .03));
@@ -322,7 +329,7 @@
     border-radius: var(--r-md);
 }
 
-.ins-badge {
+.ins-root ::deep .ins-badge {
     flex: none;
     padding: 3px 7px;
     font-family: var(--font-mono);
@@ -333,4 +340,4 @@
     border-radius: 4px;
 }
 
-.ins-range-dash { flex: none; color: var(--text-dim); }
+.ins-root ::deep .ins-range-dash { flex: none; color: var(--text-dim); }
