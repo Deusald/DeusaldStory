@@ -209,7 +209,15 @@ namespace DeusaldStoryCommon
                 {
                     case StoryFlowNavigator.NextKind.End:
                         string theEnd = StoryCommonLocalizationKeys.Resolve(localization, StoryCommonLocalizationKeys.GamebookTheEnd);
-                        lines.Add(new ContinueLine { Text = hasText ? UiLang.T(Localization.Services.Gamebook.choiceToEnd, new Dictionary<string, object> { ["label"] = label, ["theEnd"] = theEnd }) : theEnd });
+                        // A label that writes its own line gets THE END as its section reference — that is where it leads.
+                        lines.Add(new ContinueLine
+                        {
+                            Text = rc.WithSection is not null
+                                ? rc.WithSection(theEnd)
+                                : hasText
+                                    ? UiLang.T(Localization.Services.Gamebook.choiceToEnd, new Dictionary<string, object> { ["label"] = label, ["theEnd"] = theEnd })
+                                    : theEnd
+                        });
                         break;
 
                     case StoryFlowNavigator.NextKind.Dangling:
@@ -246,14 +254,18 @@ namespace DeusaldStoryCommon
                 switch (next.Kind)
                 {
                     case StoryFlowNavigator.NextKind.Logic when next.Logic is not null:
+                        // A hub destination is referenced by its card, not a section, so that is what a self-composing
+                        // label binds — the localizer's phrasing wraps the card token exactly as it would a section.
                         string card = HubCardToken(next.Logic);
                         lines.Add(new ContinueLine
                         {
-                            Text = hasText
-                                ? StoryCommonLocalizationKeys.Resolve(localization, StoryCommonLocalizationKeys.GamebookGatherHubCardChoice,
-                                    new Dictionary<string, object> { ["choice"] = rc.Text, ["card"] = card })
-                                : StoryCommonLocalizationKeys.Resolve(localization, StoryCommonLocalizationKeys.GamebookGatherHubCard,
-                                    new Dictionary<string, object> { ["card"] = card }),
+                            Text = rc.WithSection is not null
+                                ? rc.WithSection(card)
+                                : hasText
+                                    ? StoryCommonLocalizationKeys.Resolve(localization, StoryCommonLocalizationKeys.GamebookGatherHubCardChoice,
+                                        new Dictionary<string, object> { ["choice"] = rc.Text, ["card"] = card })
+                                    : StoryCommonLocalizationKeys.Resolve(localization, StoryCommonLocalizationKeys.GamebookGatherHubCard,
+                                        new Dictionary<string, object> { ["card"] = card }),
                             TargetLogicId = next.Logic.Id
                         });
                         break;
@@ -302,18 +314,23 @@ namespace DeusaldStoryCommon
                 {
                     case StoryFlowNavigator.NextKind.Logic when next.Logic is not null:
                         string section = SectionToken(project, next.Logic, null, new StoryChoiceSources.Combination());
-                        string text    = hasText
-                            ? StoryCommonLocalizationKeys.Resolve(localization, StoryCommonLocalizationKeys.GamebookChoiceToSection,
-                                new Dictionary<string, object> { ["choice"] = ic.Text, ["section"] = section })
-                            : StoryCommonLocalizationKeys.Resolve(localization, StoryCommonLocalizationKeys.GamebookGoToSection,
-                                new Dictionary<string, object> { ["section"] = section });
+                        string text    = ic.WithSection is not null
+                            ? ic.WithSection(section)
+                            : hasText
+                                ? StoryCommonLocalizationKeys.Resolve(localization, StoryCommonLocalizationKeys.GamebookChoiceToSection,
+                                    new Dictionary<string, object> { ["choice"] = ic.Text, ["section"] = section })
+                                : StoryCommonLocalizationKeys.Resolve(localization, StoryCommonLocalizationKeys.GamebookGoToSection,
+                                    new Dictionary<string, object> { ["section"] = section });
                         links.Add(new InlineLink { Name = ic.Name, Text = text, TargetLogicId = next.Logic.Id, TargetSectionKey = section });
                         break;
 
                     case StoryFlowNavigator.NextKind.End:
-                        string endText = hasText
-                            ? UiLang.T(Localization.Services.Gamebook.choiceToEnd, new Dictionary<string, object> { ["label"] = ic.Text, ["theEnd"] = StoryCommonLocalizationKeys.Resolve(localization, StoryCommonLocalizationKeys.GamebookTheEnd) })
-                            : StoryCommonLocalizationKeys.Resolve(localization, StoryCommonLocalizationKeys.GamebookTheEnd);
+                        string theEnd  = StoryCommonLocalizationKeys.Resolve(localization, StoryCommonLocalizationKeys.GamebookTheEnd);
+                        string endText = ic.WithSection is not null
+                            ? ic.WithSection(theEnd)
+                            : hasText
+                                ? UiLang.T(Localization.Services.Gamebook.choiceToEnd, new Dictionary<string, object> { ["label"] = ic.Text, ["theEnd"] = theEnd })
+                                : theEnd;
                         links.Add(new InlineLink { Name = ic.Name, Text = endText }); // End — no section to navigate to
                         break;
 
@@ -343,13 +360,13 @@ namespace DeusaldStoryCommon
                 StoryChoiceSources.Combination? match = info.Combos.Find(c => AgreesWith(c.Pins, rc.Pins));
                 if (match is not null)
                 {
-                    yield return ContinueTo(localization, choiceText, hasText, next, SectionToken(project, next, info.Source, match));
+                    yield return ContinueTo(localization, rc, choiceText, hasText, next, SectionToken(project, next, info.Source, match));
                     yield break;
                 }
             }
 
             foreach (StoryChoiceSources.Combination combo in info.Combos)
-                yield return ContinueTo(localization, choiceText, hasText, next, SectionToken(project, next, info.Source, combo));
+                yield return ContinueTo(localization, rc, choiceText, hasText, next, SectionToken(project, next, info.Source, combo));
         }
 
         /// <summary>Whether every key the choice pinned is present in the section's pins with the same value.</summary>
@@ -361,14 +378,23 @@ namespace DeusaldStoryCommon
             return true;
         }
 
-        private static ContinueLine ContinueTo(LocProject? localization, string choiceText, bool hasText, StoryLogicNode next, string section) =>
+        /// <summary>
+        /// One continue line pointing at <paramref name="section"/>. A label whose template uses
+        /// <see cref="StoryLogicRenderer.SECTION_TOKEN"/> composes the line itself — the localizer owns the whole
+        /// phrasing, so the "…go to section …" wrapper is skipped and the re-resolved label becomes the line.
+        /// </summary>
+        private static ContinueLine ContinueTo(
+            LocProject? localization, StoryLogicRenderer.RenderedChoice rc,
+            string choiceText, bool hasText, StoryLogicNode next, string section) =>
             new()
             {
-                Text = hasText
-                    ? StoryCommonLocalizationKeys.Resolve(localization, StoryCommonLocalizationKeys.GamebookChoiceToSection,
-                        new Dictionary<string, object> { ["choice"] = choiceText, ["section"] = section })
-                    : StoryCommonLocalizationKeys.Resolve(localization, StoryCommonLocalizationKeys.GamebookContinueToSection,
-                        new Dictionary<string, object> { ["section"] = section }),
+                Text = rc.WithSection is not null
+                    ? rc.WithSection(section)
+                    : hasText
+                        ? StoryCommonLocalizationKeys.Resolve(localization, StoryCommonLocalizationKeys.GamebookChoiceToSection,
+                            new Dictionary<string, object> { ["choice"] = choiceText, ["section"] = section })
+                        : StoryCommonLocalizationKeys.Resolve(localization, StoryCommonLocalizationKeys.GamebookContinueToSection,
+                            new Dictionary<string, object> { ["section"] = section }),
                 TargetLogicId    = next.Id,
                 TargetSectionKey = section
             };

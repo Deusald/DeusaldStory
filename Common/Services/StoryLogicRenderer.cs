@@ -19,6 +19,16 @@ namespace DeusaldStoryCommon
     {
         private static readonly Dictionary<Guid, string> _EmptyValues = new();
 
+        /// <summary>
+        /// The SmartFormat token a continuation's label may use to print the reference of the section it leads to. A
+        /// label that mentions it takes over the whole Gamebook continue line — the localizer writes the "go to
+        /// section …" phrasing themselves instead of the app composing it around the label.
+        /// </summary>
+        public const string SECTION_TOKEN = "sectionId";
+
+        /// <summary>Matches a <see cref="SECTION_TOKEN"/> reference in a raw template, with or without a format spec.</summary>
+        private static readonly Regex _SectionIdToken = new Regex(@"\{\s*" + SECTION_TOKEN + @"\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
         /// <summary>A logic node resolved to display text/icon for one combination of variable values.</summary>
         public sealed class RenderedLogic
         {
@@ -97,6 +107,14 @@ namespace DeusaldStoryCommon
             /// pick which downstream section to jump to.
             /// </summary>
             public Dictionary<Guid, string> Pins { get; set; } = new();
+
+            /// <summary>
+            /// Re-resolves the label with a concrete <see cref="SECTION_TOKEN"/> bound, or <c>null</c> when the label's
+            /// template never mentions the token. Non-null means the label <b>is</b> the whole Gamebook continue line:
+            /// the section reference is only known once the destination section has been picked, so the Gamebook calls
+            /// this instead of composing "…go to section …" around <see cref="Text"/> (which binds an empty token).
+            /// </summary>
+            public Func<string, string>? WithSection { get; set; }
         }
 
         /// <summary>
@@ -131,6 +149,9 @@ namespace DeusaldStoryCommon
 
             /// <summary>The outer connection point the story continues from — as <see cref="RenderedChoice.OuterFlowOut"/>. Empty when unwired.</summary>
             public Guid OuterFlowOut { get; set; }
+
+            /// <summary>As <see cref="RenderedChoice.WithSection"/> — non-null when this label writes its own "go to section …" phrase.</summary>
+            public Func<string, string>? WithSection { get; set; }
         }
 
         /// <summary>
@@ -233,11 +254,13 @@ namespace DeusaldStoryCommon
                         continue;
                     }
                     if (logic.Choices.Find(c => string.Equals(c.Name, name, StringComparison.OrdinalIgnoreCase)) is not StoryChoice choice) continue;
+                    (string text, Func<string, string>? withSection) = ResolveLabel(localization, choice.Label, ctx, errors);
                     result.Add(new RenderedInlineChoice
                     {
                         Name         = name,
                         ChoiceId     = choice.Id,
-                        Text         = ResolveText(localization, choice.Label, ctx, errors),
+                        Text         = text,
+                        WithSection  = withSection,
                         OuterFlowOut = OuterFlowOut(logic, choice)
                     });
                 }
@@ -568,12 +591,16 @@ namespace DeusaldStoryCommon
             {
                 StoryChoice? picked = logic.Choices.FirstOrDefault(c => c.IsElse || (c.Condition?.Evaluate(id => Operand(ctx, id)) ?? false));
                 if (picked is not null)
+                {
+                    (string text, Func<string, string>? withSection) = ResolveLabel(localization, logic.AutoText, ctx, errors);
                     result.Add(new RenderedChoice
                     {
-                        Text         = ResolveText(localization, logic.AutoText, ctx, errors),
+                        Text         = text,
+                        WithSection  = withSection,
                         ChoiceId     = picked.Id,
                         OuterFlowOut = OuterFlowOut(logic, picked)
                     });
+                }
                 return result;
             }
 
@@ -584,9 +611,11 @@ namespace DeusaldStoryCommon
                 if (autoResolve && mode == StoryExitAutoMode.ChoiceVisibility
                     && !(choice.Condition?.Evaluate(id => Operand(ctx, id)) ?? true)) continue;
 
+                (string text, Func<string, string>? withSection) = ResolveLabel(localization, choice.Label, ctx, errors);
                 result.Add(new RenderedChoice
                 {
-                    Text         = ResolveText(localization, choice.Label, ctx, errors),
+                    Text         = text,
+                    WithSection  = withSection,
                     ChoiceId     = choice.Id,
                     OuterFlowOut = OuterFlowOut(logic, choice)
                 });
@@ -613,9 +642,11 @@ namespace DeusaldStoryCommon
 
                 // The last definition's entry carries the label; earlier ones only narrow the combination.
                 StoryChoiceSources.ChoiceEntry label = combo.Entries[^1];
+                (string text, Func<string, string>? withSection) = ResolveChoiceLabel(localization, label, combo, ctx, errors);
                 result.Add(new RenderedChoice
                 {
-                    Text         = ResolveChoiceLabel(localization, label, combo, ctx, errors),
+                    Text         = text,
+                    WithSection  = withSection,
                     ChoiceId     = Guid.Empty,
                     OuterFlowOut = logic.SingleOut.Id,
                     Pins         = new Dictionary<Guid, string>(combo.Pins)
@@ -627,13 +658,14 @@ namespace DeusaldStoryCommon
         /// <summary>
         /// One enumerated continuation's label: its localization key SmartFormatted with the combination's pins bound
         /// (so <c>{Health}</c> prints the value this button stands for) plus <c>{Range}</c> for a band. Falls back to
-        /// the entry's literal text when it carries no key.
+        /// the entry's literal text when it carries no key. Also yields the <see cref="SECTION_TOKEN"/> re-resolver
+        /// when the key uses it — see <see cref="ResolveLabel"/>.
         /// </summary>
-        private static string ResolveChoiceLabel(
+        private static (string Text, Func<string, string>? WithSection) ResolveChoiceLabel(
             LocProject? localization, StoryChoiceSources.ChoiceEntry entry, StoryChoiceSources.Combination combo,
             StoryVariableDictionary.Context ctx, List<string> errors)
         {
-            if (entry.KeyId == Guid.Empty) return entry.FallbackText;
+            if (entry.KeyId == Guid.Empty) return (entry.FallbackText, null);
 
             Dictionary<string, object> tokens = new(ctx.Tokens, StringComparer.OrdinalIgnoreCase);
             foreach (KeyValuePair<Guid, string> pin in combo.Pins)
@@ -641,9 +673,18 @@ namespace DeusaldStoryCommon
                 else if (StoryChoiceVariables.Find(pin.Key) is StoryVariable cv) tokens[cv.Name] = pin.Value;
             if (entry.RangeToken is not null) tokens["Range"] = entry.RangeToken;
 
-            string rendered = StoryConditionPreview.Render(LocalizedText(localization, entry.KeyId), tokens, out string? error);
-            if (error is not null) AddSmartFormatError(errors, ctx, error);
-            return rendered;
+            string template = LocalizedText(localization, entry.KeyId);
+
+            string Bind(string section, List<string> into)
+            {
+                tokens[SECTION_TOKEN] = section;
+                string rendered = StoryConditionPreview.Render(template, tokens, out string? error);
+                if (error is not null) AddSmartFormatError(into, ctx, error);
+                return rendered;
+            }
+
+            if (!_SectionIdToken.IsMatch(template)) return (Bind("", errors), null);
+            return (Bind("", errors), section => Bind(section, new List<string>()));
         }
 
         /// <summary>
@@ -695,6 +736,23 @@ namespace DeusaldStoryCommon
             if (error is not null) AddSmartFormatError(errors, ctx, error);
 
             return config.Prefix + ApplyCasing(rendered, config.Casing) + config.Suffix;
+        }
+
+        /// <summary>
+        /// Resolves a continuation's label and, when its template mentions <see cref="SECTION_TOKEN"/>, the re-resolver
+        /// that rebinds the token once the destination section is known (see <see cref="RenderedChoice.WithSection"/>).
+        /// The eager text always binds an empty token — that is what the App shows and what error lines quote.
+        /// </summary>
+        private static (string Text, Func<string, string>? WithSection) ResolveLabel(
+            LocProject? localization, StoryTextConfig config, StoryVariableDictionary.Context ctx, List<string> errors)
+        {
+            if (config.IsEmpty || !_SectionIdToken.IsMatch(LocalizedText(localization, config.KeyId)))
+                return (ResolveText(localization, config, ctx, errors), null);
+
+            string Bind(string section, List<string> into) =>
+                ResolveText(localization, config, ctx, into, new Dictionary<string, object> { [SECTION_TOKEN] = section });
+
+            return (Bind("", errors), section => Bind(section, new List<string>()));
         }
 
         /// <summary>Records a SmartFormat failure, pointing at the Gamebook-omitted-value cause when that is the likely reason.</summary>
