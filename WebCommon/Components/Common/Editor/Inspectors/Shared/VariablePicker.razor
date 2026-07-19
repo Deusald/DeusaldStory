@@ -1,0 +1,49 @@
+@namespace DeusaldStoryWeb.Components.Common
+@inject UiLocalizationService Loc
+@inject ProjectStateService _ProjectState
+
+@*
+    Picks any variable the catalog knows — authored, Medium/Theme, ChoiceA/B/C, or a derived text map. Every variable
+    dropdown in the editor goes through here so none of them can drift from StoryVariableCatalog.
+*@
+
+<div class="ins-field">
+    @if (!string.IsNullOrEmpty(Label))
+    {
+        <label class="ins-label">@Label</label>
+    }
+    <select class="ins-input" value="@Selected" @onchange="OnPicked">
+        <option value="@Guid.Empty">@Loc.T(Localization.Common.Buttons.selectVariable)</option>
+        @foreach (StoryVariable v in Candidates())
+        {
+            <option value="@v.Id">@v.Name</option>
+        }
+    </select>
+    @if (Description() is { Length: > 0 } description)
+    {
+        <div class="ins-hint">@description</div>
+    }
+</div>
+
+@code {
+    [Parameter] public Guid Selected { get; set; }
+    [Parameter] public EventCallback<Guid> SelectedChanged { get; set; }
+    [Parameter] public string Label { get; set; } = "";
+
+    /// <summary>When set, only variables a Set node may target are offered (no built-ins, Choice vars or text maps).</summary>
+    [Parameter] public bool WritableOnly { get; set; }
+
+    private StoryProject Project => _ProjectState.CurrentProject!;
+
+    private List<StoryVariable> Candidates() =>
+        WritableOnly ? StoryVariableCatalog.Writable(Project) : StoryVariableCatalog.All(Project);
+
+    private string Description() =>
+        StoryVariableCatalog.Resolve(Project, Selected)?.Description ?? "";
+
+    private async Task OnPicked(ChangeEventArgs e)
+    {
+        Selected = Guid.TryParse(e.Value?.ToString(), out Guid id) ? id : Guid.Empty;
+        await SelectedChanged.InvokeAsync(Selected);
+    }
+}

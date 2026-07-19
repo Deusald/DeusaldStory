@@ -72,5 +72,20 @@ namespace DeusaldStoryCommon
 
         /// <summary>How long the slot is reserved (Scenario = exclusive for the whole story, Chapter = per container).</summary>
         public StoryVariableLifespan Lifespan { get; set; } = StoryVariableLifespan.Scenario;
+
+        // ---- Choice labelling ----
+
+        /// <summary>
+        /// The localization key labelling a <see cref="StoryVariableChoiceMode.ValueBased"/> choice on this variable —
+        /// the button / "go to section" phrase printed once per possible value. SmartFormatted against the logic
+        /// node's variable dictionary, so it may reference this variable's own token or <c>{ChoiceA}</c>.
+        /// </summary>
+        public Guid ValueConditionKeyId { get; set; }
+
+        /// <summary>
+        /// The localization key labelling an option-based choice that reads this variable
+        /// (see <see cref="StoryChoiceOption"/>). Overridden by an option's own key when it sets one.
+        /// </summary>
+        public Guid OptionConditionKeyId { get; set; }
     }
 }

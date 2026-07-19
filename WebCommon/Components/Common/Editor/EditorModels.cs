@@ -24,8 +24,8 @@ namespace DeusaldStoryWeb
         Logic
     }
 
-    // PortType lives in DeusaldStoryCommon (Common/Data/Story/PortType.cs) so persisted data can carry a port
-    // type. Referenced here via `using DeusaldStoryCommon`.
+    // Ports are untyped — every wire carries plain flow. Variables are global, so nothing travels down a wire and
+    // there is no compatibility rule to enforce; the node's own colour carries the kind distinction instead.
 
     /// <summary>
     /// One step in the editor's breadcrumb — the path the user has drilled into (containers, and finally a logic
@@ -52,25 +52,16 @@ namespace DeusaldStoryWeb
         Container,  // a child container node (blue)
         PortalIn,   // a portal's entry node — flow arriving here teleports to the paired portal out (orange)
         PortalOut,  // a portal's exit node — flow re-emerges here and continues on (orange)
-        LogicEntry, // inside a logic node: the single Entry node (Title/Icon inputs + LFlow output) (green)
-        LogicExit,  // inside a logic node: the single Exit node carrying the node's choices (LFlow input) (red)
-        Localization, // inside a logic node: picks a localization key, emits its text (accent)
-        Icon,       // inside a logic node: picks a project icon, feeds an Icon input (orange)
-        LightDarkSwitch, // inside a logic node: picks between two icons by render theme (info)
-        SmartFormat,     // inside a logic node: formats a text with connected variable values (purple)
-        GetVariable,      // inside a logic node: reads a global variable — App value (+ Gamebook slot tag for Internal) (teal)
-        ConstantVariable, // inside a logic node: a named constant value fed into a SmartFormat/Exit input (teal)
-        ConstantString,   // inside a logic node: a literal text (verbatim) fed into any text input (teal)
+        LogicEntry, // inside a logic node: the single Entry node — title/subtitle/icon config + flow output (green)
+        LogicExit,  // inside a logic node: the single Exit node terminating the flow spine (red)
+        Text,       // inside a logic node: on the flow spine, renders a text block then continues (accent)
+        ConstantVariable,      // inside a logic node: on the flow spine, publishes a named constant into the dictionary (teal)
         RandomizedInstruction, // inside a logic node: renders a random choice — App drawn value / Gamebook D12 band table (purple)
-        FlowText,         // inside a logic node: on the LFlow chain, renders a text block then continues (amber)
-        SplitForApp,      // inside a logic node: on the LFlow chain, breaks the App render into a new "continue" page (purple)
-        SetVariable,        // inside a logic node: on the LFlow chain, sets a global variable's value (blue)
-        PrevExitVariable,        // inside a logic node: exposes the upstream node's declared variables as constants (teal)
-        LogicPortalIn,           // inside a logic node: a value portal's single input node (Text/Icon/Variable arrives here) (orange)
-        LogicPortalOut,          // inside a logic node: a value portal's output node (the value re-emerges here) (orange)
-        ConditionFlow,           // inside a logic node: on the LFlow chain, injects an optional block of flow gated by a constant condition (pink)
-        EndConditionFlow,        // inside a logic node: the paired terminator that closes a Condition node's injected block (pink)
-        Comment                  // in a container's graph or a logic node's inner graph: a free-text author note, no ports (dim)
+        SplitForApp,           // inside a logic node: on the flow spine, breaks the App render into a new "continue" page (orange)
+        SetVariable,           // inside a logic node: on the flow spine, sets a global variable's value (pink)
+        ConditionFlow,         // inside a logic node: on the flow spine, injects an optional block of flow gated by a condition (amber)
+        EndConditionFlow,      // inside a logic node: the paired terminator that closes a Condition node's injected block (amber)
+        Comment                // in a container's graph or a logic node's inner graph: a free-text author note, no ports (dim)
     }
 
     /// <summary>A point on the graph canvas in world (un-panned, un-scaled) coordinates.</summary>
@@ -88,9 +79,8 @@ namespace DeusaldStoryWeb
     /// <summary>An input or output connection port drawn on a node card.</summary>
     public sealed class EdPort
     {
-        public Guid     Id   { get; init; }
-        public string   Name { get; init; } = "";
-        public PortType Type { get; init; } = PortType.Flow;
+        public Guid   Id   { get; init; }
+        public string Name { get; init; } = "";
     }
 
     /// <summary>A node as drawn on the graph canvas, projected from the persisted story model.</summary>
@@ -166,7 +156,7 @@ namespace DeusaldStoryWeb
                     Deletable = false,
                     Editable  = false
                 };
-                node.Outputs.Add(new EdPort { Id = ep.Id, Name = ep.FlowKind == StoryPointFlow.VFlow ? UiLang.T(Localization.Editor.Nodes.Ports.variables) : UiLang.T(Localization.Editor.Nodes.Ports.flow), Type = ep.FlowKind == StoryPointFlow.VFlow ? PortType.VFlow : PortType.Flow });
+                node.Outputs.Add(new EdPort { Id = ep.Id, Name = UiLang.T(Localization.Editor.Nodes.Ports.flow) });
                 nodes.Add(node);
             }
 
@@ -182,7 +172,7 @@ namespace DeusaldStoryWeb
                     Deletable = false,
                     Editable  = false
                 };
-                node.Inputs.Add(new EdPort { Id = xp.Id, Name = xp.FlowKind == StoryPointFlow.VFlow ? UiLang.T(Localization.Editor.Nodes.Ports.variables) : UiLang.T(Localization.Editor.Nodes.Ports.flow), Type = xp.FlowKind == StoryPointFlow.VFlow ? PortType.VFlow : PortType.Flow });
+                node.Inputs.Add(new EdPort { Id = xp.Id, Name = UiLang.T(Localization.Editor.Nodes.Ports.flow) });
                 nodes.Add(node);
             }
 
@@ -202,13 +192,13 @@ namespace DeusaldStoryWeb
                 };
                 // Accept-variables makes the single entry a VFlow input (flow that also carries the upstream variables).
                 // Label the port after its type so the author can tell a plain-flow entry from a variable-carrying one.
-                node.Inputs.Add(new EdPort { Id = logic.EntryPoint.Id, Name = logic.AcceptVariables ? UiLang.T(Localization.Editor.Nodes.Ports.variables) : UiLang.T(Localization.Editor.Nodes.Ports.flow), Type = logic.AcceptVariables ? PortType.VFlow : PortType.Flow });
+                node.Inputs.Add(new EdPort { Id = logic.EntryPoint.Id, Name = UiLang.T(Localization.Editor.Nodes.Ports.flow) });
 
                 if (logic.ExitMode == StoryLogicExitMode.SinglePath)
-                    node.Outputs.Add(new EdPort { Id = logic.VFlowOut.Id, Name = UiLang.T(Localization.Editor.Nodes.Ports.continueLabel), Type = PortType.VFlow });
+                    node.Outputs.Add(new EdPort { Id = logic.SingleOut.Id, Name = UiLang.T(Localization.Editor.Nodes.Ports.continueLabel) });
                 else
                     node.Outputs.AddRange(logic.Choices.Select(c =>
-                        new EdPort { Id = c.OuterFlowOut.Id, Name = string.IsNullOrWhiteSpace(c.Name) ? UiLang.T(Localization.Editor.Nodes.Ports.choice) : c.Name, Type = PortType.Flow }));
+                        new EdPort { Id = c.OuterFlowOut.Id, Name = string.IsNullOrWhiteSpace(c.Name) ? UiLang.T(Localization.Editor.Nodes.Ports.choice) : c.Name }));
                 nodes.Add(node);
             }
 
@@ -266,8 +256,8 @@ namespace DeusaldStoryWeb
                     Y         = child.Y,
                     Deletable = true
                 };
-                node.Inputs.AddRange(child.EntryPoints.Select(p => new EdPort { Id = p.Id, Name = p.Name, Type = p.FlowKind == StoryPointFlow.VFlow ? PortType.VFlow : PortType.Flow }));
-                node.Outputs.AddRange(child.ExitPoints.Select(p => new EdPort { Id = p.Id, Name = p.Name, Type = p.FlowKind == StoryPointFlow.VFlow ? PortType.VFlow : PortType.Flow }));
+                node.Inputs.AddRange(child.EntryPoints.Select(p => new EdPort { Id = p.Id, Name = p.Name }));
+                node.Outputs.AddRange(child.ExitPoints.Select(p => new EdPort { Id = p.Id, Name = p.Name }));
                 nodes.Add(node);
             }
 
@@ -308,487 +298,220 @@ namespace DeusaldStoryWeb
 
         /// <summary>
         /// Builds the graph nodes for a logic node's inner content graph: its single Entry node (the reused
-        /// <see cref="StoryLogicNode.EntryPoint"/>, with the extra Title/Subtitle/Icon config inputs), one Exit node per
-        /// <see cref="StoryLogicNode.ExitPoints"/> entry, and every Localization/Icon content node. Names for
-        /// content nodes are resolved from <paramref name="localization"/> and the project's image library.
+        /// <see cref="StoryLogicNode.EntryPoint"/>), the single Exit node terminating the spine, and every content
+        /// node on that spine. Every node has exactly one flow in and one flow out, so the projection is uniform —
+        /// what each node <i>does</i> is configured in the inspector, not wired.
         /// </summary>
         public static List<EdNode> BuildLogicNodes(StoryProject project, StoryLogicNode logic, LocProject? localization)
         {
             List<EdNode> nodes = new();
 
-            // ── Entry node (green) — flow starts here; Title/Subtitle/Icon feed its content. ──
+            // ── Entry node (green) — flow starts here. Title/subtitle/icon are configured on it, not wired in. ──
             (double ex, double ey) = PointPos(logic.EntryPoint, _LOGIC_ENTRY_X, _LOGIC_ENTRY_Y);
             EdNode entry = new()
             {
                 Id        = logic.EntryPoint.Id,
                 Kind      = StoryNodeKind.LogicEntry,
                 Title     = UiLang.T(Localization.Editor.Nodes.Titles.entry),
+                Subtitle  = EntrySummary(logic, localization),
                 X         = ex,
                 Y         = ey,
                 Deletable = false,
-                Editable  = false
+                Editable  = true,
+                Thumb     = EntryThumb(project, logic)
             };
-            entry.Inputs.Add(new EdPort { Id = logic.TitleIn.Id,    Name = UiLang.T(Localization.Editor.Nodes.Ports.title),    Type = PortType.Text });
-            entry.Inputs.Add(new EdPort { Id = logic.SubtitleIn.Id, Name = UiLang.T(Localization.Editor.Nodes.Ports.subtitle), Type = PortType.Text });
-            entry.Inputs.Add(new EdPort { Id = logic.IconIn.Id,     Name = UiLang.T(Localization.Editor.Nodes.Ports.icon),     Type = PortType.Icon });
-            entry.Outputs.Add(new EdPort { Id = logic.EntryPoint.Id, Name = UiLang.T(Localization.Editor.Nodes.Ports.flow), Type = PortType.LFlow });
+            entry.Outputs.Add(new EdPort { Id = logic.EntryPoint.Id, Name = UiLang.T(Localization.Editor.Nodes.Ports.flow) });
             nodes.Add(entry);
 
-            // ── Exit node (red) — the single terminator carrying the node's choices. One LFlow input, one Text input
-            //    per choice, one Variables input (wire it to auto-resolve the choice in the App), and — in auto mode —
-            //    a single Auto-text input overriding the default "Click here to continue…" label. ──
-            bool autoMode = logic.ContentConnections.Exists(c => c.ToPoint == logic.ExitVariablesIn.Id);
-            // The single Auto-text port only applies to Automatic Choice — Choice Visibility and Hub Paths label each
-            // choice from its own per-choice Text input instead.
-            bool autoChoiceText = autoMode && logic.ExitMode != StoryLogicExitMode.HubPaths && logic.ExitAutoMode == StoryExitAutoMode.AutomaticChoice;
-            (double xx, double xy) = PointPos(logic.ExitLFlowIn, _LOGIC_EXIT_X, _LOGIC_EXIT_Y0);
+            // ── Exit node (red) — the single terminator. Choices are configured on it, not wired into it. ──
+            (double xx, double xy) = PointPos(logic.ExitFlowIn, _LOGIC_EXIT_X, _LOGIC_EXIT_Y0);
             EdNode exit = new()
             {
-                Id        = logic.ExitLFlowIn.Id,
+                Id        = logic.ExitFlowIn.Id,
                 Kind      = StoryNodeKind.LogicExit,
                 Title     = UiLang.T(Localization.Editor.Nodes.Titles.exit),
-                Subtitle  = autoMode ? UiLang.T(Localization.Editor.Nodes.Titles.exitAutoSubtitle) : "",
+                Subtitle  = ExitSummary(project, logic),
                 X         = xx,
                 Y         = xy,
                 Deletable = false,
                 Editable  = true
             };
-            exit.Inputs.Add(new EdPort { Id = logic.ExitLFlowIn.Id,     Name = UiLang.T(Localization.Editor.Nodes.Ports.flow),      Type = PortType.LFlow });
-            exit.Inputs.Add(new EdPort { Id = logic.ExitVariablesIn.Id, Name = UiLang.T(Localization.Editor.Nodes.Ports.variables), Type = PortType.Variable });
-            if (autoChoiceText)
-                exit.Inputs.Add(new EdPort { Id = logic.ExitAutoTextIn.Id, Name = UiLang.T(Localization.Editor.Nodes.Ports.text), Type = PortType.Text });
-            foreach (StoryChoice choice in logic.Choices)
-            {
-                string label = string.IsNullOrWhiteSpace(choice.Name) ? UiLang.T(Localization.Editor.Nodes.Ports.choice) : choice.Name;
-                exit.Inputs.Add(new EdPort { Id = choice.TextIn.Id, Name = UiLang.T(Localization.Editor.Nodes.Ports.choiceText, new Dictionary<string, object> { ["label"] = label }), Type = PortType.Text });
-            }
+            exit.Inputs.Add(new EdPort { Id = logic.ExitFlowIn.Id, Name = UiLang.T(Localization.Editor.Nodes.Ports.flow) });
             nodes.Add(exit);
 
-            // ── Localization nodes (accent) — show the full category/key path + preview text. ──
-            foreach (StoryLocalizationNode loc in logic.LocalizationNodes)
-            {
-                LocLocalizationKey? key = localization?.Keys.Find(k => k.Id == loc.SelectedKeyId);
-                EdNode node = new()
-                {
-                    Id        = loc.Id,
-                    Kind      = StoryNodeKind.Localization,
-                    Title     = key is not null ? FullKeyName(key, localization!) : UiLang.T(Localization.Editor.Nodes.Titles.noKey),
-                    Subtitle  = key is not null ? PreviewText(key, localization) : "",
-                    X         = loc.X,
-                    Y         = loc.Y,
-                    Deletable = true
-                };
-                node.Outputs.Add(new EdPort { Id = loc.OutPoint.Id, Name = UiLang.T(Localization.Editor.Nodes.Ports.text), Type = PortType.Text });
-                nodes.Add(node);
-            }
-
-            // ── Icon nodes (orange) — show the picked icon as a thumbnail. ──
-            foreach (StoryIconNode ico in logic.IconNodes)
-            {
-                bool found = project.Images.TryGetValue(ico.SelectedImageId, out StoryImage? image);
-                EdNode node = new()
-                {
-                    Id        = ico.Id,
-                    Kind      = StoryNodeKind.Icon,
-                    Title     = found ? image!.Name : UiLang.T(Localization.Editor.Nodes.Titles.noIcon),
-                    Thumb     = found ? image!.Data : null,
-                    X         = ico.X,
-                    Y         = ico.Y,
-                    Deletable = true
-                };
-                node.Outputs.Add(new EdPort { Id = ico.OutPoint.Id, Name = UiLang.T(Localization.Editor.Nodes.Ports.icon), Type = PortType.Icon });
-                nodes.Add(node);
-            }
-
-            // ── Light/Dark switch nodes (info) — two icon inputs, one icon output; no config to edit. ──
-            foreach (StoryLightDarkSwitchNode lds in logic.LightDarkSwitchNodes)
+            // ── Text nodes ──
+            foreach (StoryTextNode text in logic.TextNodes)
             {
                 EdNode node = new()
                 {
-                    Id        = lds.Id,
-                    Kind      = StoryNodeKind.LightDarkSwitch,
-                    Title     = UiLang.T(Localization.Editor.Nodes.Titles.lightDark),
-                    X         = lds.X,
-                    Y         = lds.Y,
-                    Deletable = true,
-                    Editable  = false
-                };
-                node.Inputs.Add(new EdPort { Id = lds.DarkIn.Id,  Name = UiLang.T(Localization.Editor.Nodes.Ports.dark),  Type = PortType.Icon });
-                node.Inputs.Add(new EdPort { Id = lds.LightIn.Id, Name = UiLang.T(Localization.Editor.Nodes.Ports.light), Type = PortType.Icon });
-                node.Outputs.Add(new EdPort { Id = lds.OutPoint.Id, Name = UiLang.T(Localization.Editor.Nodes.Ports.icon), Type = PortType.Icon });
-                nodes.Add(node);
-            }
-
-            // ── SmartFormat nodes (purple) — a text input, a many-to-one variables input, one formatted output. ──
-            foreach (StorySmartFormatNode sf in logic.SmartFormatNodes)
-            {
-                EdNode node = new()
-                {
-                    Id        = sf.Id,
-                    Kind      = StoryNodeKind.SmartFormat,
-                    Title     = UiLang.T(Localization.Editor.Nodes.Titles.smartFormat),
-                    Subtitle  = SmartFormatSummary(sf),
-                    X         = sf.X,
-                    Y         = sf.Y,
+                    Id        = text.Id,
+                    Kind      = StoryNodeKind.Text,
+                    Title     = StoryStyle.NodeLabel(StoryNodeKind.Text),
+                    Subtitle  = TextNodeSummary(text) ?? TextPreview(localization, text.Text),
+                    X         = text.X,
+                    Y         = text.Y,
                     Deletable = true,
                     Editable  = true
                 };
-                node.Inputs.Add(new EdPort { Id = sf.LocalizationIn.Id, Name = UiLang.T(Localization.Editor.Nodes.Ports.text),      Type = PortType.Text });
-                node.Inputs.Add(new EdPort { Id = sf.VariablesIn.Id,    Name = UiLang.T(Localization.Editor.Nodes.Ports.variables), Type = PortType.Variable });
-                node.Outputs.Add(new EdPort { Id = sf.OutPoint.Id, Name = UiLang.T(Localization.Editor.Nodes.Ports.text), Type = PortType.Text });
+                AddFlowPorts(node, text.FlowIn.Id, text.FlowOut.Id);
                 nodes.Add(node);
             }
 
-            // ── Get Variable nodes (teal) — read a global variable: a Value port (+ a Slot tag for Internal variables). ──
-            foreach (StoryGetVariableNode gv in logic.GetVariableNodes)
-            {
-                StoryVariable? v      = StoryLogicFlow.GetTarget(project, gv);
-                bool           found  = v is not null;
-                bool           inner  = found && v!.Scope == StoryVariableScope.Internal;
-                bool           constant = found && (StoryBuiltInVariables.IsBuiltIn(v!.Id) || StoryVariableValues.IsConstant(v));
-                string         name   = !string.IsNullOrWhiteSpace(gv.NameOverride) ? gv.NameOverride : found ? v!.Name : "";
-                EdNode node = new()
-                {
-                    Id        = gv.Id,
-                    Kind      = StoryNodeKind.GetVariable,
-                    Title     = !string.IsNullOrWhiteSpace(name) ? name : UiLang.T(Localization.Editor.Nodes.Titles.noVariable),
-                    Subtitle  = inner ? UiLang.T(Localization.Editor.Nodes.Titles.slotTypeSubtitle, new Dictionary<string, object> { ["slot"] = StoryVariableSlots.Label(v!.InternalSubtype, v.SlotIndex), ["type"] = StoryVariableSlots.Bank(v.InternalSubtype) })
-                              : found ? v!.Description
-                                      : UiLang.T(Localization.Editor.Nodes.Titles.unregistered),
-                    X         = gv.X,
-                    Y         = gv.Y,
-                    Deletable = true
-                };
-                node.Outputs.Add(new EdPort { Id = gv.OutPoint.Id, Name = UiLang.T(Localization.Editor.Nodes.Ports.value), Type = constant ? PortType.CVariable : PortType.Variable });
-                if (inner)
-                    node.Outputs.Add(new EdPort { Id = gv.SlotOutPoint.Id, Name = UiLang.T(Localization.Editor.Nodes.Ports.slot), Type = PortType.CVariable });
-                nodes.Add(node);
-            }
-
-            // ── Constant Variable nodes (teal) — a named constant value fed into a SmartFormat/Exit input. ──
-            foreach (StoryConstantVariableNode cv in logic.ConstantVariableNodes)
-            {
-                EdNode node = new()
-                {
-                    Id        = cv.Id,
-                    Kind      = StoryNodeKind.ConstantVariable,
-                    Title     = string.IsNullOrWhiteSpace(cv.Name) ? UiLang.T(Localization.Common.Placeholders.unnamed) : cv.Name,
-                    Subtitle  = cv.Value,
-                    X         = cv.X,
-                    Y         = cv.Y,
-                    Deletable = true
-                };
-                node.Outputs.Add(new EdPort { Id = cv.OutPoint.Id, Name = UiLang.T(Localization.Editor.Nodes.Ports.value), Type = PortType.CVariable });
-                nodes.Add(node);
-            }
-
-            // ── Constant String nodes (teal) — a literal text (verbatim) fed into any text input. ──
-            foreach (StoryConstantStringNode cs in logic.ConstantStringNodes)
-            {
-                EdNode node = new()
-                {
-                    Id        = cs.Id,
-                    Kind      = StoryNodeKind.ConstantString,
-                    Title     = string.IsNullOrWhiteSpace(cs.Value) ? UiLang.T(Localization.Editor.Nodes.Titles.constantString) : cs.Value,
-                    X         = cs.X,
-                    Y         = cs.Y,
-                    Deletable = true
-                };
-                node.Outputs.Add(new EdPort { Id = cs.OutPoint.Id, Name = UiLang.T(Localization.Editor.Nodes.Ports.text), Type = PortType.Text });
-                nodes.Add(node);
-            }
-
-            // ── Randomized Instruction nodes (purple) — a medium-switching SmartFormat: App drawn value / Gamebook D12 band table. ──
-            foreach (StoryRandomizedInstructionNode ri in logic.RandomizedInstructionNodes)
-            {
-                EdNode node = new()
-                {
-                    Id        = ri.Id,
-                    Kind      = StoryNodeKind.RandomizedInstruction,
-                    Title     = string.IsNullOrWhiteSpace(ri.ResultToken) ? UiLang.T(Localization.Editor.Nodes.Titles.randomizedInstruction) : ri.ResultToken,
-                    Subtitle  = UiLang.T(ri.RandomMode == RandomMode.Pure ? Localization.Common.Assignment.randomModePure : Localization.Common.Assignment.randomModeSaved),
-                    X         = ri.X,
-                    Y         = ri.Y,
-                    Deletable = true,
-                    Editable  = true
-                };
-                node.Inputs.Add(new EdPort { Id = ri.AppTextIn.Id,            Name = UiLang.T(Localization.Editor.Nodes.Ports.appInstruction),       Type = PortType.Text });
-                node.Inputs.Add(new EdPort { Id = ri.GamebookTextIn.Id,       Name = UiLang.T(Localization.Editor.Nodes.Ports.gamebookInstruction),  Type = PortType.Text });
-                node.Inputs.Add(new EdPort { Id = ri.GamebookResultFormat.Id, Name = UiLang.T(Localization.Editor.Nodes.Ports.gamebookResultFormat), Type = PortType.Text });
-                node.Inputs.Add(new EdPort { Id = ri.BranchIn.Id,            Name = UiLang.T(Localization.Editor.Nodes.Ports.branch),               Type = PortType.CVariable });
-                node.Outputs.Add(new EdPort { Id = ri.OutText.Id,     Name = UiLang.T(Localization.Editor.Nodes.Ports.text),   Type = PortType.Text });
-                node.Outputs.Add(new EdPort { Id = ri.OutVariable.Id, Name = UiLang.T(Localization.Editor.Nodes.Ports.result), Type = PortType.Variable });
-                nodes.Add(node);
-            }
-
-            // ── FlowText nodes (amber) — sit on the flow spine, render a text block, continue flow. ──
-            foreach (StoryFlowTextNode ft in logic.FlowTextNodes)
-            {
-                EdNode node = new()
-                {
-                    Id        = ft.Id,
-                    Kind      = StoryNodeKind.FlowText,
-                    Title     = UiLang.T(Localization.Editor.Nodes.Titles.flowText),
-                    Subtitle  = FlowTextMediumLabel(ft) ?? "",
-                    X         = ft.X,
-                    Y         = ft.Y,
-                    Deletable = true,
-                    Editable  = true
-                };
-                node.Inputs.Add(new EdPort { Id = ft.FlowIn.Id, Name = UiLang.T(Localization.Editor.Nodes.Ports.flow), Type = PortType.LFlow });
-                node.Inputs.Add(new EdPort { Id = ft.TextIn.Id, Name = UiLang.T(Localization.Editor.Nodes.Ports.text), Type = PortType.Text });
-                node.Outputs.Add(new EdPort { Id = ft.FlowOut.Id, Name = UiLang.T(Localization.Editor.Nodes.Ports.flow), Type = PortType.LFlow });
-                nodes.Add(node);
-            }
-
-            // ── Split-for-App nodes (purple) — on the flow spine, break the App render into a new "continue" page. ──
+            // ── Split for App ──
             foreach (StorySplitForAppNode split in logic.SplitForAppNodes)
             {
                 EdNode node = new()
                 {
                     Id        = split.Id,
                     Kind      = StoryNodeKind.SplitForApp,
-                    Title     = UiLang.T(Localization.Editor.Nodes.Titles.splitForApp),
-                    Subtitle  = UiLang.T(Localization.Editor.Nodes.Titles.splitForAppSubtitle),
+                    Title     = StoryStyle.NodeLabel(StoryNodeKind.SplitForApp),
                     X         = split.X,
                     Y         = split.Y,
                     Deletable = true,
                     Editable  = false
                 };
-                node.Inputs.Add(new EdPort { Id = split.FlowIn.Id, Name = UiLang.T(Localization.Editor.Nodes.Ports.flow), Type = PortType.LFlow });
-                node.Outputs.Add(new EdPort { Id = split.FlowOut.Id, Name = UiLang.T(Localization.Editor.Nodes.Ports.flow), Type = PortType.LFlow });
+                AddFlowPorts(node, split.FlowIn.Id, split.FlowOut.Id);
                 nodes.Add(node);
             }
 
-            // ── Set-variable nodes (blue) — on the flow spine, set a global variable's value. ──
+            // ── Constant Variable ──
+            foreach (StoryConstantVariableNode constant in logic.ConstantVariableNodes)
+            {
+                EdNode node = new()
+                {
+                    Id        = constant.Id,
+                    Kind      = StoryNodeKind.ConstantVariable,
+                    Title     = string.IsNullOrWhiteSpace(constant.Name) ? StoryStyle.NodeLabel(StoryNodeKind.ConstantVariable) : constant.Name,
+                    Subtitle  = constant.Value,
+                    X         = constant.X,
+                    Y         = constant.Y,
+                    Deletable = true,
+                    Editable  = true
+                };
+                AddFlowPorts(node, constant.FlowIn.Id, constant.FlowOut.Id);
+                nodes.Add(node);
+            }
+
+            // ── Set Variable ──
             foreach (StorySetVariableNode set in logic.SetVariableNodes)
             {
-                StoryVariable? target   = StoryLogicFlow.SetTarget(project, set);
-                bool           found    = target is not null;
-                bool           external = found && target!.Scope == StoryVariableScope.External;
-                bool           innerText = found && target!.Scope == StoryVariableScope.Internal && target.InternalSubtype == StoryInternalSubtype.Text;
-                bool           innerNum  = found && target!.Scope == StoryVariableScope.Internal
-                                        && target.InternalSubtype is StoryInternalSubtype.SmallNumber or StoryInternalSubtype.BigPublicNumber or StoryInternalSubtype.BigSecretNumber;
-                bool           remapped = external && set.ExternalMode == StorySetExternalVariableMode.RemapFromVariable;
-                bool           mapped   = external && (remapped || set.ExternalMode == StorySetExternalVariableMode.MapFromVariable);
+                StoryVariable? target = StoryLogicFlow.SetTarget(project, set);
                 EdNode node = new()
                 {
                     Id        = set.Id,
                     Kind      = StoryNodeKind.SetVariable,
-                    Title     = found ? UiLang.T(Localization.Editor.Nodes.Titles.setVariable, new Dictionary<string, object> { ["name"] = target!.Name })
-                                      : UiLang.T(Localization.Editor.Nodes.Titles.setNoVariable),
-                    Subtitle  = target is { Scope: StoryVariableScope.Internal } iv ? StoryVariableSlots.Label(iv.InternalSubtype, iv.SlotIndex)
-                              : remapped ? UiLang.T(Localization.Editor.Nodes.Titles.setExternalRemapped)
-                              : mapped   ? UiLang.T(Localization.Editor.Nodes.Titles.setExternalMapped)
-                              : external && !string.IsNullOrEmpty(set.ExternalValue) ? UiLang.T(Localization.Editor.Nodes.Titles.setExternalValue, new Dictionary<string, object> { ["value"] = set.ExternalValue })
-                              : "",
+                    Title     = StoryStyle.NodeLabel(StoryNodeKind.SetVariable),
+                    Subtitle  = target?.Name ?? UiLang.T(Localization.Common.Placeholders.unnamed),
                     X         = set.X,
                     Y         = set.Y,
-                    Deletable = true
+                    Deletable = true,
+                    Editable  = true
                 };
-                node.Inputs.Add(new EdPort { Id = set.FlowIn.Id, Name = UiLang.T(Localization.Editor.Nodes.Ports.flow), Type = PortType.LFlow });
-                if (mapped) node.Inputs.Add(new EdPort { Id = set.ValueIn.Id, Name = UiLang.T(Localization.Editor.Nodes.Ports.value), Type = PortType.Variable });
-                if (innerText && set.StringMode == StringValueMode.PlayerInput)
-                {
-                    node.Inputs.Add(new EdPort { Id = set.InstructionIn.Id, Name = UiLang.T(Localization.Editor.Nodes.Ports.instruction), Type = PortType.Text });
-                    node.Inputs.Add(new EdPort { Id = set.PlaceholderIn.Id, Name = UiLang.T(Localization.Editor.Nodes.Ports.placeholder), Type = PortType.Text });
-                    node.Inputs.Add(new EdPort { Id = set.ValidationIn.Id,  Name = UiLang.T(Localization.Editor.Nodes.Ports.validation),  Type = PortType.Variable });
-                }
-                // A wired specific value takes it from a Variable port (the App's runtime value) and a Text port (the
-                // Gamebook display of what to write) — mirrors Get Variable's Value/Slot split, but as inputs.
-                bool wireSpecific = set.WireValue
-                                 && ((innerText && set.StringMode == StringValueMode.Specific)
-                                  || (innerNum  && set.Assignment == NumberAssignment.SetSpecific));
-                if (wireSpecific)
-                {
-                    node.Inputs.Add(new EdPort { Id = set.ValueIn.Id,     Name = UiLang.T(Localization.Editor.Nodes.Ports.appValue),     Type = PortType.Variable });
-                    node.Inputs.Add(new EdPort { Id = set.ValueTextIn.Id, Name = UiLang.T(Localization.Editor.Nodes.Ports.gamebookText), Type = PortType.Text });
-                }
-                node.Outputs.Add(new EdPort { Id = set.FlowOut.Id, Name = UiLang.T(Localization.Editor.Nodes.Ports.flow), Type = PortType.LFlow });
+                AddFlowPorts(node, set.FlowIn.Id, set.FlowOut.Id);
                 nodes.Add(node);
             }
 
-            // ── Prev Exit Variable node (teal, non-deletable) — appears when this node accepts variables and its
-            //    Variables input is wired to an upstream Single-path node. Exposes each incoming declared variable as a
-            //    Constant (CVariable) output, keyed by the upstream declared-variable id. ──
-            List<StoryDeclaredVariable> incoming = logic.AcceptVariables
-                ? StorySelectionResolver.IncomingVariables(project, logic)
-                : new List<StoryDeclaredVariable>();
-            if (incoming.Count > 0)
+            // ── Randomized Instruction ──
+            foreach (StoryRandomizedInstructionNode random in logic.RandomizedInstructionNodes)
             {
-                StoryPrevExitVariableNode prev = logic.PrevExitVariable;
-                double px = prev.X == 0 && prev.Y == 0 ? _LOGIC_ENTRY_X : prev.X;
-                double py = prev.X == 0 && prev.Y == 0 ? _PREV_EXIT_Y   : prev.Y;
                 EdNode node = new()
                 {
-                    Id        = prev.Id,
-                    Kind      = StoryNodeKind.PrevExitVariable,
-                    Title     = UiLang.T(Localization.Editor.Nodes.Titles.prevExitVariables),
-                    Subtitle  = string.Join(", ", incoming.Select(d => d.Name)),
-                    X         = px,
-                    Y         = py,
-                    Deletable = false,
-                    Editable  = false
+                    Id        = random.Id,
+                    Kind      = StoryNodeKind.RandomizedInstruction,
+                    Title     = StoryStyle.NodeLabel(StoryNodeKind.RandomizedInstruction),
+                    Subtitle  = string.IsNullOrWhiteSpace(random.ResultToken) ? "" : random.ResultToken,
+                    X         = random.X,
+                    Y         = random.Y,
+                    Deletable = true,
+                    Editable  = true
                 };
-                foreach (StoryDeclaredVariable dv in incoming)
-                    node.Outputs.Add(new EdPort { Id = dv.Id, Name = string.IsNullOrWhiteSpace(dv.Name) ? UiLang.T(Localization.Editor.Nodes.Ports.varFallback) : dv.Name, Type = PortType.CVariable });
+                AddFlowPorts(node, random.FlowIn.Id, random.FlowOut.Id);
                 nodes.Add(node);
             }
 
-            // ── Logic portals (orange) — one-in / many-out value relays. The in accepts any value (Data); each out
-            //    adopts the concrete type (Text/Icon/Variable/Constant) of whatever is wired into the in. ──
-            foreach (StoryLogicPortalNode portal in logic.LogicPortalNodes)
-            {
-                PortType outType    = ResolvedPortalType(project, logic, portal);
-                string   outLabel   = PortTypeLabel(outType);
-
-                EdNode inNode = new()
-                {
-                    Id                = portal.InPoint.Id,
-                    Kind              = StoryNodeKind.LogicPortalIn,
-                    Title             = portal.Name,
-                    Subtitle          = outType == PortType.Data ? UiLang.T(Localization.Editor.Nodes.Titles.portalAny) : outLabel,
-                    X                 = portal.InPoint.X,
-                    Y                 = portal.InPoint.Y,
-                    Deletable         = true,
-                    Editable          = true,
-                    // One-in / many-out: the single in jumps to the first out (no next-jump — there is only one in).
-                    PortalCrossTarget = portal.OutPoints.Count > 0 ? portal.OutPoints[0].Id : null
-                };
-                inNode.Inputs.Add(new EdPort { Id = portal.InPoint.Id, Name = UiLang.T(Localization.Editor.Nodes.Ports.data), Type = PortType.Data });
-                nodes.Add(inNode);
-
-                for (int x = 0; x < portal.OutPoints.Count; ++x)
-                {
-                    StoryConnectionPoint outPoint = portal.OutPoints[x];
-                    EdNode outNode = new()
-                    {
-                        Id                = outPoint.Id,
-                        Kind              = StoryNodeKind.LogicPortalOut,
-                        Title             = portal.Name,
-                        Subtitle          = outLabel,
-                        X                 = outPoint.X,
-                        Y                 = outPoint.Y,
-                        Deletable         = true,
-                        Editable          = true,
-                        // The cross-jump lands on the single in; the next-jump cycles the other outs.
-                        PortalCrossTarget = portal.InPoint.Id,
-                        PortalNextTarget  = portal.OutPoints.Count > 1 ? portal.OutPoints[(x + 1) % portal.OutPoints.Count].Id : null
-                    };
-                    outNode.Outputs.Add(new EdPort { Id = outPoint.Id, Name = outLabel, Type = outType });
-                    nodes.Add(outNode);
-                }
-            }
-
-            // ── Condition-flow pairs (pink) — one object → two cards. The Condition card sits on the flow spine
-            //    (Flow in → Continue out) and injects an optional block out its "Condition true" output up to the
-            //    paired End condition card (Flow in only), which terminates the injected block. ──
+            // ── Condition pairs — the gate card and its paired terminator. ──
             foreach (StoryConditionFlowNode cf in logic.ConditionFlowNodes)
             {
                 EdNode condition = new()
                 {
                     Id        = cf.Id,
                     Kind      = StoryNodeKind.ConditionFlow,
-                    Title     = string.IsNullOrWhiteSpace(cf.Name) ? UiLang.T(Localization.Editor.Nodes.Titles.condition) : cf.Name,
+                    Title     = string.IsNullOrWhiteSpace(cf.Name) ? StoryStyle.NodeLabel(StoryNodeKind.ConditionFlow) : cf.Name,
                     Subtitle  = cf.Negate ? UiLang.T(Localization.Editor.Nodes.Titles.conditionNegated) : "",
                     X         = cf.X,
                     Y         = cf.Y,
                     Deletable = true,
                     Editable  = true
                 };
-                condition.Inputs.Add(new EdPort { Id = cf.FlowIn.Id, Name = UiLang.T(Localization.Editor.Nodes.Ports.flow), Type = PortType.LFlow });
-                condition.Inputs.Add(new EdPort { Id = cf.VariablesIn.Id, Name = UiLang.T(Localization.Editor.Nodes.Ports.variables), Type = PortType.Variable });
-                condition.Outputs.Add(new EdPort { Id = cf.ContinueOut.Id, Name = UiLang.T(Localization.Editor.Nodes.Ports.continueLabel), Type = PortType.LFlow });
-                condition.Outputs.Add(new EdPort { Id = cf.ConditionTrueOut.Id, Name = UiLang.T(Localization.Editor.Nodes.Ports.conditionTrue), Type = PortType.LFlow });
+                condition.Inputs.Add(new EdPort { Id = cf.FlowIn.Id, Name = UiLang.T(Localization.Editor.Nodes.Ports.flow) });
+                condition.Outputs.Add(new EdPort { Id = cf.ContinueOut.Id, Name = UiLang.T(Localization.Editor.Nodes.Ports.continueLabel) });
+                condition.Outputs.Add(new EdPort { Id = cf.ConditionTrueOut.Id, Name = UiLang.T(Localization.Editor.Nodes.Ports.conditionTrue) });
                 nodes.Add(condition);
 
                 EdNode end = new()
                 {
                     Id        = cf.EndId,
                     Kind      = StoryNodeKind.EndConditionFlow,
-                    Title     = string.IsNullOrWhiteSpace(cf.Name) ? UiLang.T(Localization.Editor.Nodes.Titles.endCondition) : cf.Name,
-                    Subtitle  = "",
+                    Title     = StoryStyle.NodeLabel(StoryNodeKind.EndConditionFlow),
                     X         = cf.EndX,
                     Y         = cf.EndY,
                     Deletable = true,
                     Editable  = false
                 };
-                end.Inputs.Add(new EdPort { Id = cf.EndFlowIn.Id, Name = UiLang.T(Localization.Editor.Nodes.Ports.flow), Type = PortType.LFlow });
+                end.Inputs.Add(new EdPort { Id = cf.EndFlowIn.Id, Name = UiLang.T(Localization.Editor.Nodes.Ports.flow) });
                 nodes.Add(end);
             }
 
-            // ── Comment notes (dim, portless) — free-text author notes; ignored during playback. ──
             foreach (StoryCommentNode comment in logic.CommentNodes)
                 nodes.Add(BuildCommentNode(comment));
 
             return nodes;
         }
 
-        /// <summary>A one-line card subtitle summarising a SmartFormat node's output transforms (empty when none are set).</summary>
-        private static string SmartFormatSummary(StorySmartFormatNode sf)
+        /// <summary>Adds the one-in / one-out flow ports every spine node carries.</summary>
+        private static void AddFlowPorts(EdNode node, Guid flowIn, Guid flowOut)
         {
-            List<string> parts = new();
-            switch (sf.Casing)
+            node.Inputs.Add(new EdPort { Id = flowIn, Name = UiLang.T(Localization.Editor.Nodes.Ports.flow) });
+            node.Outputs.Add(new EdPort { Id = flowOut, Name = UiLang.T(Localization.Editor.Nodes.Ports.flow) });
+        }
+
+        /// <summary>A one-line preview of an authored text — its main-language localized text, trimmed to fit a card.</summary>
+        private static string TextPreview(LocProject? localization, StoryTextConfig config)
+        {
+            if (config.IsEmpty) return "";
+            string text = StoryLogicRenderer.LocalizedText(localization, config.KeyId).Replace('\n', ' ').Trim();
+            return text.Length <= 60 ? text : text.Substring(0, 57) + "…";
+        }
+
+        /// <summary>The Entry card's subtitle — its title text, so the card reads as the screen it produces.</summary>
+        private static string EntrySummary(StoryLogicNode logic, LocProject? localization) =>
+            TextPreview(localization, logic.EntryTitle);
+
+        /// <summary>The Entry card's thumbnail — whichever icon slot is filled (dark preferred, matching the editor's own theme).</summary>
+        private static string? EntryThumb(StoryProject project, StoryLogicNode logic)
+        {
+            Guid id = logic.DarkIcon != Guid.Empty ? logic.DarkIcon : logic.LightIcon;
+            if (id == Guid.Empty) return null;
+            return project.Images.TryGetValue(id, out StoryImage? img) ? img.Data : null;
+        }
+
+        /// <summary>The Exit card's subtitle — how many continuations this node offers, and how they are decided.</summary>
+        private static string ExitSummary(StoryProject project, StoryLogicNode logic)
+        {
+            if (logic.ExitMode == StoryLogicExitMode.SinglePath)
             {
-                case StoryTextCasing.Upper: parts.Add(UiLang.T(Localization.Editor.Modals.SmartFormatOptions.caseUpper)); break;
-                case StoryTextCasing.Lower: parts.Add(UiLang.T(Localization.Editor.Modals.SmartFormatOptions.caseLower)); break;
+                StoryChoiceSources.Combinations(project, logic, StoryGamebookPreview.MAX_SECTIONS, out int total);
+                return logic.ChoiceDefinitions.Count == 0
+                    ? ""
+                    : UiLang.T(Localization.Editor.Nodes.Titles.exitChoiceCount, new Dictionary<string, object> { ["count"] = total });
             }
-            if (!string.IsNullOrEmpty(sf.Prefix) || !string.IsNullOrEmpty(sf.Suffix))
-                parts.Add($"{sf.Prefix}…{sf.Suffix}");
-            return string.Join(" · ", parts);
+
+            return logic.Choices.Count == 0
+                ? ""
+                : UiLang.T(Localization.Editor.Nodes.Titles.exitChoiceCount, new Dictionary<string, object> { ["count"] = logic.Choices.Count });
         }
 
-        /// <summary>
-        /// The concrete port type a logic portal carries — the type of the output wired into its in (following any
-        /// chained portals), or <see cref="PortType.Data"/> when the in is unconnected (so the out accepts nothing yet).
-        /// </summary>
-        public static PortType ResolvedPortalType(StoryProject project, StoryLogicNode logic, StoryLogicPortalNode portal)
-        {
-            Guid feed = logic.ContentConnections.Find(c => c.ToPoint == portal.InPoint.Id)?.FromPoint ?? Guid.Empty;
-            Guid src  = logic.ResolvePortalSource(feed);
-            return PortTypeOfOutput(project, logic, src) ?? PortType.Data;
-        }
-
-        /// <summary>The port type of an inner-graph output point (Text/Icon/Variable/Constant), or null when it names no known output.</summary>
-        public static PortType? PortTypeOfOutput(StoryProject project, StoryLogicNode logic, Guid outputId)
-        {
-            if (outputId == Guid.Empty) return null;
-
-            if (logic.LocalizationNodes.Exists(n => n.OutPoint.Id == outputId)
-             || logic.SmartFormatNodes.Exists(n => n.OutPoint.Id == outputId))
-                return PortType.Text;
-
-            if (logic.IconNodes.Exists(n => n.OutPoint.Id == outputId)
-             || logic.LightDarkSwitchNodes.Exists(n => n.OutPoint.Id == outputId))
-                return PortType.Icon;
-
-            if (logic.GetVariableNodes.Find(n => n.OutPoint.Id == outputId) is StoryGetVariableNode gvo)
-            {
-                StoryVariable? v = StoryLogicFlow.GetTarget(project, gvo);
-                bool constant = v is not null && (StoryBuiltInVariables.IsBuiltIn(v.Id) || StoryVariableValues.IsConstant(v));
-                return constant ? PortType.CVariable : PortType.Variable;
-            }
-            if (logic.GetVariableNodes.Exists(n => n.SlotOutPoint.Id == outputId)) return PortType.CVariable;
-            if (logic.ConstantVariableNodes.Exists(n => n.OutPoint.Id == outputId)) return PortType.CVariable;
-            if (logic.ConstantStringNodes.Exists(n => n.OutPoint.Id == outputId))   return PortType.Text;
-            if (logic.RandomizedInstructionNodes.Exists(n => n.OutText.Id == outputId))     return PortType.Text;
-            if (logic.RandomizedInstructionNodes.Exists(n => n.OutVariable.Id == outputId)) return PortType.Variable;
-            if (StorySelectionResolver.IncomingVariables(project, logic).Exists(d => d.Id == outputId)) return PortType.CVariable;
-
-            return null;
-        }
-
-        /// <summary>A short human label for a resolved port type (shown as a portal node's subtitle / port name).</summary>
-        public static string PortTypeLabel(PortType t) => t switch
-        {
-            PortType.Text      => UiLang.T(Localization.Editor.Nodes.PortTypes.text),
-            PortType.Icon      => UiLang.T(Localization.Editor.Nodes.PortTypes.icon),
-            PortType.Variable  => UiLang.T(Localization.Editor.Nodes.PortTypes.variable),
-            PortType.CVariable => UiLang.T(Localization.Editor.Nodes.PortTypes.constant),
-            _                  => UiLang.T(Localization.Editor.Nodes.PortTypes.data)
-        };
-
-        /// <summary>A compact symbol for a condition operator (used in the Exit-node auto-resolution editor).</summary>
+        /// <summary>A compact symbol for a condition operator (used in the condition editor).</summary>
         public static string ConditionSymbol(StoryConditionOperator op) => op switch
         {
             StoryConditionOperator.Equal          => "=",
@@ -801,65 +524,20 @@ namespace DeusaldStoryWeb
         };
 
         /// <summary>
-        /// The display name of the variable output wired at <paramref name="fromPoint"/> (resolved through any portal)
-        /// — how a condition builder labels an operand. Empty when the wire names no known source.
+        /// Subtitle for a Text node — the non-Normal frame style and/or a medium restriction, joined with " · ".
+        /// Null when the block renders in both mediums with the plain Normal frame (nothing worth flagging), so the
+        /// caller can fall back to previewing the text itself.
         /// </summary>
-        public static string VariableSourceName(StoryProject project, StoryLogicNode logic, Guid fromPoint)
+        private static string? TextNodeSummary(StoryTextNode text)
         {
-            fromPoint = logic.ResolvePortalSource(fromPoint);
-
-            if (logic.GetVariableNodes.Find(n => n.OutPoint.Id == fromPoint || n.SlotOutPoint.Id == fromPoint) is StoryGetVariableNode gv)
-            {
-                bool slot = gv.SlotOutPoint.Id == fromPoint;
-                if (slot && !string.IsNullOrWhiteSpace(gv.SlotNameOverride)) return gv.SlotNameOverride;
-                if (!string.IsNullOrWhiteSpace(gv.NameOverride))
-                    return slot ? UiLang.T(Localization.Editor.Page.registerSlotName, new Dictionary<string, object> { ["regName"] = gv.NameOverride }) : gv.NameOverride;
-                string varName = StoryLogicFlow.GetTarget(project, gv)?.Name ?? "";
-                return string.IsNullOrWhiteSpace(varName)
-                    ? (slot ? UiLang.T(Localization.Editor.Page.slotNameFallback) : UiLang.T(Localization.Editor.Page.getNameFallback))
-                    : (slot ? UiLang.T(Localization.Editor.Page.registerSlotName, new Dictionary<string, object> { ["regName"] = varName }) : varName);
-            }
-
-            if (logic.ConstantVariableNodes.Find(n => n.OutPoint.Id == fromPoint) is StoryConstantVariableNode cn)
-                return string.IsNullOrWhiteSpace(cn.Name) ? UiLang.T(Localization.Editor.Page.constantNameFallback) : cn.Name;
-
-            if (logic.RandomizedInstructionNodes.Find(n => n.OutVariable.Id == fromPoint) is StoryRandomizedInstructionNode ri)
-                return string.IsNullOrWhiteSpace(ri.ResultToken) ? UiLang.T(Localization.Editor.Nodes.Labels.randomizedInstruction) : ri.ResultToken;
-
-            return StorySelectionResolver.IncomingVariables(project, logic).Find(d => d.Id == fromPoint)?.Name ?? "";
-        }
-
-        /// <summary>
-        /// The outputs wired into the multi-wire variables input <paramref name="variablesIn"/>, as (output id, display
-        /// name) operands for a condition builder. Empty when the node isn't on a graph yet (a create has no wires).
-        /// </summary>
-        public static List<(Guid Id, string Name)> WiredVariables(StoryProject project, StoryLogicNode? logic, Guid variablesIn)
-        {
-            List<(Guid, string)> result = new();
-            if (logic is null || variablesIn == Guid.Empty) return result;
-
-            foreach (StoryConnection c in logic.ContentConnections.Where(c => c.ToPoint == variablesIn))
-            {
-                string name = VariableSourceName(project, logic, c.FromPoint);
-                if (!string.IsNullOrWhiteSpace(name)) result.Add((c.FromPoint, name));
-            }
-            return result;
-        }
-
-        /// <summary>
-        /// Subtitle for a FlowText node — the non-Normal frame style and/or a medium restriction, joined with " · ".
-        /// Null when the block renders in both mediums with the plain Normal frame (nothing worth flagging).
-        /// </summary>
-        private static string? FlowTextMediumLabel(StoryFlowTextNode ft)
-        {
-            string? medium = (ft.RenderInApp, ft.RenderInGamebook) switch
+            string? medium = (text.RenderInApp, text.RenderInGamebook) switch
             {
                 (true,  true)  => null,
                 (true,  false) => UiLang.T(Localization.Editor.Nodes.Mediums.appOnly),
                 (false, true)  => UiLang.T(Localization.Editor.Nodes.Mediums.gamebookOnly),
                 (false, false) => UiLang.T(Localization.Editor.Nodes.Mediums.notRendered)
             };
-            string? frame = ft.FrameStyle == StoryTextFrameStyle.Normal ? null : StoryStyle.FrameLabel(ft.FrameStyle);
+            string? frame = text.FrameStyle == StoryTextFrameStyle.Normal ? null : StoryStyle.FrameLabel(text.FrameStyle);
             return (frame, medium) switch
             {
                 (null, null) => null,
@@ -917,20 +595,11 @@ namespace DeusaldStoryWeb
             StoryNodeKind.PortalOut => UiLang.T(Localization.Editor.Nodes.Labels.portalOut),
             StoryNodeKind.LogicEntry   => UiLang.T(Localization.Editor.Nodes.Labels.entry),
             StoryNodeKind.LogicExit    => UiLang.T(Localization.Editor.Nodes.Labels.exit),
-            StoryNodeKind.Localization => UiLang.T(Localization.Editor.Nodes.Labels.localization),
-            StoryNodeKind.Icon         => UiLang.T(Localization.Editor.Nodes.Labels.icon),
-            StoryNodeKind.LightDarkSwitch => UiLang.T(Localization.Editor.Nodes.Labels.lightDark),
-            StoryNodeKind.SmartFormat      => UiLang.T(Localization.Editor.Nodes.Labels.smartFormat),
-            StoryNodeKind.GetVariable      => UiLang.T(Localization.Editor.Nodes.Labels.getVariable),
             StoryNodeKind.ConstantVariable => UiLang.T(Localization.Editor.Nodes.Labels.constantVariable),
-            StoryNodeKind.ConstantString   => UiLang.T(Localization.Editor.Nodes.Labels.constantString),
             StoryNodeKind.RandomizedInstruction => UiLang.T(Localization.Editor.Nodes.Labels.randomizedInstruction),
-            StoryNodeKind.FlowText         => UiLang.T(Localization.Editor.Nodes.Labels.flowText),
-            StoryNodeKind.SplitForApp      => UiLang.T(Localization.Editor.Nodes.Labels.splitForApp),
-            StoryNodeKind.SetVariable        => UiLang.T(Localization.Editor.Nodes.Labels.setVariable),
-            StoryNodeKind.PrevExitVariable        => UiLang.T(Localization.Editor.Nodes.Labels.prevExitVariables),
-            StoryNodeKind.LogicPortalIn           => UiLang.T(Localization.Editor.Nodes.Labels.portalIn),
-            StoryNodeKind.LogicPortalOut          => UiLang.T(Localization.Editor.Nodes.Labels.portalOut),
+            StoryNodeKind.Text                    => UiLang.T(Localization.Editor.Nodes.Labels.flowText),
+            StoryNodeKind.SplitForApp             => UiLang.T(Localization.Editor.Nodes.Labels.splitForApp),
+            StoryNodeKind.SetVariable             => UiLang.T(Localization.Editor.Nodes.Labels.setVariable),
             StoryNodeKind.ConditionFlow           => UiLang.T(Localization.Editor.Nodes.Labels.condition),
             StoryNodeKind.EndConditionFlow        => UiLang.T(Localization.Editor.Nodes.Labels.endCondition),
             StoryNodeKind.Comment                 => UiLang.T(Localization.Editor.Nodes.Labels.comment),
@@ -939,7 +608,7 @@ namespace DeusaldStoryWeb
 
         /// <summary>
         /// True when a node's <see cref="EdNode.Title"/> carries no information beyond the kind label already shown in
-        /// the header (e.g. a SmartFormat / FlowText / Exit node whose title just repeats its type) — so callers can
+        /// the header (e.g. a Text / Exit node whose title just repeats its type) — so callers can
         /// skip drawing the redundant title line. Compares case- and whitespace-insensitively.
         /// </summary>
         public static bool IsRedundantTitle(StoryNodeKind kind, string title)
@@ -965,60 +634,31 @@ namespace DeusaldStoryWeb
             StoryNodeKind.PortalOut => "bi-box-arrow-right",
             StoryNodeKind.LogicEntry   => "bi-box-arrow-in-right",
             StoryNodeKind.LogicExit    => "bi-box-arrow-right",
-            StoryNodeKind.Localization => "bi-translate",
-            StoryNodeKind.Icon         => "bi-emoji-smile",
-            StoryNodeKind.LightDarkSwitch => "bi-circle-half",
-            StoryNodeKind.SmartFormat      => "bi-braces-asterisk",
-            StoryNodeKind.GetVariable      => "bi-box-arrow-down",
-            StoryNodeKind.ConstantVariable => "bi-braces",
-            StoryNodeKind.ConstantString   => "bi-fonts",
+            StoryNodeKind.Text                  => "bi-text-paragraph",
+            StoryNodeKind.ConstantVariable      => "bi-braces",
             StoryNodeKind.RandomizedInstruction => "bi-dice-5",
-            StoryNodeKind.FlowText         => "bi-text-paragraph",
-            StoryNodeKind.SplitForApp      => "bi-scissors",
-            StoryNodeKind.SetVariable        => "bi-pencil-square",
-            StoryNodeKind.PrevExitVariable        => "bi-braces",
-            StoryNodeKind.LogicPortalIn           => "bi-box-arrow-in-right",
-            StoryNodeKind.LogicPortalOut          => "bi-box-arrow-right",
-            StoryNodeKind.ConditionFlow           => "bi-signpost-split",
+            StoryNodeKind.SplitForApp           => "bi-scissors",
+            StoryNodeKind.SetVariable           => "bi-pencil-square",
+            StoryNodeKind.ConditionFlow         => "bi-signpost-split",
             StoryNodeKind.EndConditionFlow        => "bi-sign-merge-left",
             StoryNodeKind.Comment                 => "bi-chat-left-text",
             _                       => "bi-circle"
         };
 
         /// <summary>
-        /// The colour of a port's connection dot, keyed by what the port carries so a wire's signal type is readable
-        /// at a glance: flow (blue), variable-flow (purple), logic-flow (amber), variable (red), constant (teal),
-        /// text (green), icon (orange).
+        /// The colour of every port dot and wire. All ports now carry plain flow — nothing travels down a wire since
+        /// variables became global — so a single neutral tint keeps the graph readable and lets the <b>node</b> colour
+        /// (see <see cref="NodeColor"/>) carry the kind distinction on its own.
         /// </summary>
-        public static string PortColor(PortType t) => t switch
-        {
-            PortType.Flow      => "var(--info)",
-            PortType.VFlow     => "var(--purple)",
-            PortType.LFlow     => "var(--warning)",
-            PortType.Variable  => "var(--danger)",
-            PortType.CVariable => "var(--code-func)",
-            PortType.Text      => "var(--success)",
-            PortType.Icon      => "var(--orange)",
-            PortType.Data      => "var(--text-dim)",
-            _                  => "var(--text-dim)"
-        };
+        public const string WireColor = "var(--text-muted)";
 
         /// <summary>
-        /// Whether an output of type <paramref name="src"/> may wire into an input of type <paramref name="dst"/>.
-        /// A <see cref="PortType.Variable"/> input accepts a Variable or a Constant (CVariable) source; a
-        /// <see cref="PortType.CVariable"/> input accepts only a Constant source; every other type joins its own kind.
+        /// A node's accent colour, distinct per kind so a graph reads at a glance. Container-graph kinds and a logic
+        /// node's inner-graph kinds never share a canvas, so the two sets reuse the same hues independently.
         /// </summary>
-        public static bool IsCompatible(PortType src, PortType dst) => dst switch
-        {
-            PortType.Variable  => src is PortType.Variable or PortType.CVariable,
-            PortType.CVariable => src is PortType.CVariable,
-            // A portal's Data input accepts any value signal; two portals may also chain (Data → Data).
-            PortType.Data      => src is PortType.Text or PortType.Icon or PortType.Variable or PortType.CVariable or PortType.Data,
-            _                  => src == dst
-        };
-
         public static string NodeColor(StoryNodeKind k) => k switch
         {
+            // ── Container graph ──
             StoryNodeKind.Start     => "var(--success)",
             StoryNodeKind.Entry     => "var(--success)",
             StoryNodeKind.End       => "var(--danger)",
@@ -1027,26 +667,20 @@ namespace DeusaldStoryWeb
             StoryNodeKind.Container => "var(--info)",
             StoryNodeKind.PortalIn  => "var(--orange)",
             StoryNodeKind.PortalOut => "var(--orange)",
-            StoryNodeKind.LogicEntry   => "var(--success)",
-            StoryNodeKind.LogicExit    => "var(--danger)",
-            StoryNodeKind.Localization => "var(--accent)",
-            StoryNodeKind.Icon         => "var(--orange)",
-            StoryNodeKind.LightDarkSwitch => "var(--info)",
-            StoryNodeKind.SmartFormat      => "var(--purple)",
-            StoryNodeKind.GetVariable      => "var(--code-func)",
-            StoryNodeKind.ConstantVariable => "var(--code-func)",
-            StoryNodeKind.ConstantString   => "var(--code-func)",
+
+            // ── Logic node inner graph ──
+            StoryNodeKind.LogicEntry            => "var(--success)",
+            StoryNodeKind.LogicExit             => "var(--danger)",
+            StoryNodeKind.Text                  => "var(--accent)",
+            StoryNodeKind.SetVariable           => "var(--pink)",
+            StoryNodeKind.ConstantVariable      => "var(--code-func)",
             StoryNodeKind.RandomizedInstruction => "var(--purple)",
-            StoryNodeKind.FlowText         => "var(--warning)",
-            StoryNodeKind.SplitForApp      => "var(--purple)",
-            StoryNodeKind.SetVariable        => "var(--info)",
-            StoryNodeKind.PrevExitVariable        => "var(--code-func)",
-            StoryNodeKind.LogicPortalIn           => "var(--orange)",
-            StoryNodeKind.LogicPortalOut          => "var(--orange)",
-            StoryNodeKind.ConditionFlow           => "var(--pink)",
-            StoryNodeKind.EndConditionFlow        => "var(--pink)",
-            StoryNodeKind.Comment                 => "var(--text-dim)",
-            _                       => "var(--text-dim)"
+            StoryNodeKind.SplitForApp           => "var(--orange)",
+            StoryNodeKind.ConditionFlow         => "var(--warning)",
+            StoryNodeKind.EndConditionFlow      => "var(--warning)",
+
+            StoryNodeKind.Comment => "var(--text-dim)",
+            _                     => "var(--text-dim)"
         };
 
         /// <summary>The CSS-modifier suffix for a text-block frame style ("success", "danger", …); empty for <see cref="StoryTextFrameStyle.Normal"/>.</summary>

@@ -101,6 +101,54 @@ public partial class ProjectStateService
     {
         if (_Replaying) return;
         _TxnTouched.Add(id);
+
+        // A live edit of the same field keeps accumulating into one pending entry instead of committing per
+        // keystroke; anything else flushes it first so the two never merge.
+        if (_TxnDepth != 0) return;
+        if (_Coalescing) return;
+        CommitTransaction();
+    }
+
+    // ── Coalescing (live inspector edits) ──────────────────────────────────
+    //
+    // The inspector applies every change immediately, so a text field fires one mutation per keystroke. Committing
+    // each one would make undo walk back letter by letter. Instead, consecutive touches of the same (entity, field)
+    // within _COALESCE_MS accumulate into a single pending entry: because CommitTransaction diffs against _Shadow,
+    // the folded entry's "before" is still the pre-typing JSON, so one undo reverts the whole edit.
+
+    private const int _COALESCE_MS = 600;
+
+    private (Guid Id, string Field)? _CoalesceKey;
+    private DateTime                 _CoalesceUntil;
+    private bool                     _Coalescing;
+
+    /// <summary>
+    /// Marks <paramref name="id"/> dirty as part of a debounced edit of <paramref name="field"/>. The change lands in
+    /// the model at once but joins one pending history entry, flushed by the window elapsing, by editing a different
+    /// field/entity, or by <see cref="FlushCoalesced"/> (call it on blur, save, undo/redo and graph navigation).
+    /// </summary>
+    public void MarkKeyDirtyCoalesced(Guid id, string field)
+    {
+        (Guid, string) key = (id, field);
+        DateTime       now = DateTime.UtcNow;
+
+        // A different field, or a stale window, ends the previous run before this one starts.
+        if (_CoalesceKey is not null && (!_CoalesceKey.Value.Equals(key) || now > _CoalesceUntil))
+            FlushCoalesced();
+
+        _CoalesceKey   = key;
+        _CoalesceUntil = now.AddMilliseconds(_COALESCE_MS);
+
+        _Coalescing = true;
+        try { MarkKeyDirty(id); }
+        finally { _Coalescing = false; }
+    }
+
+    /// <summary>Commits any pending coalesced edit as one history entry. Safe to call when nothing is pending.</summary>
+    public void FlushCoalesced()
+    {
+        if (_CoalesceKey is null) return;
+        _CoalesceKey = null;
         if (_TxnDepth == 0) CommitTransaction();
     }
 
@@ -142,6 +190,7 @@ public partial class ProjectStateService
 
     public void Undo()
     {
+        FlushCoalesced(); // a half-typed edit is its own step, not part of the one being undone
         if (_Undo.Count == 0) return;
         HistoryEntry entry = _Undo[^1];
         _Undo.RemoveAt(_Undo.Count - 1);
@@ -153,6 +202,7 @@ public partial class ProjectStateService
 
     public void Redo()
     {
+        FlushCoalesced();
         if (_Redo.Count == 0) return;
         HistoryEntry entry = _Redo[^1];
         _Redo.RemoveAt(_Redo.Count - 1);

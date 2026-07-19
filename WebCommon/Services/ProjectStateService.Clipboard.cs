@@ -155,20 +155,6 @@ public partial class ProjectStateService
 
         foreach (Guid sourceId in sourceEdIds)
         {
-            // A logic portal is one-in / many-out: within the same node a copied *out* (the many side) attaches as
-            // another out on the same portal, so it re-emits the same source; copying the single in is illegal. Across
-            // nodes there is no shared portal to attach to, so the portal falls through to be cloned whole (below).
-            if (sameNode && FindLogicPortalByPoint(logic, sourceId) is StoryLogicPortalNode portal)
-            {
-                StoryConnectionPoint? outPoint = portal.OutPoints.Find(p => p.Id == sourceId);
-                if (outPoint is null) continue; // the single in — nothing legal to paste
-                StoryConnectionPoint newOut = new() { Name = "Out", X = outPoint.X + dx, Y = outPoint.Y + dy };
-                portal.OutPoints.Add(newOut);
-                map[outPoint.Id] = newOut.Id;
-                pasted.Add(newOut.Id);
-                continue;
-            }
-
             object? model = FindInnerModel(source, sourceId);
             if (model is null || !seen.Add(model)) continue;
             clones.Add(model);
@@ -232,25 +218,15 @@ public partial class ProjectStateService
         return null;
     }
 
-    /// <summary>Resolves an inner-graph canvas node id to the content model it belongs to (a logic portal resolves from its in/out points), or null for a non-copyable boundary node.</summary>
-    private object? FindInnerModel(StoryLogicNode logic, Guid edId)
-    {
-        object? found =
-            (object?)logic.LocalizationNodes.Find(n => n.Id == edId)
-            ?? logic.IconNodes.Find(n => n.Id == edId)
-            ?? logic.LightDarkSwitchNodes.Find(n => n.Id == edId)
-            ?? logic.SmartFormatNodes.Find(n => n.Id == edId)
-            ?? logic.GetVariableNodes.Find(n => n.Id == edId)
-            ?? logic.ConstantVariableNodes.Find(n => n.Id == edId)
-            ?? logic.ConstantStringNodes.Find(n => n.Id == edId)
-            ?? logic.RandomizedInstructionNodes.Find(n => n.Id == edId)
-            ?? logic.FlowTextNodes.Find(n => n.Id == edId)
-            ?? logic.SplitForAppNodes.Find(n => n.Id == edId)
-            ?? logic.SetVariableNodes.Find(n => n.Id == edId)
-            ?? logic.ConditionFlowNodes.Find(n => n.Id == edId || n.EndId == edId)
-            ?? (object?)logic.CommentNodes.Find(n => n.Id == edId);
-        return found ?? FindLogicPortalByPoint(logic, edId);
-    }
+    /// <summary>Resolves an inner-graph canvas node id to the content model it belongs to, or null for a non-copyable boundary node (the Entry / Exit).</summary>
+    private object? FindInnerModel(StoryLogicNode logic, Guid edId) =>
+        (object?)logic.TextNodes.Find(n => n.Id == edId)
+        ?? logic.ConstantVariableNodes.Find(n => n.Id == edId)
+        ?? logic.RandomizedInstructionNodes.Find(n => n.Id == edId)
+        ?? logic.SplitForAppNodes.Find(n => n.Id == edId)
+        ?? logic.SetVariableNodes.Find(n => n.Id == edId)
+        ?? logic.ConditionFlowNodes.Find(n => n.Id == edId || n.EndId == edId)
+        ?? (object?)logic.CommentNodes.Find(n => n.Id == edId);
 
     /// <summary>
     /// Deep-clones a container together with every entity nested beneath it, registering the clones and returning the

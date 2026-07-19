@@ -358,6 +358,13 @@
                                                                @oninput="e => OnMapValueInput(sel, mapIndex, key, e)"/>
                                                     </div>
                                                 }
+                                                @* A map reads as its own variable, so it carries its own choice label. *@
+                                                <div class="var-map-row">
+                                                    <span class="var-map-key">@Loc.T(Localization.Editor.Panels.Variables.valueConditionKey)</span>
+                                                    <button class="modal-input var-key-btn" @onclick="() => PickKey(sel, k => textMap.ValueConditionKeyId = k, textMap.ValueConditionKeyId)">
+                                                        <i class="bi bi-translate"></i> @KeyName(textMap.ValueConditionKeyId)
+                                                    </button>
+                                                </div>
                                             </div>
                                         }
                                     </div>
@@ -394,6 +401,29 @@
                         </div>
                     }
 
+                    @* ── Choice labels ──────────────────────────────────────────────
+                       When a logic node offers this variable as a choice, these keys label the buttons /
+                       "go to section" lines — once here rather than per node, since the phrasing is the
+                       variable's own. *@
+                    @if (!sel.IsReadOnly)
+                    {
+                        <div class="modal-field">
+                            <label class="modal-label">@Loc.T(Localization.Editor.Panels.Variables.valueConditionKey)</label>
+                            <button class="modal-input var-key-btn" @onclick="() => PickKey(sel, k => sel.ValueConditionKeyId = k, sel.ValueConditionKeyId)">
+                                <i class="bi bi-translate"></i> @KeyName(sel.ValueConditionKeyId)
+                            </button>
+                            <div class="var-key-hint">@Loc.T(Localization.Editor.Panels.Variables.valueConditionKeyHint)</div>
+                        </div>
+
+                        <div class="modal-field">
+                            <label class="modal-label">@Loc.T(Localization.Editor.Panels.Variables.optionConditionKey)</label>
+                            <button class="modal-input var-key-btn" @onclick="() => PickKey(sel, k => sel.OptionConditionKeyId = k, sel.OptionConditionKeyId)">
+                                <i class="bi bi-translate"></i> @KeyName(sel.OptionConditionKeyId)
+                            </button>
+                            <div class="var-key-hint">@Loc.T(Localization.Editor.Panels.Variables.optionConditionKeyHint)</div>
+                        </div>
+                    }
+
                 </div>
             }
         </div>
@@ -402,7 +432,39 @@
 
 </div>
 
+<LocalizationKeyPickerModal @ref="_KeyPicker" OnConfirm="OnKeyPicked"/>
+
 @code {
+    // ── Choice-label key picking ────────────────────────────────────────────
+
+    private LocalizationKeyPickerModal? _KeyPicker;
+    private Action<Guid>?               _PendingKeyApply;
+    private StoryVariable?              _PendingKeyOwner;
+
+    /// <summary>Opens the key picker for one of a variable's (or text map's) choice-label keys.</summary>
+    private void PickKey(StoryVariable owner, Action<Guid> apply, Guid current)
+    {
+        _PendingKeyOwner = owner;
+        _PendingKeyApply = apply;
+        _KeyPicker?.Show(Guid.Empty, current);
+    }
+
+    private void OnKeyPicked(LocalizationKeyPickerModal.LocalizationPickResult result)
+    {
+        _PendingKeyApply?.Invoke(result.KeyId);
+        if (_PendingKeyOwner is StoryVariable owner) Dirty(owner);
+        _PendingKeyApply = null;
+        _PendingKeyOwner = null;
+    }
+
+    /// <summary>The chosen key's name, or a "pick a key" prompt when nothing is set.</summary>
+    private string KeyName(Guid keyId)
+    {
+        if (keyId == Guid.Empty) return Loc.T(Localization.Common.Buttons.selectKey);
+        return _ProjectState.CurrentLocalization?.Keys.Find(k => k.Id == keyId)?.KeyName
+               ?? Loc.T(Localization.Common.Placeholders.unnamed);
+    }
+
     private string  _Search = "";
     private Guid    _SelectedId;
     private string? _NameError;
@@ -492,6 +554,12 @@
 
     private void Dirty(StoryVariable v) => _ProjectState.MarkVariableDirty(v.Id);
 
+    /// <summary>
+    /// Marks a variable dirty for a field being <b>typed</b> into. The edit lands at once, but consecutive keystrokes
+    /// in the same field fold into one undo step rather than one per character.
+    /// </summary>
+    private void DirtyLive(StoryVariable v, string field) => _ProjectState.MarkKeyDirtyCoalesced(v.Id, field);
+
     private static T ParseEnum<T>(ChangeEventArgs e, T fallback) where T : struct, Enum =>
         Enum.TryParse(e.Value?.ToString(), out T r) ? r : fallback;
 
@@ -507,13 +575,13 @@
         else if (_ProjectState.IsVariableNameTaken(value, v.Id)) _NameError = Loc.T(Localization.Editor.Panels.Variables.errNameTaken);
         else                                                     _NameError = null;
 
-        Dirty(v);
+        DirtyLive(v, "name");
     }
 
     private void OnDescriptionInput(StoryVariable v, ChangeEventArgs e)
     {
         v.Description = e.Value?.ToString() ?? "";
-        Dirty(v);
+        DirtyLive(v, "description");
     }
 
     private void OnScopeChanged(StoryVariable v, ChangeEventArgs e)
@@ -570,7 +638,7 @@
     {
         if (index < 0 || index >= v.TextOptions.Count) return;
         v.TextOptions[index] = e.Value?.ToString() ?? "";
-        Dirty(v);
+        DirtyLive(v, $"option:{index}");
     }
 
     private void AddOption(StoryVariable v)
@@ -645,14 +713,14 @@
     {
         if (index < 0 || index >= v.TextMaps.Count) return;
         v.TextMaps[index].Name = e.Value?.ToString() ?? "";
-        Dirty(v);
+        DirtyLive(v, $"mapName:{index}");
     }
 
     private void OnMapValueInput(StoryVariable v, int index, string key, ChangeEventArgs e)
     {
         if (index < 0 || index >= v.TextMaps.Count) return;
         v.TextMaps[index].Values[key] = e.Value?.ToString() ?? "";
-        Dirty(v);
+        DirtyLive(v, $"mapValue:{index}:{key}");
     }
 
     private void OnDataChanged() => InvokeAsync(StateHasChanged);

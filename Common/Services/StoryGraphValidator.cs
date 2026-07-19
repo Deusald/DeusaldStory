@@ -36,6 +36,7 @@ namespace DeusaldStoryCommon
 
             CheckDanglingOutputs(project, problems);
             CheckChoices(project, problems);
+            CheckChoiceDefinitions(project, problems);
             CheckConditionFlows(project, problems);
             CheckGamebookText(project, localization, problems);
 
@@ -74,18 +75,18 @@ namespace DeusaldStoryCommon
                 {
                     if (!project.LogicNodes.TryGetValue(logicId, out StoryLogicNode? logic)) continue;
 
-                    // SinglePath collapses every choice into one VFlow output; ManyPaths draws one Flow output per
-                    // choice. Each drawn output must continue somewhere within this container.
+                    // SinglePath collapses every continuation into one output; ManyPaths draws one per choice.
+                    // Each drawn output must continue somewhere within this container.
                     if (logic.ExitMode == StoryLogicExitMode.SinglePath)
                     {
-                        if (!container.Connections.Exists(c => c.FromPoint == logic.VFlowOut.Id))
+                        if (!container.Connections.Exists(c => c.FromPoint == logic.SingleOut.Id))
                             problems.Add(new StoryProblem
                             {
                                 Severity    = StoryProblemSeverity.Error,
                                 Message     = UiLang.T(Localization.Validation.variablesOutputNotConnected, new Dictionary<string, object> { ["node"] = NodeName(logic.Name) }),
                                 ContainerId = container.Id,
                                 LogicNodeId = logic.Id,
-                                PointId     = logic.VFlowOut.Id
+                                PointId     = logic.SingleOut.Id
                             });
                         continue;
                     }
@@ -136,14 +137,16 @@ namespace DeusaldStoryCommon
         // ── Choices & auto-resolution ──────────────────────────────────────────
 
         /// <summary>
-        /// Validates each logic node's Exit-node choices: at least one choice; when App auto-resolution is enabled
-        /// (the Variables input is wired), exactly one locked Else and every non-Else choice carries a condition;
-        /// and in SinglePath mode every choice assigns a value for each declared variable.
+        /// Validates each logic node's continuations. ManyPaths / HubPaths need at least one authored choice, and —
+        /// under Automatic Choice — exactly one locked Else with a condition on every other choice. Single-path is
+        /// checked by <see cref="CheckChoiceDefinitions"/> instead: there the continuations are enumerated, not authored.
         /// </summary>
         private static void CheckChoices(StoryProject project, List<StoryProblem> problems)
         {
             foreach (StoryLogicNode logic in project.LogicNodes.Values)
             {
+                if (logic.ExitMode == StoryLogicExitMode.SinglePath) continue;
+
                 if (logic.Choices.Count == 0)
                 {
                     problems.Add(new StoryProblem
@@ -158,9 +161,8 @@ namespace DeusaldStoryCommon
 
                 // The Else-fallback + per-choice-condition rules only apply to Automatic Choice. Choice Visibility (and
                 // Hub Paths, which is always visibility-driven) has no Else and treats conditions as optional.
-                bool varsWired    = FromInto(logic, logic.ExitVariablesIn.Id) != Guid.Empty;
                 StoryExitAutoMode mode = logic.ExitMode == StoryLogicExitMode.HubPaths ? StoryExitAutoMode.ChoiceVisibility : logic.ExitAutoMode;
-                if (varsWired && mode == StoryExitAutoMode.AutomaticChoice)
+                if (logic.ExitAutoResolve && mode == StoryExitAutoMode.AutomaticChoice)
                 {
                     int elseCount = logic.Choices.Count(c => c.IsElse);
                     if (elseCount != 1)
@@ -172,42 +174,128 @@ namespace DeusaldStoryCommon
                         if (!c.IsElse && c.Condition is null)
                             problems.Add(Node(logic, UiLang.T(Localization.Validation.choiceNoCondition, new Dictionary<string, object> { ["choice"] = NodeName(c.Name), ["logic"] = NodeName(logic.Name) })));
                 }
-
-                if (logic.ExitMode == StoryLogicExitMode.SinglePath)
-                    foreach (StoryChoice c in logic.Choices)
-                        foreach (StoryDeclaredVariable dv in logic.DeclaredVariables)
-                            if (c.VariableValues.Find(v => v.DeclaredVarId == dv.Id) is null)
-                                problems.Add(Node(logic, UiLang.T(Localization.Validation.choiceNoVariableValue, new Dictionary<string, object> { ["choice"] = NodeName(c.Name), ["logic"] = NodeName(logic.Name), ["var"] = NodeName(dv.Name) })));
             }
         }
 
         /// <summary>
-        /// Validates each logic node's Condition nodes: every variable wired into a Condition's Variables input must be
-        /// a <b>constant</b> source, so the branch resolves the same in the App and the printed Gamebook.
+        /// Validates a Single-path node's choice definitions: it must declare between one and
+        /// <see cref="StoryChoiceVariables.MAX_DEFINITIONS"/> of them, each must resolve to something enumerable, and
+        /// every entry must be labellable — otherwise the player is offered a button with no text.
+        /// </summary>
+        private static void CheckChoiceDefinitions(StoryProject project, List<StoryProblem> problems)
+        {
+            foreach (StoryLogicNode logic in project.LogicNodes.Values)
+            {
+                if (logic.ExitMode != StoryLogicExitMode.SinglePath) continue;
+
+                if (logic.ChoiceDefinitions.Count == 0)
+                {
+                    problems.Add(Node(logic, UiLang.T(Localization.Validation.choiceDefsEmpty, new Dictionary<string, object> { ["node"] = NodeName(logic.Name) })));
+                    continue;
+                }
+
+                if (logic.ChoiceDefinitions.Count > StoryChoiceVariables.MAX_DEFINITIONS)
+                    problems.Add(Node(logic, UiLang.T(Localization.Validation.choiceDefsTooMany,
+                        new Dictionary<string, object> { ["node"] = NodeName(logic.Name), ["max"] = StoryChoiceVariables.MAX_DEFINITIONS })));
+
+                foreach (StoryChoiceDefinition def in logic.ChoiceDefinitions)
+                    CheckOneChoiceDefinition(project, logic, def, problems);
+            }
+        }
+
+        private static void CheckOneChoiceDefinition(StoryProject project, StoryLogicNode logic, StoryChoiceDefinition def, List<StoryProblem> problems)
+        {
+            string node = NodeName(logic.Name);
+
+            if (def.Kind == StoryChoiceDefKind.Option)
+            {
+                if (def.Options.Count == 0)
+                    problems.Add(Node(logic, UiLang.T(Localization.Validation.choiceDefNoOptions, new Dictionary<string, object> { ["node"] = node })));
+                return;
+            }
+
+            StoryVariable? target = StoryVariableCatalog.Resolve(project, def.SelectedVariableId);
+            if (target is null)
+            {
+                problems.Add(Node(logic, UiLang.T(Localization.Validation.choiceDefNoVariable, new Dictionary<string, object> { ["node"] = node })));
+                return;
+            }
+
+            if (def.VariableMode == StoryVariableChoiceMode.ValueBased)
+            {
+                Guid keyId = StoryVariableCatalog.ResolveTextMap(project, def.SelectedVariableId) is var (_, map)
+                    ? map.ValueConditionKeyId
+                    : target.ValueConditionKeyId;
+                if (keyId == Guid.Empty)
+                    problems.Add(Node(logic, UiLang.T(Localization.Validation.choiceDefNoValueKey,
+                        new Dictionary<string, object> { ["node"] = node, ["var"] = NodeName(target.Name) })));
+                return;
+            }
+
+            if (def.Ranges.Count == 0)
+            {
+                problems.Add(Node(logic, UiLang.T(Localization.Validation.choiceDefNoRanges, new Dictionary<string, object> { ["node"] = node })));
+                return;
+            }
+
+            foreach (StoryChoiceRange range in def.Ranges)
+                if (range.KeyId == Guid.Empty)
+                    problems.Add(Node(logic, UiLang.T(Localization.Validation.choiceDefRangeNoKey,
+                        new Dictionary<string, object> { ["node"] = node, ["range"] = range.Token })));
+
+            // Two bands covering the same value make the choice ambiguous — the player could take either.
+            for (int x = 0; x < def.Ranges.Count; ++x)
+                for (int y = x + 1; y < def.Ranges.Count; ++y)
+                    if (def.Ranges[x].From <= def.Ranges[y].To && def.Ranges[y].From <= def.Ranges[x].To)
+                        problems.Add(Node(logic, UiLang.T(Localization.Validation.choiceDefRangeOverlap,
+                            new Dictionary<string, object> { ["node"] = node, ["a"] = def.Ranges[x].Token, ["b"] = def.Ranges[y].Token })));
+        }
+
+        /// <summary>
+        /// Validates each logic node's Condition nodes: every variable the condition tests must be knowable the same
+        /// way in the App and the printed Gamebook, so the branch resolves identically in both.
         /// </summary>
         private static void CheckConditionFlows(StoryProject project, List<StoryProblem> problems)
         {
             foreach (StoryLogicNode logic in project.LogicNodes.Values)
                 foreach (StoryConditionFlowNode cf in logic.ConditionFlowNodes)
-                    foreach (StoryConnection c in logic.ContentConnections.Where(c => c.ToPoint == cf.VariablesIn.Id))
-                        if (!IsConstantSource(project, logic, c.FromPoint))
+                    foreach (Guid variableId in ConditionOperands(cf.Condition))
+                        if (!IsConstantOperand(project, variableId))
+                        {
                             problems.Add(Inner(logic, cf.Id,
                                 UiLang.T(Localization.Validation.conditionNonConstant, new Dictionary<string, object> { ["cond"] = NodeName(cf.Name), ["logic"] = NodeName(logic.Name) })));
+                            break; // one report per condition is enough
+                        }
         }
 
-        /// <summary>Whether the output wired at <paramref name="fromPoint"/> (resolved through any portal) is a constant value source.</summary>
-        private static bool IsConstantSource(StoryProject project, StoryLogicNode logic, Guid fromPoint)
+        /// <summary>Every variable id referenced anywhere in a condition tree (both operand sides, recursively).</summary>
+        private static IEnumerable<Guid> ConditionOperands(StoryConditionExpr expr)
         {
-            Guid src = logic.ResolvePortalSource(fromPoint);
-            if (logic.ConstantVariableNodes.Exists(n => n.OutPoint.Id == src)) return true;
-            if (logic.GetVariableNodes.Exists(n => n.SlotOutPoint.Id == src)) return true; // Gamebook slot tag — constant
-            if (logic.GetVariableNodes.Find(n => n.OutPoint.Id == src) is StoryGetVariableNode gv)
+            if (expr.Kind == StoryConditionExprKind.Comparison)
             {
-                StoryVariable? v = StoryLogicFlow.GetTarget(project, gv);
-                return v is not null && (StoryBuiltInVariables.IsBuiltIn(v.Id) || StoryVariableValues.IsConstant(v));
+                if (expr.LeftVariableRef != Guid.Empty) yield return expr.LeftVariableRef;
+                if (expr.RightKind == StoryConditionOperandKind.Variable && expr.RightVariableRef != Guid.Empty)
+                    yield return expr.RightVariableRef;
+                yield break;
             }
-            // Prev Exit / incoming declared variables are exposed as constants inside the node.
-            return StorySelectionResolver.IncomingVariables(project, logic).Exists(d => d.Id == src);
+
+            foreach (StoryConditionExpr child in expr.Children)
+                foreach (Guid id in ConditionOperands(child))
+                    yield return id;
+        }
+
+        /// <summary>
+        /// Whether a condition operand resolves the same in both mediums: a built-in (medium/theme), a Constant/Initial
+        /// External, or a Choice variable (pinned per section, so constant <i>within</i> a section).
+        /// </summary>
+        public static bool IsConstantOperand(StoryProject project, Guid variableId)
+        {
+            if (variableId == Guid.Empty) return true; // an unset operand is reported by the condition editor, not here
+            if (StoryBuiltInVariables.IsBuiltIn(variableId)) return true;
+            if (StoryChoiceVariables.IsChoiceVariable(variableId)) return true;
+
+            StoryVariable? v = StoryVariableCatalog.Resolve(project, variableId);
+            return v is not null && StoryVariableValues.IsConstant(v);
         }
 
         /// <summary>Reports SmartFormat render failures in each node's Gamebook text (e.g. a live value unavailable in the Gamebook).</summary>
@@ -239,8 +327,15 @@ namespace DeusaldStoryCommon
                 if (string.IsNullOrWhiteSpace(ri.ResultToken))
                     problems.Add(Inner(logic, ri.Id, UiLang.T(Localization.Validation.randomResultTokenEmpty, new Dictionary<string, object> { ["node"] = nodeName })));
 
-                Guid          branchFrom   = StoryLogicFlow.FromInto(logic, ri.BranchIn.Id);
-                List<string>? branchValues = branchFrom == Guid.Empty ? null : StoryLogicFlow.BranchValues(project, logic, branchFrom);
+                if (ri.SaveToVariable && StoryVariableCatalog.Resolve(project, ri.TargetVariableId) is null)
+                    problems.Add(Inner(logic, ri.Id, UiLang.T(Localization.Validation.randomSaveNoTarget, new Dictionary<string, object> { ["node"] = nodeName })));
+
+                Guid          branchFrom   = ri.BranchVariableId;
+                List<string>? branchValues = branchFrom == Guid.Empty
+                    ? null
+                    : StoryVariableCatalog.Resolve(project, branchFrom) is StoryVariable branchVar
+                        ? StoryVariableValues.PossibleValues(branchVar)
+                        : null;
 
                 if (branchFrom == Guid.Empty)
                 {
@@ -260,24 +355,34 @@ namespace DeusaldStoryCommon
         }
 
         /// <summary>
-        /// Flags any inline <c>&lt;var=Name&gt;</c> reference in this node's localized text that doesn't name a variable
-        /// in the project catalog (or a built-in). Variables are global now, so any catalogued name is valid anywhere.
+        /// Flags any inline <c>&lt;var=Name&gt;</c> reference in this node's authored text that doesn't name a variable
+        /// the catalog knows, and any text pointing at a localization key that no longer exists. Variables are global,
+        /// so any catalogued name — plus the built-ins, ChoiceA/B/C and the derived text maps — is valid anywhere.
         /// </summary>
         private static void CheckTextReferences(
             StoryProject project, StoryLogicNode logic, LocProject? localization, List<StoryProblem> problems)
         {
-            if (localization is null || logic.LocalizationNodes.Count == 0) return;
+            if (localization is null) return;
 
             HashSet<string> known = new(StringComparer.OrdinalIgnoreCase);
-            foreach (StoryVariable v in project.Variables.Values)
+            foreach (StoryVariable v in StoryVariableCatalog.All(project))
                 if (!string.IsNullOrWhiteSpace(v.Name)) known.Add(v.Name);
-            foreach (StoryVariable v in StoryBuiltInVariables.All)
-                known.Add(v.Name);
 
-            HashSet<string> reported = new(StringComparer.OrdinalIgnoreCase);
-            foreach (StoryLocalizationNode loc in logic.LocalizationNodes)
+            HashSet<string> reported    = new(StringComparer.OrdinalIgnoreCase);
+            bool            missingKey  = false;
+
+            foreach (StoryTextConfig config in logic.AllTextConfigs())
             {
-                string text = StoryLogicRenderer.LocalizedText(localization, loc.SelectedKeyId);
+                if (config.IsEmpty) continue;
+
+                if (!missingKey && localization.Keys.Find(k => k.Id == config.KeyId) is null)
+                {
+                    problems.Add(Node(logic, UiLang.T(Localization.Validation.textKeyMissing, new Dictionary<string, object> { ["node"] = NodeName(logic.Name) })));
+                    missingKey = true; // one report per node is enough
+                    continue;
+                }
+
+                string text = StoryLogicRenderer.LocalizedText(localization, config.KeyId);
                 if (text.Length == 0) continue;
 
                 foreach (Match m in _VarRef.Matches(text))
@@ -289,8 +394,7 @@ namespace DeusaldStoryCommon
                         Severity    = StoryProblemSeverity.Error,
                         Message     = UiLang.T(Localization.Validation.textRefUnregistered, new Dictionary<string, object> { ["name"] = name, ["node"] = NodeName(logic.Name) }),
                         ContainerId = logic.ParentContainer,
-                        LogicNodeId = logic.Id,
-                        InnerNodeId = loc.Id
+                        LogicNodeId = logic.Id
                     });
                 }
             }

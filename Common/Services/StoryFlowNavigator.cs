@@ -127,10 +127,10 @@ namespace DeusaldStoryCommon
                 foreach (StoryLogicNode logic in project.LogicNodes.Values)
                 {
                     lk.LogicByEntry[logic.EntryPoint.Id] = logic;
-                    // ManyPaths: each choice has its own outer Flow output. SinglePath: all choices share the one VFlow output.
+                    // ManyPaths: each choice has its own outer output. SinglePath: every continuation shares SingleOut.
                     foreach (StoryChoice choice in logic.Choices)
                         lk.LogicByExit[choice.OuterFlowOut.Id] = logic;
-                    lk.LogicByExit[logic.VFlowOut.Id] = logic;
+                    lk.LogicByExit[logic.SingleOut.Id] = logic;
                 }
 
                 foreach (StoryContainerNode container in project.ContainerNodes.Values)

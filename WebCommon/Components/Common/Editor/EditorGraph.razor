@@ -46,7 +46,7 @@
                         EdEdge e      = edge;
                         bool   active = edge.Id == _SelectedEdgeId;
                         // Tint the wire in its signal colour (the connected ports' type) so the flow it carries reads at a glance.
-                        string stroke = active ? "var(--accent)" : StoryStyle.PortColor(from.Type);
+                        string stroke = active ? "var(--accent)" : StoryStyle.WireColor;
                         <path d="@EdgePath(from.X, from.Y, to.X, to.Y)"
                               style="stroke:transparent; stroke-width:14px; fill:none; pointer-events:stroke; cursor:pointer;"
                               @onpointerdown="() => SelectEdge(e.Id)" @onpointerdown:stopPropagation="true"
@@ -139,7 +139,7 @@
                         EdPort port = n.Inputs[i];
                         <div class="edg-port-anchor edg-port-in" style="top:@F(PortCenterY(n, i))px;">
                             <span class="edg-port @(IsCompatibleTarget(port) ? "edg-port-target" : "")"
-                                  style="background:@StoryStyle.PortColor(port.Type)"
+                                  style="background:@StoryStyle.WireColor"
                                   @onpointerdown:stopPropagation="true"></span>
                             @if (ShowPortLabels(n) && !string.IsNullOrEmpty(port.Name))
                             {
@@ -153,7 +153,7 @@
                     {
                         EdPort port = n.Outputs[i];
                         <div class="edg-port-anchor edg-port-out" style="top:@F(PortCenterY(n, i))px;">
-                            <span class="edg-port" style="background:@StoryStyle.PortColor(port.Type)"
+                            <span class="edg-port" style="background:@StoryStyle.WireColor"
                                   @onpointerdown="e => StartConnect(e, port.Id)" @onpointerdown:stopPropagation="true"></span>
                             @if (ShowPortLabels(n) && !string.IsNullOrEmpty(port.Name))
                             {
@@ -251,12 +251,6 @@
                         <i class="bi bi-box-arrow-in-right"></i> @Loc.T(Localization.Editor.Graph.addPortalIn)
                     </button>
                 }
-                @if (menu.Kind is StoryNodeKind.LogicPortalIn or StoryNodeKind.LogicPortalOut)
-                {
-                    <button class="edg-menu-item" @onclick="() => MenuInvoke(OnNodeAddPortalOut, menu)">
-                        <i class="bi bi-box-arrow-right"></i> @Loc.T(Localization.Editor.Graph.addPortalOut)
-                    </button>
-                }
                 @if (CanMoveToParent && menu.Kind is StoryNodeKind.Logic or StoryNodeKind.Container)
                 {
                     <button class="edg-menu-item" @onclick="() => MenuInvoke(OnNodeMoveToParent, menu)">
@@ -314,7 +308,6 @@
     [Parameter] public EventCallback<EdNode>     OnNodePreview       { get; set; }
     [Parameter] public EventCallback<EdNode>     OnNodeDelete        { get; set; }
     [Parameter] public EventCallback<EdNode>     OnNodeAddPortalIn   { get; set; }
-    [Parameter] public EventCallback<EdNode>     OnNodeAddPortalOut  { get; set; }
     [Parameter] public EventCallback<EdNodeReparent> OnNodeReparent  { get; set; }
     [Parameter] public EventCallback<EdNode>     OnNodeMoveToParent  { get; set; }
     [Parameter] public EventCallback<IReadOnlyList<EdNode>> OnNodesDelete { get; set; }
@@ -356,7 +349,7 @@
     private const double SNAP_RADIUS  = 60;  // how close a drop must land to an input port to wire it
 
     /// <summary>A resolved connection-point position in world coordinates, keyed by point id.</summary>
-    private readonly record struct PortAnchor(Guid NodeId, double X, double Y, bool IsOutput, PortType Type, StoryNodeKind OwnerKind);
+    private readonly record struct PortAnchor(Guid NodeId, double X, double Y, bool IsOutput, StoryNodeKind OwnerKind);
 
     private double _Scale = 1;
     private double _PanX  = 24;
@@ -450,9 +443,9 @@
         foreach (EdNode n in Nodes)
         {
             for (int i = 0; i < n.Inputs.Count; ++i)
-                anchors[n.Inputs[i].Id] = new PortAnchor(n.Id, n.X, n.Y + PortCenterY(n, i), false, n.Inputs[i].Type, n.Kind);
+                anchors[n.Inputs[i].Id] = new PortAnchor(n.Id, n.X, n.Y + PortCenterY(n, i), false, n.Kind);
             for (int i = 0; i < n.Outputs.Count; ++i)
-                anchors[n.Outputs[i].Id] = new PortAnchor(n.Id, n.X + NODE_W, n.Y + PortCenterY(n, i), true, n.Outputs[i].Type, n.Kind);
+                anchors[n.Outputs[i].Id] = new PortAnchor(n.Id, n.X + NODE_W, n.Y + PortCenterY(n, i), true, n.Kind);
         }
         return anchors;
     }
@@ -489,14 +482,15 @@
     private static bool ShowPortLabels(EdNode n) => true;
 
     /// <summary>
-    /// True when a wire is being dragged and this input port is a valid drop target for its source: same signal type,
-    /// and — when dragging from a Choice option's flow-out — only an Exit input qualifies (choices lead to exits only).
+    /// True when a wire is being dragged and this input port is a valid drop target for its source. Ports are untyped,
+    /// so every input qualifies except one on the source's own node (a node may not wire back into itself).
     /// </summary>
     private bool IsCompatibleTarget(EdPort input) =>
         _ConnFrom is Guid from
         && _Anchors.TryGetValue(from, out PortAnchor src)
-        && _Anchors.TryGetValue(input.Id, out _)
-        && StoryStyle.IsCompatible(src.Type, input.Type);
+        && _Anchors.TryGetValue(input.Id, out PortAnchor dst)
+        && !dst.IsOutput
+        && dst.NodeId != src.NodeId;
 
     // ── Pan / drag ─────────────────────────────────────────────────────────
 
@@ -744,15 +738,14 @@
     /// </summary>
     private Guid? NearestInputPoint(Guid fromPoint)
     {
-        bool     haveSrc     = _Anchors.TryGetValue(fromPoint, out PortAnchor src);
-        Guid     sourceNode  = haveSrc ? src.NodeId   : Guid.Empty;
-        PortType sourceType  = haveSrc ? src.Type     : PortType.Flow;
-        Guid?    best        = null;
-        double   bestDist    = SNAP_RADIUS * SNAP_RADIUS;
+        bool   haveSrc    = _Anchors.TryGetValue(fromPoint, out PortAnchor src);
+        Guid   sourceNode = haveSrc ? src.NodeId : Guid.Empty;
+        Guid?  best       = null;
+        double bestDist   = SNAP_RADIUS * SNAP_RADIUS;
 
         foreach ((Guid pointId, PortAnchor a) in _Anchors)
         {
-            if (a.IsOutput || a.NodeId == sourceNode || !StoryStyle.IsCompatible(sourceType, a.Type)) continue;
+            if (a.IsOutput || a.NodeId == sourceNode) continue;
             double dx = a.X - _ConnX, dy = a.Y - _ConnY;
             double d2 = dx * dx + dy * dy;
             if (d2 <= bestDist)
@@ -813,7 +806,7 @@
         n.Kind is StoryNodeKind.Logic or StoryNodeKind.Container or StoryNodeKind.Start;
 
     /// <summary>True when a portal node is an "in" side (container or logic) — picks the "out"/"in" wording and icons.</summary>
-    private static bool IsPortalIn(EdNode n) => n.Kind is StoryNodeKind.PortalIn or StoryNodeKind.LogicPortalIn;
+    private static bool IsPortalIn(EdNode n) => n.Kind is StoryNodeKind.PortalIn;
 
     /// <summary>Context-menu portal jump — close the menu and recentre the view on the paired / next portal node.</summary>
     private async Task MenuJumpTo(Guid id)
@@ -890,18 +883,9 @@
         StoryNodeKind.Container    => Loc.T(Localization.Editor.Graph.Nouns.container),
         StoryNodeKind.PortalIn     => Loc.T(Localization.Editor.Graph.Nouns.portalIn),
         StoryNodeKind.PortalOut    => Loc.T(Localization.Editor.Graph.Nouns.portalOut),
-        StoryNodeKind.LogicPortalIn  => Loc.T(Localization.Editor.Graph.Nouns.logicPortalIn),
-        StoryNodeKind.LogicPortalOut => Loc.T(Localization.Editor.Graph.Nouns.logicPortalOut),
-        StoryNodeKind.Localization    => Loc.T(Localization.Editor.Graph.Nouns.localizationNode),
-        StoryNodeKind.Icon            => Loc.T(Localization.Editor.Graph.Nouns.iconNode),
-        StoryNodeKind.LightDarkSwitch => Loc.T(Localization.Editor.Graph.Nouns.lightDarkSwitch),
-        StoryNodeKind.SmartFormat      => Loc.T(Localization.Editor.Graph.Nouns.smartFormatNode),
-        StoryNodeKind.FlowText         => Loc.T(Localization.Editor.Graph.Nouns.flowTextNode),
-        StoryNodeKind.SplitForApp      => Loc.T(Localization.Editor.Graph.Nouns.splitForAppNode),
+        StoryNodeKind.Text                    => Loc.T(Localization.Editor.Graph.Nouns.flowTextNode),
+        StoryNodeKind.SplitForApp             => Loc.T(Localization.Editor.Graph.Nouns.splitForAppNode),
         StoryNodeKind.ConstantVariable        => Loc.T(Localization.Editor.Graph.Nouns.constantVariableNode),
-        StoryNodeKind.ConstantString          => Loc.T(Localization.Editor.Graph.Nouns.constantStringNode),
-        StoryNodeKind.GetVariable             => Loc.T(Localization.Editor.Graph.Nouns.getVariableNode),
-        StoryNodeKind.PrevExitVariable        => Loc.T(Localization.Editor.Graph.Nouns.prevExitVariables),
         StoryNodeKind.Comment                 => Loc.T(Localization.Editor.Graph.Nouns.comment),
         _                       => Loc.T(Localization.Editor.Graph.Nouns.nodeFallback)
     };

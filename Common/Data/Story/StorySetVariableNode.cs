@@ -10,7 +10,7 @@ namespace DeusaldStoryCommon
     /// <see cref="FlowIn"/> → <see cref="FlowOut"/>.
     /// <para>
     /// For an <b>External</b> variable the value follows <see cref="ExternalMode"/> — a fixed <see cref="ExternalValue"/>,
-    /// the value wired into <see cref="ValueIn"/>, or that wired value translated through <see cref="ValueMap"/>. External
+    /// the value of <see cref="ValueVariableId"/>, or that value translated through <see cref="ValueMap"/>. External
     /// sets emit no printed-Gamebook instruction (the components track the value).
     /// For an <b>Internal</b> variable the Number/Dial/String assignment fields below apply, and the Gamebook prints the
     /// instruction / the App shows the input field as before.
@@ -49,18 +49,18 @@ namespace DeusaldStoryCommon
 
         /// <summary>
         /// When the value is specific (<see cref="NumberAssignment.SetSpecific"/> for Number/Dial, or
-        /// <see cref="StringValueMode.Specific"/> for String), take it from the wired <see cref="ValueIn"/> (the value the
-        /// App assigns at runtime) and <see cref="ValueTextIn"/> (the Gamebook display of what to write) instead of the
-        /// baked <see cref="SpecificValue"/>/<see cref="StringValue"/>. The App stores the value silently either way, so
-        /// only the Gamebook text differs.
+        /// <see cref="StringValueMode.Specific"/> for String), take it from <see cref="ValueVariableId"/> (the value the
+        /// App assigns at runtime) and <see cref="GamebookValueText"/> (the Gamebook display of what to write) instead of
+        /// the baked <see cref="SpecificValue"/>/<see cref="StringValue"/>. The App stores the value silently either way,
+        /// so only the Gamebook text differs.
         /// </summary>
         public bool WireValue { get; set; }
 
-        /// <summary><see cref="WireValue"/> / external Map/Remap — a <c>Variable</c> input carrying the value the App assigns at runtime.</summary>
-        public StoryConnectionPoint ValueIn { get; set; } = new() { Name = "Value" };
+        /// <summary><see cref="WireValue"/> / external Map/Remap — the variable read for the value the App assigns at runtime.</summary>
+        public Guid ValueVariableId { get; set; }
 
-        /// <summary><see cref="WireValue"/> only — a <c>Text</c> input carrying the Gamebook display of what to write.</summary>
-        public StoryConnectionPoint ValueTextIn { get; set; } = new() { Name = "Gamebook Text" };
+        /// <summary><see cref="WireValue"/> only — the Gamebook display of what to write.</summary>
+        public StoryTextConfig GamebookValueText { get; set; } = new();
 
         /// <summary>When <see cref="Assignment"/> is <see cref="NumberAssignment.Randomize"/>, whether the App keeps the first draw across undo/redo (Saved) or re-draws each time (Pure). Unused otherwise and by the Gamebook.</summary>
         public RandomMode RandomMode { get; set; }
@@ -79,17 +79,11 @@ namespace DeusaldStoryCommon
         /// <summary>String / <see cref="StringValueMode.PlayerInput"/> — whether the App input field accepts text or a number.</summary>
         public StringInputKind StringInputKind { get; set; }
 
-        /// <summary>String / <see cref="StringValueMode.PlayerInput"/> — Text input port carrying the "what to write" instruction (a Localization output).</summary>
-        public StoryConnectionPoint InstructionIn { get; set; } = new() { Name = "Instruction" };
+        /// <summary>String / <see cref="StringValueMode.PlayerInput"/> — the "what to write" instruction shown to the player.</summary>
+        public StoryTextConfig Instruction { get; set; } = new();
 
-        /// <summary>String / <see cref="StringValueMode.PlayerInput"/> — Text input port carrying the App input field's placeholder hint (a Localization output). Empty falls back to a default.</summary>
-        public StoryConnectionPoint PlaceholderIn { get; set; } = new() { Name = "Placeholder" };
-
-        /// <summary>
-        /// String / <see cref="StringValueMode.PlayerInput"/> — a <b>multi-wire</b> Variable input whose sources become
-        /// extra operands of <see cref="ValidationRule"/>, each referenced by its connection <c>FromPoint</c> id.
-        /// </summary>
-        public StoryConnectionPoint ValidationIn { get; set; } = new() { Name = "Validation" };
+        /// <summary>String / <see cref="StringValueMode.PlayerInput"/> — the App input field's placeholder hint. Empty falls back to a default.</summary>
+        public StoryTextConfig Placeholder { get; set; } = new();
 
         /// <summary>String / <see cref="StringValueMode.PlayerInput"/> — smallest accepted entry length in characters (default 1).</summary>
         public int MinLength { get; set; } = 1;
@@ -100,7 +94,7 @@ namespace DeusaldStoryCommon
         /// <summary>String / <see cref="StringValueMode.PlayerInput"/> — localization key for the message shown when the entry is outside <see cref="MinLength"/>…<see cref="MaxLength"/>. Empty = a default message.</summary>
         public Guid LengthErrorKeyId { get; set; }
 
-        /// <summary>String / <see cref="StringValueMode.PlayerInput"/> — an <b>App-only</b> validation rule the entry must satisfy (a boolean Group tree; null = no rule). Operands reference <see cref="StorageValidation.ThisEntryRef"/>, other variable ids, and the outputs wired into <see cref="ValidationIn"/> (by connection <c>FromPoint</c> id). The Gamebook cannot enforce it.</summary>
+        /// <summary>String / <see cref="StringValueMode.PlayerInput"/> — an <b>App-only</b> validation rule the entry must satisfy (a boolean Group tree; null = no rule). Operands reference <see cref="StorageValidation.ThisEntryRef"/> or any variable id. The Gamebook cannot enforce it.</summary>
         public StoryConditionExpr? ValidationRule { get; set; }
 
         /// <summary>String / <see cref="StringValueMode.PlayerInput"/> — localization key for the message shown when <see cref="ValidationRule"/> is not met. Empty = a default message.</summary>

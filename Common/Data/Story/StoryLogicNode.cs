@@ -6,8 +6,8 @@ namespace DeusaldStoryCommon
     /// <summary>
     /// The heart of the system — a stop point in the story that generates content and runs calculations on variables.
     /// The story is played by moving from one logic node to the next. A logic node has exactly one entry point and a
-    /// single <b>Exit</b> node carrying its list of <see cref="Choices"/> (the continuations). Its inner render graph
-    /// is a linear <c>LFlow</c> chain from the Entry to the Exit node.
+    /// single <b>Exit</b> node. Its inner render graph is a linear flow chain from the Entry to the Exit in which every
+    /// node has exactly one flow in and one flow out; a Condition node is the only branch (it detours out and rejoins).
     /// </summary>
     public class StoryLogicNode : IFileWithId
     {
@@ -27,127 +27,128 @@ namespace DeusaldStoryCommon
 
         /// <summary>
         /// How this node hands its continuations to the next node(s): <see cref="StoryLogicExitMode.ManyPaths"/>
-        /// (one outer Flow output per choice) or <see cref="StoryLogicExitMode.SinglePath"/> (one outer VFlow output
-        /// carrying the <see cref="DeclaredVariables"/>, each choice pinning their values).
+        /// (one outer output per <see cref="Choices"/> entry), <see cref="StoryLogicExitMode.SinglePath"/> (every
+        /// continuation shares <see cref="SingleOut"/> and comes from enumerating <see cref="ChoiceDefinitions"/>),
+        /// or <see cref="StoryLogicExitMode.HubPaths"/> (like ManyPaths, rendered as sub-cards / gather-hub cards).
         /// </summary>
         public StoryLogicExitMode ExitMode { get; set; }
 
         /// <summary>
-        /// When a variable is wired into <see cref="ExitVariablesIn"/>, whether the App auto-picks one choice
+        /// When <see cref="ExitAutoResolve"/> is set, whether the App auto-picks one choice
         /// (<see cref="StoryExitAutoMode.AutomaticChoice"/>) or uses each choice's condition to gate its visibility
-        /// (<see cref="StoryExitAutoMode.ChoiceVisibility"/>). Ignored when no variable is wired. Forced to
-        /// ChoiceVisibility when <see cref="ExitMode"/> is <see cref="StoryLogicExitMode.HubPaths"/>.
+        /// (<see cref="StoryExitAutoMode.ChoiceVisibility"/>). Forced to ChoiceVisibility for HubPaths.
         /// </summary>
         public StoryExitAutoMode ExitAutoMode { get; set; }
 
-        /// <summary>The continuations offered by this node's single Exit node (replaces the old per-exit points + Choice node).</summary>
-        public List<StoryChoice> Choices { get; } = new();
-
-        /// <summary>SinglePath only — the variables this node declares and hands to the next node over its VFlow output.</summary>
-        public List<StoryDeclaredVariable> DeclaredVariables { get; } = new();
-
-        /// <summary>SinglePath only — the single outer VFlow output all choices share. Kept stable across mode toggles.</summary>
-        public StoryConnectionPoint VFlowOut { get; set; } = new() { Name = "Continue" };
+        /// <summary>
+        /// Whether this node's choices resolve automatically from their conditions (see <see cref="ExitAutoMode"/>).
+        /// Replaces the old "is something wired into the Exit's Variables port" signal — with variables global there
+        /// is nothing to wire, so auto-resolution is an explicit flag.
+        /// </summary>
+        public bool ExitAutoResolve { get; set; }
 
         /// <summary>
-        /// When set, this node gains a second (VFlow) input port, <see cref="VariablesIn"/>, that accepts an upstream
-        /// SinglePath node's declared variables. Wiring it in surfaces the <see cref="PrevExitVariable"/> node inside
-        /// this node's inner graph, exposing those variables as constants.
+        /// The continuations offered by this node in ManyPaths / HubPaths. <b>Unused in SinglePath</b> — there the
+        /// continuations are the enumeration of <see cref="ChoiceDefinitions"/>.
         /// </summary>
-        public bool AcceptVariables { get; set; }
+        public List<StoryChoice> Choices { get; } = new();
 
-        /// <summary>The second (VFlow) input port — accepts an upstream node's declared variables. Shown when <see cref="AcceptVariables"/>.</summary>
-        public StoryConnectionPoint VariablesIn { get; set; } = new() { Name = "Variables" };
+        /// <summary>
+        /// SinglePath only — at most <see cref="StoryChoiceVariables.MAX_DEFINITIONS"/> definitions describing the
+        /// choices the player makes here. Position x writes <c>StoryChoiceVariables.All[x]</c> (ChoiceA/B/C), and the
+        /// cartesian product of their entries dimensions the downstream node's Gamebook sections.
+        /// </summary>
+        public List<StoryChoiceDefinition> ChoiceDefinitions { get; } = new();
 
-        /// <summary>The always-present Prev Exit Variable node, drawn inside the inner graph when <see cref="AcceptVariables"/> is set and <see cref="VariablesIn"/> is wired.</summary>
-        public StoryPrevExitVariableNode PrevExitVariable { get; set; } = new();
+        /// <summary>SinglePath only — the single outer output every continuation shares. Kept stable across mode toggles.</summary>
+        public StoryConnectionPoint SingleOut { get; set; } = new() { Name = "Continue" };
 
+        /// <summary>This node's single outer input; inside the inner graph it is also the Entry node's flow output.</summary>
         public StoryConnectionPoint EntryPoint { get; set; } = new() { Name = "In" };
 
         // ── Inner content graph ────────────────────────────────────────────────
-        // The logic node opens into its own linear LFlow graph. The single EntryPoint (above) is the Entry node — with
-        // three extra config inputs, Title, Subtitle and Icon — and the single Exit node terminates the chain, carrying
-        // one Text input per choice plus the auto-resolution inputs. Content nodes (Localization/Icon/SmartFormat/…)
-        // and their wiring live here too and are serialized as part of this logic node's file.
+        // The logic node opens into its own linear flow graph. The single EntryPoint (above) is the Entry node and the
+        // single Exit node terminates the chain at ExitFlowIn. Content nodes and their wiring live here too and are
+        // serialized as part of this logic node's file.
 
-        /// <summary>The Entry node's Title input port — accepts a Localization node's output.</summary>
-        public StoryConnectionPoint TitleIn { get; set; } = new() { Name = "Title" };
+        /// <summary>The Exit node's flow input — the render chain terminates here.</summary>
+        public StoryConnectionPoint ExitFlowIn { get; set; } = new() { Name = "Flow" };
 
-        /// <summary>The Entry node's Subtitle input port — accepts a Localization node's output; optional.</summary>
-        public StoryConnectionPoint SubtitleIn { get; set; } = new() { Name = "Subtitle" };
+        // ── Entry node content ─────────────────────────────────────────────────
 
-        /// <summary>The Entry node's Icon input port — accepts an Icon node's output.</summary>
-        public StoryConnectionPoint IconIn { get; set; } = new() { Name = "Icon" };
+        /// <summary>The screen title shown for this node. Authored in place — key plus formatting.</summary>
+        public StoryTextConfig EntryTitle { get; set; } = new();
 
-        /// <summary>The Exit node's LFlow input port — the render chain terminates here.</summary>
-        public StoryConnectionPoint ExitLFlowIn { get; set; } = new() { Name = "Flow" };
+        /// <summary>The screen subtitle shown for this node; optional.</summary>
+        public StoryTextConfig EntrySubtitle { get; set; } = new();
 
-        /// <summary>The Exit node's Variables input (many-in) — wire variables here to enable App auto-resolution of the choice.</summary>
-        public StoryConnectionPoint ExitVariablesIn { get; set; } = new() { Name = "Variables" };
+        /// <summary>
+        /// The icon shown in the light/paper theme (a <see cref="StoryImage"/> id). When empty the renderer falls back
+        /// to <see cref="DarkIcon"/>, so filling only one slot gives both themes the same icon.
+        /// </summary>
+        public Guid LightIcon { get; set; }
 
-        /// <summary>The Exit node's single Auto-text input — overrides the default "Click here to continue…" button label in auto mode.</summary>
-        public StoryConnectionPoint ExitAutoTextIn { get; set; } = new() { Name = "Text" };
+        /// <summary>The icon shown in the dark theme; falls back to <see cref="LightIcon"/> when empty.</summary>
+        public Guid DarkIcon { get; set; }
 
-        /// <summary>Localization nodes placed in the inner graph (each feeds a Title/Text input).</summary>
-        public List<StoryLocalizationNode> LocalizationNodes { get; } = new();
+        /// <summary>Overrides the default "Click here to continue…" label in Automatic-Choice mode.</summary>
+        public StoryTextConfig AutoText { get; set; } = new();
 
-        /// <summary>Icon nodes placed in the inner graph (each feeds an Icon input).</summary>
-        public List<StoryIconNode> IconNodes { get; } = new();
+        // ── Inner node collections — every node has exactly one flow in and one flow out ──
 
-        /// <summary>Light/Dark switch nodes placed in the inner graph (each picks between two icons by theme).</summary>
-        public List<StoryLightDarkSwitchNode> LightDarkSwitchNodes { get; } = new();
+        /// <summary>Text nodes on the flow chain — the ordered sequence of rendered text blocks.</summary>
+        public List<StoryTextNode> TextNodes { get; } = new();
 
-        /// <summary>SmartFormat nodes placed in the inner graph (each formats a text with connected variable values).</summary>
-        public List<StorySmartFormatNode> SmartFormatNodes { get; } = new();
-
-        /// <summary>Get Variable nodes placed in the inner graph (each reads a global variable — App value, plus the Gamebook slot tag for Internal variables).</summary>
-        public List<StoryGetVariableNode> GetVariableNodes { get; } = new();
-
-        /// <summary>Constant Variable nodes placed in the inner graph (each supplies a named constant value into a SmartFormat/Exit input).</summary>
-        public List<StoryConstantVariableNode> ConstantVariableNodes { get; } = new();
-
-        /// <summary>Constant String nodes placed in the inner graph (each supplies a literal text, verbatim, into any text input).</summary>
-        public List<StoryConstantStringNode> ConstantStringNodes { get; } = new();
-
-        /// <summary>FlowText nodes placed in the inner graph — the LFlow chain that renders text blocks in order.</summary>
-        public List<StoryFlowTextNode> FlowTextNodes { get; } = new();
-
-        /// <summary>Split-for-App nodes on the LFlow chain — each breaks the App render into a new "continue" page (ignored by the Gamebook).</summary>
+        /// <summary>Split-for-App nodes — each breaks the App render into a new "continue" page (ignored by the Gamebook).</summary>
         public List<StorySplitForAppNode> SplitForAppNodes { get; } = new();
 
-        /// <summary>Set-variable nodes on the LFlow chain — each assigns a value to a global variable (External or Internal).</summary>
+        /// <summary>Set-variable nodes — each assigns a value to a global variable (External or Internal).</summary>
         public List<StorySetVariableNode> SetVariableNodes { get; } = new();
 
-        /// <summary>Portal pairs on the inner graph — one-in / many-out relays that carry a Text/Icon/Variable value across the graph.</summary>
-        public List<StoryLogicPortalNode> LogicPortalNodes { get; } = new();
+        /// <summary>Constant Variable nodes — each publishes a named constant into this node's variable dictionary.</summary>
+        public List<StoryConstantVariableNode> ConstantVariableNodes { get; } = new();
 
-        /// <summary>Condition-flow pairs on the LFlow chain — each injects an optional block of flow gated by a constant-variable condition.</summary>
+        /// <summary>Randomized Instruction nodes — each renders a random choice (App drawn value / Gamebook D12 band table).</summary>
+        public List<StoryRandomizedInstructionNode> RandomizedInstructionNodes { get; } = new();
+
+        /// <summary>Condition-flow pairs — each injects an optional block of flow gated by a condition.</summary>
         public List<StoryConditionFlowNode> ConditionFlowNodes { get; } = new();
 
         /// <summary>Free-text comment notes placed in this logic node's inner graph (no ports; documentation only).</summary>
         public List<StoryCommentNode> CommentNodes { get; } = new();
 
-        /// <summary>Randomized Instruction nodes placed in the inner graph — each renders a random choice (App drawn value / Gamebook D12 band table).</summary>
-        public List<StoryRandomizedInstructionNode> RandomizedInstructionNodes { get; } = new();
-
         /// <summary>Wires between the inner graph's connection points (Entry/Exit ports and content-node ports).</summary>
         public List<StoryConnection> ContentConnections { get; } = new();
 
         /// <summary>
-        /// Resolves <paramref name="fromPoint"/> through any logic portal it belongs to: when it is a portal-out output,
-        /// follows the portal back to whatever output feeds the portal's in (transitively). Any non-portal point — and a
-        /// portal whose in is unwired — is returned unchanged, so callers can treat every output source uniformly.
+        /// Every authored text on this node, in no particular order — the one place the validator and any "find
+        /// usages" pass need to look to see which localization keys this node references.
         /// </summary>
-        public Guid ResolvePortalSource(Guid fromPoint, int depth = 0)
+        public IEnumerable<StoryTextConfig> AllTextConfigs()
         {
-            if (fromPoint == Guid.Empty || depth > 32) return fromPoint;
-            foreach (StoryLogicPortalNode portal in LogicPortalNodes)
-                if (portal.OutPoints.Exists(o => o.Id == fromPoint))
-                {
-                    Guid feed = ContentConnections.Find(c => c.ToPoint == portal.InPoint.Id)?.FromPoint ?? Guid.Empty;
-                    return ResolvePortalSource(feed, depth + 1);
-                }
-            return fromPoint;
+            yield return EntryTitle;
+            yield return EntrySubtitle;
+            yield return AutoText;
+
+            foreach (StoryChoice choice in Choices)
+                yield return choice.Label;
+
+            foreach (StoryTextNode text in TextNodes)
+                yield return text.Text;
+
+            foreach (StorySetVariableNode set in SetVariableNodes)
+            {
+                yield return set.Instruction;
+                yield return set.Placeholder;
+                yield return set.GamebookValueText;
+            }
+
+            foreach (StoryRandomizedInstructionNode random in RandomizedInstructionNodes)
+            {
+                yield return random.AppText;
+                yield return random.GamebookText;
+                yield return random.GamebookResultFormat;
+            }
         }
     }
 }

@@ -8,10 +8,11 @@ namespace DeusaldStoryCommon
 {
     /// <summary>
     /// Builds the Gamebook preview of a single logic node. Sections are dimensioned only by the <b>previous</b> node's
-    /// choices: a node reached over a plain Flow (or the story start) is one section; a node reached over a Single-path
-    /// node's VFlow becomes one section per upstream choice, each pinning the incoming declared-variable constants. The
-    /// node's own choices become the <b>continue-instructions</b> ("<i>{choice}</i> go to section …"). Global section
-    /// numbers do not exist yet, so section references are placeholder tokens. Pure/host-agnostic for PDF export reuse.
+    /// choice definitions: a node reached over a plain flow (or the story start) is one section; a node reached from a
+    /// Single-path node becomes one section per combination of that node's choices, each pinning the ChoiceA/B/C values
+    /// (and any real variable those choices fix). The node's own continuations become the <b>continue-instructions</b>
+    /// ("<i>{choice}</i> go to section …"). Global section numbers do not exist yet, so section references are
+    /// placeholder tokens. Pure/host-agnostic for PDF export reuse.
     /// </summary>
     [PublicAPI]
     public static class StoryGamebookPreview
@@ -39,7 +40,7 @@ namespace DeusaldStoryCommon
             public List<InlineLink>                 InlineLinks      { get; set; } = new();
             /// <summary>This section's own continue-instruction lines. Per-section because Choice Visibility gates each option against the incoming variable values pinned in <see cref="Values"/> — different sections can offer different continuations. Empty when the text carries inline <c>&lt;choice&gt;</c> links (they replace the standalone lines).</summary>
             public List<ContinueLine>               Continue         { get; set; } = new();
-            /// <summary>The incoming declared-variable values pinned for this section (declared-var id → value); the basis for its per-section Choice-Visibility filtering.</summary>
+            /// <summary>The variable values the incoming choice pinned for this section (variable id → value); the basis for its per-section Choice-Visibility filtering and for printing those variables concretely.</summary>
             public Dictionary<Guid, string>         Values           { get; set; } = new();
         }
 
@@ -71,11 +72,11 @@ namespace DeusaldStoryCommon
 
         public static Result Build(StoryProject project, LocProject? localization, StoryLogicNode logic)
         {
-            (List<StoryDeclaredVariable> incoming, List<Dictionary<Guid, string>> valueMaps, int total) = SectionsData(project, logic);
+            SectionsInfo info = SectionsData(project, logic);
 
-            List<Section> sections = valueMaps
-                                    .Select(values => BuildSection(project, localization, logic, incoming, values))
-                                    .ToList();
+            List<Section> sections = info.Combos
+                                         .Select(combo => BuildSection(project, localization, logic, info.Source, combo))
+                                         .ToList();
 
             // When the text references choices inline (<choice=Name>), those links replace the standalone continue lines
             // — a whole-node decision (matching the App), so one inline section suppresses the standalone lines everywhere.
@@ -88,8 +89,8 @@ namespace DeusaldStoryCommon
             return new Result
             {
                 Sections          = sections,
-                TotalCombinations = total,
-                Truncated         = total > valueMaps.Count
+                TotalCombinations = info.Total,
+                Truncated         = info.Total > info.Combos.Count
             };
         }
 
@@ -97,15 +98,19 @@ namespace DeusaldStoryCommon
 
         private static Section BuildSection(
             StoryProject project, LocProject? localization, StoryLogicNode logic,
-            List<StoryDeclaredVariable> incoming, Dictionary<Guid, string> values)
+            StoryLogicNode? source, StoryChoiceSources.Combination combo)
         {
-            StoryLogicRenderer.RenderedLogic rendered = StoryLogicRenderer.Render(project, localization, logic, values, paper: true, StoryRenderTarget.Gamebook);
-            List<InlineLink>                 inline   = BuildInlineLinks(project, localization, rendered);
-            string                           label    = ComboLabel(incoming, values);
-            string                           key      = SectionToken(logic, incoming, values);
+            // The pinned values are both the live values this section renders against and the set the dictionary
+            // prints concretely instead of as slot pills — the player turned to this section by making those choices.
+            StoryLogicRenderer.RenderedLogic rendered = StoryLogicRenderer.Render(
+                project, localization, logic, combo.Pins, paper: true, StoryRenderTarget.Gamebook, pinned: combo.Pins);
+
+            List<InlineLink> inline = BuildInlineLinks(project, localization, rendered);
+            string           label  = ComboLabel(project, source, combo);
+            string           key    = SectionToken(project, logic, source, combo);
 
             if (!logic.GamebookInstructions)
-                return new Section { Label = label, Key = key, Rendered = rendered, InlineLinks = inline, Values = values };
+                return new Section { Label = label, Key = key, Rendered = rendered, InlineLinks = inline, Values = combo.Pins };
 
             return new Section
             {
@@ -113,49 +118,61 @@ namespace DeusaldStoryCommon
                 Key              = key,
                 Rendered         = rendered,
                 InlineLinks      = inline,
-                Values           = values,
+                Values           = combo.Pins,
                 IsInstructions   = true,
-                InstructionLines = incoming.Select(dv => $"{(string.IsNullOrWhiteSpace(dv.Name) ? UiLang.T(Localization.Services.Gamebook.instructionVariableFallback) : dv.Name)} = {(values.TryGetValue(dv.Id, out string? v) ? v : "")}").ToList()
+                InstructionLines = DimensionLabels(project, source, combo)
             };
         }
 
-        /// <summary>
-        /// The incoming declared variables and the per-section value maps for <paramref name="node"/>: the cartesian
-        /// product of the upstream Single-path node's declared-variable possible values (one section per combination),
-        /// or a single empty map when the node isn't reached over a Single-path VFlow. <paramref name="total"/> is the
-        /// un-capped product size.
-        /// </summary>
-        private static (List<StoryDeclaredVariable> Incoming, List<Dictionary<Guid, string>> ValueMaps, int Total) SectionsData(
-            StoryProject project, StoryLogicNode node)
+        /// <summary>The upstream node dimensioning a node's sections, the capped combinations, and the un-capped total.</summary>
+        private sealed class SectionsInfo
         {
-            StoryLogicNode? source = StorySelectionResolver.SourceNode(project, node);
-            if (source is null || source.DeclaredVariables.Count == 0)
-                return (new List<StoryDeclaredVariable>(), new List<Dictionary<Guid, string>> { new() }, 1);
-
-            List<Dictionary<Guid, string>> maps = Combinations(source.DeclaredVariables, out int total);
-            return (source.DeclaredVariables, maps, total);
+            public StoryLogicNode?                      Source { get; set; }
+            public List<StoryChoiceSources.Combination> Combos { get; set; } = new();
+            public int                                  Total  { get; set; }
         }
 
-        /// <summary>The cartesian product of the declared variables' possible values as declared-var-id → value maps, capped at <see cref="MAX_SECTIONS"/>.</summary>
-        private static List<Dictionary<Guid, string>> Combinations(List<StoryDeclaredVariable> vars, out int total)
+        /// <summary>
+        /// The sections of <paramref name="node"/>: one per combination of the upstream Single-path node's choice
+        /// definitions, or a single empty combination when nothing upstream dimensions it.
+        /// </summary>
+        private static SectionsInfo SectionsData(StoryProject project, StoryLogicNode node)
         {
-            List<Dictionary<Guid, string>> combos = new() { new() };
-            total = 1;
-            foreach (StoryDeclaredVariable v in vars)
-            {
-                List<string> possible = v.PossibleValues.Count > 0 ? v.PossibleValues : new List<string> { "" };
-                total *= possible.Count;
+            StoryLogicNode? source = StoryChoiceSources.SourceOf(project, node);
+            if (source is null || source.ChoiceDefinitions.Count == 0)
+                return new SectionsInfo { Source = null, Combos = new List<StoryChoiceSources.Combination> { new() }, Total = 1 };
 
-                List<Dictionary<Guid, string>> next = new();
-                foreach (Dictionary<Guid, string> baseCombo in combos)
-                    foreach (string value in possible)
-                    {
-                        if (next.Count >= MAX_SECTIONS) break;
-                        next.Add(new Dictionary<Guid, string>(baseCombo) { [v.Id] = value });
-                    }
-                combos = next;
+            List<StoryChoiceSources.Combination> combos = StoryChoiceSources.Combinations(project, source, MAX_SECTIONS, out int total);
+            return new SectionsInfo { Source = source, Combos = combos, Total = total };
+        }
+
+        /// <summary>
+        /// The name each choice dimension reads under — the definition's target variable, falling back to the Choice
+        /// variable it writes (ChoiceA/B/C) when the definition targets no single variable (a range or option list).
+        /// </summary>
+        private static string DimensionName(StoryProject project, StoryChoiceDefinition def, int index)
+        {
+            if (def.Kind == StoryChoiceDefKind.Variable
+                && StoryVariableCatalog.Resolve(project, def.SelectedVariableId) is StoryVariable target
+                && !string.IsNullOrWhiteSpace(target.Name))
+                return target.Name;
+
+            return StoryChoiceVariables.ForIndex(index)?.Name ?? UiLang.T(Localization.Services.Gamebook.instructionVariableFallback);
+        }
+
+        /// <summary>One "Name = value" line per choice dimension this section was reached through.</summary>
+        private static List<string> DimensionLabels(StoryProject project, StoryLogicNode? source, StoryChoiceSources.Combination combo)
+        {
+            List<string> lines = new();
+            if (source is null) return lines;
+
+            for (int x = 0; x < source.ChoiceDefinitions.Count && x < combo.Entries.Count; ++x)
+            {
+                string name  = DimensionName(project, source.ChoiceDefinitions[x], x);
+                string value = combo.Entries[x].ChoiceValue;
+                lines.Add($"{name} = {value}");
             }
-            return combos;
+            return lines;
         }
 
         // ── Continue instructions ────────────────────────────────────────────────
@@ -284,7 +301,7 @@ namespace DeusaldStoryCommon
                 switch (next.Kind)
                 {
                     case StoryFlowNavigator.NextKind.Logic when next.Logic is not null:
-                        string section = SectionToken(next.Logic, new List<StoryDeclaredVariable>(), new Dictionary<Guid, string>());
+                        string section = SectionToken(project, next.Logic, null, new StoryChoiceSources.Combination());
                         string text    = hasText
                             ? StoryCommonLocalizationKeys.Resolve(localization, StoryCommonLocalizationKeys.GamebookChoiceToSection,
                                 new Dictionary<string, object> { ["choice"] = ic.Text, ["section"] = section })
@@ -317,19 +334,31 @@ namespace DeusaldStoryCommon
             StoryProject project, LocProject? localization, StoryLogicNode logic,
             StoryLogicRenderer.RenderedChoice rc, string choiceText, bool hasText, StoryLogicNode next)
         {
-            (List<StoryDeclaredVariable> incoming, List<Dictionary<Guid, string>> maps, _) = SectionsData(project, next);
+            SectionsInfo info = SectionsData(project, next);
 
-            if (logic.ExitMode == StoryLogicExitMode.SinglePath
-                && StorySelectionResolver.SourceNode(project, next) is StoryLogicNode src && src.Id == logic.Id
-                && logic.Choices.Find(c => c.Id == rc.ChoiceId) is StoryChoice thisChoice)
+            // This node feeds the next one's sections, so the continuation the player took picks exactly one of them —
+            // the combination agreeing with everything this choice pinned.
+            if (info.Source is not null && info.Source.Id == logic.Id && rc.Pins.Count > 0)
             {
-                Dictionary<Guid, string> values = StorySelectionResolver.ValuesForChoice(logic, thisChoice);
-                yield return ContinueTo(localization, choiceText, hasText, next, SectionToken(next, incoming, values));
-                yield break;
+                StoryChoiceSources.Combination? match = info.Combos.Find(c => AgreesWith(c.Pins, rc.Pins));
+                if (match is not null)
+                {
+                    yield return ContinueTo(localization, choiceText, hasText, next, SectionToken(project, next, info.Source, match));
+                    yield break;
+                }
             }
 
-            foreach (Dictionary<Guid, string> map in maps)
-                yield return ContinueTo(localization, choiceText, hasText, next, SectionToken(next, incoming, map));
+            foreach (StoryChoiceSources.Combination combo in info.Combos)
+                yield return ContinueTo(localization, choiceText, hasText, next, SectionToken(project, next, info.Source, combo));
+        }
+
+        /// <summary>Whether every key the choice pinned is present in the section's pins with the same value.</summary>
+        private static bool AgreesWith(IReadOnlyDictionary<Guid, string> sectionPins, IReadOnlyDictionary<Guid, string> choicePins)
+        {
+            foreach (KeyValuePair<Guid, string> pin in choicePins)
+                if (!sectionPins.TryGetValue(pin.Key, out string? value) || !string.Equals(value, pin.Value, StringComparison.Ordinal))
+                    return false;
+            return true;
         }
 
         private static ContinueLine ContinueTo(LocProject? localization, string choiceText, bool hasText, StoryLogicNode next, string section) =>
@@ -346,18 +375,25 @@ namespace DeusaldStoryCommon
 
         // ── Section tokens ─────────────────────────────────────────────────────────
 
-        /// <summary>Placeholder section reference token, e.g. <c>[§ Forest Path · A=Win]</c>.</summary>
-        private static string SectionToken(StoryLogicNode node, List<StoryDeclaredVariable> vars, Dictionary<Guid, string> values)
+        /// <summary>Placeholder section reference token, e.g. <c>[§ Forest Path · Health=3]</c>.</summary>
+        private static string SectionToken(StoryProject project, StoryLogicNode node, StoryLogicNode? source, StoryChoiceSources.Combination combo)
         {
             string name    = string.IsNullOrWhiteSpace(node.Name) ? UiLang.T(Localization.Common.Placeholders.unnamed) : node.Name;
-            string summary = ComboLabel(vars, values);
+            string summary = ComboLabel(project, source, combo);
             return string.IsNullOrEmpty(summary)
                 ? UiLang.T(Localization.Services.Gamebook.sectionTokenBare, new Dictionary<string, object> { ["name"] = name })
                 : UiLang.T(Localization.Services.Gamebook.sectionToken,     new Dictionary<string, object> { ["name"] = name, ["summary"] = summary });
         }
 
-        /// <summary>A short "A=val, B=val2" label for a combination (empty when no incoming variables).</summary>
-        private static string ComboLabel(List<StoryDeclaredVariable> vars, Dictionary<Guid, string> values) =>
-            string.Join(", ", vars.Select(v => $"{v.Name}={(values.TryGetValue(v.Id, out string? val) ? val : "")}"));
+        /// <summary>A short "Health=3, ChoiceB=Left" label for a combination (empty when nothing dimensions the node).</summary>
+        private static string ComboLabel(StoryProject project, StoryLogicNode? source, StoryChoiceSources.Combination combo)
+        {
+            if (source is null || combo.Entries.Count == 0) return "";
+
+            List<string> parts = new();
+            for (int x = 0; x < source.ChoiceDefinitions.Count && x < combo.Entries.Count; ++x)
+                parts.Add($"{DimensionName(project, source.ChoiceDefinitions[x], x)}={combo.Entries[x].ChoiceValue}");
+            return string.Join(", ", parts);
+        }
     }
 }

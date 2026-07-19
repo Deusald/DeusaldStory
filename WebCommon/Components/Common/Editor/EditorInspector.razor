@@ -2,6 +2,12 @@
 @inject UiLocalizationService Loc
 @inject ProjectStateService _ProjectState
 
+@*
+    The editing surface for the selected node. Every kind's settings live here and apply live — creating a node from
+    the palette spawns it with defaults, and everything about it is then configured in this column, so there are no
+    per-node modals. Edits mutate the POCO directly and mark the owning entity dirty (the VariablesPanel pattern).
+*@
+
 <div class="ins-root">
 
     @if (Node is null)
@@ -14,7 +20,6 @@
     }
     else
     {
-        @* ── Header ──────────────────────────────────────────────────── *@
         <div class="ins-header">
             <div class="ins-header-top">
                 <span class="ins-kind" style="color:@StoryStyle.NodeColor(Node.Kind)">
@@ -22,102 +27,514 @@
                     @StoryStyle.NodeLabel(Node.Kind)
                 </span>
             </div>
-            @* Skip the title when it only repeats the kind label above (e.g. SmartFormat / FlowText / Exit). *@
             @if (!StoryStyle.IsRedundantTitle(Node.Kind, Node.Title))
             {
                 <div class="ins-title">@Node.Title</div>
             }
-            @if (!string.IsNullOrEmpty(Node.Subtitle))
-            {
-                <div class="ins-subtitle">@Node.Subtitle</div>
-            }
         </div>
 
-        @* ── Body ────────────────────────────────────────────────────── *@
         <div class="ins-body">
-
-            @* SmartFormat / FlowText carry no config of their own — surface the text wired into them. *@
-            @if (ConnectedText is string connected)
+            @switch (Node.Kind)
             {
-                <div class="ins-section-head">
-                    <span class="ins-section-label">@Loc.T(Localization.Editor.Inspector.connectedText)</span>
-                </div>
-                <div class="ins-text">@(string.IsNullOrWhiteSpace(connected) ? Loc.T(Localization.Editor.Inspector.nothingConnected) : connected)</div>
-            }
-
-            @if (!string.IsNullOrEmpty(Node.Thumb))
-            {
-                <div class="ins-thumb">
-                    <img src="data:image/png;base64,@Node.Thumb" alt="@Node.Title"/>
-                </div>
-            }
-
-            @if (Node.Inputs.Count > 0)
-            {
-                <div class="ins-section-head">
-                    <span class="ins-section-label">@Loc.T(Localization.Editor.Inspector.inputs)</span>
-                    <span class="ins-section-count">@Node.Inputs.Count</span>
-                </div>
-                @foreach (EdPort port in Node.Inputs)
-                {
-                    <div class="ins-port">
-                        <span class="ins-port-dot" style="background:@StoryStyle.PortColor(port.Type)"></span>
-                        <span class="ins-port-name">@PortName(port)</span>
-                        <span class="ins-port-type">@PortTypeLabel(port.Type)</span>
-                    </div>
-                }
-            }
-
-            @if (Node.Outputs.Count > 0)
-            {
-                <div class="ins-section-head">
-                    <span class="ins-section-label">@Loc.T(Localization.Editor.Inspector.outputs)</span>
-                    <span class="ins-section-count">@Node.Outputs.Count</span>
-                </div>
-                @foreach (EdPort port in Node.Outputs)
-                {
-                    <div class="ins-port">
-                        <span class="ins-port-dot" style="background:@StoryStyle.PortColor(port.Type)"></span>
-                        <span class="ins-port-name">@PortName(port)</span>
-                        <span class="ins-port-type">@PortTypeLabel(port.Type)</span>
-                    </div>
-                }
+                case StoryNodeKind.Logic:            @LogicBody();            break;
+                case StoryNodeKind.Container:        @ContainerBody();        break;
+                case StoryNodeKind.PortalIn:
+                case StoryNodeKind.PortalOut:        @PortalBody();           break;
+                case StoryNodeKind.LogicEntry:       @EntryBody();            break;
+                case StoryNodeKind.LogicExit:        @ExitBody();             break;
+                case StoryNodeKind.Text:             @TextBody();             break;
+                case StoryNodeKind.ConstantVariable: @ConstantBody();         break;
+                case StoryNodeKind.SetVariable:      @SetVariableBody();      break;
+                case StoryNodeKind.RandomizedInstruction: @RandomBody();      break;
+                case StoryNodeKind.ConditionFlow:    @ConditionBody();        break;
+                case StoryNodeKind.Comment:          @CommentBody();          break;
+                default:                             @ReadOnlyBody();         break;
             }
         </div>
     }
 </div>
 
 @code {
-    [Parameter] public EdNode?        Node  { get; set; }
-    /// <summary>The logic node whose inner graph the selected node lives in (null in a container graph); used to resolve wired-in text.</summary>
+    [Parameter] public EdNode? Node { get; set; }
+
+    /// <summary>The logic node whose inner graph the selection lives in; null in a container graph.</summary>
     [Parameter] public StoryLogicNode? Logic { get; set; }
 
-    /// <summary>
-    /// For a SmartFormat / FlowText node, the text resolved from whatever is wired into its Text input (the format
-    /// string for SmartFormat, the formatted result for FlowText). Null for every other kind — those show no text row.
-    /// </summary>
-    private string? ConnectedText
+    /// <summary>The graph currently open — the container id, or the logic node id when inside one.</summary>
+    [Parameter] public Guid OwnerId { get; set; }
+
+    [Parameter] public EventCallback OnChanged { get; set; }
+    [Parameter] public EventCallback<(Guid Current, Action<Guid> Apply)> OnPickKey  { get; set; }
+    [Parameter] public EventCallback<(Guid Current, Action<Guid> Apply)> OnPickIcon { get; set; }
+
+    private StoryProject Project => _ProjectState.CurrentProject!;
+
+    /// <summary>Marks the entity that owns the selection dirty and tells the page to rebuild the canvas.</summary>
+    private async Task Dirty(Guid entityId)
     {
-        get
-        {
-            if (Logic is null || Node is null) return null;
-            if (Node.Kind is not (StoryNodeKind.SmartFormat or StoryNodeKind.FlowText)) return null;
-            EdPort? textIn = Node.Inputs.Find(p => p.Type == PortType.Text);
-            if (textIn is null) return null;
-            return StoryLogicRenderer.ResolvePortText(_ProjectState.CurrentProject!, _ProjectState.CurrentLocalization, Logic, textIn.Id);
-        }
+        _ProjectState.MarkKeyDirty(entityId);
+        await OnChanged.InvokeAsync();
     }
 
-    private string PortName(EdPort port) => string.IsNullOrEmpty(port.Name) ? Loc.T(Localization.Common.Placeholders.unnamed) : port.Name;
+    /// <summary>The logic node the inner-graph selection belongs to — dirtying it persists any inner edit.</summary>
+    private Task DirtyLogic() => Dirty(Logic?.Id ?? OwnerId);
 
-    private string PortTypeLabel(PortType type) => type switch
+    // Text fields commit on blur/Enter (@onchange), so each completed edit is already one undo step; selects and
+    // checkboxes commit on the interaction itself. Per-keystroke fields go through
+    // ProjectStateService.MarkKeyDirtyCoalesced instead (see the Variables panel).
+
+    // ── Container-graph kinds ───────────────────────────────────────────────
+
+    private RenderFragment LogicBody() => @<text>
+        @if (Project.LogicNodes.TryGetValue(Node!.Id, out StoryLogicNode? logic))
+        {
+            <div class="ins-field">
+                <label class="ins-label">@Loc.T(Localization.Common.Fields.name)</label>
+                <input class="ins-input" type="text" value="@logic.Name" maxlength="80"
+                       @onchange="async e => { logic.Name = e.Value?.ToString() ?? string.Empty; await Dirty(logic.Id); }"/>
+            </div>
+            <div class="ins-field">
+                <label class="ins-label">@Loc.T(Localization.Common.Fields.description)</label>
+                <textarea class="ins-input ins-textarea" rows="3" maxlength="400"
+                          @onchange="async e => { logic.Description = e.Value?.ToString() ?? string.Empty; await Dirty(logic.Id); }">@logic.Description</textarea>
+            </div>
+
+            <div class="ins-field">
+                <label class="ins-label">@Loc.T(Localization.Editor.Inspector.exitModeLabel)</label>
+                <select class="ins-input" value="@logic.ExitMode" @onchange="e => OnExitModeChanged(logic, e)">
+                    <option value="@StoryLogicExitMode.ManyPaths">@Loc.T(Localization.Editor.Inspector.exitManyPaths)</option>
+                    <option value="@StoryLogicExitMode.SinglePath">@Loc.T(Localization.Editor.Inspector.exitSinglePath)</option>
+                    <option value="@StoryLogicExitMode.HubPaths">@Loc.T(Localization.Editor.Inspector.exitHubPaths)</option>
+                </select>
+            </div>
+
+            <label class="ins-check">
+                <input type="checkbox" checked="@logic.GamebookInstructions"
+                       @onchange="async e => { logic.GamebookInstructions = (bool?)e.Value ?? false; await Dirty(logic.Id); }"/>
+                <span>@Loc.T(Localization.Editor.Inspector.gamebookInstructionsLabel)</span>
+            </label>
+
+            @if (logic.ExitMode == StoryLogicExitMode.SinglePath)
+            {
+                <ChoiceDefinitionsEditor Logic="logic" OnChanged="() => Dirty(logic.Id)" OnPickKey="OnPickKey"/>
+            }
+        }
+    </text>;
+
+    private async Task OnExitModeChanged(StoryLogicNode logic, ChangeEventArgs e)
     {
-        PortType.VFlow     => Loc.T(Localization.Editor.Inspector.PortTypes.vflow),
-        PortType.LFlow     => Loc.T(Localization.Editor.Inspector.PortTypes.lflow),
-        PortType.Text      => Loc.T(Localization.Editor.Inspector.PortTypes.text),
-        PortType.Icon      => Loc.T(Localization.Editor.Inspector.PortTypes.icon),
-        PortType.Variable  => Loc.T(Localization.Editor.Inspector.PortTypes.variable),
-        PortType.CVariable => Loc.T(Localization.Editor.Inspector.PortTypes.cvariable),
-        _                  => Loc.T(Localization.Editor.Inspector.PortTypes.flow)
-    };
+        if (!Enum.TryParse(e.Value?.ToString(), out StoryLogicExitMode mode)) return;
+        _ProjectState.SetLogicExitMode(logic.Id, mode);
+        await OnChanged.InvokeAsync();
+    }
+
+    private RenderFragment ContainerBody() => @<text>
+        @if (Project.ContainerNodes.TryGetValue(Node!.Id, out StoryContainerNode? container))
+        {
+            <div class="ins-field">
+                <label class="ins-label">@Loc.T(Localization.Common.Fields.name)</label>
+                <input class="ins-input" type="text" value="@container.Name" maxlength="80"
+                       @onchange="async e => { container.Name = e.Value?.ToString() ?? string.Empty; await Dirty(container.Id); }"/>
+            </div>
+            <div class="ins-field">
+                <label class="ins-label">@Loc.T(Localization.Common.Fields.description)</label>
+                <textarea class="ins-input ins-textarea" rows="3" maxlength="400"
+                          @onchange="async e => { container.Description = e.Value?.ToString() ?? string.Empty; await Dirty(container.Id); }">@container.Description</textarea>
+            </div>
+            <div class="ins-hint">@Loc.T(Localization.Editor.Inspector.containerPointsHint)</div>
+        }
+    </text>;
+
+    private RenderFragment PortalBody() => @<text>
+        @if (_ProjectState.FindPortalByPoint(Node!.Id) is StoryPortalNode portal)
+        {
+            <div class="ins-field">
+                <label class="ins-label">@Loc.T(Localization.Common.Fields.name)</label>
+                <input class="ins-input" type="text" value="@portal.Name" maxlength="80"
+                       @onchange="async e => { portal.Name = e.Value?.ToString() ?? string.Empty; await Dirty(portal.Id); }"/>
+            </div>
+            <div class="ins-field">
+                <label class="ins-label">@Loc.T(Localization.Common.Fields.description)</label>
+                <textarea class="ins-input ins-textarea" rows="2" maxlength="400"
+                          @onchange="async e => { portal.Description = e.Value?.ToString() ?? string.Empty; await Dirty(portal.Id); }">@portal.Description</textarea>
+            </div>
+        }
+    </text>;
+
+    // ── Logic-node inner graph ──────────────────────────────────────────────
+
+    private RenderFragment EntryBody() => @<text>
+        @if (Logic is StoryLogicNode logic)
+        {
+            <TextConfigEditor Config="logic.EntryTitle"    Label="@Loc.T(Localization.Editor.Nodes.Ports.title)"
+                              OnChanged="DirtyLogic" OnPickKey="OnPickKey"/>
+            <TextConfigEditor Config="logic.EntrySubtitle" Label="@Loc.T(Localization.Editor.Nodes.Ports.subtitle)"
+                              OnChanged="DirtyLogic" OnPickKey="OnPickKey"/>
+
+            <div class="ins-section-head">
+                <span class="ins-section-label">@Loc.T(Localization.Editor.Nodes.Ports.icon)</span>
+            </div>
+            <div class="ins-icon-slots">
+                <IconSlotEditor Label="@Loc.T(Localization.Editor.Nodes.Ports.light)" ImageId="logic.LightIcon"
+                                ImageIdChanged="id => SetIcon(logic, light: true, id)" OnPickIcon="OnPickIcon"/>
+                <IconSlotEditor Label="@Loc.T(Localization.Editor.Nodes.Ports.dark)"  ImageId="logic.DarkIcon"
+                                ImageIdChanged="id => SetIcon(logic, light: false, id)" OnPickIcon="OnPickIcon"/>
+            </div>
+            <div class="ins-hint">@Loc.T(Localization.Editor.Inspector.iconSlotsHint)</div>
+        }
+    </text>;
+
+    /// <summary>
+    /// Applies an icon pick. While both slots are empty a pick fills <b>both</b>, so the common "one icon for either
+    /// theme" case needs a single action; once either slot is set, a pick only touches the slot it was made on.
+    /// </summary>
+    private async Task SetIcon(StoryLogicNode logic, bool light, Guid imageId)
+    {
+        bool bothEmpty = logic.LightIcon == Guid.Empty && logic.DarkIcon == Guid.Empty;
+
+        if (bothEmpty && imageId != Guid.Empty)
+        {
+            logic.LightIcon = imageId;
+            logic.DarkIcon  = imageId;
+        }
+        else if (light) logic.LightIcon = imageId;
+        else            logic.DarkIcon  = imageId;
+
+        await Dirty(logic.Id);
+    }
+
+    private RenderFragment ExitBody() => @<text>
+        @if (Logic is StoryLogicNode logic)
+        {
+            @if (logic.ExitMode == StoryLogicExitMode.SinglePath)
+            {
+                <div class="ins-hint">@Loc.T(Localization.Editor.Inspector.exitSinglePathHint)</div>
+            }
+            else
+            {
+                <label class="ins-check">
+                    <input type="checkbox" checked="@logic.ExitAutoResolve"
+                           @onchange="async e => { logic.ExitAutoResolve = (bool?)e.Value ?? false; await Dirty(logic.Id); }"/>
+                    <span>@Loc.T(Localization.Editor.Inspector.autoResolveLabel)</span>
+                </label>
+
+                @if (logic.ExitAutoResolve && logic.ExitMode != StoryLogicExitMode.HubPaths)
+                {
+                    <div class="ins-field">
+                        <label class="ins-label">@Loc.T(Localization.Editor.Inspector.autoModeLabel)</label>
+                        <select class="ins-input" value="@logic.ExitAutoMode"
+                                @onchange="async e => { if (Enum.TryParse(e.Value?.ToString(), out StoryExitAutoMode m)) { logic.ExitAutoMode = m; await Dirty(logic.Id); } }">
+                            <option value="@StoryExitAutoMode.AutomaticChoice">@Loc.T(Localization.Editor.Inspector.autoModeAutomatic)</option>
+                            <option value="@StoryExitAutoMode.ChoiceVisibility">@Loc.T(Localization.Editor.Inspector.autoModeVisibility)</option>
+                        </select>
+                    </div>
+
+                    @if (logic.ExitAutoMode == StoryExitAutoMode.AutomaticChoice)
+                    {
+                        <TextConfigEditor Config="logic.AutoText" Label="@Loc.T(Localization.Editor.Nodes.Ports.text)"
+                                          OnChanged="DirtyLogic" OnPickKey="OnPickKey"/>
+                    }
+                }
+
+                <div class="ins-section-head">
+                    <span class="ins-section-label">@Loc.T(Localization.Editor.Inspector.choicesLabel)</span>
+                    <span class="ins-section-count">@logic.Choices.Count</span>
+                </div>
+
+                @foreach (StoryChoice choice in logic.Choices.ToList())
+                {
+                    StoryChoice c = choice;
+                    <div class="ins-card">
+                        <div class="ins-inline-row">
+                            <input class="ins-input" type="text" value="@c.Name" maxlength="80"
+                                   placeholder="@Loc.T(Localization.Common.Fields.name)"
+                                   @onchange="async e => { c.Name = e.Value?.ToString() ?? string.Empty; await Dirty(logic.Id); }"/>
+                            <button class="ins-icon-btn" title="@Loc.T(Localization.Common.Buttons.remove)"
+                                    @onclick="async () => { _ProjectState.RemoveChoice(logic.Id, c.Id); await OnChanged.InvokeAsync(); }">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </div>
+                        <TextConfigEditor Config="c.Label" Label="@Loc.T(Localization.Editor.Nodes.Ports.text)"
+                                          OnChanged="DirtyLogic" OnPickKey="OnPickKey"/>
+                        @if (logic.ExitAutoResolve && !c.IsElse)
+                        {
+                            <ExitConditionEditor Expr="ConditionOf(c)" Vars="ConditionVars()" OnChanged="DirtyLogic"/>
+                        }
+                    </div>
+                }
+
+                <button class="ins-add" @onclick="async () => { _ProjectState.AddChoice(logic.Id); await OnChanged.InvokeAsync(); }">
+                    <i class="bi bi-plus-lg"></i> @Loc.T(Localization.Editor.Inspector.addChoice)
+                </button>
+            }
+        }
+    </text>;
+
+    /// <summary>A choice's condition tree, created on first edit so an unconditioned choice stores no empty group.</summary>
+    private StoryConditionExpr ConditionOf(StoryChoice choice) =>
+        choice.Condition ??= new StoryConditionExpr { Kind = StoryConditionExprKind.Group };
+
+    /// <summary>Every variable a condition may test — the whole catalog, since any variable is readable anywhere now.</summary>
+    private List<(Guid Id, string Name)> ConditionVars() =>
+        StoryVariableCatalog.All(Project).Select(v => (v.Id, v.Name)).ToList();
+
+    private RenderFragment TextBody() => @<text>
+        @if (Logic?.TextNodes.Find(n => n.Id == Node!.Id) is StoryTextNode text)
+        {
+            <TextConfigEditor Config="text.Text" Label="@Loc.T(Localization.Editor.Nodes.Ports.text)"
+                              OnChanged="DirtyLogic" OnPickKey="OnPickKey"/>
+
+            <div class="ins-field">
+                <label class="ins-label">@Loc.T(Localization.Editor.Inspector.frameLabel)</label>
+                <select class="ins-input" value="@text.FrameStyle"
+                        @onchange="async e => { if (Enum.TryParse(e.Value?.ToString(), out StoryTextFrameStyle f)) { text.FrameStyle = f; await DirtyLogic(); } }">
+                    <option value="@StoryTextFrameStyle.Normal">@StoryStyle.FrameLabel(StoryTextFrameStyle.Normal)</option>
+                    <option value="@StoryTextFrameStyle.Info">@StoryStyle.FrameLabel(StoryTextFrameStyle.Info)</option>
+                    <option value="@StoryTextFrameStyle.Success">@StoryStyle.FrameLabel(StoryTextFrameStyle.Success)</option>
+                    <option value="@StoryTextFrameStyle.Warning">@StoryStyle.FrameLabel(StoryTextFrameStyle.Warning)</option>
+                    <option value="@StoryTextFrameStyle.Danger">@StoryStyle.FrameLabel(StoryTextFrameStyle.Danger)</option>
+                </select>
+            </div>
+
+            <label class="ins-check">
+                <input type="checkbox" checked="@text.RenderInApp"
+                       @onchange="async e => { text.RenderInApp = (bool?)e.Value ?? false; await DirtyLogic(); }"/>
+                <span>@Loc.T(Localization.Editor.Inspector.renderInApp)</span>
+            </label>
+            <label class="ins-check">
+                <input type="checkbox" checked="@text.RenderInGamebook"
+                       @onchange="async e => { text.RenderInGamebook = (bool?)e.Value ?? false; await DirtyLogic(); }"/>
+                <span>@Loc.T(Localization.Editor.Inspector.renderInGamebook)</span>
+            </label>
+        }
+    </text>;
+
+    private RenderFragment ConstantBody() => @<text>
+        @if (Logic?.ConstantVariableNodes.Find(n => n.Id == Node!.Id) is StoryConstantVariableNode constant)
+        {
+            <div class="ins-field">
+                <label class="ins-label">@Loc.T(Localization.Common.Fields.name)</label>
+                <input class="ins-input" type="text" value="@constant.Name" maxlength="80"
+                       @onchange="async e => { constant.Name = (e.Value?.ToString() ?? string.Empty).Trim(); await DirtyLogic(); }"/>
+                <div class="ins-hint">@Loc.T(Localization.Editor.Inspector.constantNameHint)</div>
+            </div>
+            <div class="ins-field">
+                <label class="ins-label">@Loc.T(Localization.Common.Fields.value)</label>
+                <input class="ins-input" type="text" value="@constant.Value" maxlength="200"
+                       @onchange="async e => { constant.Value = e.Value?.ToString() ?? string.Empty; await DirtyLogic(); }"/>
+            </div>
+        }
+    </text>;
+
+    private RenderFragment SetVariableBody() => @<text>
+        @if (Logic?.SetVariableNodes.Find(n => n.Id == Node!.Id) is StorySetVariableNode set)
+        {
+            <VariablePicker Selected="set.SelectedVariableId" WritableOnly="true"
+                            Label="@Loc.T(Localization.Editor.Inspector.targetLabel)"
+                            SelectedChanged="async id => { set.SelectedVariableId = id; await DirtyLogic(); }"/>
+
+            @if (StoryLogicFlow.SetTarget(Project, set) is StoryVariable target)
+            {
+                @if (target.Scope == StoryVariableScope.External)
+                {
+                    <div class="ins-field">
+                        <label class="ins-label">@Loc.T(Localization.Common.Fields.value)</label>
+                        <input class="ins-input" type="text" value="@set.ExternalValue" maxlength="200"
+                               @onchange="async e => { set.ExternalValue = e.Value?.ToString() ?? string.Empty; await DirtyLogic(); }"/>
+                    </div>
+                }
+                else if (target.InternalSubtype == StoryInternalSubtype.Text)
+                {
+                    <div class="ins-field">
+                        <label class="ins-label">@Loc.T(Localization.Editor.Inspector.stringModeLabel)</label>
+                        <select class="ins-input" value="@set.StringMode"
+                                @onchange="async e => { if (Enum.TryParse(e.Value?.ToString(), out StringValueMode m)) { set.StringMode = m; await DirtyLogic(); } }">
+                            <option value="@StringValueMode.Unset">@Loc.T(Localization.Editor.Inspector.stringUnset)</option>
+                            <option value="@StringValueMode.Specific">@Loc.T(Localization.Editor.Inspector.stringSpecific)</option>
+                            <option value="@StringValueMode.PlayerInput">@Loc.T(Localization.Editor.Inspector.stringPlayerInput)</option>
+                        </select>
+                    </div>
+
+                    @if (set.StringMode == StringValueMode.Specific)
+                    {
+                        <div class="ins-field">
+                            <label class="ins-label">@Loc.T(Localization.Common.Fields.value)</label>
+                            <input class="ins-input" type="text" value="@set.StringValue" maxlength="200"
+                                   @onchange="async e => { set.StringValue = e.Value?.ToString() ?? string.Empty; await DirtyLogic(); }"/>
+                        </div>
+                    }
+                    else if (set.StringMode == StringValueMode.PlayerInput)
+                    {
+                        <TextConfigEditor Config="set.Instruction" Label="@Loc.T(Localization.Editor.Nodes.Ports.instruction)"
+                                          OnChanged="DirtyLogic" OnPickKey="OnPickKey"/>
+                        <TextConfigEditor Config="set.Placeholder" Label="@Loc.T(Localization.Editor.Nodes.Ports.placeholder)"
+                                          OnChanged="DirtyLogic" OnPickKey="OnPickKey"/>
+                    }
+                }
+                else
+                {
+                    <div class="ins-field">
+                        <label class="ins-label">@Loc.T(Localization.Editor.Inspector.assignmentLabel)</label>
+                        <select class="ins-input" value="@set.Assignment"
+                                @onchange="async e => { if (Enum.TryParse(e.Value?.ToString(), out NumberAssignment a)) { set.Assignment = a; await DirtyLogic(); } }">
+                            <option value="@NumberAssignment.Unset">@Loc.T(Localization.Editor.Inspector.assignUnset)</option>
+                            <option value="@NumberAssignment.SetSpecific">@Loc.T(Localization.Editor.Inspector.assignSpecific)</option>
+                            <option value="@NumberAssignment.Randomize">@Loc.T(Localization.Editor.Inspector.assignRandomize)</option>
+                        </select>
+                    </div>
+
+                    @if (set.Assignment == NumberAssignment.SetSpecific)
+                    {
+                        <div class="ins-field">
+                            <label class="ins-label">@Loc.T(Localization.Common.Fields.value)</label>
+                            <input class="ins-input" type="number" value="@set.SpecificValue"
+                                   @onchange="async e => { if (int.TryParse(e.Value?.ToString(), out int v)) { set.SpecificValue = v; await DirtyLogic(); } }"/>
+                        </div>
+                    }
+
+                    <label class="ins-check">
+                        <input type="checkbox" checked="@set.Secret"
+                               @onchange="async e => { set.Secret = (bool?)e.Value ?? false; await DirtyLogic(); }"/>
+                        <span>@Loc.T(Localization.Editor.Inspector.secretLabel)</span>
+                    </label>
+                }
+
+                <div class="ins-field">
+                    <label class="ins-label">@Loc.T(Localization.Editor.Inspector.placementLabel)</label>
+                    <select class="ins-input" value="@set.Placement"
+                            @onchange="async e => { if (Enum.TryParse(e.Value?.ToString(), out StorageInstructionPlacement p)) { set.Placement = p; await DirtyLogic(); } }">
+                        <option value="@StorageInstructionPlacement.Below">@Loc.T(Localization.Editor.Inspector.placementBelow)</option>
+                        <option value="@StorageInstructionPlacement.Above">@Loc.T(Localization.Editor.Inspector.placementAbove)</option>
+                    </select>
+                </div>
+            }
+        }
+    </text>;
+
+    private RenderFragment RandomBody() => @<text>
+        @if (Logic?.RandomizedInstructionNodes.Find(n => n.Id == Node!.Id) is StoryRandomizedInstructionNode random)
+        {
+            <div class="ins-field">
+                <label class="ins-label">@Loc.T(Localization.Editor.Inspector.resultTokenLabel)</label>
+                <input class="ins-input" type="text" value="@random.ResultToken" maxlength="80"
+                       @onchange="async e => { random.ResultToken = (e.Value?.ToString() ?? string.Empty).Trim(); await DirtyLogic(); }"/>
+            </div>
+
+            <label class="ins-check">
+                <input type="checkbox" checked="@random.SaveToVariable"
+                       @onchange="async e => { random.SaveToVariable = (bool?)e.Value ?? false; await DirtyLogic(); }"/>
+                <span>@Loc.T(Localization.Editor.Inspector.randomSaveLabel)</span>
+            </label>
+
+            @if (random.SaveToVariable)
+            {
+                <VariablePicker Selected="random.TargetVariableId" WritableOnly="true"
+                                Label="@Loc.T(Localization.Editor.Inspector.targetLabel)"
+                                SelectedChanged="async id => { random.TargetVariableId = id; await DirtyLogic(); }"/>
+            }
+
+            <div class="ins-field">
+                <label class="ins-label">@Loc.T(Localization.Editor.Inspector.randomModeLabel)</label>
+                <select class="ins-input" value="@random.RandomMode"
+                        @onchange="async e => { if (Enum.TryParse(e.Value?.ToString(), out RandomMode m)) { random.RandomMode = m; await DirtyLogic(); } }">
+                    <option value="@RandomMode.Saved">@Loc.T(Localization.Editor.Inspector.randomSaved)</option>
+                    <option value="@RandomMode.Pure">@Loc.T(Localization.Editor.Inspector.randomPure)</option>
+                </select>
+            </div>
+
+            <div class="ins-field">
+                <label class="ins-label">@Loc.T(Localization.Editor.Inspector.remainderLabel)</label>
+                <select class="ins-input" value="@random.RemainderMode"
+                        @onchange="async e => { if (Enum.TryParse(e.Value?.ToString(), out RandomRemainderMode m)) { random.RemainderMode = m; await DirtyLogic(); } }">
+                    <option value="@RandomRemainderMode.Reroll">@Loc.T(Localization.Editor.Inspector.remainderReroll)</option>
+                    <option value="@RandomRemainderMode.Fill">@Loc.T(Localization.Editor.Inspector.remainderFill)</option>
+                </select>
+            </div>
+
+            <VariablePicker Selected="random.BranchVariableId"
+                            Label="@Loc.T(Localization.Editor.Nodes.Ports.branch)"
+                            SelectedChanged="async id => { random.BranchVariableId = id; await DirtyLogic(); }"/>
+
+            <div class="ins-field">
+                <label class="ins-label">@Loc.T(Localization.Editor.Inspector.defaultRangeLabel)</label>
+                <textarea class="ins-input ins-textarea" rows="4"
+                          @onchange="async e => { SetLines(random.DefaultRange, e.Value?.ToString()); await DirtyLogic(); }">@string.Join("\n", random.DefaultRange)</textarea>
+                <div class="ins-hint">@Loc.T(Localization.Editor.Inspector.rangeLinesHint)</div>
+            </div>
+
+            <TextConfigEditor Config="random.AppText"              Label="@Loc.T(Localization.Editor.Nodes.Ports.appInstruction)"
+                              OnChanged="DirtyLogic" OnPickKey="OnPickKey"/>
+            <TextConfigEditor Config="random.GamebookText"         Label="@Loc.T(Localization.Editor.Nodes.Ports.gamebookInstruction)"
+                              OnChanged="DirtyLogic" OnPickKey="OnPickKey"/>
+            <TextConfigEditor Config="random.GamebookResultFormat" Label="@Loc.T(Localization.Editor.Nodes.Ports.gamebookResultFormat)"
+                              OnChanged="DirtyLogic" OnPickKey="OnPickKey"/>
+
+            <div class="ins-field">
+                <label class="ins-label">@Loc.T(Localization.Editor.Inspector.previewValueLabel)</label>
+                <input class="ins-input" type="text" value="@random.PreviewValue" maxlength="200"
+                       @onchange="async e => { random.PreviewValue = e.Value?.ToString() ?? string.Empty; await DirtyLogic(); }"/>
+            </div>
+        }
+    </text>;
+
+    /// <summary>Replaces a range list from a textarea — one outcome per non-blank line.</summary>
+    private static void SetLines(List<string> target, string? text)
+    {
+        target.Clear();
+        if (string.IsNullOrWhiteSpace(text)) return;
+        foreach (string line in text.Replace("\r\n", "\n").Split('\n'))
+            if (!string.IsNullOrWhiteSpace(line))
+                target.Add(line.Trim());
+    }
+
+    private RenderFragment ConditionBody() => @<text>
+        @if (Logic is StoryLogicNode logic && _ProjectState.FindConditionFlowByAnyId(logic, Node!.Id) is StoryConditionFlowNode cf)
+        {
+            <div class="ins-field">
+                <label class="ins-label">@Loc.T(Localization.Common.Fields.name)</label>
+                <input class="ins-input" type="text" value="@cf.Name" maxlength="80"
+                       @onchange="async e => { cf.Name = e.Value?.ToString() ?? string.Empty; await DirtyLogic(); }"/>
+            </div>
+
+            <label class="ins-check">
+                <input type="checkbox" checked="@cf.Negate"
+                       @onchange="async e => { cf.Negate = (bool?)e.Value ?? false; await DirtyLogic(); }"/>
+                <span>@Loc.T(Localization.Editor.Inspector.negateLabel)</span>
+            </label>
+
+            <ExitConditionEditor Expr="cf.Condition" Vars="ConditionVars()" OnChanged="DirtyLogic"/>
+        }
+    </text>;
+
+    private RenderFragment CommentBody() => @<text>
+        @if (_ProjectState.FindCommentNode(OwnerId, Node!.Id) is StoryCommentNode comment)
+        {
+            <div class="ins-field">
+                <label class="ins-label">@Loc.T(Localization.Editor.Inspector.commentTextLabel)</label>
+                <textarea class="ins-input ins-textarea" rows="6" maxlength="2000"
+                          @onchange="async e => { comment.Text = e.Value?.ToString() ?? string.Empty; await Dirty(OwnerId); }">@comment.Text</textarea>
+            </div>
+        }
+    </text>;
+
+    /// <summary>Boundary and no-config kinds (Start/End/Entry/Exit, Split for App) — nothing to edit, just describe them.</summary>
+    private RenderFragment ReadOnlyBody() => @<text>
+        @if (!string.IsNullOrEmpty(Node!.Subtitle))
+        {
+            <div class="ins-subtitle">@Node.Subtitle</div>
+        }
+        @if (Node.Inputs.Count > 0 || Node.Outputs.Count > 0)
+        {
+            <div class="ins-section-head">
+                <span class="ins-section-label">@Loc.T(Localization.Editor.Inspector.inputs)</span>
+            </div>
+            @foreach (EdPort port in Node.Inputs.Concat(Node.Outputs))
+            {
+                <div class="ins-port">
+                    <span class="ins-port-dot" style="background:@StoryStyle.WireColor"></span>
+                    <span class="ins-port-name">@(string.IsNullOrEmpty(port.Name) ? Loc.T(Localization.Common.Placeholders.unnamed) : port.Name)</span>
+                </div>
+            }
+        }
+    </text>;
 }

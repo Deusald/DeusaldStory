@@ -103,21 +103,27 @@
     }
 
     /// <summary>
-    /// The variables this logic node previews: those its Get Variable nodes reference (built-ins excluded — they follow
-    /// the render), plus the incoming declared variables handed in by an upstream Single-path node, so the reader can
-    /// pick a value and the text never renders as null.
+    /// The variables this logic node previews. Every variable is now readable from every node, so the panel offers
+    /// the whole catalog (built-ins excluded — they follow the render) plus ChoiceA/B/C, whose values stand in for
+    /// whatever choice the player made upstream.
     /// </summary>
     private List<PreviewVar> ReferencedVariables()
     {
-        Dictionary<Guid, PreviewVar> map = new();
-        foreach (StoryGetVariableNode n in Logic.GetVariableNodes)
-            if (Variable(n.SelectedVariableId) is StoryVariable v)
-                map[v.Id] = new PreviewVar(v.Id, v.Name, v.Description, StoryVariableValues.PossibleValues(v));
+        List<PreviewVar> ordered = Project.Variables.Values
+                                          .OrderBy(v => v.Name, StringComparer.OrdinalIgnoreCase)
+                                          .Select(v => new PreviewVar(v.Id, v.Name, v.Description, StoryVariableValues.PossibleValues(v)))
+                                          .ToList();
 
-        List<PreviewVar> ordered = map.Values.OrderBy(v => v.Name, StringComparer.OrdinalIgnoreCase).ToList();
-
-        foreach (StoryDeclaredVariable d in StorySelectionResolver.IncomingVariables(Project, Logic))
-            ordered.Add(new PreviewVar(d.Id, string.IsNullOrWhiteSpace(d.Name) ? Loc.T(Localization.Editor.Panels.PreviewVariables.incoming) : d.Name, "", d.PossibleValues));
+        // The upstream node's choices decide what a Choice variable can hold, so offer its entries when there is one.
+        StoryLogicNode? source = StoryChoiceSources.SourceOf(Project, Logic);
+        for (int x = 0; x < StoryChoiceVariables.All.Count; ++x)
+        {
+            StoryVariable choiceVar = StoryChoiceVariables.All[x];
+            List<string>  values    = source is not null && x < source.ChoiceDefinitions.Count
+                ? StoryChoiceSources.Enumerate(Project, source.ChoiceDefinitions[x]).Select(e => e.ChoiceValue).Distinct().ToList()
+                : new List<string>();
+            ordered.Add(new PreviewVar(choiceVar.Id, choiceVar.Name, choiceVar.Description, values));
+        }
 
         return ordered;
     }

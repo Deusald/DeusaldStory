@@ -62,5 +62,14 @@ namespace DeusaldStoryCommon
         public static bool IsConstant(StoryVariable v) =>
             v.Scope == StoryVariableScope.External &&
             v.ExternalForm is StoryExternalForm.Constant or StoryExternalForm.Initial;
+
+        /// <summary>
+        /// The name — and SmartFormat token — of the read-only pseudo-variable a text map surfaces as, e.g.
+        /// <c>Health_Wounded</c>. An <b>underscore</b>, not a dot: SmartFormat reads <c>.</c> as member access, so
+        /// <c>{Health.Wounded}</c> would try to find a <c>Wounded</c> member on a string and throw. Every surface
+        /// (dropdowns, the dictionary, the validator) goes through here so the display name and token cannot drift.
+        /// </summary>
+        public static string TextMapName(StoryVariable owner, StoryVariableTextMap map) =>
+            $"{owner.Name}_{map.Name}";
     }
 }

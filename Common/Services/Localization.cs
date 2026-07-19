@@ -381,6 +381,65 @@ namespace DeusaldStoryCommon
                 public static readonly Guid nothingConnected = new Guid("1c92ac42-41a9-4320-a378-4dddac92b945");
                 public static readonly Guid inputs = new Guid("4c59429a-aec1-492b-be74-0333be59d1eb");
                 public static readonly Guid outputs = new Guid("dc681440-3f6b-462d-bb63-ab184679273a");
+                public static readonly Guid exitModeLabel = new Guid("3b1f0a10-0004-4a00-9000-000000000001");
+                public static readonly Guid exitManyPaths = new Guid("3b1f0a10-0004-4a00-9000-000000000002");
+                public static readonly Guid exitSinglePath = new Guid("3b1f0a10-0004-4a00-9000-000000000003");
+                public static readonly Guid exitHubPaths = new Guid("3b1f0a10-0004-4a00-9000-000000000004");
+                public static readonly Guid gamebookInstructionsLabel = new Guid("3b1f0a10-0004-4a00-9000-000000000005");
+                public static readonly Guid autoModeLabel = new Guid("3b1f0a10-0004-4a00-9000-000000000006");
+                public static readonly Guid autoModeAutomatic = new Guid("3b1f0a10-0004-4a00-9000-000000000007");
+                public static readonly Guid autoModeVisibility = new Guid("3b1f0a10-0004-4a00-9000-000000000008");
+                public static readonly Guid addChoice = new Guid("3b1f0a10-0004-4a00-9000-000000000009");
+                public static readonly Guid frameLabel = new Guid("3b1f0a10-0004-4a00-9000-00000000000a");
+                public static readonly Guid renderInApp = new Guid("3b1f0a10-0004-4a00-9000-00000000000b");
+                public static readonly Guid renderInGamebook = new Guid("3b1f0a10-0004-4a00-9000-00000000000c");
+                public static readonly Guid targetLabel = new Guid("3b1f0a10-0004-4a00-9000-00000000000d");
+                public static readonly Guid stringModeLabel = new Guid("3b1f0a10-0004-4a00-9000-00000000000e");
+                public static readonly Guid stringUnset = new Guid("3b1f0a10-0004-4a00-9000-00000000000f");
+                public static readonly Guid stringSpecific = new Guid("3b1f0a10-0004-4a00-9000-000000000010");
+                public static readonly Guid stringPlayerInput = new Guid("3b1f0a10-0004-4a00-9000-000000000011");
+                public static readonly Guid assignmentLabel = new Guid("3b1f0a10-0004-4a00-9000-000000000012");
+                public static readonly Guid assignUnset = new Guid("3b1f0a10-0004-4a00-9000-000000000013");
+                public static readonly Guid assignSpecific = new Guid("3b1f0a10-0004-4a00-9000-000000000014");
+                public static readonly Guid assignRandomize = new Guid("3b1f0a10-0004-4a00-9000-000000000015");
+                public static readonly Guid secretLabel = new Guid("3b1f0a10-0004-4a00-9000-000000000016");
+                public static readonly Guid placementLabel = new Guid("3b1f0a10-0004-4a00-9000-000000000017");
+                public static readonly Guid placementBelow = new Guid("3b1f0a10-0004-4a00-9000-000000000018");
+                public static readonly Guid placementAbove = new Guid("3b1f0a10-0004-4a00-9000-000000000019");
+                public static readonly Guid resultTokenLabel = new Guid("3b1f0a10-0004-4a00-9000-00000000001a");
+                public static readonly Guid randomModeLabel = new Guid("3b1f0a10-0004-4a00-9000-00000000001b");
+                public static readonly Guid randomSaved = new Guid("3b1f0a10-0004-4a00-9000-00000000001c");
+                public static readonly Guid randomPure = new Guid("3b1f0a10-0004-4a00-9000-00000000001d");
+                public static readonly Guid remainderLabel = new Guid("3b1f0a10-0004-4a00-9000-00000000001e");
+                public static readonly Guid remainderReroll = new Guid("3b1f0a10-0004-4a00-9000-00000000001f");
+                public static readonly Guid remainderFill = new Guid("3b1f0a10-0004-4a00-9000-000000000020");
+                public static readonly Guid defaultRangeLabel = new Guid("3b1f0a10-0004-4a00-9000-000000000021");
+                public static readonly Guid previewValueLabel = new Guid("3b1f0a10-0004-4a00-9000-000000000022");
+                public static readonly Guid negateLabel = new Guid("3b1f0a10-0004-4a00-9000-000000000023");
+                public static readonly Guid commentTextLabel = new Guid("3b1f0a10-0004-4a00-9000-000000000024");
+                public static readonly Guid containerPointsHint = new Guid("3b1f0a10-0003-4a00-9000-000000000001");
+                public static readonly Guid iconSlotsHint = new Guid("3b1f0a10-0003-4a00-9000-000000000002");
+                public static readonly Guid exitSinglePathHint = new Guid("3b1f0a10-0003-4a00-9000-000000000003");
+                public static readonly Guid autoResolveLabel = new Guid("3b1f0a10-0003-4a00-9000-000000000004");
+                public static readonly Guid constantNameHint = new Guid("3b1f0a10-0003-4a00-9000-000000000005");
+                public static readonly Guid randomSaveLabel = new Guid("3b1f0a10-0003-4a00-9000-000000000006");
+                public static readonly Guid rangeLinesHint = new Guid("3b1f0a10-0003-4a00-9000-000000000007");
+                public static readonly Guid choicesLabel = new Guid("3b1f0a10-0003-4a00-9000-000000000008");
+                public static readonly Guid choiceKindVariable = new Guid("3b1f0a10-0003-4a00-9000-000000000009");
+                public static readonly Guid choiceKindOption = new Guid("3b1f0a10-0003-4a00-9000-00000000000a");
+                public static readonly Guid choiceVariableLabel = new Guid("3b1f0a10-0003-4a00-9000-00000000000b");
+                public static readonly Guid choiceModeLabel = new Guid("3b1f0a10-0003-4a00-9000-00000000000c");
+                public static readonly Guid choiceModeValue = new Guid("3b1f0a10-0003-4a00-9000-00000000000d");
+                public static readonly Guid choiceModeRange = new Guid("3b1f0a10-0003-4a00-9000-00000000000e");
+                public static readonly Guid addRange = new Guid("3b1f0a10-0003-4a00-9000-00000000000f");
+                public static readonly Guid addOption = new Guid("3b1f0a10-0003-4a00-9000-000000000010");
+                public static readonly Guid addChoiceDefinition = new Guid("3b1f0a10-0003-4a00-9000-000000000011");
+                public static readonly Guid optionFromVariable = new Guid("3b1f0a10-0003-4a00-9000-000000000012");
+                public static readonly Guid optionTextPlaceholder = new Guid("3b1f0a10-0003-4a00-9000-000000000013");
+                public static readonly Guid optionKeyLabel = new Guid("3b1f0a10-0003-4a00-9000-000000000014");
+                public static readonly Guid choicePickVariableHint = new Guid("3b1f0a10-0003-4a00-9000-000000000015");
+                public static readonly Guid choiceValueKeySet = new Guid("3b1f0a10-0003-4a00-9000-000000000016");
+                public static readonly Guid choiceValueKeyMissing = new Guid("3b1f0a10-0003-4a00-9000-000000000017");
 
                 public static class PortTypes
                 {
@@ -525,6 +584,10 @@ namespace DeusaldStoryCommon
                 public static class Variables
                 {
                     public static readonly Guid title = new Guid("36a01606-8706-4d00-8d56-2d8218f29eaa");
+                    public static readonly Guid valueConditionKey = new Guid("3b1f0a10-0005-4a00-9000-000000000001");
+                    public static readonly Guid valueConditionKeyHint = new Guid("3b1f0a10-0005-4a00-9000-000000000002");
+                    public static readonly Guid optionConditionKey = new Guid("3b1f0a10-0005-4a00-9000-000000000003");
+                    public static readonly Guid optionConditionKeyHint = new Guid("3b1f0a10-0005-4a00-9000-000000000004");
                     public static readonly Guid subtitle = new Guid("d24e99b3-ef88-463d-b98f-3680945e51b0");
                     public static readonly Guid searchPlaceholder = new Guid("5d093079-2c36-40c5-bfc5-3597e6fa5801");
                     public static readonly Guid addVariable = new Guid("59942778-c46d-4d77-aeeb-dd846f64b29e");
@@ -1002,6 +1065,8 @@ namespace DeusaldStoryCommon
                     public static readonly Guid portalAny = new Guid("a0f97409-0557-4c25-beca-31a235b8df58");
                     public static readonly Guid condition = new Guid("6e21380f-58d1-464c-a097-d50f4dafadc0");
                     public static readonly Guid conditionNegated = new Guid("1c5211fb-69ff-4b0a-9ef9-b78af2fb660f");
+                    /// <summary>Token: {count}. How many continuations a logic node offers.</summary>
+                    public static readonly Guid exitChoiceCount = new Guid("3b1f0a10-0002-4a00-9000-000000000001");
                     public static readonly Guid endCondition = new Guid("edc0018b-13ec-43a4-b28d-6a4a7bdbd7d6");
                     /// <summary>Fallback title of a Randomized Instruction node with no result token yet.</summary>
                     public static readonly Guid randomizedInstruction = new Guid("659e53a8-ccc4-41cc-bae3-817b2d43c938");
@@ -1131,6 +1196,26 @@ namespace DeusaldStoryCommon
             public static readonly Guid randomBranchNotConstant = new Guid("fb1a891e-3dfa-4b6f-9299-6009ec737e55");
             /// <summary>Tokens: {node},{value}. A branch value with no configured range.</summary>
             public static readonly Guid randomBranchMissingRange = new Guid("a240839b-049a-4447-8995-c704b49d1552");
+            /// <summary>Token: {node}. A Single-path node with no choice definitions.</summary>
+            public static readonly Guid choiceDefsEmpty = new Guid("3b1f0a10-0001-4a00-9000-000000000001");
+            /// <summary>Tokens: {node},{max}. Too many choice definitions on one node.</summary>
+            public static readonly Guid choiceDefsTooMany = new Guid("3b1f0a10-0001-4a00-9000-000000000002");
+            /// <summary>Token: {node}. A variable choice definition naming no variable.</summary>
+            public static readonly Guid choiceDefNoVariable = new Guid("3b1f0a10-0001-4a00-9000-000000000003");
+            /// <summary>Tokens: {node},{var}. A value-based choice whose variable has no label key.</summary>
+            public static readonly Guid choiceDefNoValueKey = new Guid("3b1f0a10-0001-4a00-9000-000000000004");
+            /// <summary>Token: {node}. A range-based choice with no ranges.</summary>
+            public static readonly Guid choiceDefNoRanges = new Guid("3b1f0a10-0001-4a00-9000-000000000005");
+            /// <summary>Tokens: {node},{range}. A range with no label key.</summary>
+            public static readonly Guid choiceDefRangeNoKey = new Guid("3b1f0a10-0001-4a00-9000-000000000006");
+            /// <summary>Tokens: {node},{a},{b}. Two ranges covering the same value.</summary>
+            public static readonly Guid choiceDefRangeOverlap = new Guid("3b1f0a10-0001-4a00-9000-000000000007");
+            /// <summary>Token: {node}. An option-based choice with no options.</summary>
+            public static readonly Guid choiceDefNoOptions = new Guid("3b1f0a10-0001-4a00-9000-000000000008");
+            /// <summary>Token: {node}. A Randomized Instruction saving to no variable.</summary>
+            public static readonly Guid randomSaveNoTarget = new Guid("3b1f0a10-0001-4a00-9000-000000000009");
+            /// <summary>Token: {node}. A text referencing a localization key that no longer exists.</summary>
+            public static readonly Guid textKeyMissing = new Guid("3b1f0a10-0001-4a00-9000-00000000000a");
         }
 
         public static class Services
@@ -1406,6 +1491,65 @@ namespace DeusaldStoryCommon
                 { new Guid("1c92ac42-41a9-4320-a378-4dddac92b945"), "(nothing connected)" },
                 { new Guid("4c59429a-aec1-492b-be74-0333be59d1eb"), "Inputs" },
                 { new Guid("dc681440-3f6b-462d-bb63-ab184679273a"), "Outputs" },
+                { new Guid("3b1f0a10-0004-4a00-9000-000000000001"), "How this node continues" },
+                { new Guid("3b1f0a10-0004-4a00-9000-000000000002"), "Many paths" },
+                { new Guid("3b1f0a10-0004-4a00-9000-000000000003"), "Single path + choices" },
+                { new Guid("3b1f0a10-0004-4a00-9000-000000000004"), "Hub paths" },
+                { new Guid("3b1f0a10-0004-4a00-9000-000000000005"), "Gamebook instructions only (no screen)" },
+                { new Guid("3b1f0a10-0004-4a00-9000-000000000006"), "Resolution" },
+                { new Guid("3b1f0a10-0004-4a00-9000-000000000007"), "Pick one automatically" },
+                { new Guid("3b1f0a10-0004-4a00-9000-000000000008"), "Show or hide each choice" },
+                { new Guid("3b1f0a10-0004-4a00-9000-000000000009"), "Add choice" },
+                { new Guid("3b1f0a10-0004-4a00-9000-00000000000a"), "Frame" },
+                { new Guid("3b1f0a10-0004-4a00-9000-00000000000b"), "Render in the App" },
+                { new Guid("3b1f0a10-0004-4a00-9000-00000000000c"), "Render in the Gamebook" },
+                { new Guid("3b1f0a10-0004-4a00-9000-00000000000d"), "Variable" },
+                { new Guid("3b1f0a10-0004-4a00-9000-00000000000e"), "Value" },
+                { new Guid("3b1f0a10-0004-4a00-9000-00000000000f"), "Clear it" },
+                { new Guid("3b1f0a10-0004-4a00-9000-000000000010"), "A fixed value" },
+                { new Guid("3b1f0a10-0004-4a00-9000-000000000011"), "The player writes it" },
+                { new Guid("3b1f0a10-0004-4a00-9000-000000000012"), "Assignment" },
+                { new Guid("3b1f0a10-0004-4a00-9000-000000000013"), "Clear it" },
+                { new Guid("3b1f0a10-0004-4a00-9000-000000000014"), "Set a specific value" },
+                { new Guid("3b1f0a10-0004-4a00-9000-000000000015"), "Randomize" },
+                { new Guid("3b1f0a10-0004-4a00-9000-000000000016"), "Set it secretly" },
+                { new Guid("3b1f0a10-0004-4a00-9000-000000000017"), "Placement" },
+                { new Guid("3b1f0a10-0004-4a00-9000-000000000018"), "Below the text" },
+                { new Guid("3b1f0a10-0004-4a00-9000-000000000019"), "Above the text" },
+                { new Guid("3b1f0a10-0004-4a00-9000-00000000001a"), "Result token" },
+                { new Guid("3b1f0a10-0004-4a00-9000-00000000001b"), "Draw" },
+                { new Guid("3b1f0a10-0004-4a00-9000-00000000001c"), "Keep the first draw" },
+                { new Guid("3b1f0a10-0004-4a00-9000-00000000001d"), "Re-draw each time" },
+                { new Guid("3b1f0a10-0004-4a00-9000-00000000001e"), "Uneven ranges" },
+                { new Guid("3b1f0a10-0004-4a00-9000-00000000001f"), "Reroll the remainder" },
+                { new Guid("3b1f0a10-0004-4a00-9000-000000000020"), "Spread the remainder" },
+                { new Guid("3b1f0a10-0004-4a00-9000-000000000021"), "Outcomes" },
+                { new Guid("3b1f0a10-0004-4a00-9000-000000000022"), "Preview value" },
+                { new Guid("3b1f0a10-0004-4a00-9000-000000000023"), "Invert the condition" },
+                { new Guid("3b1f0a10-0004-4a00-9000-000000000024"), "Note" },
+                { new Guid("3b1f0a10-0003-4a00-9000-000000000001"), "Entry and exit points are edited on the container's own graph." },
+                { new Guid("3b1f0a10-0003-4a00-9000-000000000002"), "With both slots empty, picking an icon fills both. Once either is set, picking changes only that slot." },
+                { new Guid("3b1f0a10-0003-4a00-9000-000000000003"), "Continuations come from this node's choices — edit them on the logic node." },
+                { new Guid("3b1f0a10-0003-4a00-9000-000000000004"), "Resolve choices automatically" },
+                { new Guid("3b1f0a10-0003-4a00-9000-000000000005"), "The SmartFormat token this value fills, e.g. {Name}." },
+                { new Guid("3b1f0a10-0003-4a00-9000-000000000006"), "Save the result into a variable" },
+                { new Guid("3b1f0a10-0003-4a00-9000-000000000007"), "One outcome per line." },
+                { new Guid("3b1f0a10-0003-4a00-9000-000000000008"), "Choices" },
+                { new Guid("3b1f0a10-0003-4a00-9000-000000000009"), "From a variable" },
+                { new Guid("3b1f0a10-0003-4a00-9000-00000000000a"), "From a list of options" },
+                { new Guid("3b1f0a10-0003-4a00-9000-00000000000b"), "Variable" },
+                { new Guid("3b1f0a10-0003-4a00-9000-00000000000c"), "Mode" },
+                { new Guid("3b1f0a10-0003-4a00-9000-00000000000d"), "Value based" },
+                { new Guid("3b1f0a10-0003-4a00-9000-00000000000e"), "Range based" },
+                { new Guid("3b1f0a10-0003-4a00-9000-00000000000f"), "Add range" },
+                { new Guid("3b1f0a10-0003-4a00-9000-000000000010"), "Add option" },
+                { new Guid("3b1f0a10-0003-4a00-9000-000000000011"), "Add choice" },
+                { new Guid("3b1f0a10-0003-4a00-9000-000000000012"), "Use a variable's value" },
+                { new Guid("3b1f0a10-0003-4a00-9000-000000000013"), "Option value" },
+                { new Guid("3b1f0a10-0003-4a00-9000-000000000014"), "Label (optional)" },
+                { new Guid("3b1f0a10-0003-4a00-9000-000000000015"), "Pick a variable to enumerate." },
+                { new Guid("3b1f0a10-0003-4a00-9000-000000000016"), "Labelled by {var}'s value-based condition key." },
+                { new Guid("3b1f0a10-0003-4a00-9000-000000000017"), "{var} has no value-based condition key yet — set one in the Variables panel." },
                 { new Guid("8827c145-d85c-4958-be9e-73b749c693c2"), "Variable Flow" },
                 { new Guid("fddd3b1a-3d01-49f5-8c35-548af546eb90"), "Logic Flow" },
                 { new Guid("93d21a85-1583-4d51-b273-eaf2f16e2a14"), "Text" },
@@ -1504,6 +1648,10 @@ namespace DeusaldStoryCommon
                 { new Guid("bdd89fa8-66ef-48b2-9716-f239e7dc02eb"), "Every flow connector is wired and all storage variables balance." },
                 { new Guid("ddc0cbef-cc5d-4448-b1fb-a5476aa14b98"), "{count} {count:plural:issue|issues}" },
                 { new Guid("36a01606-8706-4d00-8d56-2d8218f29eaa"), "Variables" },
+                { new Guid("3b1f0a10-0005-4a00-9000-000000000001"), "Value based condition key" },
+                { new Guid("3b1f0a10-0005-4a00-9000-000000000002"), "Labels each button / section jump when a node offers this variable as a value-based choice." },
+                { new Guid("3b1f0a10-0005-4a00-9000-000000000003"), "Option based condition key" },
+                { new Guid("3b1f0a10-0005-4a00-9000-000000000004"), "Labels an option when a node offers this variable's value as one of a list of options." },
                 { new Guid("d24e99b3-ef88-463d-b98f-3680945e51b0"), "Story-wide values the gamebook reads and branches on." },
                 { new Guid("5d093079-2c36-40c5-bfc5-3597e6fa5801"), "Search variables…" },
                 { new Guid("59942778-c46d-4d77-aeeb-dd846f64b29e"), "Add variable" },
@@ -1796,6 +1944,7 @@ namespace DeusaldStoryCommon
                 { new Guid("a0f97409-0557-4c25-beca-31a235b8df58"), "any" },
                 { new Guid("6e21380f-58d1-464c-a097-d50f4dafadc0"), "Condition" },
                 { new Guid("1c5211fb-69ff-4b0a-9ef9-b78af2fb660f"), "negated" },
+                { new Guid("3b1f0a10-0002-4a00-9000-000000000001"), "{count} choices" },
                 { new Guid("edc0018b-13ec-43a4-b28d-6a4a7bdbd7d6"), "End condition" },
                 { new Guid("0d230cb9-92a2-4d3d-80cf-9ccff55ea845"), "Text" },
                 { new Guid("bb6cfa9e-4067-4034-a9bf-90ca51acd287"), "Icon" },
@@ -1941,6 +2090,16 @@ namespace DeusaldStoryCommon
                 { new Guid("82f3604e-2f94-44c5-8d72-526dcd2babfb"), "Randomized Instruction \"{node}\" has an empty random range." },
                 { new Guid("fb1a891e-3dfa-4b6f-9299-6009ec737e55"), "Randomized Instruction \"{node}\" has a Branch input that isn't a constant/enumerable value." },
                 { new Guid("a240839b-049a-4447-8995-c704b49d1552"), "Randomized Instruction \"{node}\" has no range for branch value \"{value}\"." },
+                { new Guid("3b1f0a10-0001-4a00-9000-000000000001"), "Single-path node \"{node}\" declares no choices." },
+                { new Guid("3b1f0a10-0001-4a00-9000-000000000002"), "Node \"{node}\" declares more than {max} choices; only the first {max} are used." },
+                { new Guid("3b1f0a10-0001-4a00-9000-000000000003"), "A choice on \"{node}\" reads no variable." },
+                { new Guid("3b1f0a10-0001-4a00-9000-000000000004"), "Variable \"{var}\" has no value-based condition localization key, so the choice on \"{node}\" has no label." },
+                { new Guid("3b1f0a10-0001-4a00-9000-000000000005"), "A range-based choice on \"{node}\" defines no ranges." },
+                { new Guid("3b1f0a10-0001-4a00-9000-000000000006"), "Range \"{range}\" on \"{node}\" has no localization key, so its choice has no label." },
+                { new Guid("3b1f0a10-0001-4a00-9000-000000000007"), "Ranges \"{a}\" and \"{b}\" on \"{node}\" overlap." },
+                { new Guid("3b1f0a10-0001-4a00-9000-000000000008"), "An option-based choice on \"{node}\" lists no options." },
+                { new Guid("3b1f0a10-0001-4a00-9000-000000000009"), "Randomized Instruction \"{node}\" is set to save its result but names no variable." },
+                { new Guid("3b1f0a10-0001-4a00-9000-00000000000a"), "Node \"{node}\" uses a localization key that no longer exists in the linked project." },
             } },
         };
 

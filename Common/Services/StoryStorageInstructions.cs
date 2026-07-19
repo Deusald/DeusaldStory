@@ -46,23 +46,28 @@ namespace DeusaldStoryCommon
     [PublicAPI]
     public static class StoryStorageInstructions
     {
+        // Instruction text renders through the same path as node text, but its SmartFormat failures are already
+        // reported where the author can act on them, so they are dropped here rather than duplicated per instruction.
+        private static readonly List<string> _Discard = new();
+
+
         /// <summary>The ordered storage instructions for <paramref name="logic"/>'s Set operations (empty when none).</summary>
         public static List<StorageInstruction> For(
-            StoryProject project, LocProject? localization, StoryLogicNode logic,
-            StoryRenderTarget target = StoryRenderTarget.App, IReadOnlyDictionary<Guid, string>? values = null)
+            StoryProject project, LocProject? localization, StoryLogicNode logic, StoryVariableDictionary.Context ctx)
         {
             List<StorageInstruction> list = new();
-            foreach (StorySetVariableNode set in StoryLogicFlow.SetNodesInOrder(project, logic, target, values))
-                if (ForSet(project, localization, logic, set, target) is StorageInstruction entry)
+            foreach (StorySetVariableNode set in StoryLogicFlow.SetNodesInOrder(project, logic, ctx))
+                if (ForSet(project, localization, logic, set, ctx) is StorageInstruction entry)
                     list.Add(entry);
             return list;
         }
 
-        /// <summary>The player-facing instruction a single Set node surfaces for <paramref name="target"/> (null when it surfaces nothing).</summary>
+        /// <summary>The player-facing instruction a single Set node surfaces for the render's medium (null when it surfaces nothing).</summary>
         public static StorageInstruction? ForSet(
-            StoryProject project, LocProject? localization, StoryLogicNode logic, StorySetVariableNode set, StoryRenderTarget target)
+            StoryProject project, LocProject? localization, StoryLogicNode logic, StorySetVariableNode set, StoryVariableDictionary.Context ctx)
         {
-            StoryVariable? v = StoryLogicFlow.SetTarget(project, set);
+            StoryRenderTarget target = ctx.Target;
+            StoryVariable?    v      = StoryLogicFlow.SetTarget(project, set);
             // External variables are tracked by the game components — no printed instruction, no App input field.
             if (v is null || v.Scope != StoryVariableScope.Internal) return null;
 
@@ -71,10 +76,10 @@ namespace DeusaldStoryCommon
                 case StoryInternalSubtype.Text:
                 {
                     string stringVal = set.WireValue && set.StringMode == StringValueMode.Specific
-                        ? StoryLogicRenderer.ResolvePortText(project, localization, logic, set.ValueTextIn.Id, target)
+                        ? StoryLogicRenderer.ResolveText(localization, set.GamebookValueText, ctx, _Discard)
                         : set.StringValue;
-                    return StringEntry(project, localization, logic, v.SlotIndex, set.StringMode, stringVal,
-                        set.StringInputKind, set.InstructionIn.Id, set.PlaceholderIn.Id, set.Placement, target, v.Name, set.MaxLength);
+                    return StringEntry(localization, v.SlotIndex, set.StringMode, stringVal, set.StringInputKind,
+                        set.Instruction, set.Placeholder, set.Placement, ctx, v.Name, set.MaxLength);
                 }
 
                 case StoryInternalSubtype.SmallNumber:
@@ -84,7 +89,7 @@ namespace DeusaldStoryCommon
                     NumberValueCount valueCount = ValueCountOf(v.ValuesMap);
                     NumberStorageMode mode      = v.SmallNumberSource == SmallNumberSource.Token ? NumberStorageMode.Token : NumberStorageMode.Dice;
                     object? specificDisplay = set.WireValue && set.Assignment == NumberAssignment.SetSpecific
-                        ? StoryLogicRenderer.ResolvePortText(project, localization, logic, set.ValueTextIn.Id, target)
+                        ? StoryLogicRenderer.ResolveText(localization, set.GamebookValueText, ctx, _Discard)
                         : null;
                     string? line = AssignmentLine(localization, StorageVariableType.Number, v.SlotIndex, mode, valueCount, set.Assignment, secret, set.SpecificValue, specificDisplay);
                     return Line(line, set.Placement);
@@ -96,7 +101,7 @@ namespace DeusaldStoryCommon
                     if (target == StoryRenderTarget.App) return null;
                     bool secret = set.Secret || v.InternalSubtype == StoryInternalSubtype.BigSecretNumber;
                     object? specificDisplay = set.WireValue && set.Assignment == NumberAssignment.SetSpecific
-                        ? StoryLogicRenderer.ResolvePortText(project, localization, logic, set.ValueTextIn.Id, target)
+                        ? StoryLogicRenderer.ResolveText(localization, set.GamebookValueText, ctx, _Discard)
                         : null;
                     string? line = AssignmentLine(localization, StorageVariableType.Dial, v.SlotIndex, NumberStorageMode.Dice, NumberValueCount.Six, set.Assignment, secret, set.SpecificValue, specificDisplay);
                     return Line(line, set.Placement);
@@ -109,11 +114,12 @@ namespace DeusaldStoryCommon
 
         /// <summary>Builds the instruction for a String slot given its value mode — the branch that splits App vs Gamebook.</summary>
         private static StorageInstruction? StringEntry(
-            StoryProject project, LocProject? localization, StoryLogicNode logic, int slotIndex, StringValueMode mode,
-            string stringValue, StringInputKind inputKind, Guid instructionPortId, Guid placeholderPortId,
-            StorageInstructionPlacement placement, StoryRenderTarget target, string variableName, int maxLength = 0)
+            LocProject? localization, int slotIndex, StringValueMode mode, string stringValue,
+            StringInputKind inputKind, StoryTextConfig instruction, StoryTextConfig placeholderText,
+            StorageInstructionPlacement placement, StoryVariableDictionary.Context ctx, string variableName, int maxLength = 0)
         {
-            string slot = StorageSlots.Label(StorageVariableType.String, slotIndex);
+            StoryRenderTarget target = ctx.Target;
+            string            slot   = StorageSlots.Label(StorageVariableType.String, slotIndex);
 
             switch (mode)
             {
@@ -125,15 +131,21 @@ namespace DeusaldStoryCommon
                     return Line(Resolve(localization, StoryCommonLocalizationKeys.StorageStringWriteSpecific, slot, value: stringValue), placement);
 
                 case StringValueMode.PlayerInput:
+                    // The instruction may inject the slot pill via {<Name>Slot}; bind it locally so an unnamed
+                    // variable still resolves through the generic {slot} fallback.
                     string slotTag = PreviewHtmlSanitizer.SlotTag(slot);
-                    string prompt  = StoryLogicRenderer.ResolvePortText(project, localization, logic, instructionPortId, target, slotTag, StoryLogicRenderer.SlotTokenName(variableName));
+                    string slotKey = StoryVariableDictionary.SlotTokenName(variableName);
+                    Dictionary<string, object> slotTokens = new(StringComparer.OrdinalIgnoreCase) { ["slot"] = slotTag };
+                    if (slotKey.Length > 0) slotTokens[slotKey] = slotTag;
+
+                    string prompt = StoryLogicRenderer.ResolveText(localization, instruction, ctx, _Discard, slotTokens);
                     if (string.IsNullOrEmpty(prompt))
                         prompt = Resolve(localization, StoryCommonLocalizationKeys.StorageStringWrite, slot);
 
                     if (target != StoryRenderTarget.App)
                         return Line(prompt, placement);
 
-                    string placeholder = StoryLogicRenderer.ResolvePortText(project, localization, logic, placeholderPortId, target);
+                    string placeholder = StoryLogicRenderer.ResolveText(localization, placeholderText, ctx, _Discard);
                     return new StorageInstruction { Text = prompt, Placeholder = placeholder, Placement = placement, IsAppInput = true, InputKind = inputKind, Slot = slot, MaxLength = maxLength };
 
                 default:

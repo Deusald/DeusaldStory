@@ -1,0 +1,49 @@
+@namespace DeusaldStoryWeb.Components.Common
+@inject UiLocalizationService Loc
+@inject ProjectStateService _ProjectState
+
+@*
+    One of a logic node's two icon slots (light / dark). Shows the picked icon and lets it be replaced or cleared;
+    the "filling one empty slot fills both" rule lives in the owning inspector, which knows about both slots.
+*@
+
+<div class="ins-icon-slot">
+    <label class="ins-label">@Label</label>
+    <div class="ins-icon-row">
+        <button class="ins-icon-preview" @onclick="Pick" title="@Loc.T(Localization.Common.Buttons.selectKey)">
+            @if (Thumb() is { Length: > 0 } thumb)
+            {
+                <img src="data:image/png;base64,@thumb" alt="@Label"/>
+            }
+            else
+            {
+                <i class="bi bi-emoji-smile"></i>
+            }
+        </button>
+        @if (ImageId != Guid.Empty)
+        {
+            <button class="ins-icon-btn" @onclick="Clear" title="@Loc.T(Localization.Common.Buttons.clear)">
+                <i class="bi bi-x-lg"></i>
+            </button>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter] public Guid ImageId { get; set; }
+    [Parameter] public string Label { get; set; } = "";
+
+    /// <summary>Raised with the picked image id (or Empty when cleared); the owner applies the both-slots rule.</summary>
+    [Parameter] public EventCallback<Guid> ImageIdChanged { get; set; }
+
+    /// <summary>Asks the page to open the icon picker; it applies the chosen image through the supplied setter.</summary>
+    [Parameter] public EventCallback<(Guid Current, Action<Guid> Apply)> OnPickIcon { get; set; }
+
+    private string Thumb() =>
+        ImageId != Guid.Empty && _ProjectState.CurrentProject!.Images.TryGetValue(ImageId, out StoryImage? img) ? img.Data : "";
+
+    private async Task Pick() =>
+        await OnPickIcon.InvokeAsync((ImageId, async void (Guid imageId) => await ImageIdChanged.InvokeAsync(imageId)));
+
+    private async Task Clear() => await ImageIdChanged.InvokeAsync(Guid.Empty);
+}

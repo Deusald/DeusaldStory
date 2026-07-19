@@ -1,0 +1,194 @@
+@namespace DeusaldStoryWeb.Components.Common
+@inject UiLocalizationService Loc
+@inject ProjectStateService _ProjectState
+
+@*
+    A Single-path node's choice definitions — what the player decides here. Each definition writes one Choice
+    variable by its position (0 ⇒ ChoiceA, 1 ⇒ ChoiceB, 2 ⇒ ChoiceC), and the cartesian product of their entries is
+    what this node offers as continuations and what dimensions the next node's Gamebook sections.
+*@
+
+<div class="ins-section-head">
+    <span class="ins-section-label">@Loc.T(Localization.Editor.Inspector.choicesLabel)</span>
+    <span class="ins-section-count">@Total()</span>
+</div>
+
+@for (int i = 0; i < Logic.ChoiceDefinitions.Count; ++i)
+{
+    int                   index = i;
+    StoryChoiceDefinition def   = Logic.ChoiceDefinitions[index];
+
+    <div class="ins-card">
+        <div class="ins-inline-row">
+            <span class="ins-badge">@(StoryChoiceVariables.ForIndex(index)?.Name ?? "")</span>
+            <select class="ins-input ins-input-sm" value="@def.Kind"
+                    @onchange="async e => { if (Enum.TryParse(e.Value?.ToString(), out StoryChoiceDefKind k)) { def.Kind = k; await Changed(); } }">
+                <option value="@StoryChoiceDefKind.Variable">@Loc.T(Localization.Editor.Inspector.choiceKindVariable)</option>
+                <option value="@StoryChoiceDefKind.Option">@Loc.T(Localization.Editor.Inspector.choiceKindOption)</option>
+            </select>
+            <button class="ins-icon-btn" title="@Loc.T(Localization.Common.Buttons.remove)"
+                    @onclick="async () => { _ProjectState.RemoveChoiceDefinition(Logic.Id, def.Id); await OnChanged.InvokeAsync(); }">
+                <i class="bi bi-trash"></i>
+            </button>
+        </div>
+
+        @if (def.Kind == StoryChoiceDefKind.Variable)
+        {
+            <VariablePicker Selected="def.SelectedVariableId"
+                            Label="@Loc.T(Localization.Editor.Inspector.choiceVariableLabel)"
+                            SelectedChanged="async id => { def.SelectedVariableId = id; await Changed(); }"/>
+
+            <div class="ins-field">
+                <label class="ins-label">@Loc.T(Localization.Editor.Inspector.choiceModeLabel)</label>
+                <select class="ins-input" value="@def.VariableMode"
+                        @onchange="async e => { if (Enum.TryParse(e.Value?.ToString(), out StoryVariableChoiceMode m)) { def.VariableMode = m; await Changed(); } }">
+                    <option value="@StoryVariableChoiceMode.ValueBased">@Loc.T(Localization.Editor.Inspector.choiceModeValue)</option>
+                    <option value="@StoryVariableChoiceMode.RangeBased">@Loc.T(Localization.Editor.Inspector.choiceModeRange)</option>
+                </select>
+            </div>
+
+            @if (def.VariableMode == StoryVariableChoiceMode.ValueBased)
+            {
+                @* The label key lives on the variable (or its text map) — it is the same phrase wherever that
+                   variable is offered as a choice, so it is authored once in the Variables panel. *@
+                <div class="ins-hint">@ValueKeyHint(def)</div>
+            }
+            else
+            {
+                @foreach (StoryChoiceRange range in def.Ranges.ToList())
+                {
+                    StoryChoiceRange r = range;
+                    <div class="ins-subcard">
+                        <div class="ins-inline-row">
+                            <input class="ins-input ins-input-xs" type="number" value="@r.From"
+                                   @onchange="async e => { if (int.TryParse(e.Value?.ToString(), out int v)) { r.From = v; await Changed(); } }"/>
+                            <span class="ins-range-dash">–</span>
+                            <input class="ins-input ins-input-xs" type="number" value="@r.To"
+                                   @onchange="async e => { if (int.TryParse(e.Value?.ToString(), out int v)) { r.To = v; await Changed(); } }"/>
+                            <button class="ins-icon-btn" title="@Loc.T(Localization.Common.Buttons.remove)"
+                                    @onclick="async () => { def.Ranges.Remove(r); await Changed(); }">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </div>
+                        @* Each band gets its own key, formatted with {Range} = "from_to" (e.g. 0_3). *@
+                        <TextConfigEditor Config="RangeConfig(r)" Label="@r.Token" OnChanged="() => SaveRange(r)" OnPickKey="OnPickKey"/>
+                    </div>
+                }
+                <button class="ins-add" @onclick="async () => { def.Ranges.Add(new StoryChoiceRange()); await Changed(); }">
+                    <i class="bi bi-plus-lg"></i> @Loc.T(Localization.Editor.Inspector.addRange)
+                </button>
+            }
+        }
+        else
+        {
+            @foreach (StoryChoiceOption option in def.Options.ToList())
+            {
+                StoryChoiceOption o = option;
+                <div class="ins-subcard">
+                    <label class="ins-check">
+                        <input type="checkbox" checked="@o.FromVariable"
+                               @onchange="async e => { o.FromVariable = (bool?)e.Value ?? false; await Changed(); }"/>
+                        <span>@Loc.T(Localization.Editor.Inspector.optionFromVariable)</span>
+                    </label>
+
+                    @if (o.FromVariable)
+                    {
+                        <VariablePicker Selected="o.SelectedVariableId"
+                                        SelectedChanged="async id => { o.SelectedVariableId = id; await Changed(); }"/>
+                    }
+                    else
+                    {
+                        <input class="ins-input" type="text" value="@o.Text" maxlength="200"
+                               placeholder="@Loc.T(Localization.Editor.Inspector.optionTextPlaceholder)"
+                               @onchange="async e => { o.Text = e.Value?.ToString() ?? string.Empty; await Changed(); }"/>
+                    }
+
+                    @* Optional per-option key; without one a variable option falls back to the variable's option key
+                       and a manual option just prints its own text. *@
+                    <TextConfigEditor Config="OptionConfig(o)" Label="@Loc.T(Localization.Editor.Inspector.optionKeyLabel)"
+                                      OnChanged="() => SaveOption(o)" OnPickKey="OnPickKey"/>
+
+                    <button class="ins-icon-btn" title="@Loc.T(Localization.Common.Buttons.remove)"
+                            @onclick="async () => { def.Options.Remove(o); await Changed(); }">
+                        <i class="bi bi-trash"></i>
+                    </button>
+                </div>
+            }
+            <button class="ins-add" @onclick="async () => { def.Options.Add(new StoryChoiceOption()); await Changed(); }">
+                <i class="bi bi-plus-lg"></i> @Loc.T(Localization.Editor.Inspector.addOption)
+            </button>
+        }
+    </div>
+}
+
+@if (Logic.ChoiceDefinitions.Count < StoryChoiceVariables.MAX_DEFINITIONS)
+{
+    <button class="ins-add" @onclick="async () => { _ProjectState.AddChoiceDefinition(Logic.Id); await OnChanged.InvokeAsync(); }">
+        <i class="bi bi-plus-lg"></i> @Loc.T(Localization.Editor.Inspector.addChoiceDefinition)
+    </button>
+}
+
+@code {
+    [Parameter, EditorRequired] public StoryLogicNode Logic { get; set; } = null!;
+    [Parameter] public EventCallback OnChanged { get; set; }
+    [Parameter] public EventCallback<(Guid Current, Action<Guid> Apply)> OnPickKey { get; set; }
+
+    private StoryProject Project => _ProjectState.CurrentProject!;
+
+    private Task Changed() => OnChanged.InvokeAsync();
+
+    /// <summary>How many continuations these definitions currently produce — the size of their cartesian product.</summary>
+    private int Total()
+    {
+        StoryChoiceSources.Combinations(Project, Logic, StoryGamebookPreview.MAX_SECTIONS, out int total);
+        return Logic.ChoiceDefinitions.Count == 0 ? 0 : total;
+    }
+
+    /// <summary>Where a value-based definition reads its button label from — the variable's own key, or its text map's.</summary>
+    private string ValueKeyHint(StoryChoiceDefinition def)
+    {
+        if (StoryVariableCatalog.Resolve(Project, def.SelectedVariableId) is not StoryVariable v)
+            return Loc.T(Localization.Editor.Inspector.choicePickVariableHint);
+
+        bool hasKey = StoryVariableCatalog.ResolveTextMap(Project, def.SelectedVariableId) is var (_, map)
+            ? map.ValueConditionKeyId != Guid.Empty
+            : v.ValueConditionKeyId != Guid.Empty;
+
+        return hasKey
+            ? Loc.T(Localization.Editor.Inspector.choiceValueKeySet,     new Dictionary<string, object> { ["var"] = v.Name })
+            : Loc.T(Localization.Editor.Inspector.choiceValueKeyMissing, new Dictionary<string, object> { ["var"] = v.Name });
+    }
+
+    // A range / option stores only a key id, but TextConfigEditor edits a whole StoryTextConfig. These adapters keep
+    // one instance per row (so the editor's state is stable across renders) and copy the key back on change.
+    private readonly Dictionary<Guid, StoryTextConfig> _RangeConfigs  = new();
+    private readonly Dictionary<Guid, StoryTextConfig> _OptionConfigs = new();
+
+    private StoryTextConfig RangeConfig(StoryChoiceRange range)
+    {
+        if (!_RangeConfigs.TryGetValue(range.Id, out StoryTextConfig? config))
+            _RangeConfigs[range.Id] = config = new StoryTextConfig();
+        config.KeyId = range.KeyId;
+        return config;
+    }
+
+    private async Task SaveRange(StoryChoiceRange range)
+    {
+        range.KeyId = _RangeConfigs.TryGetValue(range.Id, out StoryTextConfig? config) ? config.KeyId : range.KeyId;
+        await Changed();
+    }
+
+    private StoryTextConfig OptionConfig(StoryChoiceOption option)
+    {
+        if (!_OptionConfigs.TryGetValue(option.Id, out StoryTextConfig? config))
+            _OptionConfigs[option.Id] = config = new StoryTextConfig();
+        config.KeyId = option.KeyId;
+        return config;
+    }
+
+    private async Task SaveOption(StoryChoiceOption option)
+    {
+        option.KeyId = _OptionConfigs.TryGetValue(option.Id, out StoryTextConfig? config) ? config.KeyId : option.KeyId;
+        await Changed();
+    }
+}

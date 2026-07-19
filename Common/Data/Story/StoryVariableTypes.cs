@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 
 namespace DeusaldStoryCommon
@@ -181,10 +182,19 @@ namespace DeusaldStoryCommon
     /// </summary>
     public class StoryVariableTextMap
     {
-        public string                     Name   { get; set; } = string.Empty;
+        /// <summary>Stable id — also the id of the derived read-only pseudo-variable this map surfaces as.</summary>
+        public Guid Id { get; set; } = Guid.NewGuid();
+
+        public string Name { get; set; } = string.Empty;
 
         /// <summary>Bucket key (from <see cref="StorySmallNumberMap"/>) → display string.</summary>
         public Dictionary<string, string> Values { get; set; } = new();
+
+        /// <summary>
+        /// This map's own value-based choice label key, used instead of the owning variable's
+        /// <see cref="StoryVariable.ValueConditionKeyId"/> when a choice definition targets the map.
+        /// </summary>
+        public Guid ValueConditionKeyId { get; set; }
     }
 
     /// <summary>Maps a variable's storage subtype to the physical slot bank it draws from.</summary>

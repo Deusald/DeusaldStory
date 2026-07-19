@@ -13,15 +13,16 @@
 }
 
 .ed-stage {
-    flex: 2;
+    flex: 1.6;
     min-width: 0;
     position: relative;
 }
 
+/* The inspector is the editing surface for every node kind now, so it needs room for real forms. */
 .ed-inspector {
     flex: 1;
-    min-width: 320px;
-    max-width: 420px;
+    min-width: 420px;
+    max-width: 560px;
     border-left: 1px solid var(--border-subtle);
     min-height: 0;
 }

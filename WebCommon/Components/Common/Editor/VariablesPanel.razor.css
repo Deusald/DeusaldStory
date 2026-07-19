@@ -355,3 +355,22 @@
     border-radius: var(--r-sm);
     padding: 1px 5px;
 }
+
+/* ── Choice-label key pickers ────────────────────────────────────────────── */
+
+.var-key-btn {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    text-align: left;
+    cursor: pointer;
+}
+.var-key-btn:hover { border-color: var(--accent); }
+.var-key-btn i { flex: none; color: var(--text-dim); }
+
+.var-key-hint {
+    margin-top: 5px;
+    font-size: 11.5px;
+    line-height: 1.45;
+    color: var(--text-faint);
+}

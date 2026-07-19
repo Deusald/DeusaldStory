@@ -32,13 +32,10 @@ namespace DeusaldStoryCommon
         public double EndX { get; set; }
         public double EndY { get; set; }
 
-        /// <summary>Condition card LFlow input — wired from the Entry's flow output or a previous flow node.</summary>
+        /// <summary>Condition card flow input — wired from the Entry's flow output or a previous spine node.</summary>
         public StoryConnectionPoint FlowIn { get; set; } = new() { Name = "Flow" };
 
-        /// <summary>Condition card Variables input (many-in) — accepts the constant variable outputs the condition tests.</summary>
-        public StoryConnectionPoint VariablesIn { get; set; } = new() { Name = "Variables" };
-
-        /// <summary>Condition card LFlow output — the spine always continues here after the (optional) injected block.</summary>
+        /// <summary>Condition card flow output — the spine always continues here after the (optional) injected block.</summary>
         public StoryConnectionPoint ContinueOut { get; set; } = new() { Name = "Continue" };
 
         /// <summary>Condition card LFlow output — entered only when the condition is true; runs up to <see cref="EndFlowIn"/>.</summary>

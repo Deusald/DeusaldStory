@@ -1,0 +1,109 @@
+@namespace DeusaldStoryWeb.Components.Common
+@inject UiLocalizationService Loc
+@inject ProjectStateService _ProjectState
+
+@*
+    One authored text: the localization key it reads plus its formatting. Every text on every node is edited through
+    this, so casing/prefix/suffix behave identically everywhere. Edits apply straight to the bound StoryTextConfig
+    and raise OnChanged so the owner can mark itself dirty.
+*@
+
+<div class="ins-field">
+    <label class="ins-label">@Label</label>
+
+    <div class="ins-key-row">
+        <button class="ins-key-btn" @onclick="PickKey" title="@Loc.T(Localization.Common.Buttons.pickKey)">
+            <i class="bi bi-translate"></i>
+            <span class="ins-key-name">@KeyLabel()</span>
+        </button>
+        @if (Config.KeyId != Guid.Empty)
+        {
+            <button class="ins-icon-btn" @onclick="ClearKey" title="@Loc.T(Localization.Common.Buttons.clear)">
+                <i class="bi bi-x-lg"></i>
+            </button>
+        }
+    </div>
+
+    @if (Preview() is { Length: > 0 } preview)
+    {
+        <div class="ins-key-preview">@preview</div>
+    }
+
+    @if (Config.KeyId != Guid.Empty)
+    {
+        <div class="ins-inline-row">
+            <select class="ins-input ins-input-sm"
+                    value="@Config.Casing"
+                    @onchange="OnCasingChanged"
+                    title="@Loc.T(Localization.Editor.Modals.SmartFormatOptions.caseLabel)">
+                <option value="@StoryTextCasing.None">@Loc.T(Localization.Editor.Modals.SmartFormatOptions.caseNone)</option>
+                <option value="@StoryTextCasing.Upper">@Loc.T(Localization.Editor.Modals.SmartFormatOptions.caseUpper)</option>
+                <option value="@StoryTextCasing.Lower">@Loc.T(Localization.Editor.Modals.SmartFormatOptions.caseLower)</option>
+            </select>
+            <input class="ins-input ins-input-sm"
+                   type="text"
+                   placeholder="@Loc.T(Localization.Editor.Modals.SmartFormatOptions.prefixPlaceholder)"
+                   value="@Config.Prefix"
+                   @onchange="OnPrefixChanged"/>
+            <input class="ins-input ins-input-sm"
+                   type="text"
+                   placeholder="@Loc.T(Localization.Editor.Modals.SmartFormatOptions.suffixPlaceholder)"
+                   value="@Config.Suffix"
+                   @onchange="OnSuffixChanged"/>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public StoryTextConfig Config { get; set; } = new();
+    [Parameter] public string Label { get; set; } = "";
+
+    /// <summary>Raised after any edit so the owner can mark its entity dirty and rebuild the canvas.</summary>
+    [Parameter] public EventCallback OnChanged { get; set; }
+
+    /// <summary>Asks the page to open the key picker; it applies the chosen key through the supplied setter.</summary>
+    [Parameter] public EventCallback<(Guid Current, Action<Guid> Apply)> OnPickKey { get; set; }
+
+    private async Task PickKey() =>
+        await OnPickKey.InvokeAsync((Config.KeyId, async void (Guid keyId) =>
+        {
+            Config.KeyId = keyId;
+            await OnChanged.InvokeAsync();
+        }));
+
+    private async Task ClearKey()
+    {
+        Config.KeyId = Guid.Empty;
+        await OnChanged.InvokeAsync();
+    }
+
+    private async Task OnCasingChanged(ChangeEventArgs e)
+    {
+        Config.Casing = Enum.TryParse(e.Value?.ToString(), out StoryTextCasing casing) ? casing : StoryTextCasing.None;
+        await OnChanged.InvokeAsync();
+    }
+
+    private async Task OnPrefixChanged(ChangeEventArgs e)
+    {
+        Config.Prefix = e.Value?.ToString() ?? "";
+        await OnChanged.InvokeAsync();
+    }
+
+    private async Task OnSuffixChanged(ChangeEventArgs e)
+    {
+        Config.Suffix = e.Value?.ToString() ?? "";
+        await OnChanged.InvokeAsync();
+    }
+
+    /// <summary>The chosen key's full path, or a "pick a key" prompt when nothing is set.</summary>
+    private string KeyLabel()
+    {
+        if (Config.KeyId == Guid.Empty) return Loc.T(Localization.Common.Buttons.selectKey);
+        LocLocalizationKey? key = _ProjectState.CurrentLocalization?.Keys.Find(k => k.Id == Config.KeyId);
+        return key?.KeyName ?? Loc.T(Localization.Common.Placeholders.unnamed);
+    }
+
+    /// <summary>The key's main-language text, so the author sees what the node will actually render.</summary>
+    private string Preview() =>
+        Config.KeyId == Guid.Empty ? "" : StoryLogicRenderer.LocalizedText(_ProjectState.CurrentLocalization, Config.KeyId);
+}
