@@ -42,6 +42,26 @@ namespace DeusaldStoryCommon
             return result;
         }
 
+        /// <summary>
+        /// Only the variables a choice definition may read: authored ones and their derived text maps. The Medium and
+        /// Theme built-ins are excluded — they describe the render target, not a story state a player can choose — and
+        /// so are ChoiceA/B/C, which only carry what an upstream node already chose.
+        /// </summary>
+        public static List<StoryVariable> Choosable(StoryProject project)
+        {
+            List<StoryVariable> result = new(project.Variables.Values);
+
+            foreach (StoryVariable owner in project.Variables.Values)
+                foreach (StoryVariableTextMap map in owner.TextMaps)
+                    result.Add(DerivedTextMap(owner, map));
+
+            return result;
+        }
+
+        /// <summary>True when <paramref name="id"/> names a variable a choice definition may not read.</summary>
+        public static bool IsChoosable(Guid id) =>
+            id != Guid.Empty && !StoryBuiltInVariables.IsBuiltIn(id) && !StoryChoiceVariables.IsChoiceVariable(id);
+
         /// <summary>Resolves any id returned by <see cref="All"/> — authored, built-in, Choice, or a derived text map.</summary>
         public static StoryVariable? Resolve(StoryProject project, Guid id)
         {

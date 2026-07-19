@@ -33,10 +33,17 @@
     /// <summary>When set, only variables a Set node may target are offered (no built-ins, Choice vars or text maps).</summary>
     [Parameter] public bool WritableOnly { get; set; }
 
+    /// <summary>When set, only variables a choice definition may read are offered (no Medium/Theme, no ChoiceA/B/C).</summary>
+    [Parameter] public bool ChoosableOnly { get; set; }
+
     private StoryProject Project => _ProjectState.CurrentProject!;
 
-    private List<StoryVariable> Candidates() =>
-        WritableOnly ? StoryVariableCatalog.Writable(Project) : StoryVariableCatalog.All(Project);
+    private List<StoryVariable> Candidates()
+    {
+        if (WritableOnly) return StoryVariableCatalog.Writable(Project);
+        if (ChoosableOnly) return StoryVariableCatalog.Choosable(Project);
+        return StoryVariableCatalog.All(Project);
+    }
 
     private string Description() =>
         StoryVariableCatalog.Resolve(Project, Selected)?.Description ?? "";

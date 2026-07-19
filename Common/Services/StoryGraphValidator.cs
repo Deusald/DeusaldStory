@@ -214,7 +214,11 @@ namespace DeusaldStoryCommon
                 return;
             }
 
-            StoryVariable? target = StoryVariableCatalog.Resolve(project, def.SelectedVariableId);
+            // A Medium/Theme built-in or a ChoiceA/B/C carrier is no longer offered here, so an older project still
+            // pointing at one is treated exactly like an unpicked variable.
+            StoryVariable? target = StoryVariableCatalog.IsChoosable(def.SelectedVariableId)
+                ? StoryVariableCatalog.Resolve(project, def.SelectedVariableId)
+                : null;
             if (target is null)
             {
                 problems.Add(Node(logic, UiLang.T(Localization.Validation.choiceDefNoVariable, new Dictionary<string, object> { ["node"] = node })));

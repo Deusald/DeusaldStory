@@ -34,8 +34,11 @@
 
         @if (def.Kind == StoryChoiceDefKind.Variable)
         {
+            @* Medium/Theme describe the render target and ChoiceA/B/C only carry an upstream node's pick — neither
+               is a story state the player can choose, so neither is offered here. *@
             <VariablePicker Selected="def.SelectedVariableId"
                             Label="@Loc.T(Localization.Editor.Inspector.choiceVariableLabel)"
+                            ChoosableOnly="true"
                             SelectedChanged="async id => { def.SelectedVariableId = id; await Changed(); }"/>
 
             <div class="ins-field">
@@ -94,6 +97,7 @@
                     @if (o.FromVariable)
                     {
                         <VariablePicker Selected="o.SelectedVariableId"
+                                        ChoosableOnly="true"
                                         SelectedChanged="async id => { o.SelectedVariableId = id; await Changed(); }"/>
                     }
                     else
