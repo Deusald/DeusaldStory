@@ -173,8 +173,7 @@
     [Parameter] public StoryLogicNode Logic { get; set; } = default!;
 
     /// <summary>
-    /// The project <see cref="Logic"/> belongs to — the preview session's own, chosen once by the parent (the flattened
-    /// story, or authoring space with functions inlined for a blueprint definition previewed on its own). Everything
+    /// The project <see cref="Logic"/> belongs to — the preview session's own, chosen once by the parent. Everything
     /// this component resolves must come from it, so the whole session speaks one set of ids.
     /// </summary>
     [Parameter] public StoryProject Project { get; set; } = default!;

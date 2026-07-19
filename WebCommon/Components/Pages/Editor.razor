@@ -44,11 +44,6 @@
             @* The problems list spans the whole centre; clicking a row navigates the graph behind it. *@
             <ProblemsPanel OnNavigate="OnProblemNavigate"/>
         }
-        else if (_ActiveTool == EditorRail.Tool.Blocks)
-        {
-            @* The blueprint library spans the whole centre; opening a definition drills into the graph behind it. *@
-            <BlueprintsPanel OnOpen="OnOpenBlueprint" OnEditSignature="OnEditSignature" OnEditProperties="OnEditBlueprintProperties"/>
-        }
         else
         {
             <div class="ed-stage">
@@ -77,7 +72,6 @@
                                  OnNodeAddPortalOut="OnNodeAddPortalOut"
                                  OnNodeReparent="OnNodeReparent"
                                  OnNodeMoveToParent="OnNodeMoveToParent"
-                                 OnNodeMakeBlueprint="OnNodeMakeBlueprint"
                                  OnUndo="OnUndo"
                                  OnRedo="OnRedo"
                                  CanMoveToParent="@(!_InLogic && !IsRootContainer)"
@@ -164,18 +158,12 @@
 <NewCommentNodeModal       @ref="_NewCommentNodeModal"      OnConfirm="OnCommentConfirmed"/>
 <FlowTextOptionsModal      @ref="_FlowTextOptionsModal"     OnConfirm="OnFlowTextConfirmed"/>
 <SmartFormatOptionsModal   @ref="_SmartFormatOptionsModal"  OnConfirm="OnSmartFormatConfirmed"/>
-<BlueprintPickerModal      @ref="_BlueprintPicker"          OnSelect="OnBlueprintPicked"/>
-<FunctionSignatureModal    @ref="_FunctionSignatureModal"   OnConfirm="OnSignatureConfirmed"/>
 
 @code {
     private EditorMode        _Mode = EditorMode.Edit;
     private EditorRail.Tool   _ActiveTool = EditorRail.Tool.Graph;
     private EditorRail?        _Rail;
 
-    // Editing a blueprint definition runs in its own breadcrumb trail (starting at the blueprint), separate from the
-    // story trail. The story trail is stashed here and restored when the user returns via the Story graph rail button.
-    private bool               _EditingBlueprint;
-    private List<EditorCrumb>  _StoryCrumbs = [];
     private Guid              _SelectedId;
 
     private EditorGraph? _GraphRef; // the live graph (present only in Edit mode)
@@ -211,8 +199,6 @@
     private NewCommentNodeModal?       _NewCommentNodeModal;
     private FlowTextOptionsModal?      _FlowTextOptionsModal;
     private SmartFormatOptionsModal?   _SmartFormatOptionsModal;
-    private BlueprintPickerModal?      _BlueprintPicker;
-    private FunctionSignatureModal?    _FunctionSignatureModal;
 
     // Where the next created node is placed — the right-clicked canvas point (or a staggered default).
     private double _PendingX;
@@ -244,22 +230,11 @@
         _InLogic && Project.LogicNodes.TryGetValue(_CurrentId, out StoryLogicNode? logic) ? logic : null;
 
     // ── Preview session ────────────────────────────────────────────────────
-    // A preview runs against ONE project for its whole life, and everything it shows — the rendered node, the variables
-    // panel, the flow it follows on continue — reads that same one. Mixing them silently breaks: the expander remaps
-    // ids per instance, so a value the panel seeds under an authoring id is invisible to a renderer reading a clone.
 
-    /// <summary>The id of the previewed node <b>within <see cref="_PreviewProject"/></b> — not necessarily an authoring id.</summary>
+    /// <summary>The id of the previewed node.</summary>
     private Guid _PreviewNodeId;
 
-    /// <summary>
-    /// Which space this preview session is playing in. <b>true</b> = the blueprint-flattened project: the real story,
-    /// walked from Start, where each instance is its own clone. <b>false</b> = the authoring project with functions
-    /// inlined, used when previewing a blueprint definition on its own — it is out of tree, so it has no clone to play.
-    /// </summary>
-    private bool _PreviewExpanded;
-
-    private StoryProject _PreviewProject =>
-        _PreviewExpanded ? _ProjectState.GetExpandedProject() : _ProjectState.GetFunctionExpanded().Project;
+    private StoryProject _PreviewProject => Project;
 
     /// <summary>The node being previewed, resolved in its own space.</summary>
     private StoryLogicNode? _PreviewLogic =>
@@ -353,12 +328,7 @@
             // The tab always previews what is open right now — a session started earlier may have walked the flow far
             // from here, and its node must not linger. With a container open there is nothing to preview, so the id is
             // cleared and the pane falls back to its play-mode placeholder.
-            if (_CurrentLogicNode is StoryLogicNode current)
-            {
-                _PreviewNodeId   = current.Id;
-                _PreviewExpanded = PreviewIsExpanded(current);
-            }
-            else _PreviewNodeId = Guid.Empty;
+            _PreviewNodeId = _CurrentLogicNode is StoryLogicNode current ? current.Id : Guid.Empty;
 
             _PreviewVars     = new Dictionary<Guid, string>();
             _PreviewGamebook = false;
@@ -401,7 +371,7 @@
                     && StorySelectionResolver.SourceNode(proj, result.Logic) is StoryLogicNode src && src.Id == owner.Id
                     && owner.Choices.Find(c => c.Id == choice.ChoiceId) is StoryChoice picked)
                     _PreviewVars = StorySelectionResolver.ValuesForChoice(owner, picked);
-                EnterPreview(result.Logic, _PreviewExpanded, replaceCrumb: true);
+                EnterPreview(result.Logic, replaceCrumb: true);
                 _PreviewNotice = null;
                 RebuildNodes();
                 break;
@@ -430,7 +400,7 @@
         if (request.LogicId != _PreviewNodeId)
         {
             bool gamebook = _PreviewGamebook;
-            EnterPreview(target, _PreviewExpanded, replaceCrumb: true);
+            EnterPreview(target, replaceCrumb: true);
             _PreviewGamebook = gamebook; // EnterPreview starts a session on the App tab; this navigation stays in Gamebook.
             RebuildNodes();
         }
@@ -442,16 +412,6 @@
     {
         // Some rail tools take over the whole centre and unmount the graph — save its viewport first.
         CaptureViewport();
-
-        // The Story graph button leaves blueprint-editing mode and restores the story trail where the user left it.
-        if (tool == EditorRail.Tool.Graph && _EditingBlueprint)
-        {
-            _EditingBlueprint = false;
-            _Crumbs           = _StoryCrumbs;
-            _SelectedId       = Guid.Empty;
-            _Mode             = EditorMode.Edit;
-            RebuildNodes();
-        }
 
         _ActiveTool = tool;
     }
@@ -511,22 +471,6 @@
                 _Crumbs.Add(new EditorCrumb(logic.Id, logic.Name, EditorScope.Logic));
                 break;
 
-            case StoryNodeKind.BlueprintInstance:
-                // Drill into the shared definition — edits here apply to every instance — in its own breadcrumb trail.
-                if (!Project.BlueprintInstances.TryGetValue(node.Id, out StoryBlueprintInstanceNode? bpInst)) return;
-                if (!Project.Blueprints.TryGetValue(bpInst.BlueprintId, out StoryBlueprint? bpDef)) return;
-                BeginBlueprintTrail(bpDef.DefinitionNodeId, bpDef.Name,
-                    bpDef.Kind == StoryBlueprintKind.Container ? EditorScope.Container : EditorScope.Logic);
-                RebuildNodes();
-                return;
-
-            case StoryNodeKind.FunctionInstance:
-                if (_CurrentLogicNode?.FunctionInstanceNodes.Find(n => n.Id == node.Id) is not StoryFunctionInstanceNode fnInst) return;
-                if (!Project.Blueprints.TryGetValue(fnInst.BlueprintId, out StoryBlueprint? fnDef)) return;
-                BeginBlueprintTrail(fnDef.DefinitionNodeId, fnDef.Name, EditorScope.Logic);
-                RebuildNodes();
-                return;
-
             default:
                 return;
         }
@@ -556,116 +500,43 @@
             case StoryNodeKind.Start:
                 PreviewFromEntry(node.Id);
                 break;
-
-            // An instance previews as itself, not as the shared definition: a Logic one plays this instance's own clone
-            // (so its upstream resolves to what *this* instance is wired to), a Container one follows its first entry in.
-            case StoryNodeKind.BlueprintInstance
-                when Project.BlueprintInstances.TryGetValue(node.Id, out StoryBlueprintInstanceNode? inst)
-                  && Project.Blueprints.TryGetValue(inst.BlueprintId, out StoryBlueprint? bp):
-                if (bp.Kind == StoryBlueprintKind.Logic && CloneOf(inst.Id, bp.DefinitionNodeId) is StoryLogicNode clone)
-                {
-                    _PreviewVars = new Dictionary<Guid, string>();
-                    EnterPreview(clone, expanded: true, replaceCrumb: false);
-                    RebuildNodes();
-                }
-                else if (bp.Kind == StoryBlueprintKind.Container && node.Inputs.Count > 0)
-                    PreviewFromEntry(node.Inputs[0].Id);
-                break;
         }
     }
 
-    /// <summary>
-    /// Resolves the first logic node reached from an entry/Start point and, if any, opens it in Preview. The flattened
-    /// project is the story as played, so it is tried first; only an entry that exists nowhere in it — a blueprint
-    /// definition's own boundary, reached by previewing the definition on its own — falls back to authoring space.
-    /// </summary>
+    /// <summary>Resolves the first logic node reached from an entry/Start point and, if any, opens it in Preview.</summary>
     private void PreviewFromEntry(Guid entryPointId)
     {
-        StoryFlowNavigator.NextLogicResult result = StoryFlowNavigator.ResolveNextLogicFromEntry(_ProjectState.GetExpandedProject(), entryPointId);
-        bool expanded = true;
-
-        if (result.Kind == StoryFlowNavigator.NextKind.Dangling)
-        {
-            result   = StoryFlowNavigator.ResolveNextLogicFromEntry(_ProjectState.GetFunctionExpanded().Project, entryPointId);
-            expanded = false;
-        }
+        StoryFlowNavigator.NextLogicResult result = StoryFlowNavigator.ResolveNextLogicFromEntry(Project, entryPointId);
 
         if (result is { Kind: StoryFlowNavigator.NextKind.Logic, Logic: not null })
         {
             _PreviewVars = new Dictionary<Guid, string>();
-            EnterPreview(result.Logic, expanded, replaceCrumb: false);
+            EnterPreview(result.Logic, replaceCrumb: false);
             RebuildNodes();
         }
     }
 
-    /// <summary>
-    /// Previews an <b>authoring</b> node: a story node plays as its flattened self, while a blueprint definition — which
-    /// has no clone to play — previews in authoring space with its functions inlined.
-    /// </summary>
+    /// <summary>Opens <paramref name="logic"/> in Preview.</summary>
     private void PreviewLogicNode(StoryLogicNode logic)
     {
         _PreviewVars = new Dictionary<Guid, string>();
-        EnterPreview(logic, PreviewIsExpanded(logic), replaceCrumb: false);
+        EnterPreview(logic, replaceCrumb: false);
         RebuildNodes();
     }
 
-    /// <summary>
-    /// Which space an <b>authoring</b> node previews in: expanded when the played story reaches it (expansion keeps a
-    /// story node's id, so the same id names it there), otherwise authoring space with functions inlined — a blueprint
-    /// definition is out of tree and so has no clone to play.
-    /// </summary>
-    private bool PreviewIsExpanded(StoryLogicNode logic) =>
-        _ProjectState.GetExpandedProject().LogicNodes.ContainsKey(logic.Id);
-
-    /// <summary>
-    /// Starts (or advances) a preview session on <paramref name="logic"/>, a node of the <paramref name="expanded"/>
-    /// space. The graph behind the preview still shows an authoring node — a clone has nothing to open — so the
-    /// breadcrumb follows the node it was cloned from, landing where a double-click on the instance would.
-    /// </summary>
-    private void EnterPreview(StoryLogicNode logic, bool expanded, bool replaceCrumb)
+    /// <summary>Starts (or advances) a preview session on <paramref name="logic"/>.</summary>
+    private void EnterPreview(StoryLogicNode logic, bool replaceCrumb)
     {
-        _PreviewNodeId   = logic.Id;
-        _PreviewExpanded = expanded;
+        _PreviewNodeId = logic.Id;
 
-        StoryLogicNode crumb = AuthoringNodeFor(logic) ?? logic;
-        if (crumb.ParentContainer == Guid.Empty && BlueprintOf(crumb.Id) is StoryBlueprint bp)
-            BeginBlueprintTrail(bp.DefinitionNodeId, bp.Name, EditorScope.Logic);
-        else if (replaceCrumb) _Crumbs[^1] = new EditorCrumb(crumb.Id, crumb.Name, EditorScope.Logic);
-        else _Crumbs.Add(new EditorCrumb(crumb.Id, crumb.Name, EditorScope.Logic));
+        if (replaceCrumb) _Crumbs[^1] = new EditorCrumb(logic.Id, logic.Name, EditorScope.Logic);
+        else _Crumbs.Add(new EditorCrumb(logic.Id, logic.Name, EditorScope.Logic));
 
         _SelectedId      = Guid.Empty;
         _PreviewGamebook = false;
         _PreviewNotice   = null;
         _GbpScrollKey    = null;
         _Mode            = EditorMode.Preview;
-    }
-
-    /// <summary>The flattened clone <paramref name="instanceId"/> contributed for <paramref name="definitionNodeId"/>, if any.</summary>
-    private StoryLogicNode? CloneOf(Guid instanceId, Guid definitionNodeId)
-    {
-        StoryBlueprintExpander.ExpandResult expanded = _ProjectState.GetExpanded();
-        foreach (KeyValuePair<Guid, (Guid InstanceId, Guid DefinitionNodeId)> kv in expanded.Origin)
-            if (kv.Value.InstanceId == instanceId && kv.Value.DefinitionNodeId == definitionNodeId
-                && expanded.Project.LogicNodes.TryGetValue(kv.Key, out StoryLogicNode? clone))
-                return clone;
-        return null;
-    }
-
-    /// <summary>The blueprint whose definition body is <paramref name="definitionNodeId"/>, or null when it is a story node.</summary>
-    private StoryBlueprint? BlueprintOf(Guid definitionNodeId) =>
-        Project.Blueprints.Values.FirstOrDefault(b => b.DefinitionNodeId == definitionNodeId);
-
-    /// <summary>
-    /// The authoring node behind <paramref name="node"/> — itself when it is one, otherwise the shared definition its
-    /// per-instance clone was made from. Used for breadcrumbs only: the preview itself never leaves its own space.
-    /// </summary>
-    private StoryLogicNode? AuthoringNodeFor(StoryLogicNode node)
-    {
-        if (Project.LogicNodes.TryGetValue(node.Id, out StoryLogicNode? own)) return own;
-        return _ProjectState.GetExpanded().Origin.TryGetValue(node.Id, out (Guid InstanceId, Guid DefinitionNodeId) origin)
-            && Project.LogicNodes.TryGetValue(origin.DefinitionNodeId, out StoryLogicNode? definition)
-                ? definition
-                : null;
     }
 
     /// <summary>Wire an output port to an input port in the current graph (container or logic content).</summary>
@@ -752,7 +623,6 @@
                 new NodePaletteItem(StoryNodeKind.SetVariable,        "bi-pencil-square",   Loc.T(Localization.Editor.Palette.Items.setVariableLabel),          Loc.T(Localization.Editor.Palette.Items.setVariableDesc)),
                 new NodePaletteItem(StoryNodeKind.LogicPortalIn,      "bi-box-arrow-in-right", Loc.T(Localization.Editor.Palette.Items.logicPortalLabel),                Loc.T(Localization.Editor.Palette.Items.logicPortalDesc)),
                 new NodePaletteItem(StoryNodeKind.ConditionFlow,      "bi-signpost-split",  Loc.T(Localization.Editor.Palette.Items.conditionLabel),             Loc.T(Localization.Editor.Palette.Items.conditionDesc)),
-                new NodePaletteItem(StoryNodeKind.FunctionInstance,   "bi-cpu",             Loc.T(Localization.Editor.Palette.Items.functionInstanceLabel),     Loc.T(Localization.Editor.Palette.Items.functionInstanceDesc)),
                 new NodePaletteItem(StoryNodeKind.Comment,                "bi-chat-left-text", Loc.T(Localization.Editor.Palette.Items.commentLabel),                 Loc.T(Localization.Editor.Palette.Items.commentDesc))
             ]
             :
@@ -760,7 +630,6 @@
                 new NodePaletteItem(StoryNodeKind.Logic,     "bi-diamond-half",       Loc.T(Localization.Editor.Palette.Items.logicLabel),     Loc.T(Localization.Editor.Palette.Items.logicDesc)),
                 new NodePaletteItem(StoryNodeKind.Container, "bi-collection",         Loc.T(Localization.Editor.Palette.Items.containerLabel), Loc.T(Localization.Editor.Palette.Items.containerDesc)),
                 new NodePaletteItem(StoryNodeKind.PortalIn,  "bi-box-arrow-in-right", Loc.T(Localization.Editor.Palette.Items.portalLabel),    Loc.T(Localization.Editor.Palette.Items.portalDesc)),
-                new NodePaletteItem(StoryNodeKind.BlueprintInstance, "bi-diagram-3",  Loc.T(Localization.Editor.Palette.Items.blueprintInstanceLabel), Loc.T(Localization.Editor.Palette.Items.blueprintInstanceDesc)),
                 new NodePaletteItem(StoryNodeKind.Comment,   "bi-chat-left-text",     Loc.T(Localization.Editor.Palette.Items.commentLabel),        Loc.T(Localization.Editor.Palette.Items.commentDesc))
             ];
 
@@ -815,96 +684,7 @@
                     _SelectedId = cond.Id;
                 RebuildNodes();
                 break;
-            case StoryNodeKind.BlueprintInstance:
-                _BlueprintPicker?.Show(
-                    Project.Blueprints.Values.Where(b => b.Kind != StoryBlueprintKind.Function),
-                    Loc.T(Localization.Editor.Palette.placeInstanceTitle));
-                break;
-            case StoryNodeKind.FunctionInstance:
-                _BlueprintPicker?.Show(
-                    Project.Blueprints.Values.Where(b => b.Kind == StoryBlueprintKind.Function),
-                    Loc.T(Localization.Editor.Palette.placeFunctionTitle));
-                break;
             case StoryNodeKind.Comment:   _NewCommentNodeModal?.Show();   break;
-        }
-    }
-
-    /// <summary>A blueprint was picked from the palette — place the right kind of instance at the pending position.</summary>
-    private void OnBlueprintPicked(Guid blueprintId)
-    {
-        if (!Project.Blueprints.TryGetValue(blueprintId, out StoryBlueprint? bp)) return;
-        if (bp.Kind == StoryBlueprintKind.Function)
-        {
-            if (_ProjectState.AddFunctionInstanceNode(_CurrentId, blueprintId, _PendingX, _PendingY) is StoryFunctionInstanceNode fi)
-                _SelectedId = fi.Id;
-        }
-        else if (_ProjectState.AddBlueprintInstanceNode(_CurrentId, blueprintId, _PendingX, _PendingY) is StoryBlueprintInstanceNode inst)
-            _SelectedId = inst.Id;
-        RebuildNodes();
-    }
-
-    private void OnSignatureConfirmed(FunctionSignatureModal.SignatureArgs args)
-    {
-        _ProjectState.UpdateBlueprintSignature(args.BlueprintId, args.Inputs, args.Outputs);
-        RebuildNodes();
-    }
-
-    /// <summary>Opens a blueprint's shared definition for editing (from the Blueprints panel).</summary>
-    private void OnOpenBlueprint(Guid blueprintId)
-    {
-        if (!Project.Blueprints.TryGetValue(blueprintId, out StoryBlueprint? bp)) return;
-        BeginBlueprintTrail(bp.DefinitionNodeId, bp.Name,
-            bp.Kind == StoryBlueprintKind.Container ? EditorScope.Container : EditorScope.Logic);
-        RebuildNodes();
-    }
-
-    /// <summary>
-    /// Enters blueprint-editing mode: stash the story breadcrumb trail (once) and start a fresh trail rooted at the
-    /// blueprint definition, so editing a blueprint shows just the blueprint — not the story path that reached it.
-    /// </summary>
-    private void BeginBlueprintTrail(Guid definitionNodeId, string name, EditorScope scope)
-    {
-        if (!_EditingBlueprint)
-        {
-            _StoryCrumbs      = _Crumbs;
-            _EditingBlueprint = true;
-        }
-        _Crumbs     = [new EditorCrumb(definitionNodeId, name, scope)];
-        _ActiveTool = EditorRail.Tool.Graph;
-        _Mode       = EditorMode.Edit;
-        _SelectedId = Guid.Empty;
-        _Rail?.SetActive(EditorRail.Tool.Graph);
-    }
-
-    /// <summary>Opens the signature editor for a Function blueprint (from the Blueprints panel).</summary>
-    private void OnEditSignature(Guid blueprintId)
-    {
-        if (!Project.Blueprints.TryGetValue(blueprintId, out StoryBlueprint? bp) || bp.Kind != StoryBlueprintKind.Function) return;
-        _FunctionSignatureModal?.Show(bp.Id, bp.Name,
-            bp.Inputs.Select(p => (p.Id, p.Name, p.Type)),
-            bp.Outputs.Select(p => (p.Id, p.Name, p.Type)));
-    }
-
-    /// <summary>Opens the properties editor for a Container/Logic blueprint definition (name, ports/flow types, exit mode, options).</summary>
-    private void OnEditBlueprintProperties(Guid blueprintId)
-    {
-        if (!Project.Blueprints.TryGetValue(blueprintId, out StoryBlueprint? bp)) return;
-
-        if (bp.Kind == StoryBlueprintKind.Container
-         && Project.ContainerNodes.TryGetValue(bp.DefinitionNodeId, out StoryContainerNode? cdef))
-        {
-            _NewContainerModal?.ShowEdit(cdef.Id, cdef.Name, cdef.Description,
-                cdef.EntryPoints.Select(p => (p.Id, p.Name, p.FlowKind)),
-                cdef.ExitPoints.Select(p => (p.Id, p.Name, p.FlowKind)),
-                cdef.ParentContainer, cdef.UsedVariables);
-        }
-        else if (bp.Kind == StoryBlueprintKind.Logic
-              && Project.LogicNodes.TryGetValue(bp.DefinitionNodeId, out StoryLogicNode? ldef))
-        {
-            _NewLogicNodeModal?.ShowEdit(ldef.Id, ldef.Name, ldef.Description,
-                ldef.GamebookInstructions, ldef.ExitMode, ldef.AcceptVariables,
-                ldef.DeclaredVariables.Select(d => (d.Id, d.Name, d.PossibleValues)),
-                ldef.ExpectedVariables.Select(d => (d.Id, d.Name, d.PossibleValues)));
         }
     }
 
@@ -1099,11 +879,9 @@
     {
         if (args.EditId != Guid.Empty)
         {
-            // Use the node's real parent (Empty for an out-of-tree blueprint definition), not the current graph.
-            Guid parent = Project.LogicNodes.TryGetValue(args.EditId, out StoryLogicNode? l) ? l.ParentContainer : _CurrentId;
             _ProjectState.UpdateLogicNode(
-                parent, args.EditId, args.Name, args.Description,
-                args.GamebookInstructions, args.ExitMode, args.AcceptVariables, args.DeclaredVariables, args.ExpectedVariables);
+                _CurrentId, args.EditId, args.Name, args.Description,
+                args.GamebookInstructions, args.ExitMode, args.AcceptVariables, args.DeclaredVariables);
             RebuildNodes();
             _SelectedId = args.EditId;
             return;
@@ -1126,10 +904,8 @@
     {
         if (args.EditId != Guid.Empty)
         {
-            // Use the node's real parent (Empty for an out-of-tree blueprint definition), not the current graph.
-            Guid parent = Project.ContainerNodes.TryGetValue(args.EditId, out StoryContainerNode? c) ? c.ParentContainer : _CurrentId;
             _ProjectState.UpdateContainerNode(
-                parent, args.EditId, args.Name, args.Description, args.Entries, args.Exits, args.UsedVariables);
+                _CurrentId, args.EditId, args.Name, args.Description, args.Entries, args.Exits, args.UsedVariables);
             RebuildNodes();
             _SelectedId = args.EditId;
             return;
@@ -1176,8 +952,7 @@
                     _NewLogicNodeModal?.ShowEdit(
                         logic.Id, logic.Name, logic.Description,
                         logic.GamebookInstructions, logic.ExitMode, logic.AcceptVariables,
-                        logic.DeclaredVariables.Select(d => (d.Id, d.Name, d.PossibleValues)),
-                        logic.ExpectedVariables.Select(d => (d.Id, d.Name, d.PossibleValues)));
+                        logic.DeclaredVariables.Select(d => (d.Id, d.Name, d.PossibleValues)));
                 break;
 
             case StoryNodeKind.Container:
@@ -1331,8 +1106,6 @@
             case StoryNodeKind.ConditionFlow:
             case StoryNodeKind.EndConditionFlow:    _ProjectState.DeleteConditionFlowNode(_CurrentId, node.Id);  break;
             case StoryNodeKind.Comment:                 _ProjectState.DeleteCommentNode(_CurrentId, node.Id);               break;
-            case StoryNodeKind.BlueprintInstance:   _ProjectState.DeleteBlueprintInstance(_CurrentId, node.Id);  break;
-            case StoryNodeKind.FunctionInstance:    _ProjectState.DeleteFunctionInstanceNode(_CurrentId, node.Id); break;
         }
     }
 
@@ -1424,14 +1197,6 @@
         RebuildNodes();
     }
 
-    /// <summary>Context-menu "Make into blueprint" — extract the node into a new blueprint, replacing it with an instance in place.</summary>
-    private void OnNodeMakeBlueprint(EdNode node)
-    {
-        if (_ProjectState.MakeIntoBlueprint(_CurrentId, node.Id) is StoryBlueprint bp)
-            _SelectedId = Project.BlueprintInstances.Values.FirstOrDefault(i => i.BlueprintId == bp.Id)?.Id ?? Guid.Empty;
-        RebuildNodes();
-    }
-
     /// <summary>A staggered canvas position for a node arriving in <paramref name="container"/>, so drops don't stack.</summary>
     private static (double X, double Y) DropSpot(StoryContainerNode container)
     {
@@ -1480,15 +1245,6 @@
             child.X = moved.X;
             child.Y = moved.Y;
             _ProjectState.MarkKeyDirty(child.Id);
-            return;
-        }
-
-        // A blueprint instance moved.
-        if (Project.BlueprintInstances.TryGetValue(moved.Id, out StoryBlueprintInstanceNode? inst))
-        {
-            inst.X = moved.X;
-            inst.Y = moved.Y;
-            _ProjectState.MarkKeyDirty(inst.Id);
             return;
         }
 

@@ -39,9 +39,8 @@
 
 @code {
     /// <summary>The panels the rail switches between. <see cref="Graph"/>, <see cref="Media"/>,
-    /// <see cref="Localization"/>, <see cref="Variables"/>, <see cref="Blocks"/> and <see cref="Problems"/> each have a
-    /// real panel today.</summary>
-    public enum Tool { Graph, Localization, Variables, Blocks, Media, Problems }
+    /// <see cref="Localization"/>, <see cref="Variables"/> and <see cref="Problems"/> each have a real panel today.</summary>
+    public enum Tool { Graph, Localization, Variables, Media, Problems }
 
     /// <summary>Raised when the user picks a tool, so the editor can swap the centre panel.</summary>
     [Parameter] public EventCallback<Tool> OnToolSelected { get; set; }
@@ -53,7 +52,6 @@
     [
         (Tool.Localization, "bi-globe",     Localization.Editor.Rail.localization),
         (Tool.Variables,    "bi-braces",    Localization.Editor.Rail.variables),
-        (Tool.Blocks,       "bi-diagram-3", Localization.Editor.Rail.blueprints),
         (Tool.Media,        "bi-image",     Localization.Editor.Rail.media)
     ];
 

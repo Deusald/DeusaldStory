@@ -131,42 +131,6 @@
                 </label>
             </div>
 
-            @* ── Expected incoming variables (the AcceptVariables contract) ─── *@
-            @if (_AcceptVariables)
-            {
-                <div class="modal-field">
-                    <label class="modal-label">
-                        @Loc.T(Localization.Editor.Modals.Logic.expectedVariablesLabel)
-                        <span class="modal-label-hint">@Loc.T(Localization.Editor.Modals.Logic.expectedVariablesHint)</span>
-                    </label>
-                    @for (int i = 0; i < _Expected.Count; i++)
-                    {
-                        int index = i;
-                        <div class="nlm-point">
-                            <span class="nlm-point-dot" style="background:var(--code-func)"></span>
-                            <input class="modal-input nlm-var-name"
-                                   type="text"
-                                   placeholder="@Loc.T(Localization.Editor.Modals.Logic.variableNamePlaceholder)"
-                                   value="@_Expected[index].Name"
-                                   @oninput="e => _Expected[index].Name = e.Value?.ToString() ?? string.Empty"
-                                   maxlength="60"/>
-                            <input class="modal-input nlm-var-vals"
-                                   type="text"
-                                   placeholder="@Loc.T(Localization.Editor.Modals.Logic.variableValuesPlaceholder)"
-                                   value="@_Expected[index].ValuesCsv"
-                                   @oninput="e => _Expected[index].ValuesCsv = e.Value?.ToString() ?? string.Empty"
-                                   maxlength="300"/>
-                            <button class="nlm-point-del" title="@Loc.T(Localization.Editor.Modals.Logic.removeVariable)" @onclick="() => _Expected.RemoveAt(index)">
-                                <i class="bi bi-trash"></i>
-                            </button>
-                        </div>
-                    }
-                    <button class="nlm-add-exit" @onclick="() => _Expected.Add(new PointRow())">
-                        <i class="bi bi-plus-lg"></i> @Loc.T(Localization.Editor.Modals.Logic.addExpectedVariable)
-                    </button>
-                </div>
-            }
-
         </div>
 
         <div class="modal-footer">
@@ -190,7 +154,6 @@
     private string             _Name        = "";
     private string             _Description = "";
     private List<PointRow>     _Vars        = new();
-    private List<PointRow>     _Expected    = new();
     private bool               _GamebookInstructions;
     private StoryLogicExitMode _ExitMode;
     private bool               _AcceptVariables;
@@ -203,7 +166,6 @@
         _Name                 = "";
         _Description          = "";
         _Vars                 = new();
-        _Expected             = new();
         _GamebookInstructions = false;
         _ExitMode             = StoryLogicExitMode.ManyPaths;
         _AcceptVariables      = false;
@@ -211,18 +173,16 @@
         StateHasChanged();
     }
 
-    /// <summary>Opens the modal to edit an existing logic node, preserving declared/expected-variable ids so wires survive.</summary>
+    /// <summary>Opens the modal to edit an existing logic node, preserving declared-variable ids so wires survive.</summary>
     public void ShowEdit(Guid id, string name, string description,
                          bool gamebookInstructions, StoryLogicExitMode exitMode, bool acceptVariables,
-                         IEnumerable<(Guid Id, string Name, List<string> PossibleValues)> declaredVariables,
-                         IEnumerable<(Guid Id, string Name, List<string> PossibleValues)>? expectedVariables = null)
+                         IEnumerable<(Guid Id, string Name, List<string> PossibleValues)> declaredVariables)
     {
         _IsEdit               = true;
         _EditId               = id;
         _Name                 = name;
         _Description          = description;
         _Vars                 = declaredVariables.Select(d => new PointRow { Id = d.Id, Name = d.Name, ValuesCsv = string.Join(", ", d.PossibleValues) }).ToList();
-        _Expected             = (expectedVariables ?? []).Select(d => new PointRow { Id = d.Id, Name = d.Name, ValuesCsv = string.Join(", ", d.PossibleValues) }).ToList();
         _GamebookInstructions = gamebookInstructions;
         _ExitMode             = exitMode;
         _AcceptVariables      = acceptVariables;
@@ -250,12 +210,6 @@
                    .ToList()
             : new List<(Guid, string, List<string>)>();
 
-        List<(Guid Id, string Name, List<string> PossibleValues)> expected = _AcceptVariables
-            ? _Expected.Where(v => !string.IsNullOrWhiteSpace(v.Name))
-                       .Select(v => (v.Id, v.Name.Trim(), SplitValues(v.ValuesCsv)))
-                       .ToList()
-            : new List<(Guid, string, List<string>)>();
-
         await OnConfirm.InvokeAsync(new NewLogicNodeArgs(
             _EditId,
             _Name.Trim(),
@@ -263,8 +217,7 @@
             _GamebookInstructions,
             _ExitMode,
             _AcceptVariables,
-            vars,
-            expected));
+            vars));
     }
 
     private static List<string> SplitValues(string csv) =>
@@ -287,6 +240,5 @@
         bool                                             GamebookInstructions,
         StoryLogicExitMode                               ExitMode,
         bool                                             AcceptVariables,
-        List<(Guid Id, string Name, List<string> PossibleValues)> DeclaredVariables,
-        List<(Guid Id, string Name, List<string> PossibleValues)> ExpectedVariables);
+        List<(Guid Id, string Name, List<string> PossibleValues)> DeclaredVariables);
 }

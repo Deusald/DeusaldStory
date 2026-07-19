@@ -37,10 +37,6 @@ public partial class ProjectStateService
         List<object>           clones            = new(); // non-portal entities to deep-clone
         Guid                   sourceContainerId = Guid.Empty;
 
-        // If we're pasting into a blueprint's definition body, an instance of a blueprint that (transitively) contains
-        // that same blueprint would make it contain itself — drop such instances instead of creating the cycle.
-        StoryBlueprint? owning = FindOwningBlueprint(containerId);
-
         foreach (Guid sourceId in sourceEdIds)
         {
             // A portal point attaches to the *same* portal instead of cloning a whole new pair, so the copy stays wired
@@ -62,8 +58,6 @@ public partial class ProjectStateService
 
             object? entity = ResolveContainerEntity(containerId, sourceId);
             if (entity is null || !seen.Add(entity)) continue;
-            if (entity is StoryBlueprintInstanceNode bpInst
-                && owning is not null && BlueprintDependsOn(bpInst.BlueprintId, owning.Id)) continue; // self-recursion
             clones.Add(entity);
             if (sourceContainerId == Guid.Empty) sourceContainerId = ParentContainerOf(entity);
         }
@@ -101,20 +95,6 @@ public partial class ProjectStateService
                 case StoryContainerNode container:
                     pasted.Add(PasteContainerSubtree(container, containerId, target, dx, dy, map));
                     break;
-                case StoryBlueprintInstanceNode inst:
-                {
-                    // Clone remaps the instance's own id + its port-map ids (owned); BlueprintId / DefinitionPointId are
-                    // plain Guids that survive, so the copy still references the same blueprint definition.
-                    StoryBlueprintInstanceNode clone = RemapClone(inst, map);
-                    clone.ParentContainer = containerId;
-                    clone.X += dx;
-                    clone.Y += dy;
-                    CurrentProject.BlueprintInstances.Add(clone.Id, clone);
-                    target.Instances.Add(clone.Id);
-                    MarkKeyDirty(clone.Id);
-                    pasted.Add(clone.Id);
-                    break;
-                }
             }
         }
 
@@ -127,10 +107,9 @@ public partial class ProjectStateService
     /// <summary>The container a copyable top-level entity lives in (portals are handled separately), or empty for comments.</summary>
     private static Guid ParentContainerOf(object entity) => entity switch
     {
-        StoryLogicNode             l => l.ParentContainer,
-        StoryContainerNode         c => c.ParentContainer,
-        StoryBlueprintInstanceNode i => i.ParentContainer,
-        _                            => Guid.Empty
+        StoryLogicNode     l => l.ParentContainer,
+        StoryContainerNode c => c.ParentContainer,
+        _                    => Guid.Empty
     };
 
     /// <summary>
@@ -155,7 +134,7 @@ public partial class ProjectStateService
     /// node ids the editor selected) into logic node <paramref name="logicId"/>, offset by
     /// (<paramref name="dx"/>, <paramref name="dy"/>). The copied ids are owned by <paramref name="sourceLogicId"/> — the
     /// logic node the copy was taken from — which may differ from the target (e.g. pasting a story logic node's inner
-    /// graph into a Logic/Function blueprint definition). Wires between copied nodes are re-created; when source and
+    /// graph into another logic node). Wires between copied nodes are re-created; when source and
     /// target are the same node a copied logic-portal out attaches to the same portal. Returns the new canvas node ids.
     /// One step.
     /// </summary>
@@ -173,10 +152,6 @@ public partial class ProjectStateService
         Dictionary<Guid, Guid> map     = new(); // shared old→new id map across the whole paste
         List<object>           clones  = new();
         List<object>           created = new(); // the clones actually inserted, for a post-pass over cross-node references
-
-        // Pasting into a blueprint's definition body: a function instance of a blueprint that (transitively) contains
-        // that same blueprint would make it call itself — drop such instances instead of creating the cycle.
-        StoryBlueprint? owning = FindOwningBlueprint(logicId);
 
         foreach (Guid sourceId in sourceEdIds)
         {
@@ -196,8 +171,6 @@ public partial class ProjectStateService
 
             object? model = FindInnerModel(source, sourceId);
             if (model is null || !seen.Add(model)) continue;
-            if (model is StoryFunctionInstanceNode fnInst
-                && owning is not null && BlueprintDependsOn(fnInst.BlueprintId, owning.Id)) continue; // self-recursion
             clones.Add(model);
         }
 
@@ -253,7 +226,6 @@ public partial class ProjectStateService
     {
         if (CurrentProject!.LogicNodes.TryGetValue(edId, out StoryLogicNode? logic))       return logic;
         if (CurrentProject.ContainerNodes.TryGetValue(edId, out StoryContainerNode? child)) return child;
-        if (CurrentProject.BlueprintInstances.TryGetValue(edId, out StoryBlueprintInstanceNode? inst)) return inst;
         if (FindPortalByPoint(edId) is StoryPortalNode portal)                              return portal;
         if (CurrentProject.ContainerNodes.TryGetValue(containerId, out StoryContainerNode? owner))
             return owner.Comments.Find(c => c.Id == edId);
@@ -276,8 +248,7 @@ public partial class ProjectStateService
             ?? logic.SplitForAppNodes.Find(n => n.Id == edId)
             ?? logic.SetVariableNodes.Find(n => n.Id == edId)
             ?? logic.ConditionFlowNodes.Find(n => n.Id == edId || n.EndId == edId)
-            ?? (object?)logic.FunctionInstanceNodes.Find(n => n.Id == edId)
-            ?? logic.CommentNodes.Find(n => n.Id == edId);
+            ?? (object?)logic.CommentNodes.Find(n => n.Id == edId);
         return found ?? FindLogicPortalByPoint(logic, edId);
     }
 
@@ -327,13 +298,6 @@ public partial class ProjectStateService
                     MarkKeyDirty(clone.Id);
                     break;
                 }
-                case StoryBlueprintInstanceNode inst:
-                {
-                    StoryBlueprintInstanceNode clone = RemapClone(inst, map);
-                    CurrentProject!.BlueprintInstances[clone.Id] = clone;
-                    MarkKeyDirty(clone.Id);
-                    break;
-                }
             }
         }
         return newTopId;
@@ -347,8 +311,6 @@ public partial class ProjectStateService
             if (CurrentProject!.LogicNodes.TryGetValue(logicId, out StoryLogicNode? logic)) entities.Add(logic);
         foreach (Guid portalId in container.Portals)
             if (CurrentProject!.PortalNodes.TryGetValue(portalId, out StoryPortalNode? portal)) entities.Add(portal);
-        foreach (Guid instanceId in container.Instances)
-            if (CurrentProject!.BlueprintInstances.TryGetValue(instanceId, out StoryBlueprintInstanceNode? inst)) entities.Add(inst);
         foreach (Guid childId in container.Containers)
             if (CurrentProject!.ContainerNodes.TryGetValue(childId, out StoryContainerNode? child)) CollectSubtreeEntities(child, entities);
     }
@@ -407,8 +369,8 @@ public partial class ProjectStateService
     /// <summary>
     /// Blanks any graph-local reference on a cloned inner node whose target wasn't part of the copy (its remapped id is
     /// not in <paramref name="copiedIds"/>) — used only for a cross-node paste, where such a reference would otherwise
-    /// dangle into the source graph. Project-global references (localization keys, images, story variables, blueprint
-    /// ids) are left alone: they resolve the same in any graph.
+    /// dangle into the source graph. Project-global references (localization keys, images, story variables) are left
+    /// alone: they resolve the same in any graph.
     /// </summary>
     private static void DropDanglingLocalRefs(object node, HashSet<Guid> copiedIds)
     {

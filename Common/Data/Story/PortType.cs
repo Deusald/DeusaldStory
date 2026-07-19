@@ -13,7 +13,7 @@ namespace DeusaldStoryCommon
     /// <item><see cref="CVariable"/> — a constant variable, known before any section is evaluated. A CVariable output
     /// may feed a Variable input, but a Variable output may not feed a CVariable input.</item>
     /// </list>
-    /// Lives in Common so persisted data (e.g. a Function blueprint's signature ports) can carry a port type.
+    /// Lives in Common so persisted graph data can carry a port type.
     /// </summary>
     public enum PortType
     {

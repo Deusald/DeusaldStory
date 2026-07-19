@@ -1075,7 +1075,6 @@ public partial class ProjectStateService(
         logic.Choices.AddRange(rebuilt);
         MarkKeyDirty(logicId);
         MarkKeyDirty(logic.ParentContainer);
-        ReconcileIfDefinition(logicId); // choices are a Logic blueprint's exit boundary
     }
 
     /// <summary>
@@ -1102,8 +1101,6 @@ public partial class ProjectStateService(
         //   Text  : Localization / SmartFormat
         //   Icon  : Icon / LightDarkSwitch
         //   Value : External / Get (value + slot) / Constant / Prev Exit
-        //   Function instance output ports (typed value ports produced by the function).
-        //   A Function definition's signature inputs — projected as outputs on its "Function in" node.
         // Only flow outputs (LFlow / VFlow) lead to a single place and get their previous wire replaced below.
         bool multiOutput = logic.LocalizationNodes.Exists(l => l.OutPoint.Id == fromPoint)
                         || logic.SmartFormatNodes.Exists(sf => sf.OutPoint.Id == fromPoint)
@@ -1114,10 +1111,6 @@ public partial class ProjectStateService(
                         || logic.ConstantStringNodes.Exists(cs => cs.OutPoint.Id == fromPoint)
                         || logic.RandomizedInstructionNodes.Exists(r => r.OutText.Id == fromPoint || r.OutVariable.Id == fromPoint)
                         || logic.LogicPortalNodes.Exists(p => p.OutPoints.Exists(o => o.Id == fromPoint))
-                        || logic.FunctionInstanceNodes.Exists(fi => fi.OutputPorts.Exists(p => p.Id == fromPoint))
-                        || CurrentProject.Blueprints.Values.Any(b => b.Kind == StoryBlueprintKind.Function
-                                                                  && b.DefinitionNodeId == logic.Id
-                                                                  && b.Inputs.Exists(s => s.Id == fromPoint))
                         || StorySelectionResolver.IncomingVariables(CurrentProject, logic).Exists(d => d.Id == fromPoint);
         logic.ContentConnections.RemoveAll(c => (!multiOutput && c.FromPoint == fromPoint) || (!multiInput && c.ToPoint == toPoint));
 
@@ -1291,14 +1284,6 @@ public partial class ProjectStateService(
             return;
         }
 
-        StoryFunctionInstanceNode? fn = logic.FunctionInstanceNodes.Find(n => n.Id == movedId);
-        if (fn is not null)
-        {
-            fn.X = x;
-            fn.Y = y;
-            MarkKeyDirty(logicId);
-            return;
-        }
     }
 
     // ── Images ───────────────────────────────────────────────────────────────
@@ -1528,8 +1513,7 @@ public partial class ProjectStateService(
         bool                                                       gamebookInstructions,
         StoryLogicExitMode                                         exitMode,
         bool                                                       acceptVariables,
-        IReadOnlyList<(Guid Id, string Name, List<string> PossibleValues)> declaredVariables,
-        IReadOnlyList<(Guid Id, string Name, List<string> PossibleValues)>? expectedVariables = null)
+        IReadOnlyList<(Guid Id, string Name, List<string> PossibleValues)> declaredVariables)
     {
         using var _ = Edit(); // node edit + container connection cleanup are one step
         if (!CurrentProject!.LogicNodes.TryGetValue(logicId, out StoryLogicNode? logic)) return;
@@ -1541,8 +1525,6 @@ public partial class ProjectStateService(
         logic.AcceptVariables      = acceptVariables;
 
         ReconcileDeclaredVariables(logic, declaredVariables);
-        // The AcceptVariables incoming contract (empty when the node adapts live or doesn't accept variables).
-        ReconcileVariableList(logic.ExpectedVariables, acceptVariables ? expectedVariables ?? [] : []);
         PruneContentConnections(CurrentProject, logic);
 
         // Drop container wires that reference outer ports this node no longer exposes after a mode/flag change.
@@ -1553,7 +1535,7 @@ public partial class ProjectStateService(
             goneOuterPorts.Add(logic.VFlowOut.Id);                                 // the shared VFlow output is gone
 
         // The entry's type (Flow vs VFlow) follows acceptVariables — drop an incoming wire whose source type no longer
-        // matches. The source is whatever the VFlow traces back to, however many containers/blueprints in between.
+        // matches. The source is whatever the VFlow traces back to, however many containers in between.
         if (CurrentProject.ContainerNodes.TryGetValue(containerId, out StoryContainerNode? parent)
             && parent.Connections.Find(c => c.ToPoint == logic.EntryPoint.Id) is StoryConnection entryWire
             && StorySelectionResolver.ResolveVFlowSource(CurrentProject, parent, entryWire.FromPoint) is not null != acceptVariables)
@@ -1563,7 +1545,6 @@ public partial class ProjectStateService(
 
         MarkKeyDirty(logicId);
         MarkKeyDirty(containerId);
-        ReconcileIfDefinition(logicId); // exit mode / accept-variables change this node's boundary as a Logic blueprint
     }
 
     /// <summary>Reconciles a logic node's declared variables (SinglePath), keeping matching ids and their per-choice values.</summary>
@@ -1601,9 +1582,8 @@ public partial class ProjectStateService(
             logic.ExitLFlowIn.Id, logic.ExitVariablesIn.Id, logic.ExitAutoTextIn.Id
         };
         foreach (StoryChoice c in logic.Choices) valid.Add(c.TextIn.Id);
-        // Prev Exit Variable output ids are the node's own ExpectedVariables in contract mode and the live upstream's
-        // declared ids otherwise — the resolver knows which, and both must be kept so inner wires survive. A removed
-        // variable's id is absent from what it returns, so its wires are still correctly pruned.
+        // Prev Exit Variable output ids are the live upstream's declared ids, which must be kept so inner wires
+        // survive. A removed variable's id is absent from what the resolver returns, so its wires are still pruned.
         foreach (StoryDeclaredVariable d in StorySelectionResolver.IncomingVariables(project, logic)) valid.Add(d.Id);
         foreach (StoryLocalizationNode n in logic.LocalizationNodes) valid.Add(n.OutPoint.Id);
         foreach (StoryIconNode n in logic.IconNodes) valid.Add(n.OutPoint.Id);
@@ -1704,7 +1684,6 @@ public partial class ProjectStateService(
 
         MarkKeyDirty(containerId);
         MarkKeyDirty(parentContainerId);
-        ReconcileIfDefinition(containerId); // this container may itself be a blueprint's definition body
     }
 
     /// <summary>
@@ -1772,7 +1751,6 @@ public partial class ProjectStateService(
         CurrentProjectPath  = folderPath;
         CurrentLocalization = localization;
         IsDirty             = false;
-        _ExpandVersion++; // invalidate the flattened-project cache for the newly loaded project
         ChangedFileIds.Clear();
         ResetHistory();
         ProjectChanged?.Invoke();
@@ -1949,7 +1927,6 @@ public partial class ProjectStateService(
 
     private void RaiseDirty()
     {
-        _ExpandVersion++; // the flattened (blueprint-expanded) project is now stale
         if (!IsDirty)
         {
             IsDirty = true;

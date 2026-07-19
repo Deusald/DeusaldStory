@@ -284,7 +284,6 @@ namespace DeusaldStoryCommon
                 public static readonly Guid flow = new Guid("1d787131-a282-4ea4-8612-540bb4f8427c");
                 public static readonly Guid localization = new Guid("4601b3a9-8697-4041-ac6b-acceda9549d7");
                 public static readonly Guid variables = new Guid("dcf02fee-1530-4425-879f-d94a1b4736bf");
-                public static readonly Guid blueprints = new Guid("2b2b1bc9-b3fa-4dbf-84a7-9e93ce2eeca1");
                 public static readonly Guid media = new Guid("98fdd565-a53c-4147-8ced-5839bc19109c");
                 public static readonly Guid preview = new Guid("f4ef50e2-6e7e-4242-b837-51b69b07f658");
             }
@@ -348,7 +347,6 @@ namespace DeusaldStoryCommon
                 public static readonly Guid addPortalIn = new Guid("55a36d71-f500-413e-a627-0f259dd5e25c");
                 public static readonly Guid addPortalOut = new Guid("8159753b-42f8-44e9-bb61-6bf088bc694a");
                 public static readonly Guid moveToParent = new Guid("028ac513-bcc8-4fcd-a1fb-c53af14b3fcc");
-                public static readonly Guid makeIntoBlueprint = new Guid("5d9bc664-811a-4950-b242-52f2ac3496ac");
 
                 public static class Nouns
                 {
@@ -401,8 +399,6 @@ namespace DeusaldStoryCommon
                 public static readonly Guid modalTitle = new Guid("2f4bb767-a633-4c69-ba00-e23559d5d7c1");
                 public static readonly Guid searchPlaceholder = new Guid("2d04ad32-0694-425b-aa5a-0b5cdbe0d5e3");
                 public static readonly Guid noMatches = new Guid("7ce4d379-1b4b-40e4-a45d-3b31fd20c81c");
-                public static readonly Guid placeInstanceTitle = new Guid("873458a3-68ff-4918-8b6d-23df2813b354");
-                public static readonly Guid placeFunctionTitle = new Guid("e38cd26d-8b84-4318-b70a-0898c1e4dc1f");
 
                 public static class Items
                 {
@@ -438,8 +434,6 @@ namespace DeusaldStoryCommon
                     public static readonly Guid logicPortalDesc = new Guid("36b083ff-7308-4c30-b200-d83b2400ce08");
                     public static readonly Guid conditionLabel = new Guid("1886d8d2-ac09-4f8c-8ca2-ab6bd6547d9b");
                     public static readonly Guid conditionDesc = new Guid("f1d6dade-36b4-446d-a748-de8ca5d98c8b");
-                    public static readonly Guid functionInstanceLabel = new Guid("d7eb8311-8c80-4e8c-9cac-faf5c361387f");
-                    public static readonly Guid functionInstanceDesc = new Guid("9d0f8a21-9ff9-4b30-8401-4750ebdb38b5");
                     public static readonly Guid commentLabel = new Guid("5457f732-6446-4faa-9945-93a27aa6487c");
                     public static readonly Guid commentDesc = new Guid("a96fda0a-3045-4e6b-a0a6-933dc7d22dca");
                     public static readonly Guid logicLabel = new Guid("ef0d34dd-c30d-4111-85e3-91fd90c92b78");
@@ -448,8 +442,6 @@ namespace DeusaldStoryCommon
                     public static readonly Guid containerDesc = new Guid("4cba6c4c-c38f-4f9a-afac-d933bae638da");
                     public static readonly Guid portalLabel = new Guid("600e130d-0814-4070-a986-3ccb65358f18");
                     public static readonly Guid portalDesc = new Guid("844b4eb5-6cbd-4fb2-93aa-3c933696d964");
-                    public static readonly Guid blueprintInstanceLabel = new Guid("35fad3a1-6a23-4716-a28d-39dd0b75fc69");
-                    public static readonly Guid blueprintInstanceDesc = new Guid("89ed77d7-8440-47ab-a7e5-7644b9e0e6cb");
                     public static readonly Guid randomizedInstructionLabel = new Guid("d7614656-05f0-4a56-8826-455ac5f00617");
                     public static readonly Guid randomizedInstructionDesc = new Guid("bd14b3dc-0e4a-449c-9e6d-6def6639fe40");
                 }
@@ -457,23 +449,6 @@ namespace DeusaldStoryCommon
 
             public static class Panels
             {
-                public static class Blueprints
-                {
-                    public static readonly Guid title = new Guid("f1cc5b22-3c48-40ec-832a-17c4ec1f07af");
-                    public static readonly Guid subtitle = new Guid("ca508296-92a8-4f2c-9687-430767a89117");
-                    public static readonly Guid newNamePlaceholder = new Guid("22666784-5a1f-4aee-8dc5-769002ffced2");
-                    public static readonly Guid container = new Guid("49b57780-89dd-4856-ab72-c6f6548d7dcd");
-                    public static readonly Guid logic = new Guid("4533b81f-525d-43d6-92eb-41f1159621ed");
-                    public static readonly Guid function = new Guid("f56d97c2-fa66-4ddf-a447-7cd8f2899db3");
-                    public static readonly Guid empty = new Guid("6a8e1925-7e32-48a6-a3c4-1bfe3aedc8ff");
-                    /// <summary>Instance count on a blueprint row. Token: {count}.</summary>
-                    public static readonly Guid instanceCount = new Guid("059222cc-2a2c-4d3d-93a4-371037d8c459");
-                    public static readonly Guid openDefinition = new Guid("d28ee807-e439-4636-97ac-cb7ccea95df7");
-                    public static readonly Guid editSignature = new Guid("a1cc50e2-6ded-43ff-b963-414699d124f6");
-                    public static readonly Guid editProperties = new Guid("e0eb3776-cb71-469e-b1c2-59067ac4dc21");
-                    public static readonly Guid confirmDelete = new Guid("279c9ba0-a204-4c45-9fad-1c1fc9d2e5a6");
-                }
-
                 public static class Images
                 {
                     public static readonly Guid title = new Guid("9e30f415-2e76-4046-9bc0-0c20e601d70a");
@@ -630,9 +605,6 @@ namespace DeusaldStoryCommon
                     public static readonly Guid gamebookInstructionsHint = new Guid("fd16cabe-ff51-43a9-8293-3d90be5c6674");
                     public static readonly Guid acceptVariablesLabel = new Guid("827bcdb5-ed6f-465a-bb9c-1d052e592de2");
                     public static readonly Guid acceptVariablesHint = new Guid("dd138858-352c-48ff-96ea-2790512ec5a5");
-                    public static readonly Guid expectedVariablesLabel = new Guid("1276de86-5464-464b-b035-9d6e57c73851");
-                    public static readonly Guid expectedVariablesHint = new Guid("1ecbd087-99f0-4e4c-b917-39956143e72d");
-                    public static readonly Guid addExpectedVariable = new Guid("c8f9bfad-76c2-40b3-b828-5d1a6401dc4f");
                     public static readonly Guid createButton = new Guid("66a76866-0b2d-4945-a38f-a05e55729d1d");
                 }
 
@@ -757,12 +729,6 @@ namespace DeusaldStoryCommon
                     public static readonly Guid suffixHint = new Guid("7ba8db33-7433-4be3-ad2a-18d0d36ef750");
                     public static readonly Guid suffixPlaceholder = new Guid("f399f0dd-4189-4d18-aae0-07a4c39d25f5");
                     public static readonly Guid note = new Guid("4f1adc1d-7431-481b-be62-85ffd6377e9b");
-                }
-
-                public static class BlueprintPicker
-                {
-                    public static readonly Guid defaultTitle = new Guid("ebc81a5f-35c5-4bd2-be0e-d57abb52f875");
-                    public static readonly Guid noBlueprintsEmpty = new Guid("7e234d0b-6cf9-46b4-a0b5-09e0bb522415");
                 }
 
                 public static class IconPicker
@@ -1001,13 +967,8 @@ namespace DeusaldStoryCommon
 
                 public static class Titles
                 {
-                    public static readonly Guid missingBlueprint = new Guid("c4311fb9-a823-469a-b4ed-6747ffe22731");
-                    public static readonly Guid blueprintSubtitle = new Guid("915c113e-9279-43dc-9245-16f8abb07274");
-                    public static readonly Guid deletedBlueprint = new Guid("b33559ab-214d-468d-bff0-37e8c74b9a0e");
                     public static readonly Guid entry = new Guid("abf3fe47-3c63-4d8b-b826-162f2dbe2780");
-                    public static readonly Guid functionIn = new Guid("e3e173fa-a3f0-4b92-be22-514bdb18ae09");
                     public static readonly Guid exit = new Guid("a306d034-c216-42cf-8b13-73e42bf0906e");
-                    public static readonly Guid functionOut = new Guid("6414edfd-177f-4e0d-a295-dbf50b74492c");
                     public static readonly Guid exitAutoSubtitle = new Guid("c37944e9-7b49-4f2c-89ea-c7009029fecf");
                     public static readonly Guid noKey = new Guid("c6ba29b8-2d14-4fec-8a6d-22155b47ac15");
                     public static readonly Guid noIcon = new Guid("f7fd084b-b1eb-4652-ba34-d69b0a43ec6d");
@@ -1042,9 +1003,6 @@ namespace DeusaldStoryCommon
                     public static readonly Guid condition = new Guid("6e21380f-58d1-464c-a097-d50f4dafadc0");
                     public static readonly Guid conditionNegated = new Guid("1c5211fb-69ff-4b0a-9ef9-b78af2fb660f");
                     public static readonly Guid endCondition = new Guid("edc0018b-13ec-43a4-b28d-6a4a7bdbd7d6");
-                    public static readonly Guid missingFunction = new Guid("1e33cfbd-83ab-42f7-bf41-3221abae5f9e");
-                    public static readonly Guid functionSubtitle = new Guid("871f5f41-8bbf-4dbe-ac0b-9ba1da6f5995");
-                    public static readonly Guid deletedFunction = new Guid("f4fcf4c8-ae8e-45fd-85dd-1e1f40a85db0");
                     /// <summary>Fallback title of a Randomized Instruction node with no result token yet.</summary>
                     public static readonly Guid randomizedInstruction = new Guid("659e53a8-ccc4-41cc-bae3-817b2d43c938");
                     /// <summary>Fallback title of a Constant String node with no value yet.</summary>
@@ -1095,8 +1053,6 @@ namespace DeusaldStoryCommon
                     public static readonly Guid condition = new Guid("6dc52ebd-95d6-4b70-b460-e57581c32cc4");
                     public static readonly Guid endCondition = new Guid("065d84e8-513d-4a19-aeeb-c8e0e5ae5a27");
                     public static readonly Guid comment = new Guid("b47c53d7-518f-4e83-9737-e354b08d263e");
-                    public static readonly Guid blueprint = new Guid("80491317-5df3-49c6-8fba-46eb854553ff");
-                    public static readonly Guid function = new Guid("79558655-29c2-4eed-9a6a-c598017a5cc9");
                     public static readonly Guid randomizedInstruction = new Guid("e6106c9a-e349-4007-86a8-143d90d3f687");
                 }
 
@@ -1141,16 +1097,6 @@ namespace DeusaldStoryCommon
             public static readonly Guid choiceNoVariableValue = new Guid("d510cf31-1cc7-478e-9afa-93df26866c8c");
             /// <summary>Tokens: {cond},{logic}.</summary>
             public static readonly Guid conditionNonConstant = new Guid("f2d48f3d-49fc-423b-b154-2a69225cd707");
-            /// <summary>Token: {node}.</summary>
-            public static readonly Guid expectsIncomingNotWired = new Guid("7bfc43aa-ea40-40e1-aaf6-64fa208516dd");
-            /// <summary>Token: {names}.</summary>
-            public static readonly Guid contractMissing = new Guid("db9d7261-9479-4e98-a173-d365959b4fcd");
-            /// <summary>Token: {names}.</summary>
-            public static readonly Guid contractUnexpected = new Guid("5ddabf2e-e63d-48e8-8f30-b0ac07f7ed11");
-            /// <summary>Tokens: {node},{detail}.</summary>
-            public static readonly Guid contractMismatch = new Guid("b455231b-feef-4558-866f-aa0f30fcc825");
-            /// <summary>Tokens: {node},{var}.</summary>
-            public static readonly Guid contractValuesDiffer = new Guid("a4d8e21e-d3ff-4920-8ad4-ce2796f8a578");
             /// <summary>Tokens: {node},{error}.</summary>
             public static readonly Guid gamebookTextPrefix = new Guid("fcbd4e62-e4d3-48a0-bfe4-442da5e0e9fa");
             /// <summary>Token: {node}.</summary>
@@ -1177,14 +1123,6 @@ namespace DeusaldStoryCommon
             public static readonly Guid variableNotReleasedAtEnd = new Guid("fb3d55d2-8aad-462c-9872-25f0c73879ad");
             /// <summary>Fallback for an unknown target variable.</summary>
             public static readonly Guid unknownTarget = new Guid("b8c99e70-5a04-4ae2-a40e-bd7b24a4be8f");
-            public static readonly Guid blueprintNestingTooDeep = new Guid("9d75a2bc-34c1-48b1-857e-8b43b7ab62de");
-            public static readonly Guid blueprintMissing = new Guid("9c60bae4-3a30-4d0d-8d72-0d0fd858dc35");
-            /// <summary>Token: {name}.</summary>
-            public static readonly Guid blueprintRecursive = new Guid("17918372-4c95-4395-a97c-449d80a84226");
-            public static readonly Guid functionNestingTooDeep = new Guid("2df503f1-6f63-4bb1-82e7-2ac26bde8d76");
-            public static readonly Guid functionMissing = new Guid("ed0ea96f-1b86-43ef-b616-effb832fc534");
-            /// <summary>Token: {name}.</summary>
-            public static readonly Guid functionRecursive = new Guid("a73ad660-0182-4f7e-959c-073f4de83d35");
             /// <summary>Token: {node}. A Randomized Instruction node with a blank result token.</summary>
             public static readonly Guid randomResultTokenEmpty = new Guid("997bf7b0-f4de-4e48-869a-11f0546a8ba7");
             /// <summary>Token: {node}. A Randomized Instruction node with an empty random range.</summary>
@@ -1193,8 +1131,6 @@ namespace DeusaldStoryCommon
             public static readonly Guid randomBranchNotConstant = new Guid("fb1a891e-3dfa-4b6f-9299-6009ec737e55");
             /// <summary>Tokens: {node},{value}. A branch value with no configured range.</summary>
             public static readonly Guid randomBranchMissingRange = new Guid("a240839b-049a-4447-8995-c704b49d1552");
-            /// <summary>Tokens: {blueprint},{node}. A Register Variable node found inside a blueprint definition.</summary>
-            public static readonly Guid blueprintRegistersVariable = new Guid("b1e7c4a2-9f36-4d81-a5c0-3e2d6f8a17b4");
         }
 
         public static class Services
@@ -1408,7 +1344,6 @@ namespace DeusaldStoryCommon
                 { new Guid("1d787131-a282-4ea4-8612-540bb4f8427c"), "Flow" },
                 { new Guid("4601b3a9-8697-4041-ac6b-acceda9549d7"), "Localization" },
                 { new Guid("dcf02fee-1530-4425-879f-d94a1b4736bf"), "Variables" },
-                { new Guid("2b2b1bc9-b3fa-4dbf-84a7-9e93ce2eeca1"), "Blueprints" },
                 { new Guid("98fdd565-a53c-4147-8ced-5839bc19109c"), "Media" },
                 { new Guid("f4ef50e2-6e7e-4242-b837-51b69b07f658"), "Preview" },
                 { new Guid("6c741d53-5329-4b3c-9938-f081756f1e9f"), "App" },
@@ -1445,7 +1380,6 @@ namespace DeusaldStoryCommon
                 { new Guid("55a36d71-f500-413e-a627-0f259dd5e25c"), "Add portal in" },
                 { new Guid("8159753b-42f8-44e9-bb61-6bf088bc694a"), "Add portal out" },
                 { new Guid("028ac513-bcc8-4fcd-a1fb-c53af14b3fcc"), "Move to parent" },
-                { new Guid("5d9bc664-811a-4950-b242-52f2ac3496ac"), "Make into blueprint" },
                 { new Guid("937903fb-6833-46b1-a1ca-7dad448d7b8d"), "logic node" },
                 { new Guid("34a37b6c-18dd-4d21-840c-f4bf62b3ca8a"), "container" },
                 { new Guid("44d67a95-05cc-4549-83df-d9074f4426e9"), "portal in" },
@@ -1482,8 +1416,6 @@ namespace DeusaldStoryCommon
                 { new Guid("2f4bb767-a633-4c69-ba00-e23559d5d7c1"), "Add node" },
                 { new Guid("2d04ad32-0694-425b-aa5a-0b5cdbe0d5e3"), "Search nodes…" },
                 { new Guid("7ce4d379-1b4b-40e4-a45d-3b31fd20c81c"), "No matching nodes." },
-                { new Guid("873458a3-68ff-4918-8b6d-23df2813b354"), "Place blueprint instance" },
-                { new Guid("e38cd26d-8b84-4318-b70a-0898c1e4dc1f"), "Place function instance" },
                 { new Guid("7397e0cd-5b41-4e59-a501-63c7f98faebd"), "Localization node" },
                 { new Guid("41d801d0-d5a2-45a2-ae02-57e32543acdf"), "Picks a localization key that supplies this logic node's title text." },
                 { new Guid("dfde2583-053f-4b2d-a198-c2cea3d21875"), "Icon node" },
@@ -1516,8 +1448,6 @@ namespace DeusaldStoryCommon
                 { new Guid("36b083ff-7308-4c30-b200-d83b2400ce08"), "A one-in / many-out relay — feed any Text/Icon/Variable output into the in, read it from every out." },
                 { new Guid("1886d8d2-ac09-4f8c-8ca2-ab6bd6547d9b"), "Condition" },
                 { new Guid("f1d6dade-36b4-446d-a748-de8ca5d98c8b"), "On the logic chain — injects the block wired from its \"Condition true\" output (up to the paired End condition) when a constant-variable condition holds, then continues." },
-                { new Guid("d7eb8311-8c80-4e8c-9cac-faf5c361387f"), "Function instance" },
-                { new Guid("9d0f8a21-9ff9-4b30-8401-4750ebdb38b5"), "Places a reusable Function blueprint on the logic chain — LFlow plus its typed inputs/outputs." },
                 { new Guid("5457f732-6446-4faa-9945-93a27aa6487c"), "Comment" },
                 { new Guid("a96fda0a-3045-4e6b-a0a6-933dc7d22dca"), "A free-text note explaining how nodes connect. No ports; ignored during playback." },
                 { new Guid("ef0d34dd-c30d-4111-85e3-91fd90c92b78"), "Logic node" },
@@ -1526,20 +1456,6 @@ namespace DeusaldStoryCommon
                 { new Guid("4cba6c4c-c38f-4f9a-afac-d933bae638da"), "Groups other nodes into a nested sub-graph with its own entries and exits." },
                 { new Guid("600e130d-0814-4070-a986-3ccb65358f18"), "Portal node" },
                 { new Guid("844b4eb5-6cbd-4fb2-93aa-3c933696d964"), "A linked in/out pair that teleports flow across the graph to keep it clean." },
-                { new Guid("35fad3a1-6a23-4716-a28d-39dd0b75fc69"), "Blueprint instance" },
-                { new Guid("89ed77d7-8440-47ab-a7e5-7644b9e0e6cb"), "Places an instance of a Container/Logic blueprint — editing the blueprint changes every instance." },
-                { new Guid("f1cc5b22-3c48-40ec-832a-17c4ec1f07af"), "Blueprints" },
-                { new Guid("ca508296-92a8-4f2c-9687-430767a89117"), "Reusable node templates — editing a blueprint changes every instance of it." },
-                { new Guid("22666784-5a1f-4aee-8dc5-769002ffced2"), "New blueprint name…" },
-                { new Guid("49b57780-89dd-4856-ab72-c6f6548d7dcd"), "Container" },
-                { new Guid("4533b81f-525d-43d6-92eb-41f1159621ed"), "Logic" },
-                { new Guid("f56d97c2-fa66-4ddf-a447-7cd8f2899db3"), "Function" },
-                { new Guid("6a8e1925-7e32-48a6-a3c4-1bfe3aedc8ff"), "No blueprints yet. Create one above, or right-click a node and choose “Make into blueprint”." },
-                { new Guid("059222cc-2a2c-4d3d-93a4-371037d8c459"), "{count}×" },
-                { new Guid("d28ee807-e439-4636-97ac-cb7ccea95df7"), "Open definition" },
-                { new Guid("a1cc50e2-6ded-43ff-b963-414699d124f6"), "Edit signature" },
-                { new Guid("e0eb3776-cb71-469e-b1c2-59067ac4dc21"), "Edit properties (name, ports, options)" },
-                { new Guid("279c9ba0-a204-4c45-9fad-1c1fc9d2e5a6"), "Confirm delete (removes all instances)" },
                 { new Guid("9e30f415-2e76-4046-9bc0-0c20e601d70a"), "Images" },
                 { new Guid("b6bef49a-8620-421a-8d3d-b3343b5e1a40"), "Referenced from story text by name. PNG only." },
                 { new Guid("34e0c142-0f0b-4a39-9712-e24dab378d12"), "Dismiss" },
@@ -1651,9 +1567,6 @@ namespace DeusaldStoryCommon
                 { new Guid("fd16cabe-ff51-43a9-8293-3d90be5c6674"), "runs automatically in the app; prints a generated instruction section in the Gamebook" },
                 { new Guid("827bcdb5-ed6f-465a-bb9c-1d052e592de2"), "Accept variables" },
                 { new Guid("dd138858-352c-48ff-96ea-2790512ec5a5"), "adds a VFlow input for an upstream Single-path node's declared variables" },
-                { new Guid("1276de86-5464-464b-b035-9d6e57c73851"), "Expected incoming variables" },
-                { new Guid("1ecbd087-99f0-4e4c-b917-39956143e72d"), "the exact set the upstream must provide (name + values); required for reusable blueprints, else the upstream is trusted as-is" },
-                { new Guid("c8f9bfad-76c2-40b3-b828-5d1a6401dc4f"), "Add expected variable" },
                 { new Guid("66a76866-0b2d-4945-a38f-a05e55729d1d"), "Create node" },
                 { new Guid("77d511d6-dd3b-481c-94d1-9d2ff9eaeca1"), "Edit portal" },
                 { new Guid("fde7ab89-52e1-4df2-a97a-67d240c50668"), "New portal" },
@@ -1731,8 +1644,6 @@ namespace DeusaldStoryCommon
                 { new Guid("7ba8db33-7433-4be3-ad2a-18d0d36ef750"), "literal text added after the formatted result" },
                 { new Guid("f399f0dd-4189-4d18-aae0-07a4c39d25f5"), "text after" },
                 { new Guid("4f1adc1d-7431-481b-be62-85ffd6377e9b"), "These settings post-process the text after its {tokens} are substituted — the case transform runs first, then the prefix and suffix are wrapped around it." },
-                { new Guid("ebc81a5f-35c5-4bd2-be0e-d57abb52f875"), "Place blueprint" },
-                { new Guid("7e234d0b-6cf9-46b4-a0b5-09e0bb522415"), "No blueprints yet — create one from the Blueprints panel in the left rail." },
                 { new Guid("3c0ce2f4-48db-4dd0-b6e0-5cafe9929af1"), "Pick an icon" },
                 { new Guid("700edee9-fb32-46a4-a795-f735478b8a47"), "No icons yet — add square, power-of-two PNGs from the Images panel." },
                 { new Guid("aaabf02c-7787-432d-8db7-68a4a1d815e3"), "Select icon" },
@@ -1857,13 +1768,8 @@ namespace DeusaldStoryCommon
                 { new Guid("0787855a-66e7-4f8a-a5ab-1f417fbd0cdf"), "(var)" },
                 { new Guid("2f99926f-553a-4398-966f-7c9dec6b711d"), "Data" },
                 { new Guid("f2c9aa38-10a7-4d7f-b714-c39438132dfc"), "Condition true" },
-                { new Guid("c4311fb9-a823-469a-b4ed-6747ffe22731"), "Missing blueprint" },
-                { new Guid("915c113e-9279-43dc-9245-16f8abb07274"), "Blueprint" },
-                { new Guid("b33559ab-214d-468d-bff0-37e8c74b9a0e"), "(deleted blueprint)" },
                 { new Guid("abf3fe47-3c63-4d8b-b826-162f2dbe2780"), "Entry" },
-                { new Guid("e3e173fa-a3f0-4b92-be22-514bdb18ae09"), "Function in" },
                 { new Guid("a306d034-c216-42cf-8b13-73e42bf0906e"), "Exit" },
-                { new Guid("6414edfd-177f-4e0d-a295-dbf50b74492c"), "Function out" },
                 { new Guid("c37944e9-7b49-4f2c-89ea-c7009029fecf"), "Auto" },
                 { new Guid("c6ba29b8-2d14-4fec-8a6d-22155b47ac15"), "(no key)" },
                 { new Guid("f7fd084b-b1eb-4652-ba34-d69b0a43ec6d"), "(no icon)" },
@@ -1891,9 +1797,6 @@ namespace DeusaldStoryCommon
                 { new Guid("6e21380f-58d1-464c-a097-d50f4dafadc0"), "Condition" },
                 { new Guid("1c5211fb-69ff-4b0a-9ef9-b78af2fb660f"), "negated" },
                 { new Guid("edc0018b-13ec-43a4-b28d-6a4a7bdbd7d6"), "End condition" },
-                { new Guid("1e33cfbd-83ab-42f7-bf41-3221abae5f9e"), "Missing function" },
-                { new Guid("871f5f41-8bbf-4dbe-ac0b-9ba1da6f5995"), "Function" },
-                { new Guid("f4fcf4c8-ae8e-45fd-85dd-1e1f40a85db0"), "(deleted function)" },
                 { new Guid("0d230cb9-92a2-4d3d-80cf-9ccff55ea845"), "Text" },
                 { new Guid("bb6cfa9e-4067-4034-a9bf-90ca51acd287"), "Icon" },
                 { new Guid("ac86deb8-2d3e-4872-8e3d-928274b75c3c"), "Variable" },
@@ -1928,8 +1831,6 @@ namespace DeusaldStoryCommon
                 { new Guid("6dc52ebd-95d6-4b70-b460-e57581c32cc4"), "CONDITION" },
                 { new Guid("065d84e8-513d-4a19-aeeb-c8e0e5ae5a27"), "END CONDITION" },
                 { new Guid("b47c53d7-518f-4e83-9737-e354b08d263e"), "COMMENT" },
-                { new Guid("80491317-5df3-49c6-8fba-46eb854553ff"), "BLUEPRINT" },
-                { new Guid("79558655-29c2-4eed-9a6a-c598017a5cc9"), "FUNCTION" },
                 { new Guid("10cc3ffb-9d4a-42f9-8f9d-a24ff61a5fa9"), "Info" },
                 { new Guid("01728ae4-af1c-4427-885a-e3c898f6d785"), "Success" },
                 { new Guid("da197ad8-15bd-41dc-8312-28e20b54465f"), "Warning" },
@@ -1949,11 +1850,6 @@ namespace DeusaldStoryCommon
                 { new Guid("0d78afda-50f3-4c64-828b-16c7585345aa"), "Choice '{choice}' in '{logic}' has no condition — set one or make it the Else." },
                 { new Guid("d510cf31-1cc7-478e-9afa-93df26866c8c"), "Choice '{choice}' in '{logic}' has no value for variable '{var}'." },
                 { new Guid("f2d48f3d-49fc-423b-b154-2a69225cd707"), "Condition '{cond}' in '{logic}' uses a non-constant variable — only constant variables are allowed so the block renders the same in the App and the Gamebook." },
-                { new Guid("7bfc43aa-ea40-40e1-aaf6-64fa208516dd"), "'{node}' expects incoming variables but its Variables input isn't wired to a Single-path node." },
-                { new Guid("db9d7261-9479-4e98-a173-d365959b4fcd"), "missing: {names}" },
-                { new Guid("5ddabf2e-e63d-48e8-8f30-b0ac07f7ed11"), "unexpected: {names}" },
-                { new Guid("b455231b-feef-4558-866f-aa0f30fcc825"), "'{node}' receives variables that don't match its contract ({detail})." },
-                { new Guid("a4d8e21e-d3ff-4920-8ad4-ce2796f8a578"), "'{node}' variable '{var}' has different possible values than its contract expects." },
                 { new Guid("fcbd4e62-e4d3-48a0-bfe4-442da5e0e9fa"), "In '{node}': {error}" },
                 { new Guid("6bd356e0-11ce-4e54-9306-0cdbc46e2a77"), "Variable state differs across the paths reaching '{node}' — a variable is left registered on some paths but not others." },
                 { new Guid("0e4b6a45-0061-4643-8619-a52905d937c3"), "Variable '{node}' is registered again while already active." },
@@ -1967,12 +1863,6 @@ namespace DeusaldStoryCommon
                 { new Guid("5ca24eed-75e6-45ac-b43e-40e7390d88d8"), "Reads variable '{name}' that isn't registered where '{node}' is played." },
                 { new Guid("fb3d55d2-8aad-462c-9872-25f0c73879ad"), "Variable '{target}' is still registered when the story reaches The End — unregister it first (or release it on the End node)." },
                 { new Guid("b8c99e70-5a04-4ae2-a40e-bd7b24a4be8f"), "(unknown)" },
-                { new Guid("9d75a2bc-34c1-48b1-857e-8b43b7ab62de"), "Blueprint nesting is too deep — expansion stopped." },
-                { new Guid("9c60bae4-3a30-4d0d-8d72-0d0fd858dc35"), "A blueprint instance references a blueprint that no longer exists." },
-                { new Guid("17918372-4c95-4395-a97c-449d80a84226"), "Blueprint '{name}' contains itself — recursive expansion stopped." },
-                { new Guid("2df503f1-6f63-4bb1-82e7-2ac26bde8d76"), "Function nesting is too deep — expansion stopped." },
-                { new Guid("ed0ea96f-1b86-43ef-b616-effb832fc534"), "A function instance references a function that no longer exists." },
-                { new Guid("a73ad660-0182-4f7e-959c-073f4de83d35"), "Function '{name}' calls itself — inlining stopped." },
                 { new Guid("28c5ac3e-55a3-4242-b466-94c79a42d290"), "(variable)" },
                 { new Guid("c22c91c3-8399-455d-aa4d-53ed00261e8b"), "This node has no choices — add at least one continuation on its Exit node." },
                 { new Guid("96de2e89-315d-4c13-8d3e-6d1f44743de8"), "Choice “{label}” is not connected to a next node." },
@@ -2051,7 +1941,6 @@ namespace DeusaldStoryCommon
                 { new Guid("82f3604e-2f94-44c5-8d72-526dcd2babfb"), "Randomized Instruction \"{node}\" has an empty random range." },
                 { new Guid("fb1a891e-3dfa-4b6f-9299-6009ec737e55"), "Randomized Instruction \"{node}\" has a Branch input that isn't a constant/enumerable value." },
                 { new Guid("a240839b-049a-4447-8995-c704b49d1552"), "Randomized Instruction \"{node}\" has no range for branch value \"{value}\"." },
-                { new Guid("b1e7c4a2-9f36-4d81-a5c0-3e2d6f8a17b4"), "Blueprint '{blueprint}' registers storage variable '{node}' — blueprints are reusable blocks and must not register variables. Move the Register Variable node out of the blueprint." },
             } },
         };
 

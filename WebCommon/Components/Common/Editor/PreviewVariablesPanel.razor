@@ -83,9 +83,8 @@
     [Parameter] public EventCallback             ValuesChanged { get; set; }
 
     /// <summary>
-    /// The project <see cref="Logic"/> belongs to — the preview session's own. It must be the one the renderer reads:
-    /// the expander gives each instance's clone its own variable ids, so resolving here against a different project
-    /// seeds every value under a key the renderer never looks up (the dropdown fills, the text never formats).
+    /// The project <see cref="Logic"/> belongs to — the preview session's own. It must be the one the renderer reads,
+    /// so every value is seeded under a key the renderer actually looks up.
     /// </summary>
     [Parameter] public StoryProject Project { get; set; } = default!;
 

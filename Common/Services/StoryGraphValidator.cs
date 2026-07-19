@@ -28,18 +28,15 @@ namespace DeusaldStoryCommon
 
         /// <summary>
         /// Validates the whole story. Pass <paramref name="localization"/> to additionally check inline
-        /// <c>&lt;var=Name&gt;</c> text references against the project's variables. <paramref name="authoring"/> is
-        /// accepted for call-site compatibility but no longer consulted (the removed blueprint-register check was the
-        /// only reader of the un-expanded project).
+        /// <c>&lt;var=Name&gt;</c> text references against the project's variables.
         /// </summary>
-        public static StoryValidationResult Validate(StoryProject project, LocProject? localization = null, StoryProject? authoring = null)
+        public static StoryValidationResult Validate(StoryProject project, LocProject? localization = null)
         {
             List<StoryProblem> problems = new();
 
             CheckDanglingOutputs(project, problems);
             CheckChoices(project, problems);
             CheckConditionFlows(project, problems);
-            CheckIncomingVariableContract(project, problems);
             CheckGamebookText(project, localization, problems);
 
             foreach (StoryLogicNode logic in project.LogicNodes.Values)
@@ -211,73 +208,6 @@ namespace DeusaldStoryCommon
             }
             // Prev Exit / incoming declared variables are exposed as constants inside the node.
             return StorySelectionResolver.IncomingVariables(project, logic).Exists(d => d.Id == src);
-        }
-
-        // ── Incoming-variable contract ─────────────────────────────────────────
-
-        /// <summary>
-        /// For every node that declares an AcceptVariables contract (<see cref="StoryLogicNode.ExpectedVariables"/>),
-        /// checks that its wired-in upstream Single-path node provides <b>exactly</b> that set — same variable names and,
-        /// for each name, the same set of possible values.
-        /// </summary>
-        private static void CheckIncomingVariableContract(StoryProject project, List<StoryProblem> problems)
-        {
-            foreach (StoryLogicNode logic in project.LogicNodes.Values)
-            {
-                if (!logic.AcceptVariables || logic.ExpectedVariables.Count == 0) continue;
-
-                string nodeName = string.IsNullOrWhiteSpace(logic.Name) ? UiLang.T(Localization.Common.Placeholders.unnamed) : logic.Name;
-                StoryLogicNode? upstream = StorySelectionResolver.SourceNode(project, logic);
-                if (upstream is null)
-                {
-                    problems.Add(new StoryProblem
-                    {
-                        Severity    = StoryProblemSeverity.Error,
-                        Message     = UiLang.T(Localization.Validation.expectsIncomingNotWired, new Dictionary<string, object> { ["node"] = nodeName }),
-                        ContainerId = logic.ParentContainer,
-                        LogicNodeId = logic.Id
-                    });
-                    continue;
-                }
-
-                HashSet<string> expected = logic.ExpectedVariables.Select(v => v.Name).ToHashSet();
-                HashSet<string> provided = upstream.DeclaredVariables.Select(v => v.Name).ToHashSet();
-                List<string>    missing  = expected.Except(provided).OrderBy(n => n).ToList();
-                List<string>    extra    = provided.Except(expected).OrderBy(n => n).ToList();
-
-                if (missing.Count > 0 || extra.Count > 0)
-                {
-                    string detail = string.Join("; ",
-                        new[]
-                        {
-                            missing.Count > 0 ? UiLang.T(Localization.Validation.contractMissing, new Dictionary<string, object> { ["names"] = string.Join(", ", missing) }) : null,
-                            extra.Count   > 0 ? UiLang.T(Localization.Validation.contractUnexpected, new Dictionary<string, object> { ["names"] = string.Join(", ", extra) }) : null
-                        }.Where(s => s is not null));
-                    problems.Add(new StoryProblem
-                    {
-                        Severity    = StoryProblemSeverity.Error,
-                        Message     = UiLang.T(Localization.Validation.contractMismatch, new Dictionary<string, object> { ["node"] = nodeName, ["detail"] = detail }),
-                        ContainerId = logic.ParentContainer,
-                        LogicNodeId = logic.Id
-                    });
-                    continue;
-                }
-
-                // Same names — every variable's set of possible values must match too.
-                foreach (StoryDeclaredVariable exp in logic.ExpectedVariables)
-                {
-                    StoryDeclaredVariable? prov = upstream.DeclaredVariables.Find(v => v.Name == exp.Name);
-                    if (prov is null) continue;
-                    if (!exp.PossibleValues.ToHashSet().SetEquals(prov.PossibleValues))
-                        problems.Add(new StoryProblem
-                        {
-                            Severity    = StoryProblemSeverity.Error,
-                            Message     = UiLang.T(Localization.Validation.contractValuesDiffer, new Dictionary<string, object> { ["node"] = nodeName, ["var"] = exp.Name }),
-                            ContainerId = logic.ParentContainer,
-                            LogicNodeId = logic.Id
-                        });
-                }
-            }
         }
 
         /// <summary>Reports SmartFormat render failures in each node's Gamebook text (e.g. a live value unavailable in the Gamebook).</summary>

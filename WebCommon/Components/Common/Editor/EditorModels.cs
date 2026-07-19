@@ -24,8 +24,8 @@ namespace DeusaldStoryWeb
         Logic
     }
 
-    // PortType moved to DeusaldStoryCommon (Common/Data/Story/PortType.cs) so persisted data — a Function
-    // blueprint's signature ports — can carry a port type. Referenced here via `using DeusaldStoryCommon`.
+    // PortType lives in DeusaldStoryCommon (Common/Data/Story/PortType.cs) so persisted data can carry a port
+    // type. Referenced here via `using DeusaldStoryCommon`.
 
     /// <summary>
     /// One step in the editor's breadcrumb — the path the user has drilled into (containers, and finally a logic
@@ -70,11 +70,7 @@ namespace DeusaldStoryWeb
         LogicPortalOut,          // inside a logic node: a value portal's output node (the value re-emerges here) (orange)
         ConditionFlow,           // inside a logic node: on the LFlow chain, injects an optional block of flow gated by a constant condition (pink)
         EndConditionFlow,        // inside a logic node: the paired terminator that closes a Condition node's injected block (pink)
-        Comment,                 // in a container's graph or a logic node's inner graph: a free-text author note, no ports (dim)
-        BlueprintInstance,       // in a container's graph: an instance referencing a Container/Logic blueprint (purple)
-        FunctionInstance,        // inside a logic node: on the LFlow chain, an instance referencing a Function blueprint (purple)
-        FunctionEntry,           // inside a function definition's inner graph: the Entry node (LFlow-out + signature inputs) (green)
-        FunctionExit             // inside a function definition's inner graph: the Exit node (signature outputs + LFlow-in) (red)
+        Comment                  // in a container's graph or a logic node's inner graph: a free-text author note, no ports (dim)
     }
 
     /// <summary>A point on the graph canvas in world (un-panned, un-scaled) coordinates.</summary>
@@ -275,36 +271,6 @@ namespace DeusaldStoryWeb
                 nodes.Add(node);
             }
 
-            foreach (Guid instanceId in container.Instances)
-            {
-                if (!project.BlueprintInstances.TryGetValue(instanceId, out StoryBlueprintInstanceNode? inst)) continue;
-
-                bool found = project.Blueprints.TryGetValue(inst.BlueprintId, out StoryBlueprint? bp);
-                EdNode node = new()
-                {
-                    Id        = inst.Id,
-                    Kind      = StoryNodeKind.BlueprintInstance,
-                    Title     = found ? bp!.Name : UiLang.T(Localization.Editor.Nodes.Titles.missingBlueprint),
-                    Subtitle  = found ? UiLang.T(Localization.Editor.Nodes.Titles.blueprintSubtitle) : UiLang.T(Localization.Editor.Nodes.Titles.deletedBlueprint),
-                    X         = inst.X,
-                    Y         = inst.Y,
-                    Deletable = true
-                };
-
-                // Mirror the port types from the definition's current boundary, matched by DefinitionPointId.
-                Dictionary<Guid, PortType> types = new();
-                if (found)
-                    foreach (BlueprintBoundaryPort b in StoryBlueprintBoundary.Enumerate(project, bp!))
-                        types[b.DefinitionPointId] = b.Type;
-
-                foreach (StoryBlueprintPortMap p in inst.EntryPorts)
-                    node.Inputs.Add(new EdPort { Id = p.Id, Name = p.Name, Type = types.TryGetValue(p.DefinitionPointId, out PortType te) ? te : PortType.Flow });
-                foreach (StoryBlueprintPortMap p in inst.ExitPorts)
-                    node.Outputs.Add(new EdPort { Id = p.Id, Name = p.Name, Type = types.TryGetValue(p.DefinitionPointId, out PortType tx) ? tx : PortType.Flow });
-
-                nodes.Add(node);
-            }
-
             foreach (StoryCommentNode comment in container.Comments)
                 nodes.Add(BuildCommentNode(comment));
 
@@ -350,40 +316,28 @@ namespace DeusaldStoryWeb
         {
             List<EdNode> nodes = new();
 
-            // When this logic node is a Function blueprint's definition body, its Entry/Exit expose the typed signature
-            // (LFlow + inputs / outputs + LFlow) instead of the story-screen Title/Choices ports.
-            StoryBlueprint? funcBp = null;
-            foreach (StoryBlueprint b in project.Blueprints.Values)
-                if (b.Kind == StoryBlueprintKind.Function && b.DefinitionNodeId == logic.Id) { funcBp = b; break; }
-
             // ── Entry node (green) — flow starts here; Title/Subtitle/Icon feed its content. ──
             (double ex, double ey) = PointPos(logic.EntryPoint, _LOGIC_ENTRY_X, _LOGIC_ENTRY_Y);
             EdNode entry = new()
             {
                 Id        = logic.EntryPoint.Id,
-                Kind      = funcBp is null ? StoryNodeKind.LogicEntry : StoryNodeKind.FunctionEntry,
-                Title     = funcBp is null ? UiLang.T(Localization.Editor.Nodes.Titles.entry) : UiLang.T(Localization.Editor.Nodes.Titles.functionIn),
+                Kind      = StoryNodeKind.LogicEntry,
+                Title     = UiLang.T(Localization.Editor.Nodes.Titles.entry),
                 X         = ex,
                 Y         = ey,
                 Deletable = false,
-                Editable  = funcBp is not null
+                Editable  = false
             };
-            if (funcBp is null)
-            {
-                entry.Inputs.Add(new EdPort { Id = logic.TitleIn.Id,    Name = UiLang.T(Localization.Editor.Nodes.Ports.title),    Type = PortType.Text });
-                entry.Inputs.Add(new EdPort { Id = logic.SubtitleIn.Id, Name = UiLang.T(Localization.Editor.Nodes.Ports.subtitle), Type = PortType.Text });
-                entry.Inputs.Add(new EdPort { Id = logic.IconIn.Id,     Name = UiLang.T(Localization.Editor.Nodes.Ports.icon),     Type = PortType.Icon });
-            }
+            entry.Inputs.Add(new EdPort { Id = logic.TitleIn.Id,    Name = UiLang.T(Localization.Editor.Nodes.Ports.title),    Type = PortType.Text });
+            entry.Inputs.Add(new EdPort { Id = logic.SubtitleIn.Id, Name = UiLang.T(Localization.Editor.Nodes.Ports.subtitle), Type = PortType.Text });
+            entry.Inputs.Add(new EdPort { Id = logic.IconIn.Id,     Name = UiLang.T(Localization.Editor.Nodes.Ports.icon),     Type = PortType.Icon });
             entry.Outputs.Add(new EdPort { Id = logic.EntryPoint.Id, Name = UiLang.T(Localization.Editor.Nodes.Ports.flow), Type = PortType.LFlow });
-            if (funcBp is not null)
-                foreach (StorySignaturePort input in funcBp.Inputs)
-                    entry.Outputs.Add(new EdPort { Id = input.Id, Name = input.Name, Type = input.Type });
             nodes.Add(entry);
 
             // ── Exit node (red) — the single terminator carrying the node's choices. One LFlow input, one Text input
             //    per choice, one Variables input (wire it to auto-resolve the choice in the App), and — in auto mode —
             //    a single Auto-text input overriding the default "Click here to continue…" label. ──
-            bool autoMode = funcBp is null && logic.ContentConnections.Exists(c => c.ToPoint == logic.ExitVariablesIn.Id);
+            bool autoMode = logic.ContentConnections.Exists(c => c.ToPoint == logic.ExitVariablesIn.Id);
             // The single Auto-text port only applies to Automatic Choice — Choice Visibility and Hub Paths label each
             // choice from its own per-choice Text input instead.
             bool autoChoiceText = autoMode && logic.ExitMode != StoryLogicExitMode.HubPaths && logic.ExitAutoMode == StoryExitAutoMode.AutomaticChoice;
@@ -391,28 +345,22 @@ namespace DeusaldStoryWeb
             EdNode exit = new()
             {
                 Id        = logic.ExitLFlowIn.Id,
-                Kind      = funcBp is null ? StoryNodeKind.LogicExit : StoryNodeKind.FunctionExit,
-                Title     = funcBp is null ? UiLang.T(Localization.Editor.Nodes.Titles.exit) : UiLang.T(Localization.Editor.Nodes.Titles.functionOut),
+                Kind      = StoryNodeKind.LogicExit,
+                Title     = UiLang.T(Localization.Editor.Nodes.Titles.exit),
                 Subtitle  = autoMode ? UiLang.T(Localization.Editor.Nodes.Titles.exitAutoSubtitle) : "",
                 X         = xx,
                 Y         = xy,
                 Deletable = false,
-                Editable  = funcBp is null
+                Editable  = true
             };
-            if (funcBp is not null)
-                foreach (StorySignaturePort output in funcBp.Outputs)
-                    exit.Inputs.Add(new EdPort { Id = output.Id, Name = output.Name, Type = output.Type });
-            exit.Inputs.Add(new EdPort { Id = logic.ExitLFlowIn.Id, Name = UiLang.T(Localization.Editor.Nodes.Ports.flow), Type = PortType.LFlow });
-            if (funcBp is null)
+            exit.Inputs.Add(new EdPort { Id = logic.ExitLFlowIn.Id,     Name = UiLang.T(Localization.Editor.Nodes.Ports.flow),      Type = PortType.LFlow });
+            exit.Inputs.Add(new EdPort { Id = logic.ExitVariablesIn.Id, Name = UiLang.T(Localization.Editor.Nodes.Ports.variables), Type = PortType.Variable });
+            if (autoChoiceText)
+                exit.Inputs.Add(new EdPort { Id = logic.ExitAutoTextIn.Id, Name = UiLang.T(Localization.Editor.Nodes.Ports.text), Type = PortType.Text });
+            foreach (StoryChoice choice in logic.Choices)
             {
-                exit.Inputs.Add(new EdPort { Id = logic.ExitVariablesIn.Id, Name = UiLang.T(Localization.Editor.Nodes.Ports.variables), Type = PortType.Variable });
-                if (autoChoiceText)
-                    exit.Inputs.Add(new EdPort { Id = logic.ExitAutoTextIn.Id, Name = UiLang.T(Localization.Editor.Nodes.Ports.text), Type = PortType.Text });
-                foreach (StoryChoice choice in logic.Choices)
-                {
-                    string label = string.IsNullOrWhiteSpace(choice.Name) ? UiLang.T(Localization.Editor.Nodes.Ports.choice) : choice.Name;
-                    exit.Inputs.Add(new EdPort { Id = choice.TextIn.Id, Name = UiLang.T(Localization.Editor.Nodes.Ports.choiceText, new Dictionary<string, object> { ["label"] = label }), Type = PortType.Text });
-                }
+                string label = string.IsNullOrWhiteSpace(choice.Name) ? UiLang.T(Localization.Editor.Nodes.Ports.choice) : choice.Name;
+                exit.Inputs.Add(new EdPort { Id = choice.TextIn.Id, Name = UiLang.T(Localization.Editor.Nodes.Ports.choiceText, new Dictionary<string, object> { ["label"] = label }), Type = PortType.Text });
             }
             nodes.Add(exit);
 
@@ -769,40 +717,12 @@ namespace DeusaldStoryWeb
                 nodes.Add(end);
             }
 
-            // ── Function instances (purple) — an inlined computation on the LFlow chain: LFlow + typed inputs in, typed outputs + LFlow out. ──
-            foreach (StoryFunctionInstanceNode fi in logic.FunctionInstanceNodes)
-            {
-                bool found = project.Blueprints.TryGetValue(fi.BlueprintId, out StoryBlueprint? fbp) && fbp!.Kind == StoryBlueprintKind.Function;
-                EdNode node = new()
-                {
-                    Id        = fi.Id,
-                    Kind      = StoryNodeKind.FunctionInstance,
-                    Title     = found ? fbp!.Name : UiLang.T(Localization.Editor.Nodes.Titles.missingFunction),
-                    Subtitle  = found ? UiLang.T(Localization.Editor.Nodes.Titles.functionSubtitle) : UiLang.T(Localization.Editor.Nodes.Titles.deletedFunction),
-                    X         = fi.X,
-                    Y         = fi.Y,
-                    Deletable = true,
-                    Editable  = false
-                };
-                node.Inputs.Add(new EdPort { Id = fi.FlowIn.Id, Name = UiLang.T(Localization.Editor.Nodes.Ports.flow), Type = PortType.LFlow });
-                foreach (StoryBlueprintPortMap pm in fi.InputPorts)
-                    node.Inputs.Add(new EdPort { Id = pm.Id, Name = pm.Name, Type = found ? SignatureType(fbp!.Inputs, pm.DefinitionPointId) : PortType.Data });
-                node.Outputs.Add(new EdPort { Id = fi.FlowOut.Id, Name = UiLang.T(Localization.Editor.Nodes.Ports.flow), Type = PortType.LFlow });
-                foreach (StoryBlueprintPortMap pm in fi.OutputPorts)
-                    node.Outputs.Add(new EdPort { Id = pm.Id, Name = pm.Name, Type = found ? SignatureType(fbp!.Outputs, pm.DefinitionPointId) : PortType.Data });
-                nodes.Add(node);
-            }
-
             // ── Comment notes (dim, portless) — free-text author notes; ignored during playback. ──
             foreach (StoryCommentNode comment in logic.CommentNodes)
                 nodes.Add(BuildCommentNode(comment));
 
             return nodes;
         }
-
-        /// <summary>The port type of a function signature port by its definition id, or Data when it no longer exists.</summary>
-        private static PortType SignatureType(List<StorySignaturePort> signature, Guid definitionPointId) =>
-            signature.Find(p => p.Id == definitionPointId)?.Type ?? PortType.Data;
 
         /// <summary>A one-line card subtitle summarising a SmartFormat node's output transforms (empty when none are set).</summary>
         private static string SmartFormatSummary(StorySmartFormatNode sf)
@@ -855,19 +775,6 @@ namespace DeusaldStoryWeb
             if (logic.RandomizedInstructionNodes.Exists(n => n.OutVariable.Id == outputId)) return PortType.Variable;
             if (StorySelectionResolver.IncomingVariables(project, logic).Exists(d => d.Id == outputId)) return PortType.CVariable;
 
-            // A Function instance's typed output port carries the type of its signature output.
-            foreach (StoryFunctionInstanceNode fi in logic.FunctionInstanceNodes)
-                if (fi.OutputPorts.Find(p => p.Id == outputId) is StoryBlueprintPortMap op
-                 && project.Blueprints.TryGetValue(fi.BlueprintId, out StoryBlueprint? fbp)
-                 && fbp!.Kind == StoryBlueprintKind.Function)
-                    return SignatureType(fbp.Outputs, op.DefinitionPointId);
-
-            // Inside a Function definition graph, the signature inputs are outputs on the "Function in" node.
-            foreach (StoryBlueprint b in project.Blueprints.Values)
-                if (b.Kind == StoryBlueprintKind.Function && b.DefinitionNodeId == logic.Id
-                 && b.Inputs.Find(s => s.Id == outputId) is StorySignaturePort sip)
-                    return sip.Type;
-
             return null;
         }
 
@@ -919,27 +826,8 @@ namespace DeusaldStoryWeb
             if (logic.RandomizedInstructionNodes.Find(n => n.OutVariable.Id == fromPoint) is StoryRandomizedInstructionNode ri)
                 return string.IsNullOrWhiteSpace(ri.ResultToken) ? UiLang.T(Localization.Editor.Nodes.Labels.randomizedInstruction) : ri.ResultToken;
 
-            // A Function instance's typed output port is named by its signature output (mirrors PortTypeOfOutput).
-            foreach (StoryFunctionInstanceNode fi in logic.FunctionInstanceNodes)
-                if (fi.OutputPorts.Find(p => p.Id == fromPoint) is StoryBlueprintPortMap op
-                 && project.Blueprints.TryGetValue(fi.BlueprintId, out StoryBlueprint? fbp)
-                 && fbp!.Kind == StoryBlueprintKind.Function)
-                    return SignatureName(fbp.Outputs, op.DefinitionPointId);
-
-            // Inside a Function definition graph, the signature inputs are outputs on the "Function in" node.
-            foreach (StoryBlueprint b in project.Blueprints.Values)
-                if (b.Kind == StoryBlueprintKind.Function && b.DefinitionNodeId == logic.Id
-                 && b.Inputs.Find(s => s.Id == fromPoint) is StorySignaturePort sip)
-                    return string.IsNullOrWhiteSpace(sip.Name) ? UiLang.T(Localization.Editor.Page.variableNameFallback) : sip.Name;
-
             return StorySelectionResolver.IncomingVariables(project, logic).Find(d => d.Id == fromPoint)?.Name ?? "";
         }
-
-        /// <summary>The display name of the signature port <paramref name="definitionPointId"/>, falling back when unnamed.</summary>
-        private static string SignatureName(List<StorySignaturePort> signature, Guid definitionPointId) =>
-            signature.Find(p => p.Id == definitionPointId) is { Name: { Length: > 0 } n }
-                ? n
-                : UiLang.T(Localization.Editor.Page.variableNameFallback);
 
         /// <summary>
         /// The outputs wired into the multi-wire variables input <paramref name="variablesIn"/>, as (output id, display
@@ -1046,10 +934,6 @@ namespace DeusaldStoryWeb
             StoryNodeKind.ConditionFlow           => UiLang.T(Localization.Editor.Nodes.Labels.condition),
             StoryNodeKind.EndConditionFlow        => UiLang.T(Localization.Editor.Nodes.Labels.endCondition),
             StoryNodeKind.Comment                 => UiLang.T(Localization.Editor.Nodes.Labels.comment),
-            StoryNodeKind.BlueprintInstance       => UiLang.T(Localization.Editor.Nodes.Labels.blueprint),
-            StoryNodeKind.FunctionInstance        => UiLang.T(Localization.Editor.Nodes.Labels.function),
-            StoryNodeKind.FunctionEntry           => UiLang.T(Localization.Editor.Nodes.Labels.entry),
-            StoryNodeKind.FunctionExit            => UiLang.T(Localization.Editor.Nodes.Labels.exit),
             _                       => ""
         };
 
@@ -1098,10 +982,6 @@ namespace DeusaldStoryWeb
             StoryNodeKind.ConditionFlow           => "bi-signpost-split",
             StoryNodeKind.EndConditionFlow        => "bi-sign-merge-left",
             StoryNodeKind.Comment                 => "bi-chat-left-text",
-            StoryNodeKind.BlueprintInstance       => "bi-diagram-3",
-            StoryNodeKind.FunctionInstance        => "bi-cpu",
-            StoryNodeKind.FunctionEntry           => "bi-box-arrow-in-right",
-            StoryNodeKind.FunctionExit            => "bi-box-arrow-right",
             _                       => "bi-circle"
         };
 
@@ -1166,10 +1046,6 @@ namespace DeusaldStoryWeb
             StoryNodeKind.ConditionFlow           => "var(--pink)",
             StoryNodeKind.EndConditionFlow        => "var(--pink)",
             StoryNodeKind.Comment                 => "var(--text-dim)",
-            StoryNodeKind.BlueprintInstance       => "var(--purple)",
-            StoryNodeKind.FunctionInstance        => "var(--purple)",
-            StoryNodeKind.FunctionEntry           => "var(--success)",
-            StoryNodeKind.FunctionExit            => "var(--danger)",
             _                       => "var(--text-dim)"
         };
 
