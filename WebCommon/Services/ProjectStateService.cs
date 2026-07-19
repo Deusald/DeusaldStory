@@ -183,7 +183,8 @@ public partial class ProjectStateService(
         IEnumerable<StoryConnectionPoint> entryPoints,
         IEnumerable<StoryConnectionPoint> exitPoints,
         double                            x,
-        double                            y)
+        double                            y,
+        IEnumerable<Guid>?                usedVariables = null)
     {
         using var _ = Edit(); // node + parent container change together
         StoryContainerNode node = new()
@@ -196,6 +197,7 @@ public partial class ProjectStateService(
         };
         node.EntryPoints.AddRange(entryPoints);
         node.ExitPoints.AddRange(exitPoints);
+        if (usedVariables is not null) node.UsedVariables.AddRange(usedVariables);
 
         CurrentProject!.ContainerNodes.Add(node.Id, node);
 
@@ -469,80 +471,42 @@ public partial class ProjectStateService(
         MarkKeyDirty(logicId);
     }
 
-    /// <summary>Adds an External Variable node (referencing <paramref name="variableId"/>) to a logic node's inner graph.</summary>
-    public StoryExternalVariableNode? AddExternalVariableNode(Guid logicId, Guid variableId, double x, double y)
-    {
-        if (!CurrentProject!.LogicNodes.TryGetValue(logicId, out StoryLogicNode? logic)) return null;
-
-        StoryExternalVariableNode node = new() { SelectedVariableId = variableId, X = x, Y = y };
-        logic.ExternalVariableNodes.Add(node);
-        MarkKeyDirty(logicId);
-        return node;
-    }
-
-    /// <summary>Changes the story variable an External Variable node points at.</summary>
-    public void UpdateExternalVariableNode(Guid logicId, Guid nodeId, Guid variableId)
-    {
-        if (!CurrentProject!.LogicNodes.TryGetValue(logicId, out StoryLogicNode? logic)) return;
-        StoryExternalVariableNode? node = logic.ExternalVariableNodes.Find(n => n.Id == nodeId);
-        if (node is null) return;
-        node.SelectedVariableId = variableId;
-        MarkKeyDirty(logicId);
-    }
-
-    /// <summary>Deletes an External Variable node and any inner wire that touched its output.</summary>
-    public void DeleteExternalVariableNode(Guid logicId, Guid nodeId)
-    {
-        if (!CurrentProject!.LogicNodes.TryGetValue(logicId, out StoryLogicNode? logic)) return;
-        StoryExternalVariableNode? node = logic.ExternalVariableNodes.Find(n => n.Id == nodeId);
-        if (node is null) return;
-
-        logic.ExternalVariableNodes.Remove(node);
-        logic.ContentConnections.RemoveAll(c => c.FromPoint == node.OutPoint.Id || c.ToPoint == node.OutPoint.Id);
-        MarkKeyDirty(logicId);
-    }
-
-    /// <summary>Adds a Get Variable node (reading a variable picked by id, or one named by its wired Name port) to a logic node's inner graph.</summary>
+    /// <summary>Adds a Get Variable node (reading the global variable <paramref name="selectedVariableId"/>) to a logic node's inner graph.</summary>
     public StoryGetVariableNode? AddGetVariableNode(
-        Guid logicId, StorageVariableRefMode refMode, StorageVariableType refType, Guid registeredVariableId,
-        string nameOverride, string slotNameOverride, string previewValue, double x, double y)
+        Guid logicId, Guid selectedVariableId, string nameOverride, string slotNameOverride, string previewValue, double x, double y)
     {
         if (!CurrentProject!.LogicNodes.TryGetValue(logicId, out StoryLogicNode? logic)) return null;
 
         StoryGetVariableNode node = new()
         {
-            RefMode              = refMode,
-            RefType              = refType,
-            RegisteredVariableId = registeredVariableId,
-            NameOverride         = nameOverride,
-            SlotNameOverride     = slotNameOverride,
-            PreviewValue         = previewValue,
-            X                    = x,
-            Y                    = y
+            SelectedVariableId = selectedVariableId,
+            NameOverride       = nameOverride,
+            SlotNameOverride   = slotNameOverride,
+            PreviewValue       = previewValue,
+            X                  = x,
+            Y                  = y
         };
         logic.GetVariableNodes.Add(node);
         MarkKeyDirty(logicId);
         return node;
     }
 
-    /// <summary>Updates which variable a Get Variable node reads (by id or by type + wired name), its name overrides and preview value.</summary>
+    /// <summary>Updates which global variable a Get Variable node reads, its name overrides and preview value.</summary>
     public void UpdateGetVariableNode(
-        Guid logicId, Guid nodeId, StorageVariableRefMode refMode, StorageVariableType refType,
-        Guid registeredVariableId, string nameOverride, string slotNameOverride, string previewValue)
+        Guid logicId, Guid nodeId, Guid selectedVariableId, string nameOverride, string slotNameOverride, string previewValue)
     {
         if (!CurrentProject!.LogicNodes.TryGetValue(logicId, out StoryLogicNode? logic)) return;
         StoryGetVariableNode? node = logic.GetVariableNodes.Find(n => n.Id == nodeId);
         if (node is null) return;
-        node.RefMode              = refMode;
-        node.RefType              = refType;
-        node.RegisteredVariableId = registeredVariableId;
-        node.NameOverride         = nameOverride;
-        node.SlotNameOverride     = slotNameOverride;
-        node.PreviewValue         = previewValue;
+        node.SelectedVariableId = selectedVariableId;
+        node.NameOverride       = nameOverride;
+        node.SlotNameOverride   = slotNameOverride;
+        node.PreviewValue       = previewValue;
 
-        // The Name port only exists in ByType mode — drop its wire when the node goes back to a specific variable.
-        if (refMode != StorageVariableRefMode.ByType)
-            logic.ContentConnections.RemoveAll(c => c.ToPoint == node.NameIn.Id);
+        // The Slot port only exists for an Internal variable — drop its wire when the target has no slot.
+        StoryVariable? v = StoryLogicFlow.Variable(CurrentProject!, selectedVariableId);
+        if (v is null || v.Scope != StoryVariableScope.Internal)
+            logic.ContentConnections.RemoveAll(c => c.FromPoint == node.SlotOutPoint.Id || c.ToPoint == node.SlotOutPoint.Id);
         MarkKeyDirty(logicId);
     }
 
@@ -556,8 +520,7 @@ public partial class ProjectStateService(
         logic.GetVariableNodes.Remove(node);
         logic.ContentConnections.RemoveAll(c =>
             c.FromPoint == node.OutPoint.Id || c.ToPoint == node.OutPoint.Id ||
-            c.FromPoint == node.SlotOutPoint.Id || c.ToPoint == node.SlotOutPoint.Id ||
-            c.ToPoint == node.NameIn.Id);
+            c.FromPoint == node.SlotOutPoint.Id || c.ToPoint == node.SlotOutPoint.Id);
         MarkKeyDirty(logicId);
     }
 
@@ -986,76 +949,7 @@ public partial class ProjectStateService(
         return null;
     }
 
-    /// <summary>Adds a Register-variable node (claims a storage slot for a new variable) to a logic node's flow spine.</summary>
-    public StoryRegisterVariableNode? AddRegisterVariableNode(Guid logicId, double x, double y)
-    {
-        if (!CurrentProject!.LogicNodes.TryGetValue(logicId, out StoryLogicNode? logic)) return null;
-
-        StoryRegisterVariableNode node = new() { X = x, Y = y };
-        logic.RegisterVariableNodes.Add(node);
-        MarkKeyDirty(logicId);
-        return node;
-    }
-
-    /// <summary>Updates a Register-variable node's definition (identity, slot and value parameters).</summary>
-    public void UpdateRegisterVariableNode(
-        Guid logicId, Guid nodeId, string name, string description, StorageVariableType type, int slotIndex,
-        NumberStorageMode mode, NumberValueCount valueCount, bool secret, NumberAssignment assignment,
-        int specificValue, RandomMode randomMode, Guid conditionKeyId, StorageInstructionPlacement placement, StringValueMode stringMode,
-        string stringValue, StringInputKind stringInputKind, string previewValue,
-        int minLength, int maxLength, Guid lengthErrorKeyId, StoryConditionExpr? validationRule, Guid validationErrorKeyId)
-    {
-        if (!CurrentProject!.LogicNodes.TryGetValue(logicId, out StoryLogicNode? logic)) return;
-        StoryRegisterVariableNode? node = logic.RegisterVariableNodes.Find(n => n.Id == nodeId);
-        if (node is null) return;
-
-        node.Name            = name;
-        node.Description     = description;
-        node.Type            = type;
-        node.SlotIndex       = slotIndex;
-        node.Mode            = mode;
-        node.ValueCount      = valueCount;
-        node.Secret          = secret;
-        node.Assignment      = assignment;
-        node.SpecificValue   = specificValue;
-        node.RandomMode      = randomMode;
-        node.ConditionKeyId  = conditionKeyId;
-        node.Placement       = placement;
-        node.StringMode      = stringMode;
-        node.StringValue     = stringValue;
-        node.StringInputKind = stringInputKind;
-        node.PreviewValue    = previewValue;
-
-        bool playerInput      = type == StorageVariableType.String && stringMode == StringValueMode.PlayerInput;
-        node.MinLength            = minLength;
-        node.MaxLength            = maxLength;
-        node.LengthErrorKeyId     = playerInput ? lengthErrorKeyId : Guid.Empty;
-        node.ValidationRule       = playerInput ? validationRule : null;
-        node.ValidationErrorKeyId = playerInput ? validationErrorKeyId : Guid.Empty;
-
-        // The Instruction / Placeholder / Validation ports only exist for a player-input String — drop any stale wire when they no longer apply.
-        if (!playerInput)
-            logic.ContentConnections.RemoveAll(c => c.ToPoint == node.InstructionIn.Id || c.ToPoint == node.PlaceholderIn.Id || c.ToPoint == node.ValidationIn.Id);
-        MarkKeyDirty(logicId);
-    }
-
-    /// <summary>Deletes a Register-variable node and any inner wire that touched its flow ports.</summary>
-    public void DeleteRegisterVariableNode(Guid logicId, Guid nodeId)
-    {
-        if (!CurrentProject!.LogicNodes.TryGetValue(logicId, out StoryLogicNode? logic)) return;
-        StoryRegisterVariableNode? node = logic.RegisterVariableNodes.Find(n => n.Id == nodeId);
-        if (node is null) return;
-
-        logic.RegisterVariableNodes.Remove(node);
-        logic.ContentConnections.RemoveAll(c =>
-            c.FromPoint == node.FlowOut.Id || c.ToPoint == node.FlowOut.Id ||
-            c.FromPoint == node.FlowIn.Id  || c.ToPoint == node.FlowIn.Id  ||
-            c.ToPoint   == node.InstructionIn.Id || c.ToPoint == node.PlaceholderIn.Id ||
-            c.ToPoint   == node.ValidationIn.Id);
-        MarkKeyDirty(logicId);
-    }
-
-    /// <summary>Adds a Set-variable node (assigns a value to an already-registered variable) to a logic node's flow spine.</summary>
+    /// <summary>Adds a Set-variable node (assigns a value to a global variable) to a logic node's flow spine.</summary>
     public StorySetVariableNode? AddSetVariableNode(Guid logicId, double x, double y)
     {
         if (!CurrentProject!.LogicNodes.TryGetValue(logicId, out StoryLogicNode? logic)) return null;
@@ -1066,9 +960,14 @@ public partial class ProjectStateService(
         return node;
     }
 
-    /// <summary>Updates which variable a Set-variable node writes (by id or by type + wired name) and its value assignment.</summary>
+    /// <summary>
+    /// Updates a Set-variable node: the target global variable and its value assignment. External variables use
+    /// <paramref name="externalMode"/> / <paramref name="externalValue"/> / <paramref name="valueMap"/>; Internal
+    /// Number/Dial/Text use the assignment / string fields. Stale wires on ports that no longer apply to the target are pruned.
+    /// </summary>
     public void UpdateSetVariableNode(
-        Guid logicId, Guid nodeId, StorageVariableRefMode refMode, StorageVariableType refType, Guid registeredVariableId,
+        Guid logicId, Guid nodeId, Guid selectedVariableId,
+        StorySetExternalVariableMode externalMode, string externalValue, List<StorySetExternalVariableRemap> valueMap,
         NumberAssignment assignment, bool secret, int specificValue, RandomMode randomMode,
         StorageInstructionPlacement placement, StringValueMode stringMode, string stringValue, StringInputKind stringInputKind,
         int minLength, int maxLength, Guid lengthErrorKeyId, StoryConditionExpr? validationRule, Guid validationErrorKeyId,
@@ -1078,48 +977,47 @@ public partial class ProjectStateService(
         StorySetVariableNode? node = logic.SetVariableNodes.Find(n => n.Id == nodeId);
         if (node is null) return;
 
-        node.RefMode              = refMode;
-        node.RefType              = refType;
-        node.RegisteredVariableId = registeredVariableId;
-        node.Assignment           = assignment;
-        node.Secret               = secret;
-        node.SpecificValue        = specificValue;
-        node.RandomMode           = randomMode;
-        node.Placement            = placement;
-        node.StringMode           = stringMode;
-        node.StringValue          = stringValue;
-        node.StringInputKind      = stringInputKind;
-        node.WireValue            = wireValue;
+        node.SelectedVariableId = selectedVariableId;
+        node.ExternalMode       = externalMode;
+        node.ExternalValue      = externalValue;
+        node.ValueMap           = valueMap;
+        node.Assignment         = assignment;
+        node.Secret             = secret;
+        node.SpecificValue      = specificValue;
+        node.RandomMode         = randomMode;
+        node.Placement          = placement;
+        node.StringMode         = stringMode;
+        node.StringValue        = stringValue;
+        node.StringInputKind    = stringInputKind;
+        node.WireValue          = wireValue;
+        node.MinLength          = minLength;
+        node.MaxLength          = maxLength;
 
-        // The Name port only exists in ByType mode — drop its wire when the node goes back to a specific variable.
-        if (refMode != StorageVariableRefMode.ByType)
-            logic.ContentConnections.RemoveAll(c => c.ToPoint == node.NameIn.Id);
+        StoryVariable? v         = StoryLogicFlow.Variable(CurrentProject!, selectedVariableId);
+        bool           external  = v is { Scope: StoryVariableScope.External };
+        bool           innerText = v is { Scope: StoryVariableScope.Internal, InternalSubtype: StoryInternalSubtype.Text };
+        bool           innerNum  = v is { Scope: StoryVariableScope.Internal }
+                                && v.InternalSubtype is StoryInternalSubtype.SmallNumber or StoryInternalSubtype.BigPublicNumber or StoryInternalSubtype.BigSecretNumber;
 
-        // The Instruction / Placeholder / Validation ports only exist for a player-input String target — drop any stale
-        // wire when they no longer apply. A ByType set knows its type up front; a specific one takes it from its target.
-        StorageVariableType? type = refMode == StorageVariableRefMode.ByType
-            ? refType
-            : EditorProjection.FindRegister(CurrentProject!, registeredVariableId)?.Type;
-        bool playerInput = type == StorageVariableType.String && stringMode == StringValueMode.PlayerInput;
-        if (!playerInput)
-            logic.ContentConnections.RemoveAll(c => c.ToPoint == node.InstructionIn.Id || c.ToPoint == node.PlaceholderIn.Id || c.ToPoint == node.ValidationIn.Id);
-
-        // The wired-value ports only exist when the specific value is wired for the current target type — drop stale wires.
-        bool wireSpecific = wireValue && (type == StorageVariableType.String
-            ? stringMode == StringValueMode.Specific
-            : type is StorageVariableType.Number or StorageVariableType.Dial && assignment == NumberAssignment.SetSpecific);
-        if (!wireSpecific)
-            logic.ContentConnections.RemoveAll(c => c.ToPoint == node.ValueIn.Id || c.ToPoint == node.ValueTextIn.Id);
-
-        node.MinLength            = minLength;
-        node.MaxLength            = maxLength;
+        bool playerInput = innerText && stringMode == StringValueMode.PlayerInput;
         node.LengthErrorKeyId     = playerInput ? lengthErrorKeyId : Guid.Empty;
         node.ValidationRule       = playerInput ? validationRule : null;
         node.ValidationErrorKeyId = playerInput ? validationErrorKeyId : Guid.Empty;
+        if (!playerInput)
+            logic.ContentConnections.RemoveAll(c => c.ToPoint == node.InstructionIn.Id || c.ToPoint == node.PlaceholderIn.Id || c.ToPoint == node.ValidationIn.Id);
+
+        // ValueIn carries the external map/remap source OR an internal wired-specific App value; keep its wire only while one applies.
+        bool mapped       = external && externalMode is StorySetExternalVariableMode.MapFromVariable or StorySetExternalVariableMode.RemapFromVariable;
+        bool wireSpecific = wireValue && ((innerText && stringMode == StringValueMode.Specific) || (innerNum && assignment == NumberAssignment.SetSpecific));
+        if (!mapped && !wireSpecific)
+            logic.ContentConnections.RemoveAll(c => c.ToPoint == node.ValueIn.Id);
+        if (!wireSpecific)
+            logic.ContentConnections.RemoveAll(c => c.ToPoint == node.ValueTextIn.Id);
+
         MarkKeyDirty(logicId);
     }
 
-    /// <summary>Deletes a Set-variable node and any inner wire that touched its flow ports.</summary>
+    /// <summary>Deletes a Set-variable node and any inner wire that touched its ports.</summary>
     public void DeleteSetVariableNode(Guid logicId, Guid nodeId)
     {
         if (!CurrentProject!.LogicNodes.TryGetValue(logicId, out StoryLogicNode? logic)) return;
@@ -1131,95 +1029,8 @@ public partial class ProjectStateService(
             c.FromPoint == node.FlowOut.Id || c.ToPoint == node.FlowOut.Id ||
             c.FromPoint == node.FlowIn.Id  || c.ToPoint == node.FlowIn.Id  ||
             c.ToPoint   == node.InstructionIn.Id || c.ToPoint == node.PlaceholderIn.Id ||
-            c.ToPoint   == node.ValidationIn.Id  || c.ToPoint == node.NameIn.Id ||
+            c.ToPoint   == node.ValidationIn.Id  ||
             c.ToPoint   == node.ValueIn.Id       || c.ToPoint == node.ValueTextIn.Id);
-        MarkKeyDirty(logicId);
-    }
-
-    /// <summary>Adds an Unregister-variable node (releases a registered variable, freeing its slot) to a logic node's flow spine.</summary>
-    public StoryUnregisterVariableNode? AddUnregisterVariableNode(Guid logicId, double x, double y)
-    {
-        if (!CurrentProject!.LogicNodes.TryGetValue(logicId, out StoryLogicNode? logic)) return null;
-
-        StoryUnregisterVariableNode node = new() { X = x, Y = y };
-        logic.UnregisterVariableNodes.Add(node);
-        MarkKeyDirty(logicId);
-        return node;
-    }
-
-    /// <summary>Updates which registered variable an Unregister-variable node releases, and where its instruction sits.</summary>
-    public void UpdateUnregisterVariableNode(Guid logicId, Guid nodeId, Guid registeredVariableId, StorageInstructionPlacement placement)
-    {
-        if (!CurrentProject!.LogicNodes.TryGetValue(logicId, out StoryLogicNode? logic)) return;
-        StoryUnregisterVariableNode? node = logic.UnregisterVariableNodes.Find(n => n.Id == nodeId);
-        if (node is null) return;
-
-        node.RegisteredVariableId = registeredVariableId;
-        node.Placement            = placement;
-        MarkKeyDirty(logicId);
-    }
-
-    /// <summary>Deletes an Unregister-variable node and any inner wire that touched its flow ports.</summary>
-    public void DeleteUnregisterVariableNode(Guid logicId, Guid nodeId)
-    {
-        if (!CurrentProject!.LogicNodes.TryGetValue(logicId, out StoryLogicNode? logic)) return;
-        StoryUnregisterVariableNode? node = logic.UnregisterVariableNodes.Find(n => n.Id == nodeId);
-        if (node is null) return;
-
-        logic.UnregisterVariableNodes.Remove(node);
-        logic.ContentConnections.RemoveAll(c =>
-            c.FromPoint == node.FlowOut.Id || c.ToPoint == node.FlowOut.Id ||
-            c.FromPoint == node.FlowIn.Id  || c.ToPoint == node.FlowIn.Id);
-        MarkKeyDirty(logicId);
-    }
-
-    /// <summary>Adds a Set-external-variable node (assigns a value to a story-wide external variable) to a logic node's flow spine.</summary>
-    public StorySetExternalVariableNode? AddSetExternalVariableNode(Guid logicId, double x, double y)
-    {
-        if (!CurrentProject!.LogicNodes.TryGetValue(logicId, out StoryLogicNode? logic)) return null;
-
-        StorySetExternalVariableNode node = new() { X = x, Y = y };
-        logic.SetExternalVariableNodes.Add(node);
-        MarkKeyDirty(logicId);
-        return node;
-    }
-
-    /// <summary>
-    /// Updates which external variable a Set-external-variable node assigns, the mode it uses, and — in
-    /// <see cref="StorySetExternalVariableMode.SpecificValue"/> mode — the fixed value it assigns, or in
-    /// <see cref="StorySetExternalVariableMode.RemapFromVariable"/> mode the incoming-value conversion table.
-    /// Leaving the map/remap modes (which both consume the value input) drops any wire feeding it.
-    /// </summary>
-    public void UpdateSetExternalVariableNode(
-        Guid logicId, Guid nodeId, Guid selectedVariableId, StorySetExternalVariableMode mode, string value,
-        List<StorySetExternalVariableRemap> valueMap)
-    {
-        if (!CurrentProject!.LogicNodes.TryGetValue(logicId, out StoryLogicNode? logic)) return;
-        StorySetExternalVariableNode? node = logic.SetExternalVariableNodes.Find(n => n.Id == nodeId);
-        if (node is null) return;
-
-        node.SelectedVariableId = selectedVariableId;
-        node.Mode               = mode;
-        node.Value              = value;
-        node.ValueMap           = valueMap;
-        bool consumesInput = mode is StorySetExternalVariableMode.MapFromVariable or StorySetExternalVariableMode.RemapFromVariable;
-        if (!consumesInput)
-            logic.ContentConnections.RemoveAll(c => c.FromPoint == node.ValueIn.Id || c.ToPoint == node.ValueIn.Id);
-        MarkKeyDirty(logicId);
-    }
-
-    /// <summary>Deletes a Set-external-variable node and any inner wire that touched its flow or value ports.</summary>
-    public void DeleteSetExternalVariableNode(Guid logicId, Guid nodeId)
-    {
-        if (!CurrentProject!.LogicNodes.TryGetValue(logicId, out StoryLogicNode? logic)) return;
-        StorySetExternalVariableNode? node = logic.SetExternalVariableNodes.Find(n => n.Id == nodeId);
-        if (node is null) return;
-
-        logic.SetExternalVariableNodes.Remove(node);
-        logic.ContentConnections.RemoveAll(c =>
-            c.FromPoint == node.FlowOut.Id || c.ToPoint == node.FlowOut.Id ||
-            c.FromPoint == node.FlowIn.Id  || c.ToPoint == node.FlowIn.Id  ||
-            c.FromPoint == node.ValueIn.Id || c.ToPoint == node.ValueIn.Id);
         MarkKeyDirty(logicId);
     }
 
@@ -1267,14 +1078,6 @@ public partial class ProjectStateService(
         ReconcileIfDefinition(logicId); // choices are a Logic blueprint's exit boundary
     }
 
-    /// <summary>Sets which registered storage variables are released when the story reaches The End (edited on the End node).</summary>
-    public void SetEndUnregister(IEnumerable<Guid> registeredVariableIds)
-    {
-        if (CurrentProject is null) return;
-        CurrentProject.Metadata.UnregisterAtEnd = registeredVariableIds.ToList();
-        MarkDirty();
-    }
-
     /// <summary>
     /// Wires an output (<paramref name="fromPoint"/>) to an input (<paramref name="toPoint"/>) inside a logic node's
     /// content graph. Only a flow output (LFlow / VFlow) leads to a single place, so any existing wire leaving
@@ -1294,7 +1097,6 @@ public partial class ProjectStateService(
         bool multiInput  = logic.SmartFormatNodes.Exists(sf => sf.VariablesIn.Id == toPoint)
                         || logic.ExitVariablesIn.Id == toPoint
                         || logic.ConditionFlowNodes.Exists(cf => cf.VariablesIn.Id == toPoint)
-                        || logic.RegisterVariableNodes.Exists(rv => rv.ValidationIn.Id == toPoint)
                         || logic.SetVariableNodes.Exists(sv => sv.ValidationIn.Id == toPoint);
         // Every non-flow content output is one-in-many-out — it keeps all its wires:
         //   Text  : Localization / SmartFormat
@@ -1307,7 +1109,6 @@ public partial class ProjectStateService(
                         || logic.SmartFormatNodes.Exists(sf => sf.OutPoint.Id == fromPoint)
                         || logic.IconNodes.Exists(ic => ic.OutPoint.Id == fromPoint)
                         || logic.LightDarkSwitchNodes.Exists(ld => ld.OutPoint.Id == fromPoint)
-                        || logic.ExternalVariableNodes.Exists(ev => ev.OutPoint.Id == fromPoint)
                         || logic.GetVariableNodes.Exists(gv => gv.OutPoint.Id == fromPoint || gv.SlotOutPoint.Id == fromPoint)
                         || logic.ConstantVariableNodes.Exists(cv => cv.OutPoint.Id == fromPoint)
                         || logic.ConstantStringNodes.Exists(cs => cs.OutPoint.Id == fromPoint)
@@ -1402,15 +1203,6 @@ public partial class ProjectStateService(
             return;
         }
 
-        StoryExternalVariableNode? ev = logic.ExternalVariableNodes.Find(n => n.Id == movedId);
-        if (ev is not null)
-        {
-            ev.X = x;
-            ev.Y = y;
-            MarkKeyDirty(logicId);
-            return;
-        }
-
         StoryGetVariableNode? gv = logic.GetVariableNodes.Find(n => n.Id == movedId);
         if (gv is not null)
         {
@@ -1465,38 +1257,11 @@ public partial class ProjectStateService(
             return;
         }
 
-        StoryRegisterVariableNode? reg = logic.RegisterVariableNodes.Find(n => n.Id == movedId);
-        if (reg is not null)
-        {
-            reg.X = x;
-            reg.Y = y;
-            MarkKeyDirty(logicId);
-            return;
-        }
-
         StorySetVariableNode? set = logic.SetVariableNodes.Find(n => n.Id == movedId);
         if (set is not null)
         {
             set.X = x;
             set.Y = y;
-            MarkKeyDirty(logicId);
-            return;
-        }
-
-        StoryUnregisterVariableNode? unreg = logic.UnregisterVariableNodes.Find(n => n.Id == movedId);
-        if (unreg is not null)
-        {
-            unreg.X = x;
-            unreg.Y = y;
-            MarkKeyDirty(logicId);
-            return;
-        }
-
-        StorySetExternalVariableNode? setExt = logic.SetExternalVariableNodes.Find(n => n.Id == movedId);
-        if (setExt is not null)
-        {
-            setExt.X = x;
-            setExt.Y = y;
             MarkKeyDirty(logicId);
             return;
         }
@@ -1593,17 +1358,10 @@ public partial class ProjectStateService(
         return variable;
     }
 
-    /// <summary>Applies an edit to a variable: name, description and possible values.</summary>
-    public void UpdateVariable(
-        Guid                id,
-        string              name,
-        string              description,
-        IEnumerable<string> possibleValues)
+    /// <summary>Marks a variable dirty after the panel has edited its fields in place. No-op when the id is unknown.</summary>
+    public void MarkVariableDirty(Guid id)
     {
-        if (!CurrentProject!.Variables.TryGetValue(id, out StoryVariable? variable)) return;
-        variable.Name           = name;
-        variable.Description    = description;
-        variable.PossibleValues = possibleValues.ToList();
+        if (!CurrentProject!.Variables.ContainsKey(id)) return;
         MarkKeyDirty(id);
     }
 
@@ -1861,12 +1619,10 @@ public partial class ProjectStateService(
             valid.Add(n.VariablesIn.Id);
             valid.Add(n.OutPoint.Id);
         }
-        foreach (StoryExternalVariableNode n in logic.ExternalVariableNodes) valid.Add(n.OutPoint.Id);
         foreach (StoryGetVariableNode n in logic.GetVariableNodes)
         {
             valid.Add(n.OutPoint.Id);
             valid.Add(n.SlotOutPoint.Id);
-            valid.Add(n.NameIn.Id);
         }
         foreach (StoryConstantVariableNode n in logic.ConstantVariableNodes) valid.Add(n.OutPoint.Id);
         foreach (StoryConstantStringNode n in logic.ConstantStringNodes)     valid.Add(n.OutPoint.Id);
@@ -1890,14 +1646,6 @@ public partial class ProjectStateService(
             valid.Add(n.FlowIn.Id);
             valid.Add(n.FlowOut.Id);
         }
-        foreach (StoryRegisterVariableNode n in logic.RegisterVariableNodes)
-        {
-            valid.Add(n.FlowIn.Id);
-            valid.Add(n.FlowOut.Id);
-            valid.Add(n.InstructionIn.Id);
-            valid.Add(n.PlaceholderIn.Id);
-            valid.Add(n.ValidationIn.Id);
-        }
         foreach (StorySetVariableNode n in logic.SetVariableNodes)
         {
             valid.Add(n.FlowIn.Id);
@@ -1905,20 +1653,8 @@ public partial class ProjectStateService(
             valid.Add(n.InstructionIn.Id);
             valid.Add(n.PlaceholderIn.Id);
             valid.Add(n.ValidationIn.Id);
-            valid.Add(n.NameIn.Id);
             valid.Add(n.ValueIn.Id);
             valid.Add(n.ValueTextIn.Id);
-        }
-        foreach (StoryUnregisterVariableNode n in logic.UnregisterVariableNodes)
-        {
-            valid.Add(n.FlowIn.Id);
-            valid.Add(n.FlowOut.Id);
-        }
-        foreach (StorySetExternalVariableNode n in logic.SetExternalVariableNodes)
-        {
-            valid.Add(n.FlowIn.Id);
-            valid.Add(n.FlowOut.Id);
-            valid.Add(n.ValueIn.Id);
         }
         foreach (StoryLogicPortalNode n in logic.LogicPortalNodes)
         {
@@ -1948,13 +1684,20 @@ public partial class ProjectStateService(
         string                                                   name,
         string                                                   description,
         IReadOnlyList<(Guid Id, string Name, StoryPointFlow Flow)> entries,
-        IReadOnlyList<(Guid Id, string Name, StoryPointFlow Flow)> exits)
+        IReadOnlyList<(Guid Id, string Name, StoryPointFlow Flow)> exits,
+        IEnumerable<Guid>?                                       usedVariables = null)
     {
         using var _ = Edit(); // container edit + parent/self connection cleanup are one step
         if (!CurrentProject!.ContainerNodes.TryGetValue(containerId, out StoryContainerNode? container)) return;
 
         container.Name        = name;
         container.Description = description;
+
+        if (usedVariables is not null)
+        {
+            container.UsedVariables.Clear();
+            container.UsedVariables.AddRange(usedVariables);
+        }
 
         ReconcilePoints(container.EntryPoints, entries, parentContainerId, containerId, isEntry: true);
         ReconcilePoints(container.ExitPoints,  exits,   parentContainerId, containerId, isEntry: false);

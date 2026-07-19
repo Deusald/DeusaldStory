@@ -67,3 +67,21 @@
 }
 .ncm-add:hover { color: var(--text-soft); border-color: var(--border-hover); background: var(--surface-3); }
 .ncm-add i { font-size: 11px; }
+
+/* Chapter-variable slot reservation list */
+.ncm-var {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 6px;
+    border-radius: 6px;
+    cursor: pointer;
+}
+.ncm-var:hover { background: var(--hover, rgba(127, 127, 127, 0.1)); }
+.ncm-var-locked { opacity: 0.5; cursor: not-allowed; }
+.ncm-var-name { flex: 1; }
+.ncm-var-slot {
+    font-family: var(--font-mono, monospace);
+    font-size: 0.8em;
+    opacity: 0.75;
+}

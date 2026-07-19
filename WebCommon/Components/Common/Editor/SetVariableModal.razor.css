@@ -133,3 +133,19 @@
 .svm-rule {
     margin-top: 0.35rem;
 }
+
+.svm-remap-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 4px;
+}
+.svm-inline { display: flex; gap: 10px; }
+.svm-inline > div { flex: 1; }
+.svm-check {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 6px 0;
+    cursor: pointer;
+}

@@ -8,48 +8,49 @@ using JetBrains.Annotations;
 namespace DeusaldStoryCommon
 {
     /// <summary>
-    /// Validates a whole story's <b>flow</b> graph. Two independent checks:
+    /// Validates a whole story's <b>flow</b> graph and its variable usage:
     /// <list type="number">
     /// <item>every flow output (Start, each logic/container exit, each portal out) is wired to something;</item>
-    /// <item>storage variables register/unregister consistently — a variable can't be registered onto an occupied
-    /// slot or used before it is registered, every path leaving a node carries the same set of active variables,
-    /// and every variable is released before the story End.</item>
+    /// <item>each logic node's Exit-node choices / auto-resolution are well-formed;</item>
+    /// <item>Condition and Randomized-Instruction inputs are constant/enumerable where required;</item>
+    /// <item>inline <c>&lt;var=Name&gt;</c> text references name a real variable;</item>
+    /// <item>container slot <b>reservations</b> don't collide — an Internal variable's physical slot can be reserved by
+    /// at most one variable on any nesting path (a Scenario-lifespan variable reserves its slot for the whole story;
+    /// a Chapter-lifespan variable only inside the containers that use it).</item>
     /// </list>
-    /// The balance check walks the flow from the root Start (across container boundaries and through portals,
-    /// exactly like <see cref="StoryFlowNavigator"/>), processing each logic node's inner Register/Set/Unregister
-    /// nodes in flow order. As a by-product it records, per logic node, which storage slots are occupied on entry —
-    /// see <see cref="StoryValidationResult.FreeSlots"/> — so the editor can offer only free slots when registering.
+    /// Since variables are now global and slot-owned (no register/unregister lifecycle), slot occupancy is a structural
+    /// container-tree check rather than a flow simulation.
     /// </summary>
     [PublicAPI]
     public static class StoryGraphValidator
     {
-        private const int _GUARD = 4096;
-
         private static readonly Regex _VarRef = new Regex(@"<var=([^<>]+?)>", RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
         /// <summary>
         /// Validates the whole story. Pass <paramref name="localization"/> to additionally check inline
-        /// <c>&lt;var=Name&gt;</c> text references against the variables active where the text is shown. Pass
-        /// <paramref name="authoring"/> — the un-expanded project — when <paramref name="project"/> is the
-        /// blueprint-flattened one, so the blueprint-register check can see the out-of-tree definitions that
-        /// expansion strips out; when omitted it falls back to <paramref name="project"/>.
+        /// <c>&lt;var=Name&gt;</c> text references against the project's variables. <paramref name="authoring"/> is
+        /// accepted for call-site compatibility but no longer consulted (the removed blueprint-register check was the
+        /// only reader of the un-expanded project).
         /// </summary>
         public static StoryValidationResult Validate(StoryProject project, LocProject? localization = null, StoryProject? authoring = null)
         {
-            List<StoryProblem>                    problems = new();
-            Dictionary<Guid, StoryRegisterVariableNode> regById = BuildRegisterIndex(project);
-            Lookups                               lk       = Lookups.Build(project);
+            List<StoryProblem> problems = new();
 
             CheckDanglingOutputs(project, problems);
             CheckChoices(project, problems);
             CheckConditionFlows(project, problems);
             CheckIncomingVariableContract(project, problems);
             CheckGamebookText(project, localization, problems);
-            CheckBlueprintRegisters(authoring ?? project, problems);
-            CheckVariableBalance(project, lk, regById, localization, problems,
-                out Dictionary<Guid, HashSet<Guid>> entryActive, out HashSet<Guid> endActive);
 
-            return new StoryValidationResult(problems, entryActive, endActive, regById);
+            foreach (StoryLogicNode logic in project.LogicNodes.Values)
+            {
+                CheckRandomizedInstruction(project, logic, problems);
+                CheckTextReferences(project, logic, localization, problems);
+            }
+
+            CheckContainerSlots(project, problems);
+
+            return new StoryValidationResult(problems);
         }
 
         // ── Pass A: every flow output must be wired ────────────────────────────
@@ -185,9 +186,7 @@ namespace DeusaldStoryCommon
 
         /// <summary>
         /// Validates each logic node's Condition nodes: every variable wired into a Condition's Variables input must be
-        /// a <b>constant</b> source, so the branch resolves the same in the App and the printed Gamebook (a live
-        /// variable would be unknown in print / would dimension sections). The condition's structure is edited via the
-        /// modal and needs no further check here.
+        /// a <b>constant</b> source, so the branch resolves the same in the App and the printed Gamebook.
         /// </summary>
         private static void CheckConditionFlows(StoryProject project, List<StoryProblem> problems)
         {
@@ -205,11 +204,10 @@ namespace DeusaldStoryCommon
             Guid src = logic.ResolvePortalSource(fromPoint);
             if (logic.ConstantVariableNodes.Exists(n => n.OutPoint.Id == src)) return true;
             if (logic.GetVariableNodes.Exists(n => n.SlotOutPoint.Id == src)) return true; // Gamebook slot tag — constant
-            if (logic.ExternalVariableNodes.Find(n => n.OutPoint.Id == src) is StoryExternalVariableNode ev)
+            if (logic.GetVariableNodes.Find(n => n.OutPoint.Id == src) is StoryGetVariableNode gv)
             {
-                StoryVariable? v = StoryBuiltInVariables.Find(ev.SelectedVariableId)
-                    ?? (project.Variables.TryGetValue(ev.SelectedVariableId, out StoryVariable? found) ? found : null);
-                return v is not null && (v.IsConstant || StoryBuiltInVariables.IsBuiltIn(v.Id));
+                StoryVariable? v = StoryLogicFlow.GetTarget(project, gv);
+                return v is not null && (StoryBuiltInVariables.IsBuiltIn(v.Id) || StoryVariableValues.IsConstant(v));
             }
             // Prev Exit / incoming declared variables are exposed as constants inside the node.
             return StorySelectionResolver.IncomingVariables(project, logic).Exists(d => d.Id == src);
@@ -220,8 +218,7 @@ namespace DeusaldStoryCommon
         /// <summary>
         /// For every node that declares an AcceptVariables contract (<see cref="StoryLogicNode.ExpectedVariables"/>),
         /// checks that its wired-in upstream Single-path node provides <b>exactly</b> that set — same variable names and,
-        /// for each name, the same set of possible values. This is what makes a reusable Logic blueprint safe: an
-        /// instance whose upstream doesn't match the contract is flagged instead of silently rendering blank values.
+        /// for each name, the same set of possible values.
         /// </summary>
         private static void CheckIncomingVariableContract(StoryProject project, List<StoryProblem> problems)
         {
@@ -283,260 +280,17 @@ namespace DeusaldStoryCommon
             }
         }
 
-        /// <summary>Reports SmartFormat render failures in each node's Gamebook text (e.g. a plain Variable unavailable in the Gamebook).</summary>
+        /// <summary>Reports SmartFormat render failures in each node's Gamebook text (e.g. a live value unavailable in the Gamebook).</summary>
         private static void CheckGamebookText(StoryProject project, LocProject? localization, List<StoryProblem> problems)
         {
             foreach (StoryLogicNode logic in project.LogicNodes.Values)
             {
-                // Validate the node exactly as the Gamebook prints it: one render per generated section, each pinning the
-                // incoming declared-variable constants. Rendering once with empty values would resolve a Prev Exit Variable
-                // to "" and raise false SmartFormat errors (e.g. a {var:choose(…)} that never sees an empty value in print).
                 StoryGamebookPreview.Result gamebook = StoryGamebookPreview.Build(project, localization, logic);
                 HashSet<string>             seen     = new();
                 foreach (StoryGamebookPreview.Section section in gamebook.Sections)
                     foreach (string error in section.Rendered.Errors)
                         if (seen.Add(error))
                             problems.Add(Node(logic, UiLang.T(Localization.Validation.gamebookTextPrefix, new Dictionary<string, object> { ["node"] = NodeName(logic.Name), ["error"] = error })));
-            }
-        }
-
-        // ── Blueprints must not register storage variables ─────────────────────
-
-        /// <summary>
-        /// Forbids storage-variable <b>registration</b> inside a blueprint definition. Blueprints are reusable blocks:
-        /// a Register Variable node in one would claim the same physical slot on every instance, and its register id is
-        /// reminted per instance on expansion — so it can't be referenced across the blueprint boundary (see the two
-        /// id-spaces). Reports one error per Register node found in any blueprint's definition body. Runs on the
-        /// <b>authoring</b> project, since expansion strips the out-of-tree definitions.
-        /// </summary>
-        private static void CheckBlueprintRegisters(StoryProject project, List<StoryProblem> problems)
-        {
-            foreach (StoryBlueprint blueprint in project.Blueprints.Values)
-                foreach (StoryLogicNode logic in BlueprintDefinitionLogic(project, blueprint))
-                    foreach (StoryRegisterVariableNode reg in logic.RegisterVariableNodes)
-                        problems.Add(new StoryProblem
-                        {
-                            Severity    = StoryProblemSeverity.Error,
-                            Message     = UiLang.T(Localization.Validation.blueprintRegistersVariable, new Dictionary<string, object> { ["blueprint"] = NodeName(blueprint.Name), ["node"] = NodeName(reg.Name) }),
-                            ContainerId = logic.ParentContainer,
-                            LogicNodeId = logic.Id,
-                            InnerNodeId = reg.Id
-                        });
-        }
-
-        /// <summary>Every logic node in a blueprint's definition body — the node itself for a Logic/Function blueprint,
-        /// or all logic nodes nested in the definition container's subtree for a Container blueprint.</summary>
-        private static IEnumerable<StoryLogicNode> BlueprintDefinitionLogic(StoryProject project, StoryBlueprint blueprint)
-        {
-            switch (blueprint.Kind)
-            {
-                case StoryBlueprintKind.Logic:
-                case StoryBlueprintKind.Function:
-                    if (project.LogicNodes.TryGetValue(blueprint.DefinitionNodeId, out StoryLogicNode? logic))
-                        yield return logic;
-                    break;
-                case StoryBlueprintKind.Container:
-                    if (project.ContainerNodes.TryGetValue(blueprint.DefinitionNodeId, out StoryContainerNode? container))
-                        foreach (StoryLogicNode l in ContainerLogicSubtree(project, container))
-                            yield return l;
-                    break;
-            }
-        }
-
-        /// <summary>Every logic node in a container's subtree (the container's own logic plus that of every nested
-        /// child container). Nested blueprint <i>instances</i> are skipped — each referenced blueprint is checked on
-        /// its own definition by the top-level loop.</summary>
-        private static IEnumerable<StoryLogicNode> ContainerLogicSubtree(StoryProject project, StoryContainerNode container)
-        {
-            foreach (Guid logicId in container.Logic)
-                if (project.LogicNodes.TryGetValue(logicId, out StoryLogicNode? logic))
-                    yield return logic;
-            foreach (Guid childId in container.Containers)
-                if (project.ContainerNodes.TryGetValue(childId, out StoryContainerNode? child))
-                    foreach (StoryLogicNode l in ContainerLogicSubtree(project, child))
-                        yield return l;
-        }
-
-        private static Guid FromInto(StoryLogicNode logic, Guid toPoint) =>
-            logic.ContentConnections.Find(c => c.ToPoint == toPoint)?.FromPoint ?? Guid.Empty;
-
-        private static StoryProblem Node(StoryLogicNode logic, string message) => new()
-        {
-            Severity    = StoryProblemSeverity.Error,
-            Message     = message,
-            ContainerId = logic.ParentContainer,
-            LogicNodeId = logic.Id
-        };
-
-        // ── Pass B: register/unregister balance from Start ─────────────────────
-
-        private static void CheckVariableBalance(
-            StoryProject project, Lookups lk, Dictionary<Guid, StoryRegisterVariableNode> regById,
-            LocProject? localization, List<StoryProblem> problems,
-            out Dictionary<Guid, HashSet<Guid>> entryActive, out HashSet<Guid> endActive)
-        {
-            entryActive = new Dictionary<Guid, HashSet<Guid>>();
-            endActive   = new HashSet<Guid>();
-            HashSet<Guid> divergenceFlagged = new();
-            Dictionary<Guid, StoryLogicNode> regOwnerById = BuildRegisterOwnerIndex(project);
-
-            if (!project.ContainerNodes.TryGetValue(project.Metadata.RootStoryContainerNodeId, out StoryContainerNode? root)
-                || root.EntryPoints.Count == 0)
-                return;
-
-            HashSet<Guid> endReached = endActive; // captured by the local recursion
-
-            Dictionary<Guid, HashSet<Guid>> ea = entryActive; // captured by the local recursion
-
-            void VisitLogic(StoryLogicNode logic, HashSet<Guid> incoming, int guard)
-            {
-                if (guard > _GUARD) return;
-
-                if (ea.TryGetValue(logic.Id, out HashSet<Guid>? prev))
-                {
-                    if (!prev.SetEquals(incoming) && divergenceFlagged.Add(logic.Id))
-                        problems.Add(new StoryProblem
-                        {
-                            Severity    = StoryProblemSeverity.Error,
-                            Message     = UiLang.T(Localization.Validation.variableStateDiverges, new Dictionary<string, object> { ["node"] = NodeName(logic.Name) }),
-                            ContainerId = logic.ParentContainer,
-                            LogicNodeId = logic.Id
-                        });
-                    return;
-                }
-
-                ea[logic.Id] = new HashSet<Guid>(incoming);
-                CheckTextReferences(logic, incoming, regById, localization, problems);
-                CheckGetRefs(project, logic, incoming, problems);
-                CheckRandomizedInstruction(project, logic, problems);
-                HashSet<Guid> active = new(incoming);
-                ApplyOps(project, logic, active, regById, problems);
-
-                // SinglePath collapses every choice into one continuation (VFlowOut); ManyPaths continues each choice
-                // independently. Both carry the same active-variable set.
-                IEnumerable<Guid> continuations = logic.ExitMode == StoryLogicExitMode.SinglePath
-                    ? new[] { logic.VFlowOut.Id }
-                    : logic.Choices.Select(c => c.OuterFlowOut.Id);
-
-                foreach (Guid outPointId in continuations)
-                {
-                    Step step = Follow(project, lk, logic.ParentContainer, outPointId, 0);
-                    switch (step.Kind)
-                    {
-                        case StepKind.Logic: VisitLogic(step.Logic!, active, guard + 1); break;
-                        case StepKind.End:   CheckReleasedAtEnd(project, active, endReached, regById, regOwnerById, problems); break;
-                        // Dangling exits are reported by Pass A; stop this branch.
-                    }
-                }
-            }
-
-            Step start = Follow(project, lk, root, root.EntryPoints[0].Id, 0);
-            switch (start.Kind)
-            {
-                case StepKind.Logic: VisitLogic(start.Logic!, new HashSet<Guid>(), 0); break;
-                case StepKind.End:   break; // empty story — nothing to release
-            }
-        }
-
-        /// <summary>Applies a logic node's inner Register/Set/Unregister operations, in flow order, to <paramref name="active"/>.</summary>
-        private static void ApplyOps(
-            StoryProject project, StoryLogicNode logic, HashSet<Guid> active, Dictionary<Guid, StoryRegisterVariableNode> regById,
-            List<StoryProblem> problems)
-        {
-            foreach (StorageOp op in StoryLogicFlow.StorageOps(project, logic))
-            {
-                switch (op.Kind)
-                {
-                    case StorageOpKind.Register:
-                        StoryRegisterVariableNode reg = op.Register!;
-                        if (!active.Add(reg.Id))
-                        {
-                            problems.Add(Inner(logic, reg.Id, UiLang.T(Localization.Validation.variableReRegistered, new Dictionary<string, object> { ["node"] = NodeName(reg.Name) })));
-                            break;
-                        }
-                        if (reg.SlotIndex < 0 || reg.SlotIndex >= StorageSlots.Count(reg.Type))
-                            problems.Add(Inner(logic, reg.Id, UiLang.T(Localization.Validation.slotOutOfRange, new Dictionary<string, object> { ["slot"] = StorageSlots.Label(reg.Type, reg.SlotIndex), ["type"] = reg.Type })));
-                        else if (active.Any(id => id != reg.Id && regById.TryGetValue(id, out StoryRegisterVariableNode? other)
-                                                  && other.Type == reg.Type && other.SlotIndex == reg.SlotIndex))
-                            problems.Add(Inner(logic, reg.Id, UiLang.T(Localization.Validation.slotInUse, new Dictionary<string, object> { ["slot"] = StorageSlots.Label(reg.Type, reg.SlotIndex) })));
-                        break;
-
-                    case StorageOpKind.Set:
-                        CheckSetTarget(project, logic, op, active, regById, problems);
-                        break;
-
-                    case StorageOpKind.Unregister:
-                        if (!active.Remove(op.TargetRegisterId))
-                            problems.Add(Inner(logic, op.InnerId, UiLang.T(Localization.Validation.unregisterUnregistered, new Dictionary<string, object> { ["target"] = TargetName(op.TargetRegisterId, regById) })));
-                        break;
-                }
-            }
-        }
-
-        /// <summary>
-        /// Checks a Set node's target is registered on this path. A <see cref="StorageVariableRefMode.Specific"/> set
-        /// names its register directly; a <see cref="StorageVariableRefMode.ByType"/> set takes the name from its
-        /// wired Name port, so the wire must carry a constant and <i>every</i> name that constant can take must name a
-        /// registered variable of the chosen type that is active here.
-        /// </summary>
-        private static void CheckSetTarget(
-            StoryProject project, StoryLogicNode logic, StorageOp op, HashSet<Guid> active,
-            Dictionary<Guid, StoryRegisterVariableNode> regById, List<StoryProblem> problems)
-        {
-            StorySetVariableNode set = op.Set!;
-
-            if (set.RefMode == StorageVariableRefMode.Specific)
-            {
-                if (!active.Contains(op.TargetRegisterId))
-                    problems.Add(Inner(logic, op.InnerId, UiLang.T(Localization.Validation.setUnregistered, new Dictionary<string, object> { ["target"] = TargetName(op.TargetRegisterId, regById) })));
-                return;
-            }
-
-            List<string>? names = StoryLogicFlow.PossibleVariableValues(project, logic, StoryLogicFlow.FromInto(logic, set.NameIn.Id));
-            if (names is null)
-            {
-                problems.Add(Inner(logic, set.Id, UiLang.T(Localization.Validation.refNameNotConstant, new Dictionary<string, object> { ["type"] = set.RefType })));
-                return;
-            }
-
-            foreach (string name in names)
-            {
-                StoryRegisterVariableNode? reg = StoryLogicFlow.FindRegisterByName(project, name, set.RefType);
-                if (reg is null)
-                    problems.Add(Inner(logic, set.Id, UiLang.T(Localization.Validation.refNameNotFound, new Dictionary<string, object> { ["name"] = NodeName(name), ["type"] = set.RefType })));
-                else if (!active.Contains(reg.Id))
-                    problems.Add(Inner(logic, set.Id, UiLang.T(Localization.Validation.setUnregistered, new Dictionary<string, object> { ["target"] = NodeName(name) })));
-            }
-        }
-
-        /// <summary>
-        /// Checks every <see cref="StorageVariableRefMode.ByType"/> Get node in this logic node the same way: its Name
-        /// port must carry a constant, and each name that constant can take must be a variable of the chosen type
-        /// available in this node. A Get sits off the flow spine, so — as with the text references below — a variable
-        /// available at any point in the node is accepted.
-        /// </summary>
-        private static void CheckGetRefs(
-            StoryProject project, StoryLogicNode logic, HashSet<Guid> entryActive, List<StoryProblem> problems)
-        {
-            foreach (StoryGetVariableNode gv in logic.GetVariableNodes)
-            {
-                if (gv.RefMode != StorageVariableRefMode.ByType) continue;
-
-                List<string>? names = StoryLogicFlow.PossibleVariableValues(project, logic, StoryLogicFlow.FromInto(logic, gv.NameIn.Id));
-                if (names is null)
-                {
-                    problems.Add(Inner(logic, gv.Id, UiLang.T(Localization.Validation.refNameNotConstant, new Dictionary<string, object> { ["type"] = gv.RefType })));
-                    continue;
-                }
-
-                foreach (string name in names)
-                {
-                    StoryRegisterVariableNode? reg = StoryLogicFlow.FindRegisterByName(project, name, gv.RefType);
-                    if (reg is null)
-                        problems.Add(Inner(logic, gv.Id, UiLang.T(Localization.Validation.refNameNotFound, new Dictionary<string, object> { ["name"] = NodeName(name), ["type"] = gv.RefType })));
-                    else if (!entryActive.Contains(reg.Id) && !logic.RegisterVariableNodes.Exists(n => n.Id == reg.Id))
-                        problems.Add(Inner(logic, gv.Id, UiLang.T(Localization.Validation.refNameUnavailable, new Dictionary<string, object> { ["name"] = NodeName(name), ["node"] = NodeName(logic.Name) })));
-                }
             }
         }
 
@@ -576,24 +330,19 @@ namespace DeusaldStoryCommon
         }
 
         /// <summary>
-        /// Flags any inline <c>&lt;var=Name&gt;</c> reference in this node's localized text that names a storage
-        /// variable not available anywhere in this node — i.e. neither active on entry nor registered within the
-        /// node. (Intra-node ordering of register/unregister vs. the text is not modelled, so a variable available at
-        /// any point in the node is accepted.)
+        /// Flags any inline <c>&lt;var=Name&gt;</c> reference in this node's localized text that doesn't name a variable
+        /// in the project catalog (or a built-in). Variables are global now, so any catalogued name is valid anywhere.
         /// </summary>
         private static void CheckTextReferences(
-            StoryLogicNode logic, HashSet<Guid> entryActive, Dictionary<Guid, StoryRegisterVariableNode> regById,
-            LocProject? localization, List<StoryProblem> problems)
+            StoryProject project, StoryLogicNode logic, LocProject? localization, List<StoryProblem> problems)
         {
             if (localization is null || logic.LocalizationNodes.Count == 0) return;
 
-            HashSet<string> activeNames = new(StringComparer.OrdinalIgnoreCase);
-            foreach (Guid id in entryActive)
-                if (regById.TryGetValue(id, out StoryRegisterVariableNode? reg) && !string.IsNullOrWhiteSpace(reg.Name))
-                    activeNames.Add(reg.Name);
-            foreach (StoryRegisterVariableNode reg in logic.RegisterVariableNodes)
-                if (!string.IsNullOrWhiteSpace(reg.Name))
-                    activeNames.Add(reg.Name);
+            HashSet<string> known = new(StringComparer.OrdinalIgnoreCase);
+            foreach (StoryVariable v in project.Variables.Values)
+                if (!string.IsNullOrWhiteSpace(v.Name)) known.Add(v.Name);
+            foreach (StoryVariable v in StoryBuiltInVariables.All)
+                known.Add(v.Name);
 
             HashSet<string> reported = new(StringComparer.OrdinalIgnoreCase);
             foreach (StoryLocalizationNode loc in logic.LocalizationNodes)
@@ -604,7 +353,7 @@ namespace DeusaldStoryCommon
                 foreach (Match m in _VarRef.Matches(text))
                 {
                     string name = m.Groups[1].Value.Trim();
-                    if (activeNames.Contains(name) || !reported.Add(name)) continue;
+                    if (known.Contains(name) || !reported.Add(name)) continue;
                     problems.Add(new StoryProblem
                     {
                         Severity    = StoryProblemSeverity.Error,
@@ -617,114 +366,93 @@ namespace DeusaldStoryCommon
             }
         }
 
-        private static void CheckReleasedAtEnd(
-            StoryProject project, HashSet<Guid> active, HashSet<Guid> endActive,
-            Dictionary<Guid, StoryRegisterVariableNode> regById,
-            Dictionary<Guid, StoryLogicNode> regOwnerById, List<StoryProblem> problems)
+        // ── Container slot reservations ────────────────────────────────────────
+
+        /// <summary>
+        /// Checks that no physical slot is reserved by two variables on the same nesting path. Scenario-lifespan Internal
+        /// variables reserve their slot for the whole story (exclusive); each container reserves the slots of the
+        /// Chapter-lifespan variables in its <see cref="StoryContainerNode.UsedVariables"/>, and those may not collide
+        /// with a scenario reservation, an ancestor container's reservation, or a sibling reservation in the same
+        /// container. (Chapter variables in unrelated container subtrees may freely reuse a slot.)
+        /// </summary>
+        private static void CheckContainerSlots(StoryProject project, List<StoryProblem> problems)
         {
-            HashSet<Guid> releasedAtEnd = new(project.Metadata.UnregisterAtEnd);
-            foreach (Guid id in active)
+            // Scenario reservations — global and exclusive. Two scenario variables sharing a slot is itself an error.
+            Dictionary<(StorageVariableType, int), StoryVariable> scenarioSlots = new();
+            foreach (StoryVariable v in project.Variables.Values)
             {
-                endActive.Add(id); // a variable still registered when the story reaches End — a release candidate
-                if (releasedAtEnd.Contains(id)) continue; // released by the story End node
-                // Navigate to the node holding the still-active registration (the register id in `active`
-                // uniquely identifies it — a variable can't be registered again while active), not the last
-                // logic node before The End.
-                StoryProblem problem = new()
+                if (v.Scope != StoryVariableScope.Internal) continue;
+                if (v.SlotIndex < 0 || v.SlotIndex >= StorageSlots.Count(StoryVariableSlots.Bank(v.InternalSubtype)))
+                    problems.Add(VariableSlotProblem(v, Localization.Validation.slotOutOfRange));
+                if (v.Lifespan != StoryVariableLifespan.Scenario) continue;
+
+                (StorageVariableType, int) key = (StoryVariableSlots.Bank(v.InternalSubtype), v.SlotIndex);
+                if (scenarioSlots.ContainsKey(key))
+                    problems.Add(VariableSlotProblem(v, Localization.Validation.slotInUse));
+                else
+                    scenarioSlots[key] = v;
+            }
+
+            // Per-container chapter reservations.
+            foreach (StoryContainerNode container in project.ContainerNodes.Values)
+            {
+                HashSet<(StorageVariableType, int)> ancestorSlots = AncestorReservedSlots(project, container);
+                HashSet<(StorageVariableType, int)> own           = new();
+
+                foreach (Guid id in container.UsedVariables)
                 {
-                    Severity    = StoryProblemSeverity.Error,
-                    Message     = UiLang.T(Localization.Validation.variableNotReleasedAtEnd, new Dictionary<string, object> { ["target"] = TargetName(id, regById) }),
-                    InnerNodeId = id
-                };
-                if (regOwnerById.TryGetValue(id, out StoryLogicNode? owner))
-                {
-                    problem.LogicNodeId = owner.Id;
-                    problem.ContainerId = owner.ParentContainer;
+                    if (!project.Variables.TryGetValue(id, out StoryVariable? v) || v.Scope != StoryVariableScope.Internal) continue;
+                    (StorageVariableType, int) key = (StoryVariableSlots.Bank(v.InternalSubtype), v.SlotIndex);
+
+                    if (scenarioSlots.ContainsKey(key) || ancestorSlots.Contains(key) || !own.Add(key))
+                        problems.Add(new StoryProblem
+                        {
+                            Severity    = StoryProblemSeverity.Error,
+                            Message     = UiLang.T(Localization.Validation.slotInUse, new Dictionary<string, object> { ["slot"] = StoryVariableSlots.Label(v.InternalSubtype, v.SlotIndex) }),
+                            ContainerId = container.Id
+                        });
                 }
-                problems.Add(problem);
             }
         }
 
-        // ── Flow following (mirrors StoryFlowNavigator, but returns the logic node) ──
-
-        private enum StepKind { Logic, End, Dangling }
-
-        private readonly struct Step
+        /// <summary>The slots reserved by every ancestor container's chapter <see cref="StoryContainerNode.UsedVariables"/>.</summary>
+        private static HashSet<(StorageVariableType, int)> AncestorReservedSlots(StoryProject project, StoryContainerNode container)
         {
-            public Step(StepKind kind, StoryLogicNode? logic)
+            HashSet<(StorageVariableType, int)> slots = new();
+            Guid parentId = container.ParentContainer;
+            int  guard    = 0;
+            while (parentId != Guid.Empty && guard++ < 256 && project.ContainerNodes.TryGetValue(parentId, out StoryContainerNode? parent))
             {
-                Kind  = kind;
-                Logic = logic;
+                foreach (Guid id in parent.UsedVariables)
+                    if (project.Variables.TryGetValue(id, out StoryVariable? v) && v.Scope == StoryVariableScope.Internal)
+                        slots.Add((StoryVariableSlots.Bank(v.InternalSubtype), v.SlotIndex));
+                parentId = parent.ParentContainer;
             }
-
-            public StepKind        Kind  { get; }
-            public StoryLogicNode? Logic { get; }
+            return slots;
         }
 
-        private static Step Follow(StoryProject project, Lookups lk, Guid containerId, Guid outputPointId, int guard)
+        private static StoryProblem VariableSlotProblem(StoryVariable v, Guid key) => new()
         {
-            if (!project.ContainerNodes.TryGetValue(containerId, out StoryContainerNode? container))
-                return new Step(StepKind.Dangling, null);
-            return Follow(project, lk, container, outputPointId, guard);
-        }
-
-        private static Step Follow(StoryProject project, Lookups lk, StoryContainerNode container, Guid outputPointId, int guard)
-        {
-            if (guard > _GUARD) return new Step(StepKind.Dangling, null);
-
-            StoryConnection? conn = container.Connections.Find(c => c.FromPoint == outputPointId);
-            if (conn is null) return new Step(StepKind.Dangling, null);
-
-            return ArriveAt(project, lk, conn.ToPoint, guard + 1);
-        }
-
-        private static Step ArriveAt(StoryProject project, Lookups lk, Guid pointId, int guard)
-        {
-            if (guard > _GUARD) return new Step(StepKind.Dangling, null);
-
-            if (lk.LogicByEntry.TryGetValue(pointId, out StoryLogicNode? logic))
-                return new Step(StepKind.Logic, logic);
-
-            if (lk.ContainerByEntry.TryGetValue(pointId, out StoryContainerNode? child))
-                return Follow(project, lk, child, pointId, guard + 1);
-
-            if (lk.ContainerByExit.TryGetValue(pointId, out StoryContainerNode? owner))
+            Severity = StoryProblemSeverity.Error,
+            Message  = UiLang.T(key, new Dictionary<string, object>
             {
-                if (owner.Id == project.Metadata.RootStoryContainerNodeId)
-                    return new Step(StepKind.End, null);
-                if (!project.ContainerNodes.TryGetValue(owner.ParentContainer, out StoryContainerNode? parent))
-                    return new Step(StepKind.Dangling, null);
-                return Follow(project, lk, parent, pointId, guard + 1);
-            }
-
-            if (lk.PortalByIn.TryGetValue(pointId, out StoryPortalNode? portal)
-                && project.ContainerNodes.TryGetValue(portal.ParentContainer, out StoryContainerNode? portalContainer))
-                return Follow(project, lk, portalContainer, portal.OutPoint.Id, guard + 1);
-
-            return new Step(StepKind.Dangling, null);
-        }
+                ["slot"] = StoryVariableSlots.Label(v.InternalSubtype, v.SlotIndex),
+                ["type"] = StoryVariableSlots.Bank(v.InternalSubtype)
+            })
+        };
 
         // ── Helpers ────────────────────────────────────────────────────────────
 
-        private static Dictionary<Guid, StoryRegisterVariableNode> BuildRegisterIndex(StoryProject project)
-        {
-            Dictionary<Guid, StoryRegisterVariableNode> map = new();
-            foreach (StoryLogicNode logic in project.LogicNodes.Values)
-                foreach (StoryRegisterVariableNode reg in logic.RegisterVariableNodes)
-                    map[reg.Id] = reg;
-            return map;
-        }
+        private static Guid FromInto(StoryLogicNode logic, Guid toPoint) =>
+            logic.ContentConnections.Find(c => c.ToPoint == toPoint)?.FromPoint ?? Guid.Empty;
 
-        /// <summary>Maps each register-node id to the logic node that owns it — so a variable still active at
-        /// The End can be navigated to its registration node rather than the last node before End.</summary>
-        private static Dictionary<Guid, StoryLogicNode> BuildRegisterOwnerIndex(StoryProject project)
+        private static StoryProblem Node(StoryLogicNode logic, string message) => new()
         {
-            Dictionary<Guid, StoryLogicNode> map = new();
-            foreach (StoryLogicNode logic in project.LogicNodes.Values)
-                foreach (StoryRegisterVariableNode reg in logic.RegisterVariableNodes)
-                    map[reg.Id] = logic;
-            return map;
-        }
+            Severity    = StoryProblemSeverity.Error,
+            Message     = message,
+            ContainerId = logic.ParentContainer,
+            LogicNodeId = logic.Id
+        };
 
         private static StoryProblem Inner(StoryLogicNode logic, Guid innerId, string message) => new()
         {
@@ -735,89 +463,17 @@ namespace DeusaldStoryCommon
             InnerNodeId = innerId
         };
 
-        private static string TargetName(Guid id, Dictionary<Guid, StoryRegisterVariableNode> regById) =>
-            regById.TryGetValue(id, out StoryRegisterVariableNode? reg) ? NodeName(reg.Name) : UiLang.T(Localization.Validation.unknownTarget);
-
         private static string NodeName(string name) => string.IsNullOrWhiteSpace(name) ? UiLang.T(Localization.Common.Placeholders.unnamed) : name;
 
         private static string PointName(StoryConnectionPoint point, string fallback) =>
             string.IsNullOrWhiteSpace(point.Name) ? fallback : point.Name;
-
-        private sealed class Lookups
-        {
-            public Dictionary<Guid, StoryLogicNode>     LogicByEntry     { get; } = new();
-            public Dictionary<Guid, StoryContainerNode> ContainerByEntry { get; } = new();
-            public Dictionary<Guid, StoryContainerNode> ContainerByExit  { get; } = new();
-            public Dictionary<Guid, StoryPortalNode>    PortalByIn       { get; } = new();
-
-            public static Lookups Build(StoryProject project)
-            {
-                Lookups lk = new();
-
-                foreach (StoryLogicNode logic in project.LogicNodes.Values)
-                    lk.LogicByEntry[logic.EntryPoint.Id] = logic;
-
-                foreach (StoryContainerNode container in project.ContainerNodes.Values)
-                {
-                    foreach (StoryConnectionPoint entry in container.EntryPoints)
-                        lk.ContainerByEntry[entry.Id] = container;
-                    foreach (StoryConnectionPoint exit in container.ExitPoints)
-                        lk.ContainerByExit[exit.Id] = container;
-                }
-
-                foreach (StoryPortalNode portal in project.PortalNodes.Values)
-                    foreach (StoryConnectionPoint inPoint in portal.InPoints)
-                        lk.PortalByIn[inPoint.Id] = portal;
-
-                return lk;
-            }
-        }
     }
 
-    /// <summary>The outcome of <see cref="StoryGraphValidator.Validate"/>: the problems found, plus the per-logic-node
-    /// active-variable state used to compute which storage slots are free when registering at that node.</summary>
+    /// <summary>The outcome of <see cref="StoryGraphValidator.Validate"/>: the problems found.</summary>
     public sealed class StoryValidationResult
     {
-        private readonly Dictionary<Guid, HashSet<Guid>>              _EntryActive;
-        private readonly Dictionary<Guid, StoryRegisterVariableNode>  _RegById;
-
-        public StoryValidationResult(
-            List<StoryProblem> problems, Dictionary<Guid, HashSet<Guid>> entryActive,
-            HashSet<Guid> endActive, Dictionary<Guid, StoryRegisterVariableNode> regById)
-        {
-            Problems      = problems;
-            _EntryActive  = entryActive;
-            EndActive     = endActive;
-            _RegById      = regById;
-        }
+        public StoryValidationResult(List<StoryProblem> problems) => Problems = problems;
 
         public List<StoryProblem> Problems { get; }
-
-        /// <summary>Register-node ids of variables still registered when the story reaches The End on some path — the
-        /// candidates the End node can release. A variable unregistered on every path never appears here.</summary>
-        public IReadOnlyCollection<Guid> EndActive { get; }
-
-        /// <summary>Whether the logic node is reachable from Start (so its slot usage is known).</summary>
-        public bool IsReachable(Guid logicId) => _EntryActive.ContainsKey(logicId);
-
-        /// <summary>
-        /// The slot indices still free for <paramref name="type"/> on entry to <paramref name="logicId"/> — every slot
-        /// of that type minus those occupied by variables still registered on the path here. Null when the node is
-        /// unreachable (its state is unknown), so callers can fall back to offering every slot with a warning.
-        /// </summary>
-        public IReadOnlyList<int>? FreeSlots(Guid logicId, StorageVariableType type)
-        {
-            if (!_EntryActive.TryGetValue(logicId, out HashSet<Guid>? active)) return null;
-
-            HashSet<int> used = new();
-            foreach (Guid id in active)
-                if (_RegById.TryGetValue(id, out StoryRegisterVariableNode? reg) && reg.Type == type)
-                    used.Add(reg.SlotIndex);
-
-            List<int> free = new();
-            for (int i = 0; i < StorageSlots.Count(type); ++i)
-                if (!used.Contains(i)) free.Add(i);
-            return free;
-        }
     }
 }

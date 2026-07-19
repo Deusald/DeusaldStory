@@ -269,12 +269,11 @@
         return null;
     }
 
-    private StoryRegisterVariableNode? ResolveVariableTag(string name)
+    private StoryVariable? ResolveVariableTag(string name)
     {
-        // The session's project, so a variable registered inside a blueprint resolves to the slot *this* instance got.
-        foreach (StoryLogicNode logic in Project.LogicNodes.Values)
-            if (logic.RegisterVariableNodes.Find(n => string.Equals(n.Name, name, StringComparison.OrdinalIgnoreCase)) is StoryRegisterVariableNode reg)
-                return reg;
+        foreach (StoryVariable v in Project.Variables.Values)
+            if (string.Equals(v.Name, name, StringComparison.OrdinalIgnoreCase))
+                return v;
         return null;
     }
 }

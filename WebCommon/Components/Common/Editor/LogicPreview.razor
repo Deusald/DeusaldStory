@@ -351,14 +351,13 @@
         return suffix.Length == 0 ? "" : $"lpv-block-{suffix}";
     }
 
-    /// <summary>Resolves a <c>&lt;var=Name&gt;</c> tag to a registered storage variable (case-insensitive name match),
-    /// so it renders as that variable's slot label. Returns null when nothing matches so the tag stays visible.</summary>
-    private StoryRegisterVariableNode? ResolveVariableTag(string name)
+    /// <summary>Resolves a <c>&lt;var=Name&gt;</c> tag to a global variable (case-insensitive name match), so it renders
+    /// as that Internal variable's slot label. Returns null when nothing matches so the tag stays visible.</summary>
+    private StoryVariable? ResolveVariableTag(string name)
     {
-        // The session's project, so a variable registered inside a blueprint resolves to the slot *this* instance got.
-        foreach (StoryLogicNode logic in Project.LogicNodes.Values)
-            if (logic.RegisterVariableNodes.Find(n => string.Equals(n.Name, name, StringComparison.OrdinalIgnoreCase)) is StoryRegisterVariableNode reg)
-                return reg;
+        foreach (StoryVariable v in Project.Variables.Values)
+            if (string.Equals(v.Name, name, StringComparison.OrdinalIgnoreCase))
+                return v;
         return null;
     }
 

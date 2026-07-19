@@ -1,13 +1,20 @@
 using System;
+using System.Collections.Generic;
 
 namespace DeusaldStoryCommon
 {
     /// <summary>
-    /// An inner content node on a logic node's flow spine that <b>sets</b> the value of an already-registered
-    /// storage variable — the "register unset near the start, assign it later" flow (e.g. mark a place visited when
-    /// the player reaches it). It references the owning <see cref="StoryRegisterVariableNode.Id"/> via
-    /// <see cref="RegisteredVariableId"/> and carries the new value/assignment. Flow passes straight through
+    /// An inner content node on a logic node's flow spine that <b>sets</b> the value of a global
+    /// <see cref="StoryVariable"/> (External or Internal). It references the variable by its
+    /// <see cref="StoryVariable.Id"/> so a rename doesn't break the link. Flow passes straight through
     /// <see cref="FlowIn"/> → <see cref="FlowOut"/>.
+    /// <para>
+    /// For an <b>External</b> variable the value follows <see cref="ExternalMode"/> — a fixed <see cref="ExternalValue"/>,
+    /// the value wired into <see cref="ValueIn"/>, or that wired value translated through <see cref="ValueMap"/>. External
+    /// sets emit no printed-Gamebook instruction (the components track the value).
+    /// For an <b>Internal</b> variable the Number/Dial/String assignment fields below apply, and the Gamebook prints the
+    /// instruction / the App shows the input field as before.
+    /// </para>
     /// </summary>
     public class StorySetVariableNode
     {
@@ -15,21 +22,21 @@ namespace DeusaldStoryCommon
         public double X  { get; set; }
         public double Y  { get; set; }
 
-        /// <summary>Whether this sets a variable picked by id (<see cref="RegisteredVariableId"/>) or one named by the wire into <see cref="NameIn"/> (<see cref="RefType"/>).</summary>
-        public StorageVariableRefMode RefMode { get; set; }
+        /// <summary>The global variable this sets (a <see cref="StoryVariable.Id"/>). Empty when nothing picked yet.</summary>
+        public Guid SelectedVariableId { get; set; }
 
-        /// <summary>The storage type the wired name must resolve to, when <see cref="RefMode"/> is <see cref="StorageVariableRefMode.ByType"/>.</summary>
-        public StorageVariableType RefType { get; set; }
+        // ── External-variable assignment ────────────────────────────────────────
 
-        /// <summary>
-        /// <see cref="StorageVariableRefMode.ByType"/> only — a <c>CVariable</c> input carrying the <b>name</b> of the
-        /// variable to set. Only constant sources wire in, so <see cref="StoryGraphValidator"/> can prove the name
-        /// belongs to a variable of <see cref="RefType"/> that is registered on this path.
-        /// </summary>
-        public StoryConnectionPoint NameIn { get; set; } = new() { Name = "Name" };
+        /// <summary>External only — how the assigned value is decided (a fixed value, wired-through, or wired-then-remapped).</summary>
+        public StorySetExternalVariableMode ExternalMode { get; set; }
 
-        /// <summary>The registered variable this sets (a <see cref="StoryRegisterVariableNode.Id"/>), when <see cref="RefMode"/> is <see cref="StorageVariableRefMode.Specific"/>. Empty when nothing picked yet.</summary>
-        public Guid RegisteredVariableId { get; set; }
+        /// <summary>External only — the value assigned in <see cref="StorySetExternalVariableMode.SpecificValue"/> mode.</summary>
+        public string ExternalValue { get; set; } = string.Empty;
+
+        /// <summary>External only — the conversion table used in <see cref="StorySetExternalVariableMode.RemapFromVariable"/> mode (incoming value → assigned value).</summary>
+        public List<StorySetExternalVariableRemap> ValueMap { get; set; } = new();
+
+        // ── Internal Number/Dial assignment ─────────────────────────────────────
 
         /// <summary>How the value is assigned (Unset clears it back to "not set").</summary>
         public NumberAssignment Assignment { get; set; } = NumberAssignment.SetSpecific;
@@ -49,8 +56,8 @@ namespace DeusaldStoryCommon
         /// </summary>
         public bool WireValue { get; set; }
 
-        /// <summary><see cref="WireValue"/> only — a <c>Variable</c> input carrying the value the App assigns at runtime.</summary>
-        public StoryConnectionPoint ValueIn { get; set; } = new() { Name = "App Value" };
+        /// <summary><see cref="WireValue"/> / external Map/Remap — a <c>Variable</c> input carrying the value the App assigns at runtime.</summary>
+        public StoryConnectionPoint ValueIn { get; set; } = new() { Name = "Value" };
 
         /// <summary><see cref="WireValue"/> only — a <c>Text</c> input carrying the Gamebook display of what to write.</summary>
         public StoryConnectionPoint ValueTextIn { get; set; } = new() { Name = "Gamebook Text" };
@@ -61,7 +68,7 @@ namespace DeusaldStoryCommon
         /// <summary>Where this node's Gamebook instruction / App input field sits relative to the section text.</summary>
         public StorageInstructionPlacement Placement { get; set; }
 
-        // ── String value parameters (used when the target variable is String) ───
+        // ── String value parameters (used when the target variable is Internal Text) ───
 
         /// <summary>String only — how the value is decided (clear it, a baked value, or player-entered).</summary>
         public StringValueMode StringMode { get; set; }
@@ -93,7 +100,7 @@ namespace DeusaldStoryCommon
         /// <summary>String / <see cref="StringValueMode.PlayerInput"/> — localization key for the message shown when the entry is outside <see cref="MinLength"/>…<see cref="MaxLength"/>. Empty = a default message.</summary>
         public Guid LengthErrorKeyId { get; set; }
 
-        /// <summary>String / <see cref="StringValueMode.PlayerInput"/> — an <b>App-only</b> validation rule the entry must satisfy (a boolean Group tree; null = no rule). Operands reference <see cref="StorageValidation.ThisEntryRef"/>, other register-node ids, and the outputs wired into <see cref="ValidationIn"/> (by connection <c>FromPoint</c> id). The Gamebook cannot enforce it.</summary>
+        /// <summary>String / <see cref="StringValueMode.PlayerInput"/> — an <b>App-only</b> validation rule the entry must satisfy (a boolean Group tree; null = no rule). Operands reference <see cref="StorageValidation.ThisEntryRef"/>, other variable ids, and the outputs wired into <see cref="ValidationIn"/> (by connection <c>FromPoint</c> id). The Gamebook cannot enforce it.</summary>
         public StoryConditionExpr? ValidationRule { get; set; }
 
         /// <summary>String / <see cref="StringValueMode.PlayerInput"/> — localization key for the message shown when <see cref="ValidationRule"/> is not met. Empty = a default message.</summary>

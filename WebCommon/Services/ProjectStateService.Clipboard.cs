@@ -268,17 +268,13 @@ public partial class ProjectStateService
             ?? logic.IconNodes.Find(n => n.Id == edId)
             ?? logic.LightDarkSwitchNodes.Find(n => n.Id == edId)
             ?? logic.SmartFormatNodes.Find(n => n.Id == edId)
-            ?? logic.ExternalVariableNodes.Find(n => n.Id == edId)
             ?? logic.GetVariableNodes.Find(n => n.Id == edId)
             ?? logic.ConstantVariableNodes.Find(n => n.Id == edId)
             ?? logic.ConstantStringNodes.Find(n => n.Id == edId)
             ?? logic.RandomizedInstructionNodes.Find(n => n.Id == edId)
             ?? logic.FlowTextNodes.Find(n => n.Id == edId)
             ?? logic.SplitForAppNodes.Find(n => n.Id == edId)
-            ?? logic.RegisterVariableNodes.Find(n => n.Id == edId)
             ?? logic.SetVariableNodes.Find(n => n.Id == edId)
-            ?? logic.UnregisterVariableNodes.Find(n => n.Id == edId)
-            ?? logic.SetExternalVariableNodes.Find(n => n.Id == edId)
             ?? logic.ConditionFlowNodes.Find(n => n.Id == edId || n.EndId == edId)
             ?? (object?)logic.FunctionInstanceNodes.Find(n => n.Id == edId)
             ?? logic.CommentNodes.Find(n => n.Id == edId);
@@ -418,19 +414,11 @@ public partial class ProjectStateService
     {
         switch (node)
         {
-            case StoryGetVariableNode g:        g.RegisteredVariableId = KeepLocalRef(g.RegisteredVariableId, copiedIds); break;
-            case StoryUnregisterVariableNode u: u.RegisteredVariableId = KeepLocalRef(u.RegisteredVariableId, copiedIds); break;
-            case StorySetVariableNode s:
-                s.RegisteredVariableId = KeepLocalRef(s.RegisteredVariableId, copiedIds);
-                SanitizeCondition(s.ValidationRule, copiedIds);
-                break;
-            case StoryRegisterVariableNode r: SanitizeCondition(r.ValidationRule, copiedIds); break;
-            case StoryConditionFlowNode c:    SanitizeCondition(c.Condition, copiedIds);      break;
+            // Get/Set target a project-global variable id (like a localization key), so it needs no blanking.
+            case StorySetVariableNode s:   SanitizeCondition(s.ValidationRule, copiedIds); break;
+            case StoryConditionFlowNode c: SanitizeCondition(c.Condition, copiedIds);      break;
         }
     }
-
-    /// <summary>Keeps a graph-local reference id only when its target was copied (its remapped id is present); otherwise blanks it.</summary>
-    private static Guid KeepLocalRef(Guid id, HashSet<Guid> copiedIds) => copiedIds.Contains(id) ? id : Guid.Empty;
 
     /// <summary>
     /// Recursively blanks a condition tree's variable operand refs that point at a non-copied node. The

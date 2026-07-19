@@ -36,86 +36,75 @@ namespace DeusaldStoryCommon
     }
 
     /// <summary>
-    /// Turns a logic node's storage operations (Register / Set / Unregister on its flow spine) into the player-facing
-    /// instructions the previews show — printed lines for the Gamebook, input fields for player-input Strings in the
-    /// App — in flow order. Operations that set no value (unset registrations) produce nothing; the App only surfaces
-    /// player-input Strings (everything else it stores silently). Wording comes from the framework
+    /// Turns a logic node's <b>Set</b> operations on its flow spine into the player-facing instructions the previews
+    /// show — printed lines for the Gamebook, input fields for player-input Strings in the App — in flow order. External
+    /// sets surface nothing (the game components track them); Internal sets are rendered against the global variable's
+    /// slot / subtype. Operations that set no value produce nothing. Wording comes from the framework
     /// <see cref="StoryCommonLocalizationKeys"/> (with built-in English fallbacks), SmartFormatted with the slot label
     /// and any value. Host-agnostic so the App preview, Gamebook preview and PDF export share it.
     /// </summary>
     [PublicAPI]
     public static class StoryStorageInstructions
     {
-        /// <summary>The ordered storage instructions for <paramref name="logic"/>'s operations (empty when none).</summary>
+        /// <summary>The ordered storage instructions for <paramref name="logic"/>'s Set operations (empty when none).</summary>
         public static List<StorageInstruction> For(
             StoryProject project, LocProject? localization, StoryLogicNode logic,
             StoryRenderTarget target = StoryRenderTarget.App, IReadOnlyDictionary<Guid, string>? values = null)
         {
             List<StorageInstruction> list = new();
-            foreach (StorageOp op in StoryLogicFlow.StorageOps(project, logic, target, values))
-                if (ForOp(project, localization, logic, op, target) is StorageInstruction entry)
+            foreach (StorySetVariableNode set in StoryLogicFlow.SetNodesInOrder(project, logic, target, values))
+                if (ForSet(project, localization, logic, set, target) is StorageInstruction entry)
                     list.Add(entry);
             return list;
         }
 
-        /// <summary>The player-facing instruction a single storage operation surfaces (null when it surfaces nothing for the medium).</summary>
-        public static StorageInstruction? ForOp(
-            StoryProject project, LocProject? localization, StoryLogicNode logic, StorageOp op, StoryRenderTarget target) =>
-            op.Kind switch
-            {
-                StorageOpKind.Register   => RegisterEntry(project, localization, logic, op.Register!, target),
-                // The op already resolved the target — a ByType set names it through a wire, not by id.
-                StorageOpKind.Set        => SetEntry(project, localization, logic, op.Set!, op.TargetRegisterId, target),
-                StorageOpKind.Unregister => ClearEntry(project, localization, op.Unregister!, target),
-                _                        => null
-            };
-
-        private static StorageInstruction? RegisterEntry(
-            StoryProject project, LocProject? localization, StoryLogicNode logic, StoryRegisterVariableNode reg, StoryRenderTarget target)
+        /// <summary>The player-facing instruction a single Set node surfaces for <paramref name="target"/> (null when it surfaces nothing).</summary>
+        public static StorageInstruction? ForSet(
+            StoryProject project, LocProject? localization, StoryLogicNode logic, StorySetVariableNode set, StoryRenderTarget target)
         {
-            if (reg.Type == StorageVariableType.String)
-                return StringEntry(project, localization, logic, reg.SlotIndex, reg.StringMode, reg.StringValue,
-                    reg.StringInputKind, reg.InstructionIn.Id, reg.PlaceholderIn.Id, reg.Placement, target, reg.Name, reg.MaxLength);
+            StoryVariable? v = StoryLogicFlow.SetTarget(project, set);
+            // External variables are tracked by the game components — no printed instruction, no App input field.
+            if (v is null || v.Scope != StoryVariableScope.Internal) return null;
 
-            // Number/Dial values are stored silently in the App — only the Gamebook prints them.
-            if (target == StoryRenderTarget.App) return null;
-            string? line = AssignmentLine(localization, reg.Type, reg.SlotIndex, reg.Mode, reg.ValueCount, reg.Assignment, reg.Secret, reg.SpecificValue);
-            return Line(line, reg.Placement);
-        }
-
-        private static StorageInstruction? SetEntry(
-            StoryProject project, LocProject? localization, StoryLogicNode logic, StorySetVariableNode set,
-            Guid targetRegisterId, StoryRenderTarget target)
-        {
-            StoryRegisterVariableNode? targetReg = FindRegister(project, targetRegisterId);
-            if (targetReg is null) return null;
-
-            if (targetReg.Type == StorageVariableType.String)
+            switch (v.InternalSubtype)
             {
-                // A wired specific value takes its Gamebook display from the Value text port instead of the baked string
-                // (the App stores it silently either way, so only the printed text differs).
-                string stringVal = set.WireValue && set.StringMode == StringValueMode.Specific
-                    ? StoryLogicRenderer.ResolvePortText(project, localization, logic, set.ValueTextIn.Id, target)
-                    : set.StringValue;
-                return StringEntry(project, localization, logic, targetReg.SlotIndex, set.StringMode, stringVal,
-                    set.StringInputKind, set.InstructionIn.Id, set.PlaceholderIn.Id, set.Placement, target, targetReg.Name, set.MaxLength);
+                case StoryInternalSubtype.Text:
+                {
+                    string stringVal = set.WireValue && set.StringMode == StringValueMode.Specific
+                        ? StoryLogicRenderer.ResolvePortText(project, localization, logic, set.ValueTextIn.Id, target)
+                        : set.StringValue;
+                    return StringEntry(project, localization, logic, v.SlotIndex, set.StringMode, stringVal,
+                        set.StringInputKind, set.InstructionIn.Id, set.PlaceholderIn.Id, set.Placement, target, v.Name, set.MaxLength);
+                }
+
+                case StoryInternalSubtype.SmallNumber:
+                {
+                    if (target == StoryRenderTarget.App) return null; // stored silently in the App
+                    bool             secret     = set.Secret || v.SmallNumberSource == SmallNumberSource.Token;
+                    NumberValueCount valueCount = ValueCountOf(v.ValuesMap);
+                    NumberStorageMode mode      = v.SmallNumberSource == SmallNumberSource.Token ? NumberStorageMode.Token : NumberStorageMode.Dice;
+                    object? specificDisplay = set.WireValue && set.Assignment == NumberAssignment.SetSpecific
+                        ? StoryLogicRenderer.ResolvePortText(project, localization, logic, set.ValueTextIn.Id, target)
+                        : null;
+                    string? line = AssignmentLine(localization, StorageVariableType.Number, v.SlotIndex, mode, valueCount, set.Assignment, secret, set.SpecificValue, specificDisplay);
+                    return Line(line, set.Placement);
+                }
+
+                case StoryInternalSubtype.BigPublicNumber:
+                case StoryInternalSubtype.BigSecretNumber:
+                {
+                    if (target == StoryRenderTarget.App) return null;
+                    bool secret = set.Secret || v.InternalSubtype == StoryInternalSubtype.BigSecretNumber;
+                    object? specificDisplay = set.WireValue && set.Assignment == NumberAssignment.SetSpecific
+                        ? StoryLogicRenderer.ResolvePortText(project, localization, logic, set.ValueTextIn.Id, target)
+                        : null;
+                    string? line = AssignmentLine(localization, StorageVariableType.Dial, v.SlotIndex, NumberStorageMode.Dice, NumberValueCount.Six, set.Assignment, secret, set.SpecificValue, specificDisplay);
+                    return Line(line, set.Placement);
+                }
+
+                default:
+                    return null;
             }
-
-            if (target == StoryRenderTarget.App) return null;
-            // A wired specific value prints the Gamebook display text in place of the fixed number.
-            object? specificDisplay = set.WireValue && set.Assignment == NumberAssignment.SetSpecific
-                ? StoryLogicRenderer.ResolvePortText(project, localization, logic, set.ValueTextIn.Id, target)
-                : null;
-            string? line = AssignmentLine(localization, targetReg.Type, targetReg.SlotIndex, targetReg.Mode, targetReg.ValueCount, set.Assignment, set.Secret, set.SpecificValue, specificDisplay);
-            return Line(line, set.Placement);
-        }
-
-        private static StorageInstruction? ClearEntry(
-            StoryProject project, LocProject? localization, StoryUnregisterVariableNode unreg, StoryRenderTarget target)
-        {
-            // A cleared slot needs no App action — the App just drops the value.
-            if (target == StoryRenderTarget.App) return null;
-            return Line(ClearLine(project, localization, unreg.RegisteredVariableId), unreg.Placement);
         }
 
         /// <summary>Builds the instruction for a String slot given its value mode — the branch that splits App vs Gamebook.</summary>
@@ -132,21 +121,18 @@ namespace DeusaldStoryCommon
                     return null; // slot claimed, nothing written
 
                 case StringValueMode.Specific:
-                    // The App fills a baked value silently; only the Gamebook instructs the player to write it.
                     if (target == StoryRenderTarget.App) return null;
                     return Line(Resolve(localization, StoryCommonLocalizationKeys.StorageStringWriteSpecific, slot, value: stringValue), placement);
 
                 case StringValueMode.PlayerInput:
-                    // The {<Name>Slot} the instruction injects renders as a styled pill, not the bare label.
                     string slotTag = PreviewHtmlSanitizer.SlotTag(slot);
-                    string prompt   = StoryLogicRenderer.ResolvePortText(project, localization, logic, instructionPortId, target, slotTag, StoryLogicRenderer.SlotTokenName(variableName));
+                    string prompt  = StoryLogicRenderer.ResolvePortText(project, localization, logic, instructionPortId, target, slotTag, StoryLogicRenderer.SlotTokenName(variableName));
                     if (string.IsNullOrEmpty(prompt))
-                        prompt = Resolve(localization, StoryCommonLocalizationKeys.StorageStringWrite, slot); // Resolve wraps the slot itself
+                        prompt = Resolve(localization, StoryCommonLocalizationKeys.StorageStringWrite, slot);
 
                     if (target != StoryRenderTarget.App)
                         return Line(prompt, placement);
 
-                    // The App draws an input field; an optional Localization-driven placeholder hints inside it (plain text).
                     string placeholder = StoryLogicRenderer.ResolvePortText(project, localization, logic, placeholderPortId, target);
                     return new StorageInstruction { Text = prompt, Placeholder = placeholder, Placement = placement, IsAppInput = true, InputKind = inputKind, Slot = slot, MaxLength = maxLength };
 
@@ -159,17 +145,26 @@ namespace DeusaldStoryCommon
         private static StorageInstruction? Line(string? text, StorageInstructionPlacement placement) =>
             string.IsNullOrEmpty(text) ? null : new StorageInstruction { Text = text!, Placement = placement };
 
-        /// <summary>The instruction for assigning (or clearing) a Number/Dial value on a slot — shared by Register and Set.</summary>
+        /// <summary>The number of distinct outcomes a Small Number's value map folds a D6 into (1–6).</summary>
+        private static NumberValueCount ValueCountOf(SmallNumberValuesMap map) =>
+            StorySmallNumberMap.Buckets(map).Count switch
+            {
+                <= 1 => NumberValueCount.One,
+                2    => NumberValueCount.Two,
+                3    => NumberValueCount.Three,
+                4    => NumberValueCount.Four,
+                5    => NumberValueCount.Five,
+                _    => NumberValueCount.Six
+            };
+
+        /// <summary>The instruction for assigning (or clearing) a Number/Dial value on a slot.</summary>
         private static string? AssignmentLine(
             LocProject? localization, StorageVariableType type, int slotIndex, NumberStorageMode mode,
             NumberValueCount valueCount, NumberAssignment assignment, bool secret, int specificValue, object? specificDisplay = null)
         {
-            string slot = StorageSlots.Label(type, slotIndex);
-
-            // A wired Set displays this text where the fixed value would print; a baked one prints the number itself.
+            string slot  = StorageSlots.Label(type, slotIndex);
             object value = specificDisplay ?? specificValue;
 
-            // Unset produces no instruction — the slot is claimed but left empty.
             if (type is StorageVariableType.Number or StorageVariableType.Dial && assignment == NumberAssignment.Unset)
                 return null;
 
@@ -191,11 +186,9 @@ namespace DeusaldStoryCommon
             LocProject? localization, string slot, NumberStorageMode mode, NumberValueCount valueCount,
             NumberAssignment assignment, bool secret, int specificValue, object? specificDisplay = null)
         {
-            // A wired Set displays this text where the fixed value would print; a baked one prints the number itself.
             object value = specificDisplay ?? specificValue;
-            int max = StorageSlots.ToNumber(valueCount);
+            int    max   = StorageSlots.ToNumber(valueCount);
 
-            // A one-value presence flag is just "mark the slot as set", regardless of die/token.
             if (valueCount == NumberValueCount.One)
                 return Resolve(localization, StoryCommonLocalizationKeys.StorageNumberFlagSet, slot);
 
@@ -209,39 +202,20 @@ namespace DeusaldStoryCommon
                     : Resolve(localization, StoryCommonLocalizationKeys.StorageNumberDiceFull, slot);
             }
 
-            // Token.
             if (assignment == NumberAssignment.Randomize)
                 return Resolve(localization, secret ? StoryCommonLocalizationKeys.StorageNumberTokenRandomSecret : StoryCommonLocalizationKeys.StorageNumberTokenRandom, slot, max: max);
 
             return Resolve(localization, secret ? StoryCommonLocalizationKeys.StorageNumberTokenSpecificSecret : StoryCommonLocalizationKeys.StorageNumberTokenSpecific, slot, value: value);
         }
 
-        private static string ClearLine(StoryProject project, LocProject? localization, Guid registeredVariableId)
-        {
-            StoryRegisterVariableNode? target = FindRegister(project, registeredVariableId);
-            string slot = target is not null ? StorageSlots.Label(target.Type, target.SlotIndex) : "?";
-            return Resolve(localization, StoryCommonLocalizationKeys.StorageClearSlot, slot);
-        }
-
-        // The slot is injected as a <slot=NA> tag so previews render it as a styled pill (mirrors the String
-        // player-input path); the sanitizer turns it into the pill markup before display.
+        // The slot is injected as a <slot=NA> tag so previews render it as a styled pill; the sanitizer turns it into
+        // the pill markup before display.
         private static string Resolve(LocProject? localization, Guid keyId, string slot, int? max = null, object? value = null)
         {
             Dictionary<string, object> vals = new(StringComparer.OrdinalIgnoreCase) { ["slot"] = PreviewHtmlSanitizer.SlotTag(slot) };
-            if (max is int m)          vals["max"]   = m;
-            if (value is not null)     vals["value"] = value;
+            if (max is int m)      vals["max"]   = m;
+            if (value is not null) vals["value"] = value;
             return StoryCommonLocalizationKeys.Resolve(localization, keyId, vals);
-        }
-
-        private static StoryRegisterVariableNode? FindRegister(StoryProject project, Guid id)
-        {
-            if (id == Guid.Empty) return null;
-            foreach (StoryLogicNode logic in project.LogicNodes.Values)
-            {
-                StoryRegisterVariableNode? found = logic.RegisterVariableNodes.Find(n => n.Id == id);
-                if (found is not null) return found;
-            }
-            return null;
         }
     }
 }

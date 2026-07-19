@@ -132,14 +132,9 @@
                     @* Project is the session's own — seeding must key values exactly as the renderer reads them. *@
                     <PreviewVariablesPanel Logic="inspectLogic" Project="_PreviewProject" Values="_PreviewVars" ValuesChanged="StateHasChanged" Gamebook="_PreviewGamebook"/>
                 }
-                else if (_SelectedNode?.Kind == StoryNodeKind.End)
+                else if (_InLogic && _SelectedNode?.Kind is StoryNodeKind.SetVariable or StoryNodeKind.GetVariable)
                 {
-                    @* The story End node: choose which whole-story storage variables are released here. *@
-                    <EndUnregisterEditor/>
-                }
-                else if (_InLogic && _SelectedNode?.Kind is StoryNodeKind.RegisterVariable or StoryNodeKind.SetVariable or StoryNodeKind.UnregisterVariable or StoryNodeKind.GetVariable)
-                {
-                    @* A storage-variable node: show its full configuration. *@
+                    @* A Get / Set variable node: show its target variable. *@
                     <VariableNodeInspector Logic="_CurrentLogicNode" NodeId="_SelectedId"/>
                 }
                 else
@@ -159,15 +154,11 @@
 <LogicPortalNodeModal      @ref="_LogicPortalModal"    OnConfirm="OnLogicPortalConfirmed"/>
 <LocalizationKeyPickerModal @ref="_LocalizationPicker" OnConfirm="OnLocalizationPicked"/>
 <IconPickerModal           @ref="_IconPicker"          OnConfirm="OnIconPicked"/>
-<VariablePickerModal       @ref="_VariablePicker"      OnConfirm="OnVariablePicked"/>
 <GetVariableModal          @ref="_GetVariableModal"    OnConfirm="OnGetVariableConfirmed"/>
 <ConstantVariableModal     @ref="_ConstantVariableModal" OnConfirm="OnConstantVariableConfirmed"/>
 <ConstantStringModal       @ref="_ConstantStringModal"   OnConfirm="OnConstantStringConfirmed"/>
 <RandomizedInstructionModal @ref="_RandomizedInstructionModal" OnConfirm="OnRandomizedInstructionConfirmed"/>
-<RegisterVariableModal     @ref="_RegisterVariableModal" Logic="_CurrentLogicNode" OnConfirm="OnRegisterVariableConfirmed"/>
-<SetVariableModal          @ref="_SetVariableModal"      Logic="_CurrentLogicNode" OnConfirm="OnSetVariableConfirmed"/>
-<UnregisterVariablePickerModal @ref="_UnregisterPicker"  OnConfirm="OnUnregisterPicked"/>
-<SetExternalVariableModal  @ref="_SetExternalVariableModal" OnConfirm="OnSetExternalVariableConfirmed"/>
+<SetVariableModal          @ref="_SetVariableModal"      OnConfirm="OnSetVariableConfirmed"/>
 <ExitNodeModal             @ref="_ExitNodeModal"            OnConfirm="OnExitNodeConfirmed"/>
 <ConditionFlowModal        @ref="_ConditionFlowModal"       OnConfirm="OnConditionFlowConfirmed"/>
 <NewCommentNodeModal       @ref="_NewCommentNodeModal"      OnConfirm="OnCommentConfirmed"/>
@@ -210,15 +201,11 @@
     private LogicPortalNodeModal?      _LogicPortalModal;
     private LocalizationKeyPickerModal? _LocalizationPicker;
     private IconPickerModal?           _IconPicker;
-    private VariablePickerModal?       _VariablePicker;
     private GetVariableModal?          _GetVariableModal;
     private ConstantVariableModal?     _ConstantVariableModal;
     private ConstantStringModal?       _ConstantStringModal;
     private RandomizedInstructionModal? _RandomizedInstructionModal;
-    private RegisterVariableModal?     _RegisterVariableModal;
     private SetVariableModal?          _SetVariableModal;
-    private UnregisterVariablePickerModal? _UnregisterPicker;
-    private SetExternalVariableModal?  _SetExternalVariableModal;
     private ExitNodeModal?             _ExitNodeModal;
     private ConditionFlowModal?        _ConditionFlowModal;
     private NewCommentNodeModal?       _NewCommentNodeModal;
@@ -756,17 +743,13 @@
                 new NodePaletteItem(StoryNodeKind.Icon,             "bi-emoji-smile",     Loc.T(Localization.Editor.Palette.Items.iconLabel),             Loc.T(Localization.Editor.Palette.Items.iconDesc)),
                 new NodePaletteItem(StoryNodeKind.LightDarkSwitch,  "bi-circle-half",     Loc.T(Localization.Editor.Palette.Items.lightDarkLabel),     Loc.T(Localization.Editor.Palette.Items.lightDarkDesc)),
                 new NodePaletteItem(StoryNodeKind.SmartFormat,      "bi-braces-asterisk", Loc.T(Localization.Editor.Palette.Items.smartFormatLabel),      Loc.T(Localization.Editor.Palette.Items.smartFormatDesc)),
-                new NodePaletteItem(StoryNodeKind.ExternalVariable, "bi-braces",          Loc.T(Localization.Editor.Palette.Items.externalVariableLabel), Loc.T(Localization.Editor.Palette.Items.externalVariableDesc)),
                 new NodePaletteItem(StoryNodeKind.GetVariable,      "bi-box-arrow-down",  Loc.T(Localization.Editor.Palette.Items.getVariableLabel),           Loc.T(Localization.Editor.Palette.Items.getVariableDesc)),
                 new NodePaletteItem(StoryNodeKind.ConstantVariable, "bi-braces",          Loc.T(Localization.Editor.Palette.Items.constantVariableLabel),      Loc.T(Localization.Editor.Palette.Items.constantVariableDesc)),
                 new NodePaletteItem(StoryNodeKind.ConstantString,   "bi-fonts",           Loc.T(Localization.Editor.Palette.Items.constantStringLabel),        Loc.T(Localization.Editor.Palette.Items.constantStringDesc)),
                 new NodePaletteItem(StoryNodeKind.RandomizedInstruction, "bi-dice-5",     Loc.T(Localization.Editor.Palette.Items.randomizedInstructionLabel), Loc.T(Localization.Editor.Palette.Items.randomizedInstructionDesc)),
                 new NodePaletteItem(StoryNodeKind.FlowText,         "bi-text-paragraph",  Loc.T(Localization.Editor.Palette.Items.flowTextLabel),         Loc.T(Localization.Editor.Palette.Items.flowTextDesc)),
                 new NodePaletteItem(StoryNodeKind.SplitForApp,      "bi-scissors",        Loc.T(Localization.Editor.Palette.Items.splitForAppLabel),         Loc.T(Localization.Editor.Palette.Items.splitForAppDesc)),
-                new NodePaletteItem(StoryNodeKind.RegisterVariable,   "bi-box-seam",        Loc.T(Localization.Editor.Palette.Items.registerVariableLabel),     Loc.T(Localization.Editor.Palette.Items.registerVariableDesc)),
                 new NodePaletteItem(StoryNodeKind.SetVariable,        "bi-pencil-square",   Loc.T(Localization.Editor.Palette.Items.setVariableLabel),          Loc.T(Localization.Editor.Palette.Items.setVariableDesc)),
-                new NodePaletteItem(StoryNodeKind.UnregisterVariable, "bi-box-arrow-up",    Loc.T(Localization.Editor.Palette.Items.unregisterVariableLabel),   Loc.T(Localization.Editor.Palette.Items.unregisterVariableDesc)),
-                new NodePaletteItem(StoryNodeKind.SetExternalVariable, "bi-sliders",        Loc.T(Localization.Editor.Palette.Items.setExternalVariableLabel), Loc.T(Localization.Editor.Palette.Items.setExternalVariableDesc)),
                 new NodePaletteItem(StoryNodeKind.LogicPortalIn,      "bi-box-arrow-in-right", Loc.T(Localization.Editor.Palette.Items.logicPortalLabel),                Loc.T(Localization.Editor.Palette.Items.logicPortalDesc)),
                 new NodePaletteItem(StoryNodeKind.ConditionFlow,      "bi-signpost-split",  Loc.T(Localization.Editor.Palette.Items.conditionLabel),             Loc.T(Localization.Editor.Palette.Items.conditionDesc)),
                 new NodePaletteItem(StoryNodeKind.FunctionInstance,   "bi-cpu",             Loc.T(Localization.Editor.Palette.Items.functionInstanceLabel),     Loc.T(Localization.Editor.Palette.Items.functionInstanceDesc)),
@@ -786,7 +769,7 @@
         switch (item.Kind)
         {
             case StoryNodeKind.Logic:        _NewLogicNodeModal?.Show();               break;
-            case StoryNodeKind.Container:    _NewContainerModal?.Show();               break;
+            case StoryNodeKind.Container:    _NewContainerModal?.Show(_CurrentId);     break;
             case StoryNodeKind.PortalIn:     _NewPortalModal?.Show();                  break;
             case StoryNodeKind.Localization: _LocalizationPicker?.Show(Guid.Empty, Guid.Empty); break;
             case StoryNodeKind.Icon:         _IconPicker?.Show(Guid.Empty, Guid.Empty);         break;
@@ -802,7 +785,6 @@
                     _SelectedId = sf.Id;
                 RebuildNodes();
                 break;
-            case StoryNodeKind.ExternalVariable: _VariablePicker?.Show(Guid.Empty, Guid.Empty); break;
             case StoryNodeKind.GetVariable:      _GetVariableModal?.Show();      break;
             case StoryNodeKind.ConstantVariable: _ConstantVariableModal?.Show(); break;
             case StoryNodeKind.ConstantString:   _ConstantStringModal?.Show();   break;
@@ -819,10 +801,7 @@
                     _SelectedId = split.Id;
                 RebuildNodes();
                 break;
-            case StoryNodeKind.RegisterVariable:   _RegisterVariableModal?.Show(ComputeFreeSlots()); break;
             case StoryNodeKind.SetVariable:        _SetVariableModal?.Show();                break;
-            case StoryNodeKind.UnregisterVariable: _UnregisterPicker?.Show(Guid.Empty, Guid.Empty); break;
-            case StoryNodeKind.SetExternalVariable: _SetExternalVariableModal?.Show();        break;
             case StoryNodeKind.LogicPortalIn:
                 // No config — create the portal (in + one out) straight away at the pending position.
                 if (_ProjectState.AddLogicPortalNode(_CurrentId, _PendingX, _PendingY) is StoryLogicPortalNode portal)
@@ -916,7 +895,8 @@
         {
             _NewContainerModal?.ShowEdit(cdef.Id, cdef.Name, cdef.Description,
                 cdef.EntryPoints.Select(p => (p.Id, p.Name, p.FlowKind)),
-                cdef.ExitPoints.Select(p => (p.Id, p.Name, p.FlowKind)));
+                cdef.ExitPoints.Select(p => (p.Id, p.Name, p.FlowKind)),
+                cdef.ParentContainer, cdef.UsedVariables);
         }
         else if (bp.Kind == StoryBlueprintKind.Logic
               && Project.LogicNodes.TryGetValue(bp.DefinitionNodeId, out StoryLogicNode? ldef))
@@ -988,26 +968,13 @@
         RebuildNodes();
     }
 
-    private void OnVariablePicked(VariablePickerModal.VariablePickResult result)
-    {
-        if (result.EditNodeId != Guid.Empty)
-        {
-            _ProjectState.UpdateExternalVariableNode(_CurrentId, result.EditNodeId, result.VariableId);
-        }
-        else if (_ProjectState.AddExternalVariableNode(_CurrentId, result.VariableId, _PendingX, _PendingY) is StoryExternalVariableNode node)
-        {
-            _SelectedId = node.Id;
-        }
-        RebuildNodes();
-    }
-
     private void OnGetVariableConfirmed(GetVariableModal.GetVariableArgs args)
     {
         if (args.EditNodeId != Guid.Empty)
         {
-            _ProjectState.UpdateGetVariableNode(_CurrentId, args.EditNodeId, args.RefMode, args.RefType, args.RegisteredVariableId, args.NameOverride, args.SlotNameOverride, args.PreviewValue);
+            _ProjectState.UpdateGetVariableNode(_CurrentId, args.EditNodeId, args.SelectedVariableId, args.NameOverride, args.SlotNameOverride, args.PreviewValue);
         }
-        else if (_ProjectState.AddGetVariableNode(_CurrentId, args.RefMode, args.RefType, args.RegisteredVariableId, args.NameOverride, args.SlotNameOverride, args.PreviewValue, _PendingX, _PendingY) is StoryGetVariableNode node)
+        else if (_ProjectState.AddGetVariableNode(_CurrentId, args.SelectedVariableId, args.NameOverride, args.SlotNameOverride, args.PreviewValue, _PendingX, _PendingY) is StoryGetVariableNode node)
         {
             _SelectedId = node.Id;
         }
@@ -1051,20 +1018,6 @@
             _SelectedId = node.Id;
         }
         RebuildNodes();
-    }
-
-    /// <summary>The free storage slots per type on entry to the logic node being edited, so the Register modal only
-    /// offers slots that aren't already claimed on the path here. Null when not inside a logic node.</summary>
-    private IReadOnlyDictionary<StorageVariableType, IReadOnlyList<int>>? ComputeFreeSlots()
-    {
-        if (!_InLogic) return null;
-
-        StoryValidationResult result = StoryGraphValidator.Validate(Project);
-        Dictionary<StorageVariableType, IReadOnlyList<int>> dict = new();
-        foreach (StorageVariableType type in Enum.GetValues<StorageVariableType>())
-            if (result.FreeSlots(_CurrentId, type) is IReadOnlyList<int> free)
-                dict[type] = free;
-        return dict.Count > 0 ? dict : null;
     }
 
     /// <summary>Navigate to the graph location a validation problem points at (open its container, drill into the
@@ -1111,23 +1064,6 @@
         RebuildNodes();
     }
 
-    private void OnRegisterVariableConfirmed(RegisterVariableModal.RegisterVariableArgs args)
-    {
-        Guid nodeId = args.EditNodeId;
-        if (nodeId == Guid.Empty)
-        {
-            if (_ProjectState.AddRegisterVariableNode(_CurrentId, _PendingX, _PendingY) is not StoryRegisterVariableNode created) return;
-            nodeId      = created.Id;
-            _SelectedId = created.Id;
-        }
-        _ProjectState.UpdateRegisterVariableNode(
-            _CurrentId, nodeId, args.Name, args.Description, args.Type, args.SlotIndex,
-            args.Mode, args.ValueCount, args.Secret, args.Assignment, args.SpecificValue, args.RandomMode, args.ConditionKeyId,
-            args.Placement, args.StringMode, args.StringValue, args.StringInputKind, args.PreviewValue,
-            args.MinLength, args.MaxLength, args.LengthErrorKeyId, args.ValidationRule, args.ValidationErrorKeyId);
-        RebuildNodes();
-    }
-
     private void OnSetVariableConfirmed(SetVariableModal.SetVariableArgs args)
     {
         Guid nodeId = args.EditNodeId;
@@ -1138,22 +1074,11 @@
             _SelectedId = created.Id;
         }
         _ProjectState.UpdateSetVariableNode(
-            _CurrentId, nodeId, args.RefMode, args.RefType, args.RegisteredVariableId, args.Assignment, args.Secret, args.SpecificValue, args.RandomMode,
+            _CurrentId, nodeId, args.SelectedVariableId,
+            args.ExternalMode, args.ExternalValue, args.ValueMap,
+            args.Assignment, args.Secret, args.SpecificValue, args.RandomMode,
             args.Placement, args.StringMode, args.StringValue, args.StringInputKind,
             args.MinLength, args.MaxLength, args.LengthErrorKeyId, args.ValidationRule, args.ValidationErrorKeyId, args.WireValue);
-        RebuildNodes();
-    }
-
-    private void OnSetExternalVariableConfirmed(SetExternalVariableModal.SetExternalVariableArgs args)
-    {
-        Guid nodeId = args.EditNodeId;
-        if (nodeId == Guid.Empty)
-        {
-            if (_ProjectState.AddSetExternalVariableNode(_CurrentId, _PendingX, _PendingY) is not StorySetExternalVariableNode created) return;
-            nodeId      = created.Id;
-            _SelectedId = created.Id;
-        }
-        _ProjectState.UpdateSetExternalVariableNode(_CurrentId, nodeId, args.SelectedVariableId, args.Mode, args.Value, args.ValueMap);
         RebuildNodes();
     }
 
@@ -1167,20 +1092,6 @@
     private void OnConditionFlowConfirmed(ConditionFlowModal.ConditionFlowArgs args)
     {
         _ProjectState.UpdateConditionFlowNode(_CurrentId, args.NodeId, args.Name, args.Condition, args.Negate);
-        RebuildNodes();
-    }
-
-    private void OnUnregisterPicked(UnregisterVariablePickerModal.UnregisterPickResult result)
-    {
-        if (result.EditNodeId != Guid.Empty)
-        {
-            _ProjectState.UpdateUnregisterVariableNode(_CurrentId, result.EditNodeId, result.RegisteredVariableId, result.Placement);
-        }
-        else if (_ProjectState.AddUnregisterVariableNode(_CurrentId, _PendingX, _PendingY) is StoryUnregisterVariableNode node)
-        {
-            _ProjectState.UpdateUnregisterVariableNode(_CurrentId, node.Id, result.RegisteredVariableId, result.Placement);
-            _SelectedId = node.Id;
-        }
         RebuildNodes();
     }
 
@@ -1218,7 +1129,7 @@
             // Use the node's real parent (Empty for an out-of-tree blueprint definition), not the current graph.
             Guid parent = Project.ContainerNodes.TryGetValue(args.EditId, out StoryContainerNode? c) ? c.ParentContainer : _CurrentId;
             _ProjectState.UpdateContainerNode(
-                parent, args.EditId, args.Name, args.Description, args.Entries, args.Exits);
+                parent, args.EditId, args.Name, args.Description, args.Entries, args.Exits, args.UsedVariables);
             RebuildNodes();
             _SelectedId = args.EditId;
             return;
@@ -1228,7 +1139,7 @@
         List<StoryConnectionPoint> exits   = args.Exits.Select(e => new StoryConnectionPoint { Name = e.Name, FlowKind = e.Flow }).ToList();
 
         StoryContainerNode node = _ProjectState.AddContainerNode(
-            _CurrentId, args.Name, args.Description, entries, exits, _PendingX, _PendingY);
+            _CurrentId, args.Name, args.Description, entries, exits, _PendingX, _PendingY, args.UsedVariables);
 
         RebuildNodes();
         _SelectedId = node.Id;
@@ -1274,7 +1185,8 @@
                     _NewContainerModal?.ShowEdit(
                         child.Id, child.Name, child.Description,
                         child.EntryPoints.Select(p => (p.Id, p.Name, p.FlowKind)),
-                        child.ExitPoints.Select(p => (p.Id, p.Name, p.FlowKind)));
+                        child.ExitPoints.Select(p => (p.Id, p.Name, p.FlowKind)),
+                        child.ParentContainer, child.UsedVariables);
                 break;
 
             case StoryNodeKind.PortalIn:
@@ -1300,11 +1212,6 @@
                     _IconPicker?.Show(ico.Id, ico.SelectedImageId);
                 break;
 
-            case StoryNodeKind.ExternalVariable:
-                if (_CurrentLogicNode?.ExternalVariableNodes.Find(n => n.Id == node.Id) is StoryExternalVariableNode ev)
-                    _VariablePicker?.Show(ev.Id, ev.SelectedVariableId);
-                break;
-
             case StoryNodeKind.GetVariable:
                 if (_CurrentLogicNode?.GetVariableNodes.Find(n => n.Id == node.Id) is StoryGetVariableNode gv)
                     _GetVariableModal?.ShowEdit(gv);
@@ -1325,24 +1232,9 @@
                     _RandomizedInstructionModal?.ShowEdit(ri, _CurrentLogicNode);
                 break;
 
-            case StoryNodeKind.RegisterVariable:
-                if (_CurrentLogicNode?.RegisterVariableNodes.Find(n => n.Id == node.Id) is StoryRegisterVariableNode reg)
-                    _RegisterVariableModal?.ShowEdit(reg, ComputeFreeSlots());
-                break;
-
             case StoryNodeKind.SetVariable:
                 if (_CurrentLogicNode?.SetVariableNodes.Find(n => n.Id == node.Id) is StorySetVariableNode setNode)
                     _SetVariableModal?.ShowEdit(setNode);
-                break;
-
-            case StoryNodeKind.UnregisterVariable:
-                if (_CurrentLogicNode?.UnregisterVariableNodes.Find(n => n.Id == node.Id) is StoryUnregisterVariableNode unreg)
-                    _UnregisterPicker?.Show(unreg.Id, unreg.RegisteredVariableId, unreg.Placement);
-                break;
-
-            case StoryNodeKind.SetExternalVariable:
-                if (_CurrentLogicNode?.SetExternalVariableNodes.Find(n => n.Id == node.Id) is StorySetExternalVariableNode setExt)
-                    _SetExternalVariableModal?.ShowEdit(setExt);
                 break;
 
             case StoryNodeKind.LogicExit:
@@ -1429,17 +1321,13 @@
             case StoryNodeKind.Icon:         _ProjectState.DeleteIconNode(_CurrentId, node.Id);          break;
             case StoryNodeKind.LightDarkSwitch: _ProjectState.DeleteLightDarkSwitchNode(_CurrentId, node.Id); break;
             case StoryNodeKind.SmartFormat:     _ProjectState.DeleteSmartFormatNode(_CurrentId, node.Id);     break;
-            case StoryNodeKind.ExternalVariable: _ProjectState.DeleteExternalVariableNode(_CurrentId, node.Id); break;
             case StoryNodeKind.GetVariable:      _ProjectState.DeleteGetVariableNode(_CurrentId, node.Id);      break;
             case StoryNodeKind.ConstantVariable: _ProjectState.DeleteConstantVariableNode(_CurrentId, node.Id); break;
             case StoryNodeKind.ConstantString:   _ProjectState.DeleteConstantStringNode(_CurrentId, node.Id);   break;
             case StoryNodeKind.RandomizedInstruction: _ProjectState.DeleteRandomizedInstructionNode(_CurrentId, node.Id); break;
             case StoryNodeKind.FlowText:         _ProjectState.DeleteFlowTextNode(_CurrentId, node.Id);        break;
             case StoryNodeKind.SplitForApp:      _ProjectState.DeleteSplitForAppNode(_CurrentId, node.Id);     break;
-            case StoryNodeKind.RegisterVariable:   _ProjectState.DeleteRegisterVariableNode(_CurrentId, node.Id);   break;
             case StoryNodeKind.SetVariable:        _ProjectState.DeleteSetVariableNode(_CurrentId, node.Id);        break;
-            case StoryNodeKind.UnregisterVariable: _ProjectState.DeleteUnregisterVariableNode(_CurrentId, node.Id); break;
-            case StoryNodeKind.SetExternalVariable: _ProjectState.DeleteSetExternalVariableNode(_CurrentId, node.Id); break;
             case StoryNodeKind.ConditionFlow:
             case StoryNodeKind.EndConditionFlow:    _ProjectState.DeleteConditionFlowNode(_CurrentId, node.Id);  break;
             case StoryNodeKind.Comment:                 _ProjectState.DeleteCommentNode(_CurrentId, node.Id);               break;

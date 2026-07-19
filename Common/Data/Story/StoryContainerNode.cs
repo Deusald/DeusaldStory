@@ -31,6 +31,13 @@ namespace DeusaldStoryCommon
         /// <summary>Free-text comment notes placed in this container's graph (no ports; documentation only).</summary>
         public List<StoryCommentNode> Comments { get; } = new();
 
+        /// <summary>
+        /// Chapter-lifespan Internal variables whose physical slot this container reserves while flow is inside it
+        /// (references into <see cref="StoryProject.Variables"/>). Two reserved variables may not share a slot, and a
+        /// nested container inherits — and cannot re-use — its ancestors' reserved slots.
+        /// </summary>
+        public List<Guid> UsedVariables { get; } = new();
+
         /// <summary>Wires between the connection points of this container's own boundary and its children.</summary>
         public List<StoryConnection> Connections { get; } = new();
     }

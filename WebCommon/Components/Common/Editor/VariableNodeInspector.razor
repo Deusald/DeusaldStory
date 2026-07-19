@@ -3,50 +3,16 @@
 @inject ProjectStateService _ProjectState
 
 @* ─────────────────────────────────────────────────────────────────────────
-   Read-only inspector for a selected Register / Set / Unregister variable node,
-   showing all of its stored configuration. Editing is done from the node's
-   right-click "Edit" (which reopens the modal).
+   Read-only inspector for a selected Get / Set variable node, showing the
+   global variable it targets. Editing is done from the node's right-click
+   "Edit" (which reopens the modal).
    ───────────────────────────────────────────────────────────────────────── *@
 
 <div class="vni-root">
 
-    @if (Register is StoryRegisterVariableNode reg)
+    @if (SetNode is StorySetVariableNode set)
     {
-        <div class="vni-head">
-            <span class="vni-kind" style="color:@StoryStyle.NodeColor(StoryNodeKind.RegisterVariable)">
-                <span class="vni-dot" style="background:@StoryStyle.NodeColor(StoryNodeKind.RegisterVariable)"></span>
-                @Loc.T(Localization.Editor.Modals.VariableNodeInspector.registerVariableKind)
-            </span>
-            <div class="vni-title">@Name(reg.Name)</div>
-            @if (!string.IsNullOrWhiteSpace(reg.Description))
-            {
-                <div class="vni-desc">@reg.Description</div>
-            }
-        </div>
-
-        <div class="vni-body">
-            @Row(Loc.T(Localization.Common.Fields.slot), $"{StorageSlots.Label(reg.Type, reg.SlotIndex)}")
-            @Row(Loc.T(Localization.Common.Fields.storage), TypeLabel(reg.Type))
-
-            @if (reg.Type == StorageVariableType.Number)
-            {
-                @Row(Loc.T(Localization.Common.Fields.storedWith), reg.Mode == NumberStorageMode.Dice ? Loc.T(Localization.Common.StoredWith.dice) : Loc.T(Localization.Common.StoredWith.token))
-                @Row(Loc.T(Localization.Common.Fields.values), ValueCountLabel(reg.ValueCount))
-            }
-
-            @if (reg.Type is StorageVariableType.Number or StorageVariableType.Dial)
-            {
-                @Row(Loc.T(Localization.Common.Fields.initialValue), AssignmentLabel(reg.Assignment, reg.SpecificValue, reg.RandomMode))
-                @if (ShowsSecret(reg.Type, reg.Mode))
-                {
-                    @Row(Loc.T(Localization.Common.Fields.secret), reg.Secret ? Loc.T(Localization.Common.Misc.yes) : Loc.T(Localization.Common.Misc.no))
-                }
-            }
-        </div>
-    }
-    else if (SetNode is StorySetVariableNode set)
-    {
-        StoryRegisterVariableNode? target = StoryLogicFlow.TargetOf(_ProjectState.CurrentProject!, Logic!, set);
+        StoryVariable? target = StoryLogicFlow.SetTarget(_ProjectState.CurrentProject!, set);
         <div class="vni-head">
             <span class="vni-kind" style="color:@StoryStyle.NodeColor(StoryNodeKind.SetVariable)">
                 <span class="vni-dot" style="background:@StoryStyle.NodeColor(StoryNodeKind.SetVariable)"></span>
@@ -59,21 +25,16 @@
             }
         </div>
         <div class="vni-body">
-            @if (target is not null)
+            @Meta(target)
+            @if (target is { Scope: StoryVariableScope.Internal } iv && iv.InternalSubtype is StoryInternalSubtype.SmallNumber or StoryInternalSubtype.BigPublicNumber or StoryInternalSubtype.BigSecretNumber)
             {
-                @Row(Loc.T(Localization.Common.Fields.slot), StorageSlots.Label(target.Type, target.SlotIndex))
-                @Row(Loc.T(Localization.Common.Fields.storage), TypeLabel(target.Type))
-            }
-            @Row(Loc.T(Localization.Common.Fields.newValue), AssignmentLabel(set.Assignment, set.SpecificValue, set.RandomMode))
-            @if (target is not null && ShowsSecret(target.Type, target.Mode))
-            {
-                @Row(Loc.T(Localization.Common.Fields.secret), set.Secret ? Loc.T(Localization.Common.Misc.yes) : Loc.T(Localization.Common.Misc.no))
+                @Row(Loc.T(Localization.Common.Fields.newValue), AssignmentLabel(set.Assignment, set.SpecificValue, set.RandomMode))
             }
         </div>
     }
     else if (GetNode is StoryGetVariableNode get)
     {
-        StoryRegisterVariableNode? target = StoryLogicFlow.TargetOf(_ProjectState.CurrentProject!, Logic!, get);
+        StoryVariable? target = StoryLogicFlow.GetTarget(_ProjectState.CurrentProject!, get);
         <div class="vni-head">
             <span class="vni-kind" style="color:@StoryStyle.NodeColor(StoryNodeKind.GetVariable)">
                 <span class="vni-dot" style="background:@StoryStyle.NodeColor(StoryNodeKind.GetVariable)"></span>
@@ -86,30 +47,7 @@
             }
         </div>
         <div class="vni-body">
-            @if (target is not null)
-            {
-                @Row(Loc.T(Localization.Common.Fields.slot), StorageSlots.Label(target.Type, target.SlotIndex))
-                @Row(Loc.T(Localization.Common.Fields.storage), TypeLabel(target.Type))
-            }
-        </div>
-    }
-    else if (Unregister is StoryUnregisterVariableNode unreg)
-    {
-        StoryRegisterVariableNode? target = EditorProjection.FindRegister(_ProjectState.CurrentProject!, unreg.RegisteredVariableId);
-        <div class="vni-head">
-            <span class="vni-kind" style="color:@StoryStyle.NodeColor(StoryNodeKind.UnregisterVariable)">
-                <span class="vni-dot" style="background:@StoryStyle.NodeColor(StoryNodeKind.UnregisterVariable)"></span>
-                @Loc.T(Localization.Editor.Modals.VariableNodeInspector.unregisterVariableKind)
-            </span>
-            <div class="vni-title">@(target is not null ? Name(target.Name) : Loc.T(Localization.Editor.Modals.VariableNodeInspector.noVariable))</div>
-        </div>
-        <div class="vni-body">
-            @if (target is not null)
-            {
-                @Row(Loc.T(Localization.Common.Fields.slot), StorageSlots.Label(target.Type, target.SlotIndex))
-                @Row(Loc.T(Localization.Common.Fields.storage), TypeLabel(target.Type))
-            }
-            <div class="vni-note">@Loc.T(Localization.Editor.Modals.VariableNodeInspector.unregisterNote)</div>
+            @Meta(target)
         </div>
     }
 
@@ -119,10 +57,16 @@
     [Parameter] public StoryLogicNode? Logic  { get; set; }
     [Parameter] public Guid            NodeId { get; set; }
 
-    private StoryRegisterVariableNode?   Register   => Logic?.RegisterVariableNodes.Find(n => n.Id == NodeId);
-    private StorySetVariableNode?        SetNode    => Logic?.SetVariableNodes.Find(n => n.Id == NodeId);
-    private StoryGetVariableNode?        GetNode    => Logic?.GetVariableNodes.Find(n => n.Id == NodeId);
-    private StoryUnregisterVariableNode? Unregister => Logic?.UnregisterVariableNodes.Find(n => n.Id == NodeId);
+    private StorySetVariableNode? SetNode => Logic?.SetVariableNodes.Find(n => n.Id == NodeId);
+    private StoryGetVariableNode? GetNode => Logic?.GetVariableNodes.Find(n => n.Id == NodeId);
+
+    private RenderFragment Meta(StoryVariable? v) =>@<text>
+        @if (v is { Scope: StoryVariableScope.Internal } iv)
+        {
+            @Row(Loc.T(Localization.Common.Fields.slot), StoryVariableSlots.Label(iv.InternalSubtype, iv.SlotIndex))
+            @Row(Loc.T(Localization.Common.Fields.storage), TypeLabel(StoryVariableSlots.Bank(iv.InternalSubtype)))
+        }
+    </text>;
 
     private RenderFragment Row(string label, string value) =>@<div class="vni-row">
         <span class="vni-row-label">@label</span>
@@ -139,17 +83,6 @@
         _                          => type.ToString()
     };
 
-    private string ValueCountLabel(NumberValueCount count) => count switch
-    {
-        NumberValueCount.One   => Loc.T(Localization.Common.ValueCounts.one),
-        NumberValueCount.Two   => Loc.T(Localization.Common.ValueCounts.two),
-        NumberValueCount.Three => Loc.T(Localization.Common.ValueCounts.three),
-        NumberValueCount.Four  => Loc.T(Localization.Common.ValueCounts.four),
-        NumberValueCount.Five  => Loc.T(Localization.Common.ValueCounts.five),
-        NumberValueCount.Six   => Loc.T(Localization.Common.ValueCounts.six),
-        _                      => count.ToString()
-    };
-
     private string AssignmentLabel(NumberAssignment assignment, int specificValue, RandomMode randomMode) => assignment switch
     {
         NumberAssignment.Unset       => Loc.T(Localization.Editor.Modals.VariableNodeInspector.assignmentUnsetNoValue),
@@ -157,7 +90,4 @@
         NumberAssignment.Randomize   => $"{Loc.T(Localization.Common.Assignment.randomize)} · {Loc.T(randomMode == RandomMode.Pure ? Localization.Common.Assignment.randomModePure : Localization.Common.Assignment.randomModeSaved)}",
         _                            => assignment.ToString()
     };
-
-    private static bool ShowsSecret(StorageVariableType type, NumberStorageMode mode) =>
-        type == StorageVariableType.Dial || (type == StorageVariableType.Number && mode == NumberStorageMode.Token);
 }

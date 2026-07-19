@@ -42,24 +42,10 @@ namespace DeusaldStoryCommon
         Above
     }
 
-    /// <summary>
-    /// How a Get/Set node names the storage variable it acts on — either a specific register node picked in the
-    /// editor, or a <see cref="StorageVariableType"/> plus a name wired into the node's <c>Name</c> port, resolved
-    /// against the registers active at that point in the flow.
-    /// </summary>
-    public enum StorageVariableRefMode
-    {
-        /// <summary>The node points at one <see cref="StoryRegisterVariableNode"/> by id (the default).</summary>
-        Specific,
-
-        /// <summary>The node picks a storage type and takes the variable's <b>name</b> from its wired <c>Name</c> (CVariable) input.</summary>
-        ByType
-    }
-
     /// <summary>Well-known operand ids used by a player-input String's App validation rule (a <see cref="StoryConditionExpr"/>).</summary>
     public static class StorageValidation
     {
-        /// <summary>The rule operand standing for the value the player is entering right now (the variable being registered/set). Every other operand is a register-node id.</summary>
+        /// <summary>The rule operand standing for the value the player is entering right now (the variable being set). Every other operand is a variable id or a wired source's connection point id.</summary>
         public static readonly Guid ThisEntryRef = new("e0000000-0000-0000-0000-0000000000e1");
     }
 

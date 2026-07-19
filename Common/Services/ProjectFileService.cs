@@ -37,7 +37,7 @@ namespace DeusaldStoryCommon
         public const string VARIABLES_FOLDER       = "Variables";
         public const string BLUEPRINTS_FOLDER      = "Blueprints";
         public const string INSTANCES_FOLDER       = "BlueprintInstances";
-        public const int    CURRENT_FORMAT_VERSION = 9;
+        public const int    CURRENT_FORMAT_VERSION = 10;
 
         private static readonly JsonSerializerSettings _JsonSettings = new()
         {

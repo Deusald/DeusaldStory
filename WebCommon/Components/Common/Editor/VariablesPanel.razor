@@ -4,10 +4,10 @@
 @implements IDisposable
 
 @* ─────────────────────────────────────────────────────────────────────────
-   Story-wide variables editor, shown from the rail's Variables tool. Two
-   columns: the list of variables on the left (searchable, with Add), and the
-   editor for the selected variable on the right — its name, description and
-   possible values.
+   Global variables editor, shown from the rail's Variables tool. Two columns:
+   the grouped list of variables on the left (External → Runtime/Initial/Constant,
+   Internal → Small Number/Dial/Text; built-ins read-only under Initial), and the
+   editor for the selected variable on the right.
    ───────────────────────────────────────────────────────────────────────── *@
 
 <div class="var-root">
@@ -40,30 +40,36 @@
 
             <div class="var-list">
                 @{
-                    List<StoryVariable> list = FilteredVariables().ToList();
+                    List<(string Label, List<StoryVariable> Items)> groups = GroupedList();
+                    bool anyItems = groups.Any(g => g.Items.Count > 0);
                 }
-                @if (list.Count == 0)
+                @if (!anyItems)
                 {
                     <div class="var-list-empty">@Loc.T(Localization.Editor.Panels.Variables.noneMatch)</div>
                 }
                 else
                 {
-                    @foreach (StoryVariable v in list)
+                    @foreach ((string Label, List<StoryVariable> Items) group in groups)
                     {
-                        StoryVariable variable = v;
-                        <button class="var-item @(_SelectedId == variable.Id ? "selected" : "")"
-                                @onclick="() => Select(variable.Id)">
-                            <div class="var-item-name">
-                                @(string.IsNullOrWhiteSpace(variable.Name) ? Loc.T(Localization.Common.Placeholders.unnamed) : variable.Name)
-                                @if (StoryBuiltInVariables.IsBuiltIn(variable.Id))
-                                {
-                                    <i class="bi bi-lock-fill var-item-lock" title="@Loc.T(Localization.Editor.Panels.Variables.builtInLock)"></i>
-                                }
-                            </div>
-                            <div class="var-item-sub">
-                                @Loc.T(Localization.Common.Misc.valueCount, new Dictionary<string, object> { ["count"] = variable.PossibleValues.Count })
-                            </div>
-                        </button>
+                        @if (group.Items.Count > 0)
+                        {
+                            <div class="var-group-head">@group.Label</div>
+                            @foreach (StoryVariable v in group.Items)
+                            {
+                                StoryVariable variable = v;
+                                <button class="var-item @(_SelectedId == variable.Id ? "selected" : "")"
+                                        @onclick="() => Select(variable.Id)">
+                                    <div class="var-item-name">
+                                        @(string.IsNullOrWhiteSpace(variable.Name) ? Loc.T(Localization.Common.Placeholders.unnamed) : variable.Name)
+                                        @if (variable.IsReadOnly)
+                                        {
+                                            <i class="bi bi-lock-fill var-item-lock" title="@Loc.T(Localization.Editor.Panels.Variables.builtInLock)"></i>
+                                        }
+                                    </div>
+                                    <div class="var-item-sub">@Summary(variable)</div>
+                                </button>
+                            }
+                        }
                     }
                 }
             </div>
@@ -78,30 +84,12 @@
                     <span>@Loc.T(Localization.Editor.Panels.Variables.selectEmpty)</span>
                 </div>
             }
-            else if (StoryBuiltInVariables.IsBuiltIn(sel.Id))
+            else if (sel.IsReadOnly)
             {
                 <div class="var-edit-scroll">
-
                     <div class="var-edit-toolbar">
                         <span class="var-edit-heading">@Loc.T(Localization.Editor.Panels.Variables.builtInHeading)</span>
                         <span class="var-builtin-badge"><i class="bi bi-lock-fill"></i> @Loc.T(Localization.Editor.Panels.Variables.readOnly)</span>
-                    </div>
-
-                    <div class="var-builtin-note">
-                        @if (sel.Id == StoryBuiltInVariables.AppThemeId)
-                        {
-                            @((MarkupString)Loc.T(Localization.Editor.Panels.Variables.builtInNoteTheme)
-                                .Replace("[lightValue]", StoryBuiltInVariables.LightValue)
-                                .Replace("[darkValue]", StoryBuiltInVariables.DarkValue)
-                                .Replace("[sel]", sel.Name))
-                        }
-                        else
-                        {
-                            @((MarkupString)Loc.T(Localization.Editor.Panels.Variables.builtInNote)
-                                .Replace("[appValue]", StoryBuiltInVariables.AppValue)
-                                .Replace("[gamebookValue]", StoryBuiltInVariables.GamebookValue)
-                                .Replace("[sel]", sel.Name))
-                        }
                     </div>
 
                     <div class="modal-field">
@@ -111,13 +99,13 @@
 
                     <div class="modal-field">
                         <label class="modal-label">@Loc.T(Localization.Common.Fields.description)</label>
-                        <textarea class="modal-input var-textarea" rows="2" value="@sel.Description" readonly disabled></textarea>
+                        <textarea class="modal-input var-textarea" rows="3" value="@sel.Description" readonly disabled></textarea>
                     </div>
 
                     <div class="modal-field">
-                        <label class="modal-label">@Loc.T(Localization.Editor.Panels.Variables.possibleValues)</label>
+                        <label class="modal-label">Possible values</label>
                         <div class="var-values">
-                            @foreach (string val in sel.PossibleValues)
+                            @foreach (string val in StoryVariableValues.PossibleValues(sel))
                             {
                                 <div class="var-value-row">
                                     <input class="modal-input" type="text" value="@val" readonly disabled/>
@@ -125,7 +113,6 @@
                             }
                         </div>
                     </div>
-
                 </div>
             }
             else
@@ -140,7 +127,7 @@
                         </button>
                     </div>
 
-                    @* Name *@
+                    @* ── Common ──────────────────────────────────────────── *@
                     <div class="modal-field">
                         <label class="modal-label">@Loc.T(Localization.Common.Fields.name)</label>
                         <input class="modal-input" type="text" maxlength="100"
@@ -152,7 +139,6 @@
                         }
                     </div>
 
-                    @* Description *@
                     <div class="modal-field">
                         <label class="modal-label">@Loc.T(Localization.Common.Fields.description)</label>
                         <textarea class="modal-input var-textarea" rows="2" maxlength="500"
@@ -160,47 +146,253 @@
                                   @oninput="e => OnDescriptionInput(sel, e)"></textarea>
                     </div>
 
-                    @* Constant *@
                     <div class="modal-field">
-                        <label class="var-check">
-                            <input type="checkbox" checked="@sel.IsConstant" @onchange="e => OnConstantChanged(sel, e)"/>
-                            <span>
-                                @Loc.T(Localization.Editor.Panels.Variables.constant)
-                                <span class="modal-label-hint">@Loc.T(Localization.Editor.Panels.Variables.constantHint)</span>
-                            </span>
-                        </label>
+                        <label class="modal-label">Scope</label>
+                        <select class="modal-input" value="@sel.Scope"
+                                @onchange="e => OnScopeChanged(sel, e)">
+                            <option value="@StoryVariableScope.External">External</option>
+                            <option value="@StoryVariableScope.Internal">Internal</option>
+                        </select>
                     </div>
 
-                    @* Possible values *@
-                    <div class="modal-field">
-                        <label class="modal-label">@Loc.T(Localization.Editor.Panels.Variables.possibleValues)</label>
-                        @if (sel.PossibleValues.Count == 0)
+                    @* ── External block ──────────────────────────────────── *@
+                    @if (sel.Scope == StoryVariableScope.External)
+                    {
+                        <div class="var-section-head">External</div>
+
+                        <div class="modal-field">
+                            <label class="modal-label">Form</label>
+                            <select class="modal-input" value="@sel.ExternalForm"
+                                    @onchange="e => OnExternalFormChanged(sel, e)">
+                                <option value="@StoryExternalForm.Runtime">Runtime</option>
+                                <option value="@StoryExternalForm.Initial">Initial</option>
+                                <option value="@StoryExternalForm.Constant">Constant</option>
+                            </select>
+                        </div>
+
+                        <div class="modal-field">
+                            <label class="modal-label">Subtype</label>
+                            <select class="modal-input" value="@sel.ExternalSubtype"
+                                    @onchange="e => OnExternalSubtypeChanged(sel, e)">
+                                <option value="@StoryExternalSubtype.Bool">Bool</option>
+                                <option value="@StoryExternalSubtype.Number">Number</option>
+                                <option value="@StoryExternalSubtype.Text">Text</option>
+                            </select>
+                        </div>
+
+                        @if (sel.ExternalSubtype == StoryExternalSubtype.Number)
                         {
-                            <div class="var-values-empty">@Loc.T(Localization.Editor.Panels.Variables.noValues)</div>
+                            <div class="modal-field">
+                                <label class="modal-label">Range (inclusive)</label>
+                                <div class="var-range">
+                                    <input class="modal-input" type="number" value="@sel.NumberFrom"
+                                           @onchange="e => OnNumberFromChanged(sel, e)"/>
+                                    <span class="var-range-sep">to</span>
+                                    <input class="modal-input" type="number" value="@sel.NumberTo"
+                                           @onchange="e => OnNumberToChanged(sel, e)"/>
+                                </div>
+                            </div>
                         }
-                        else
+                        else if (sel.ExternalSubtype == StoryExternalSubtype.Text)
                         {
-                            <div class="var-values">
-                                @for (int i = 0; i < sel.PossibleValues.Count; ++i)
-                                {
-                                    int index = i;
-                                    <div class="var-value-row">
-                                        <input class="modal-input" type="text" maxlength="200"
-                                               value="@sel.PossibleValues[index]"
-                                               @oninput="e => OnValueInput(sel, index, e)"/>
-                                        <button class="var-value-del" title="@Loc.T(Localization.Editor.Panels.Variables.removeValue)"
-                                                @onclick="() => RemoveValue(sel, index)">
-                                            <i class="bi bi-x-lg"></i>
-                                        </button>
+                            <div class="modal-field">
+                                <label class="modal-label">Text form</label>
+                                <select class="modal-input" value="@sel.TextForm"
+                                        @onchange="e => OnTextFormChanged(sel, e)">
+                                    <option value="@StoryTextForm.Free">Free</option>
+                                    <option value="@StoryTextForm.Options">Options</option>
+                                </select>
+                            </div>
+
+                            @if (sel.TextForm == StoryTextForm.Free)
+                            {
+                                <div class="modal-field">
+                                    <label class="modal-label">Length (1..30)</label>
+                                    <div class="var-range">
+                                        <input class="modal-input" type="number" min="1" max="30" value="@sel.TextMinLength"
+                                               @onchange="e => OnTextMinChanged(sel, e)"/>
+                                        <span class="var-range-sep">to</span>
+                                        <input class="modal-input" type="number" min="1" max="30" value="@sel.TextMaxLength"
+                                               @onchange="e => OnTextMaxChanged(sel, e)"/>
                                     </div>
+                                </div>
+                            }
+                            else
+                            {
+                                <div class="modal-field">
+                                    <label class="modal-label">Options</label>
+                                    @if (sel.TextOptions.Count == 0)
+                                    {
+                                        <div class="var-values-empty">No options yet.</div>
+                                    }
+                                    else
+                                    {
+                                        <div class="var-values">
+                                            @for (int i = 0; i < sel.TextOptions.Count; ++i)
+                                            {
+                                                int index = i;
+                                                <div class="var-value-row">
+                                                    <input class="modal-input" type="text" maxlength="200"
+                                                           value="@sel.TextOptions[index]"
+                                                           @oninput="e => OnOptionInput(sel, index, e)"/>
+                                                    <button class="var-value-del" title="Remove"
+                                                            @onclick="() => RemoveOption(sel, index)">
+                                                        <i class="bi bi-x-lg"></i>
+                                                    </button>
+                                                </div>
+                                            }
+                                        </div>
+                                    }
+                                    <button class="var-value-add" @onclick="() => AddOption(sel)">
+                                        <i class="bi bi-plus-lg"></i>
+                                        <span>Add option</span>
+                                    </button>
+                                </div>
+                            }
+                        }
+
+                        @if (sel.ExternalForm is StoryExternalForm.Initial or StoryExternalForm.Constant)
+                        {
+                            <div class="modal-field">
+                                <label class="modal-label">Fixed value</label>
+                                @{
+                                    List<string> domain = StoryVariableValues.PossibleValues(sel);
+                                }
+                                @if (sel.ExternalSubtype == StoryExternalSubtype.Number)
+                                {
+                                    <input class="modal-input" type="number" min="@sel.NumberFrom" max="@sel.NumberTo"
+                                           value="@sel.FixedValue" @onchange="e => OnFixedValueChanged(sel, e)"/>
+                                }
+                                else if (domain.Count > 0)
+                                {
+                                    <select class="modal-input" value="@sel.FixedValue"
+                                            @onchange="e => OnFixedValueChanged(sel, e)">
+                                        <option value="">—</option>
+                                        @foreach (string opt in domain)
+                                        {
+                                            <option value="@opt">@opt</option>
+                                        }
+                                    </select>
+                                }
+                                else
+                                {
+                                    <input class="modal-input" type="text" maxlength="200"
+                                           value="@sel.FixedValue" @oninput="e => OnFixedValueChanged(sel, e)"/>
                                 }
                             </div>
                         }
-                        <button class="var-value-add" @onclick="() => AddValue(sel)">
-                            <i class="bi bi-plus-lg"></i>
-                            <span>@Loc.T(Localization.Editor.Panels.Variables.addValue)</span>
-                        </button>
-                    </div>
+                    }
+
+                    @* ── Internal block ──────────────────────────────────── *@
+                    else
+                    {
+                        <div class="var-section-head">Internal</div>
+
+                        <div class="modal-field">
+                            <label class="modal-label">Subtype</label>
+                            <select class="modal-input" value="@sel.InternalSubtype"
+                                    @onchange="e => OnInternalSubtypeChanged(sel, e)">
+                                <option value="@StoryInternalSubtype.SmallNumber">Small Number</option>
+                                <option value="@StoryInternalSubtype.BigPublicNumber">Big Public Number</option>
+                                <option value="@StoryInternalSubtype.BigSecretNumber">Big Secret Number</option>
+                                <option value="@StoryInternalSubtype.Text">Text</option>
+                            </select>
+                        </div>
+
+                        @if (sel.InternalSubtype == StoryInternalSubtype.SmallNumber)
+                        {
+                            <div class="modal-field">
+                                <label class="modal-label">Source</label>
+                                <select class="modal-input" value="@sel.SmallNumberSource"
+                                        @onchange="e => OnSmallNumberSourceChanged(sel, e)">
+                                    <option value="@SmallNumberSource.Dice">Dice</option>
+                                    <option value="@SmallNumberSource.Token">Token</option>
+                                </select>
+                            </div>
+
+                            <div class="modal-field">
+                                <label class="modal-label">Values map</label>
+                                <select class="modal-input" value="@sel.ValuesMap"
+                                        @onchange="e => OnValuesMapChanged(sel, e)">
+                                    @foreach (SmallNumberValuesMap map in Enum.GetValues<SmallNumberValuesMap>())
+                                    {
+                                        <option value="@map">@map</option>
+                                    }
+                                </select>
+                            </div>
+
+                            <div class="modal-field">
+                                <label class="modal-label">Text maps</label>
+                                @{
+                                    IReadOnlyList<SmallNumberBucket> buckets = StorySmallNumberMap.Buckets(sel.ValuesMap);
+                                }
+                                @if (sel.TextMaps.Count == 0)
+                                {
+                                    <div class="var-values-empty">No text maps yet.</div>
+                                }
+                                else
+                                {
+                                    <div class="var-maps">
+                                        @for (int m = 0; m < sel.TextMaps.Count; ++m)
+                                        {
+                                            int mapIndex = m;
+                                            StoryVariableTextMap textMap = sel.TextMaps[mapIndex];
+                                            <div class="var-map">
+                                                <div class="var-map-head">
+                                                    <input class="modal-input" type="text" maxlength="100"
+                                                           placeholder="Map name"
+                                                           value="@textMap.Name"
+                                                           @oninput="e => OnMapNameInput(sel, mapIndex, e)"/>
+                                                    <button class="var-value-del" title="Remove map"
+                                                            @onclick="() => RemoveMap(sel, mapIndex)">
+                                                        <i class="bi bi-x-lg"></i>
+                                                    </button>
+                                                </div>
+                                                @foreach (SmallNumberBucket bucket in buckets)
+                                                {
+                                                    string key = bucket.Key;
+                                                    <div class="var-map-row">
+                                                        <span class="var-map-key">@key</span>
+                                                        <input class="modal-input" type="text" maxlength="200"
+                                                               value="@(textMap.Values.TryGetValue(key, out string? mv) ? mv : "")"
+                                                               @oninput="e => OnMapValueInput(sel, mapIndex, key, e)"/>
+                                                    </div>
+                                                }
+                                            </div>
+                                        }
+                                    </div>
+                                }
+                                <button class="var-value-add" @onclick="() => AddMap(sel)">
+                                    <i class="bi bi-plus-lg"></i>
+                                    <span>Add text map</span>
+                                </button>
+                            </div>
+                        }
+
+                        <div class="modal-field">
+                            <label class="modal-label">Slot</label>
+                            <select class="modal-input" value="@sel.SlotIndex"
+                                    @onchange="e => OnSlotIndexChanged(sel, e)">
+                                @{
+                                    int slotCount = StorageSlots.Count(StoryVariableSlots.Bank(sel.InternalSubtype));
+                                }
+                                @for (int i = 0; i < slotCount; ++i)
+                                {
+                                    int slot = i;
+                                    <option value="@slot">@StoryVariableSlots.Label(sel.InternalSubtype, slot)</option>
+                                }
+                            </select>
+                        </div>
+
+                        <div class="modal-field">
+                            <label class="modal-label">Lifespan</label>
+                            <select class="modal-input" value="@sel.Lifespan"
+                                    @onchange="e => OnLifespanChanged(sel, e)">
+                                <option value="@StoryVariableLifespan.Scenario">Scenario</option>
+                                <option value="@StoryVariableLifespan.Chapter">Chapter</option>
+                            </select>
+                        </div>
+                    }
 
                 </div>
             }
@@ -211,8 +403,8 @@
 </div>
 
 @code {
-    private string _Search = "";
-    private Guid   _SelectedId;
+    private string  _Search = "";
+    private Guid    _SelectedId;
     private string? _NameError;
 
     private StoryProject   Project  => _ProjectState.CurrentProject!;
@@ -225,18 +417,48 @@
 
     // ── List ────────────────────────────────────────────────────────────────
 
-    private IEnumerable<StoryVariable> FilteredVariables()
+    private bool Matches(StoryVariable v)
     {
-        // Built-in variables (e.g. the read-only App/Gamebook medium value) are always listed alongside authored ones.
-        IEnumerable<StoryVariable> vars = Project.Variables.Values.Concat(StoryBuiltInVariables.All);
-
         string term = _Search.Trim();
-        if (term.Length > 0)
-            vars = vars.Where(v =>
-                v.Name.Contains(term, StringComparison.OrdinalIgnoreCase)        ||
-                v.Description.Contains(term, StringComparison.OrdinalIgnoreCase));
+        if (term.Length == 0) return true;
+        return v.Name.Contains(term, StringComparison.OrdinalIgnoreCase) ||
+               v.Description.Contains(term, StringComparison.OrdinalIgnoreCase);
+    }
 
-        return vars.OrderBy(v => v.Name, StringComparer.OrdinalIgnoreCase);
+    private List<(string Label, List<StoryVariable> Items)> GroupedList()
+    {
+        List<StoryVariable> authored = Project.Variables.Values.Where(Matches)
+                                                               .OrderBy(v => v.Name, StringComparer.OrdinalIgnoreCase)
+                                                               .ToList();
+        List<StoryVariable> builtIns = StoryBuiltInVariables.All.Where(Matches)
+                                                                .OrderBy(v => v.Name, StringComparer.OrdinalIgnoreCase)
+                                                                .ToList();
+
+        List<StoryVariable> External(StoryExternalForm form) =>
+            authored.Where(v => v.Scope == StoryVariableScope.External && v.ExternalForm == form).ToList();
+
+        List<StoryVariable> Internal(Func<StoryVariable, bool> pred) =>
+            authored.Where(v => v.Scope == StoryVariableScope.Internal && pred(v)).ToList();
+
+        List<StoryVariable> initial = External(StoryExternalForm.Initial);
+        initial.AddRange(builtIns);
+
+        return new List<(string, List<StoryVariable>)>
+        {
+            ("External · Runtime",  External(StoryExternalForm.Runtime)),
+            ("External · Initial",  initial),
+            ("External · Constant", External(StoryExternalForm.Constant)),
+            ("Internal · Small Number", Internal(v => v.InternalSubtype == StoryInternalSubtype.SmallNumber)),
+            ("Internal · Dial",         Internal(v => v.InternalSubtype is StoryInternalSubtype.BigPublicNumber or StoryInternalSubtype.BigSecretNumber)),
+            ("Internal · Text",         Internal(v => v.InternalSubtype == StoryInternalSubtype.Text))
+        };
+    }
+
+    private string Summary(StoryVariable v)
+    {
+        if (v.Scope == StoryVariableScope.External)
+            return $"{v.ExternalForm} · {v.ExternalSubtype}";
+        return $"{v.InternalSubtype} · {StoryVariableSlots.Label(v.InternalSubtype, v.SlotIndex)}";
     }
 
     private void Select(Guid id)
@@ -268,48 +490,169 @@
 
     // ── Field edits (mutate the live variable, then mark dirty) ──────────────
 
+    private void Dirty(StoryVariable v) => _ProjectState.MarkVariableDirty(v.Id);
+
+    private static T ParseEnum<T>(ChangeEventArgs e, T fallback) where T : struct, Enum =>
+        Enum.TryParse(e.Value?.ToString(), out T r) ? r : fallback;
+
+    private static int ParseInt(ChangeEventArgs e, int fallback) =>
+        int.TryParse(e.Value?.ToString(), out int r) ? r : fallback;
+
     private void OnNameInput(StoryVariable v, ChangeEventArgs e)
     {
         string value = e.Value?.ToString() ?? "";
         v.Name = value;
 
-        if (string.IsNullOrWhiteSpace(value))               _NameError = Loc.T(Localization.Common.Errors.nameEmpty);
+        if (string.IsNullOrWhiteSpace(value))                    _NameError = Loc.T(Localization.Common.Errors.nameEmpty);
         else if (_ProjectState.IsVariableNameTaken(value, v.Id)) _NameError = Loc.T(Localization.Editor.Panels.Variables.errNameTaken);
-        else                                                _NameError = null;
+        else                                                     _NameError = null;
 
-        _ProjectState.MarkKeyDirty(v.Id);
+        Dirty(v);
     }
 
     private void OnDescriptionInput(StoryVariable v, ChangeEventArgs e)
     {
         v.Description = e.Value?.ToString() ?? "";
-        _ProjectState.MarkKeyDirty(v.Id);
+        Dirty(v);
     }
 
-    private void OnConstantChanged(StoryVariable v, ChangeEventArgs e)
+    private void OnScopeChanged(StoryVariable v, ChangeEventArgs e)
     {
-        v.IsConstant = (bool)(e.Value ?? false);
-        _ProjectState.MarkKeyDirty(v.Id);
+        v.Scope = ParseEnum(e, StoryVariableScope.External);
+        Dirty(v);
     }
 
-    private void OnValueInput(StoryVariable v, int index, ChangeEventArgs e)
+    // External
+
+    private void OnExternalFormChanged(StoryVariable v, ChangeEventArgs e)
     {
-        if (index < 0 || index >= v.PossibleValues.Count) return;
-        v.PossibleValues[index] = e.Value?.ToString() ?? "";
-        _ProjectState.MarkKeyDirty(v.Id);
+        v.ExternalForm = ParseEnum(e, StoryExternalForm.Runtime);
+        Dirty(v);
     }
 
-    private void AddValue(StoryVariable v)
+    private void OnExternalSubtypeChanged(StoryVariable v, ChangeEventArgs e)
     {
-        v.PossibleValues.Add("");
-        _ProjectState.MarkKeyDirty(v.Id);
+        v.ExternalSubtype = ParseEnum(e, StoryExternalSubtype.Bool);
+        Dirty(v);
     }
 
-    private void RemoveValue(StoryVariable v, int index)
+    private void OnNumberFromChanged(StoryVariable v, ChangeEventArgs e)
     {
-        if (index < 0 || index >= v.PossibleValues.Count) return;
-        v.PossibleValues.RemoveAt(index);
-        _ProjectState.MarkKeyDirty(v.Id);
+        v.NumberFrom = ParseInt(e, v.NumberFrom);
+        Dirty(v);
+    }
+
+    private void OnNumberToChanged(StoryVariable v, ChangeEventArgs e)
+    {
+        v.NumberTo = ParseInt(e, v.NumberTo);
+        Dirty(v);
+    }
+
+    private void OnTextFormChanged(StoryVariable v, ChangeEventArgs e)
+    {
+        v.TextForm = ParseEnum(e, StoryTextForm.Free);
+        Dirty(v);
+    }
+
+    private void OnTextMinChanged(StoryVariable v, ChangeEventArgs e)
+    {
+        v.TextMinLength = Math.Clamp(ParseInt(e, v.TextMinLength), 1, 30);
+        Dirty(v);
+    }
+
+    private void OnTextMaxChanged(StoryVariable v, ChangeEventArgs e)
+    {
+        v.TextMaxLength = Math.Clamp(ParseInt(e, v.TextMaxLength), 1, 30);
+        Dirty(v);
+    }
+
+    private void OnOptionInput(StoryVariable v, int index, ChangeEventArgs e)
+    {
+        if (index < 0 || index >= v.TextOptions.Count) return;
+        v.TextOptions[index] = e.Value?.ToString() ?? "";
+        Dirty(v);
+    }
+
+    private void AddOption(StoryVariable v)
+    {
+        v.TextOptions.Add("");
+        Dirty(v);
+    }
+
+    private void RemoveOption(StoryVariable v, int index)
+    {
+        if (index < 0 || index >= v.TextOptions.Count) return;
+        v.TextOptions.RemoveAt(index);
+        Dirty(v);
+    }
+
+    private void OnFixedValueChanged(StoryVariable v, ChangeEventArgs e)
+    {
+        v.FixedValue = e.Value?.ToString() ?? "";
+        Dirty(v);
+    }
+
+    // Internal
+
+    private void OnInternalSubtypeChanged(StoryVariable v, ChangeEventArgs e)
+    {
+        v.InternalSubtype = ParseEnum(e, StoryInternalSubtype.SmallNumber);
+        int slotCount = StorageSlots.Count(StoryVariableSlots.Bank(v.InternalSubtype));
+        if (v.SlotIndex >= slotCount) v.SlotIndex = 0;
+        Dirty(v);
+    }
+
+    private void OnSmallNumberSourceChanged(StoryVariable v, ChangeEventArgs e)
+    {
+        v.SmallNumberSource = ParseEnum(e, SmallNumberSource.Dice);
+        Dirty(v);
+    }
+
+    private void OnValuesMapChanged(StoryVariable v, ChangeEventArgs e)
+    {
+        v.ValuesMap = ParseEnum(e, SmallNumberValuesMap.SixValues);
+        Dirty(v);
+    }
+
+    private void OnSlotIndexChanged(StoryVariable v, ChangeEventArgs e)
+    {
+        v.SlotIndex = ParseInt(e, v.SlotIndex);
+        Dirty(v);
+    }
+
+    private void OnLifespanChanged(StoryVariable v, ChangeEventArgs e)
+    {
+        v.Lifespan = ParseEnum(e, StoryVariableLifespan.Scenario);
+        Dirty(v);
+    }
+
+    // Text maps
+
+    private void AddMap(StoryVariable v)
+    {
+        v.TextMaps.Add(new StoryVariableTextMap());
+        Dirty(v);
+    }
+
+    private void RemoveMap(StoryVariable v, int index)
+    {
+        if (index < 0 || index >= v.TextMaps.Count) return;
+        v.TextMaps.RemoveAt(index);
+        Dirty(v);
+    }
+
+    private void OnMapNameInput(StoryVariable v, int index, ChangeEventArgs e)
+    {
+        if (index < 0 || index >= v.TextMaps.Count) return;
+        v.TextMaps[index].Name = e.Value?.ToString() ?? "";
+        Dirty(v);
+    }
+
+    private void OnMapValueInput(StoryVariable v, int index, string key, ChangeEventArgs e)
+    {
+        if (index < 0 || index >= v.TextMaps.Count) return;
+        v.TextMaps[index].Values[key] = e.Value?.ToString() ?? "";
+        Dirty(v);
     }
 
     private void OnDataChanged() => InvokeAsync(StateHasChanged);

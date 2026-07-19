@@ -70,7 +70,7 @@ namespace DeusaldStoryCommon
         /// </summary>
         public static string ToSafeHtml(
             string text, Func<string, string, StoryImage?>? resolveImage = null,
-            Func<string, StoryRegisterVariableNode?>? resolveVariable = null)
+            Func<string, StoryVariable?>? resolveVariable = null)
         {
             if (string.IsNullOrEmpty(text)) return text ?? string.Empty;
 
@@ -114,14 +114,15 @@ namespace DeusaldStoryCommon
             return $"<img class=\"{cls}\" src=\"data:image/png;base64,{image.Data}\" alt=\"{alt}\">";
         }
 
-        private static string RestoreVariable(Match match, Func<string, StoryRegisterVariableNode?> resolveVariable)
+        private static string RestoreVariable(Match match, Func<string, StoryVariable?> resolveVariable)
         {
-            string                     name = WebUtility.HtmlDecode(match.Groups[1].Value);
-            StoryRegisterVariableNode? reg  = resolveVariable(name);
-            if (reg is null) return match.Value; // unresolved — keep the escaped tag visible
+            string         name = WebUtility.HtmlDecode(match.Groups[1].Value);
+            StoryVariable? v    = resolveVariable(name);
+            if (v is null || v.Scope != StoryVariableScope.Internal) return match.Value; // unresolved / no slot — keep the escaped tag visible
 
-            string label = WebUtility.HtmlEncode(StorageSlots.Label(reg.Type, reg.SlotIndex));
-            string kind  = reg.Type.ToString().ToLowerInvariant();
+            StorageVariableType bank  = StoryVariableSlots.Bank(v.InternalSubtype);
+            string              label = WebUtility.HtmlEncode(StorageSlots.Label(bank, v.SlotIndex));
+            string              kind  = bank.ToString().ToLowerInvariant();
             return $"<span class=\"lpv-var lpv-var-{kind}\">{label}</span>";
         }
 

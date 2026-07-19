@@ -3,8 +3,11 @@
 @inject ProjectStateService _ProjectState
 
 @* ─────────────────────────────────────────────────────────────────────────
-   Creates / edits a Set-variable node: picks an already-registered variable and
-   assigns it a new value (the "register unset, set it later" flow).
+   Creates / edits a Set Variable node: picks a global variable and how its value
+   is assigned. External variables use a mode (a fixed value, the wired value, or a
+   remapped wired value) and emit no printed instruction. Internal Number/Dial/Text
+   variables use the assignment / string-input fields and surface a Gamebook line
+   (or an App input field for player-input Strings).
    ───────────────────────────────────────────────────────────────────────── *@
 
 @if (_Visible)
@@ -22,110 +25,145 @@
 
         <div class="modal-body svm-body">
 
-            @* ── Which variable: one picked here, or one named by the wired Name port ── *@
+            @* ── Which variable ── *@
             <div class="modal-field">
-                <label class="svm-mode">
-                    <input type="radio"
-                           name="svm-mode"
-                           checked="@(_RefMode == StorageVariableRefMode.Specific)"
-                           @onchange="() => _RefMode = StorageVariableRefMode.Specific"/>
-                    <span>@Loc.T(Localization.Editor.Modals.GetVariable.modeSpecific)</span>
-                </label>
-                <label class="svm-mode">
-                    <input type="radio"
-                           name="svm-mode"
-                           checked="@(_RefMode == StorageVariableRefMode.ByType)"
-                           @onchange="() => _RefMode = StorageVariableRefMode.ByType"/>
-                    <span>@Loc.T(Localization.Editor.Modals.GetVariable.modeByType)</span>
-                </label>
-            </div>
-
-            @{
-                List<StoryRegisterVariableNode> vars = RegisteredVariables();
-            }
-            @if (_RefMode == StorageVariableRefMode.Specific && vars.Count == 0)
-            {
-                <div class="svm-empty">
-                    <i class="bi bi-box-seam"></i>
-                    <span>@Loc.T(Localization.Common.Messages.noVariablesRegistered)</span>
-                </div>
-            }
-            else
-            {
-                @if (_RefMode == StorageVariableRefMode.Specific)
+                <label class="modal-label">Variable</label>
+                <input class="modal-input" type="text" placeholder="Search"
+                       @bind="_Search" @bind:event="oninput"/>
+                @{
+                    List<StoryVariable> vars = FilteredVariables();
+                }
+                @if (vars.Count == 0)
                 {
-                    <div class="modal-field">
-                        <label class="modal-label">@Loc.T(Localization.Common.Fields.variable)</label>
-                        <div class="svm-list">
-                            @foreach (StoryRegisterVariableNode v in vars)
-                            {
-                                StoryRegisterVariableNode variable = v;
-                                <button class="svm-item @(_RegisteredVariableId == variable.Id ? "selected" : "")"
-                                        @onclick="() => _RegisteredVariableId = variable.Id">
-                                    <span class="svm-item-name">@(string.IsNullOrWhiteSpace(variable.Name) ? Loc.T(Localization.Common.Placeholders.unnamed) : variable.Name)</span>
-                                    <span class="svm-item-slot">@StorageSlots.Label(variable.Type, variable.SlotIndex)</span>
-                                </button>
-                            }
-                        </div>
-                    </div>
+                    <div class="svm-empty"><i class="bi bi-braces"></i><span>@Loc.T(Localization.Common.Messages.noVariablesRegistered)</span></div>
                 }
                 else
                 {
-                    <div class="modal-field">
-                        <label class="modal-label">@Loc.T(Localization.Editor.Modals.RegisterVariable.storageType)</label>
-                        <select class="modal-input" @bind="_RefType">
-                            <option value="@StorageVariableType.Number">@Loc.T(Localization.Editor.Modals.RegisterVariable.storageTypeNumber)</option>
-                            <option value="@StorageVariableType.Dial">@Loc.T(Localization.Common.Misc.dialRange)</option>
-                            <option value="@StorageVariableType.String">@Loc.T(Localization.Common.Misc.stringWritten)</option>
-                        </select>
-                        <span class="modal-label-hint">@Loc.T(Localization.Editor.Modals.GetVariable.byTypeHint)</span>
+                    <div class="svm-list">
+                        @foreach (StoryVariable v in vars)
+                        {
+                            StoryVariable variable = v;
+                            <button class="svm-item @(_SelectedVariableId == variable.Id ? "selected" : "")"
+                                    @onclick="() => Select(variable)">
+                                <span>@(string.IsNullOrWhiteSpace(variable.Name) ? Loc.T(Localization.Common.Placeholders.unnamed) : variable.Name)</span>
+                            </button>
+                        }
                     </div>
                 }
+            </div>
 
-                @if (EffectiveType is StorageVariableType.Number or StorageVariableType.Dial)
+            @if (_Selected is StoryVariable sel)
+            {
+                @if (sel.Scope == StoryVariableScope.External)
                 {
+                    <div class="modal-field">
+                        <label class="modal-label">@Loc.T(Localization.Common.Fields.value)</label>
+                        <select class="modal-input" @bind="_ExternalMode">
+                            <option value="@StorySetExternalVariableMode.SpecificValue">Specific value</option>
+                            <option value="@StorySetExternalVariableMode.MapFromVariable">From wired value</option>
+                            <option value="@StorySetExternalVariableMode.RemapFromVariable">Remap wired value</option>
+                        </select>
+                    </div>
+
+                    @if (_ExternalMode == StorySetExternalVariableMode.SpecificValue)
+                    {
+                        <div class="modal-field">
+                            <label class="modal-label">@Loc.T(Localization.Common.Fields.value)</label>
+                            @{
+                                List<string> options = StoryVariableValues.PossibleValues(sel);
+                            }
+                            @if (options.Count > 0)
+                            {
+                                <select class="modal-input" @bind="_ExternalValue">
+                                    @foreach (string o in options)
+                                    {
+                                        <option value="@o">@o</option>
+                                    }
+                                </select>
+                            }
+                            else
+                            {
+                                <input class="modal-input" type="text" @bind="_ExternalValue" @bind:event="oninput" maxlength="200"/>
+                            }
+                        </div>
+                    }
+                    else if (_ExternalMode == StorySetExternalVariableMode.RemapFromVariable)
+                    {
+                        <div class="modal-field">
+                            <label class="modal-label">Remap table</label>
+                            @foreach (StorySetExternalVariableRemap row in _ValueMap)
+                            {
+                                StorySetExternalVariableRemap r = row;
+                                <div class="svm-remap-row">
+                                    <input class="modal-input" type="text" placeholder="from" @bind="r.From" @bind:event="oninput"/>
+                                    <i class="bi bi-arrow-right"></i>
+                                    <input class="modal-input" type="text" placeholder="to" @bind="r.To" @bind:event="oninput"/>
+                                    <button class="modal-btn modal-btn-ghost" @onclick="() => _ValueMap.Remove(r)"><i class="bi bi-trash"></i></button>
+                                </div>
+                            }
+                            <button class="modal-btn modal-btn-ghost" @onclick="() => _ValueMap.Add(new StorySetExternalVariableRemap())">
+                                <i class="bi bi-plus-lg"></i> @Loc.T(Localization.Common.Buttons.add)
+                            </button>
+                        </div>
+                    }
+                }
+                else if (sel.InternalSubtype == StoryInternalSubtype.Text)
+                {
+                    <div class="modal-field">
+                        <label class="modal-label">@Loc.T(Localization.Common.Fields.value)</label>
+                        <select class="modal-input" @bind="_StringMode">
+                            <option value="@StringValueMode.Unset">Unset</option>
+                            <option value="@StringValueMode.Specific">Specific value</option>
+                            <option value="@StringValueMode.PlayerInput">Player input</option>
+                        </select>
+                    </div>
+                    @if (_StringMode == StringValueMode.Specific)
+                    {
+                        <div class="modal-field">
+                            <label class="modal-label">@Loc.T(Localization.Common.Fields.value)</label>
+                            <input class="modal-input" type="text" @bind="_StringValue" @bind:event="oninput" maxlength="200"/>
+                        </div>
+                    }
+                    else if (_StringMode == StringValueMode.PlayerInput)
+                    {
+                        <div class="modal-field">
+                            <label class="modal-label">Input kind</label>
+                            <select class="modal-input" @bind="_StringInputKind">
+                                <option value="@StringInputKind.Text">@Loc.T(Localization.Common.Misc.stringWritten)</option>
+                                <option value="@StringInputKind.Number">@Loc.T(Localization.Editor.Modals.RegisterVariable.storageTypeNumber)</option>
+                            </select>
+                        </div>
+                        <div class="modal-field svm-inline">
+                            <div>
+                                <label class="modal-label">Min</label>
+                                <input class="modal-input" type="number" min="1" max="30" @bind="_MinLength"/>
+                            </div>
+                            <div>
+                                <label class="modal-label">Max</label>
+                                <input class="modal-input" type="number" min="1" max="30" @bind="_MaxLength"/>
+                            </div>
+                        </div>
+                    }
+                }
+                else
+                {
+                    @* Internal Number / Dial *@
                     <div class="modal-field">
                         <label class="modal-label">@Loc.T(Localization.Common.Fields.newValue)</label>
                         <select class="modal-input" @bind="_Assignment">
-                            <option value="@NumberAssignment.Unset">@Loc.T(Localization.Editor.Modals.SetVariable.unsetClear)</option>
-                            <option value="@NumberAssignment.SetSpecific">@Loc.T(Localization.Common.Assignment.setSpecific)</option>
+                            <option value="@NumberAssignment.Unset">Unset</option>
+                            <option value="@NumberAssignment.SetSpecific">Specific value</option>
                             <option value="@NumberAssignment.Randomize">@Loc.T(Localization.Common.Assignment.randomize)</option>
                         </select>
                     </div>
-
                     @if (_Assignment == NumberAssignment.SetSpecific)
                     {
                         <div class="modal-field">
-                            <label class="svm-check">
-                                <input type="checkbox"
-                                       checked="@_WireValue"
-                                       @onchange="e => _WireValue = (bool)(e.Value ?? false)"/>
-                                <span>@Loc.T(Localization.Editor.Modals.SetVariable.wireValue)</span>
-                            </label>
+                            <label class="modal-label">@Loc.T(Localization.Common.Fields.value)</label>
+                            <input class="modal-input" type="number" @bind="_SpecificValue"/>
                         </div>
-
-                        @if (_WireValue)
-                        {
-                            <div class="modal-note">
-                                <i class="bi bi-info-circle"></i>
-                                <span>@((MarkupString)Loc.T(Localization.Editor.Modals.SetVariable.wireValueHint))</span>
-                            </div>
-                        }
-                        else
-                        {
-                            <div class="modal-field">
-                                <label class="modal-label">@Loc.T(Localization.Common.Fields.value)</label>
-                                <input class="modal-input"
-                                       type="number"
-                                       min="@ValueMin"
-                                       max="@ValueMax"
-                                       @bind="_SpecificValue"
-                                       @bind:event="oninput"/>
-                            </div>
-                        }
                     }
-
-                    @if (_Assignment == NumberAssignment.Randomize)
+                    else if (_Assignment == NumberAssignment.Randomize)
                     {
                         <div class="modal-field">
                             <label class="modal-label">@Loc.T(Localization.Common.Assignment.randomMode)</label>
@@ -133,170 +171,21 @@
                                 <option value="@RandomMode.Saved">@Loc.T(Localization.Common.Assignment.randomModeSaved)</option>
                                 <option value="@RandomMode.Pure">@Loc.T(Localization.Common.Assignment.randomModePure)</option>
                             </select>
-                            <span class="modal-label-hint">
-                                @Loc.T(_RandomMode == RandomMode.Pure
-                                    ? Localization.Common.Assignment.randomModePureHint
-                                    : Localization.Common.Assignment.randomModeSavedHint)
-                            </span>
                         </div>
                     }
-
-                    @* A ByType set can't know the target's storage mode, so it always offers the secret option. *@
-                    @if (EffectiveType == StorageVariableType.Dial
-                      || Selected is null
-                      || Selected.Mode == NumberStorageMode.Token)
-                    {
-                        <div class="modal-field">
-                            <label class="svm-check">
-                                <input type="checkbox"
-                                       checked="@_Secret"
-                                       @onchange="e => _Secret = (bool)(e.Value ?? false)"/>
-                                <span>@Loc.T(Localization.Common.Fields.secret)</span>
-                            </label>
-                        </div>
-                    }
+                    <label class="svm-check">
+                        <input type="checkbox" @bind="_Secret"/>
+                        <span>@Loc.T(Localization.Common.Fields.secret)</span>
+                    </label>
                 }
 
-                @if (EffectiveType == StorageVariableType.String)
-                {
-                    <div class="modal-field">
-                        <label class="modal-label">@Loc.T(Localization.Common.Fields.newValue)</label>
-                        <select class="modal-input" @bind="_StringMode">
-                            <option value="@StringValueMode.Unset">@Loc.T(Localization.Editor.Modals.SetVariable.unsetClear)</option>
-                            <option value="@StringValueMode.Specific">@Loc.T(Localization.Common.VariableInput.stringModeSpecific)</option>
-                            <option value="@StringValueMode.PlayerInput">@Loc.T(Localization.Common.VariableInput.stringModePlayerInput)</option>
-                        </select>
-                    </div>
-
-                    @if (_StringMode == StringValueMode.Specific)
-                    {
-                        <div class="modal-field">
-                            <label class="svm-check">
-                                <input type="checkbox"
-                                       checked="@_WireValue"
-                                       @onchange="e => _WireValue = (bool)(e.Value ?? false)"/>
-                                <span>@Loc.T(Localization.Editor.Modals.SetVariable.wireValue)</span>
-                            </label>
-                        </div>
-
-                        @if (_WireValue)
-                        {
-                            <div class="modal-note">
-                                <i class="bi bi-info-circle"></i>
-                                <span>@((MarkupString)Loc.T(Localization.Editor.Modals.SetVariable.wireValueHint))</span>
-                            </div>
-                        }
-                        else
-                        {
-                            <div class="modal-field">
-                                <label class="modal-label">@Loc.T(Localization.Common.VariableInput.writtenValue)</label>
-                                <input class="modal-input"
-                                       type="text"
-                                       placeholder="@Loc.T(Localization.Common.VariableInput.writtenValuePlaceholder)"
-                                       @bind="_StringValue"
-                                       @bind:event="oninput"
-                                       maxlength="30"/>
-                            </div>
-                        }
-                    }
-
-                    @if (_StringMode == StringValueMode.PlayerInput)
-                    {
-                        <div class="modal-field">
-                            <label class="modal-label">@Loc.T(Localization.Common.VariableInput.playerEnters)</label>
-                            <select class="modal-input" @bind="_StringInputKind">
-                                <option value="@StringInputKind.Text">@Loc.T(Localization.Common.InputKind.text)</option>
-                                <option value="@StringInputKind.Number">@Loc.T(Localization.Common.InputKind.number)</option>
-                            </select>
-                            <span class="modal-label-hint">
-                                @((MarkupString)Loc.T(Localization.Common.VariableInput.playerInputHint).Replace("[slotToken]", _SlotToken))
-                            </span>
-                        </div>
-
-                        <div class="modal-note">
-                            <i class="bi bi-info-circle"></i>
-                            <span>@((MarkupString)Loc.T(Localization.Common.VariableInput.appOnlyChecksNote))</span>
-                        </div>
-
-                        @* ── Character-limit range ──────────────────────── *@
-                        <div class="svm-row">
-                            <div class="modal-field svm-grow">
-                                <label class="modal-label">@Loc.T(Localization.Common.VariableInput.minLength)</label>
-                                <input class="modal-input"
-                                       type="number"
-                                       min="0"
-                                       max="@_MaxLength"
-                                       @bind="_MinLength"
-                                       @bind:event="oninput"/>
-                            </div>
-                            <div class="modal-field svm-grow">
-                                <label class="modal-label">@Loc.T(Localization.Common.VariableInput.maxLength)</label>
-                                <input class="modal-input"
-                                       type="number"
-                                       min="1"
-                                       max="500"
-                                       @bind="_MaxLength"
-                                       @bind:event="oninput"/>
-                            </div>
-                        </div>
-
-                        @* ── Message shown when the entry length is out of range ── *@
-                        <div class="modal-field">
-                            <label class="modal-label">
-                                @Loc.T(Localization.Common.VariableInput.lengthErrorMessage)
-                                <span class="modal-label-hint">@Loc.T(Localization.Common.VariableInput.lengthErrorHint)</span>
-                            </label>
-                            <div class="svm-keyrow">
-                                <span class="svm-keyname @(_LengthErrorKeyId == Guid.Empty ? "svm-keyname-empty" : "")">@KeyLabel(_LengthErrorKeyId)</span>
-                                <button class="modal-btn modal-btn-ghost svm-keybtn" @onclick="PickLengthErrorKey">@Loc.T(Localization.Common.Buttons.pickKey)</button>
-                                @if (_LengthErrorKeyId != Guid.Empty)
-                                {
-                                    <button class="modal-btn modal-btn-ghost svm-keybtn" @onclick="() => _LengthErrorKeyId = Guid.Empty">@Loc.T(Localization.Common.Buttons.clear)</button>
-                                }
-                            </div>
-                        </div>
-
-                        @* ── Validation rule (reuses the exit auto-condition builder) ── *@
-                        <div class="modal-field">
-                            <label class="modal-label">
-                                @Loc.T(Localization.Common.VariableInput.validationRule)
-                                <span class="modal-label-hint">@Loc.T(Localization.Common.VariableInput.validationRuleHint)</span>
-                            </label>
-                            <span class="modal-label-hint">
-                                @((MarkupString)Loc.T(Localization.Common.VariableInput.validationRuleExplain))
-                            </span>
-                            <div class="svm-rule">
-                                <ExitConditionEditor Expr="_ValidationRule" Vars="RuleVars()" OnChanged="StateHasChanged"/>
-                            </div>
-                        </div>
-
-                        @if (_ValidationRule.Children.Count > 0)
-                        {
-                            <div class="modal-field">
-                                <label class="modal-label">
-                                    @Loc.T(Localization.Common.VariableInput.ruleErrorMessage)
-                                    <span class="modal-label-hint">@Loc.T(Localization.Common.VariableInput.ruleErrorHint)</span>
-                                </label>
-                                <div class="svm-keyrow">
-                                    <span class="svm-keyname @(_ValidationErrorKeyId == Guid.Empty ? "svm-keyname-empty" : "")">@KeyLabel(_ValidationErrorKeyId)</span>
-                                    <button class="modal-btn modal-btn-ghost svm-keybtn" @onclick="PickValidationErrorKey">@Loc.T(Localization.Common.Buttons.pickKey)</button>
-                                    @if (_ValidationErrorKeyId != Guid.Empty)
-                                    {
-                                        <button class="modal-btn modal-btn-ghost svm-keybtn" @onclick="() => _ValidationErrorKeyId = Guid.Empty">@Loc.T(Localization.Common.Buttons.clear)</button>
-                                    }
-                                </div>
-                            </div>
-                        }
-                    }
-                }
-
-                @if (EffectiveType is not null)
+                @if (sel.Scope == StoryVariableScope.Internal)
                 {
                     <div class="modal-field">
                         <label class="modal-label">@Loc.T(Localization.Common.Fields.placement)</label>
                         <select class="modal-input" @bind="_Placement">
-                            <option value="@StorageInstructionPlacement.Below">@Loc.T(Localization.Common.Fields.placementBelow)</option>
-                            <option value="@StorageInstructionPlacement.Above">@Loc.T(Localization.Common.Fields.placementAbove)</option>
+                            <option value="@StorageInstructionPlacement.Below">Below</option>
+                            <option value="@StorageInstructionPlacement.Above">Above</option>
                         </select>
                     </div>
                 }
@@ -306,243 +195,143 @@
 
         <div class="modal-footer">
             <button class="modal-btn modal-btn-ghost" @onclick="Cancel">@Loc.T(Localization.Common.Buttons.cancel)</button>
-            <button class="modal-btn modal-btn-primary"
-                    @onclick="Confirm"
-                    disabled="@(!_CanConfirm)">
-                @(_IsEdit ? Loc.T(Localization.Common.Buttons.saveChanges) : Loc.T(Localization.Editor.Modals.SetVariable.confirm))
+            <button class="modal-btn modal-btn-primary" @onclick="Confirm" disabled="@(!_CanConfirm)">
+                @(_IsEdit ? Loc.T(Localization.Common.Buttons.saveChanges) : "Add")
             </button>
         </div>
 
     </div>
 }
 
-@* Localization key picker for the validation messages — elevated so it stacks above this modal. *@
-<LocalizationKeyPickerModal @ref="_KeyPicker" Elevated="true" OnConfirm="OnKeyPicked"/>
-
 @code {
     [Parameter] public EventCallback<SetVariableArgs> OnConfirm { get; set; }
 
-    /// <summary>The logic node whose inner graph holds the node being edited — the source of the validation rule's wired operands.</summary>
-    [Parameter] public StoryLogicNode? Logic { get; set; }
+    private bool                                _Visible;
+    private bool                                _IsEdit;
+    private Guid                                _EditNodeId;
+    private Guid                                _SelectedVariableId;
+    private string                              _Search = "";
+    private StorySetExternalVariableMode        _ExternalMode;
+    private string                              _ExternalValue = "";
+    private List<StorySetExternalVariableRemap> _ValueMap = new();
+    private NumberAssignment                    _Assignment = NumberAssignment.SetSpecific;
+    private bool                                _Secret;
+    private int                                 _SpecificValue;
+    private RandomMode                          _RandomMode;
+    private StorageInstructionPlacement         _Placement;
+    private StringValueMode                     _StringMode;
+    private string                              _StringValue = "";
+    private StringInputKind                     _StringInputKind;
+    private int                                 _MinLength = 1;
+    private int                                 _MaxLength = 30;
 
-    private bool _Visible;
-    private bool _IsEdit;
-    private Guid _EditNodeId;
+    private StoryVariable? _Selected => StoryLogicFlow.Variable(_ProjectState.CurrentProject!, _SelectedVariableId);
+    private bool           _CanConfirm => _SelectedVariableId != Guid.Empty;
 
-    private StorageVariableRefMode _RefMode;
-    private StorageVariableType    _RefType;
-    private Guid                   _RegisteredVariableId;
-    private NumberAssignment       _Assignment = NumberAssignment.SetSpecific;
-    private bool                   _Secret;
-    private int                    _SpecificValue = 1;
-    private bool                   _WireValue;
-    private RandomMode             _RandomMode = RandomMode.Saved;
-
-    private StorageInstructionPlacement _Placement;
-    private StringValueMode             _StringMode;
-    private string                      _StringValue = "";
-    private StringInputKind             _StringInputKind;
-
-    private int                _MinLength = 1;
-    private int                _MaxLength = 30;
-    private Guid               _LengthErrorKeyId;
-    private StoryConditionExpr _ValidationRule = new() { Kind = StoryConditionExprKind.Group };
-    private Guid               _ValidationErrorKeyId;
-
-    private LocalizationKeyPickerModal? _KeyPicker;
-    private KeyPickTarget               _PickTarget;
-    private enum KeyPickTarget { LengthError, ValidationError }
-
-    /// <summary>Opens the modal to create a new Set-variable node.</summary>
+    /// <summary>Opens the modal to create a new Set Variable node.</summary>
     public void Show()
     {
-        _IsEdit               = false;
-        _EditNodeId           = Guid.Empty;
-        _RefMode              = StorageVariableRefMode.Specific;
-        _RefType              = StorageVariableType.Number;
-        _RegisteredVariableId = Guid.Empty;
-        _Assignment           = NumberAssignment.SetSpecific;
-        _Secret               = false;
-        _SpecificValue        = 1;
-        _WireValue            = false;
-        _RandomMode           = RandomMode.Saved;
-        _Placement            = StorageInstructionPlacement.Below;
-        _StringMode           = StringValueMode.Unset;
-        _StringValue          = "";
-        _StringInputKind      = StringInputKind.Text;
-        _MinLength            = 1;
-        _MaxLength            = 30;
-        _LengthErrorKeyId     = Guid.Empty;
-        _ValidationRule       = new() { Kind = StoryConditionExprKind.Group };
-        _ValidationErrorKeyId = Guid.Empty;
-        _Visible              = true;
+        Reset();
+        _IsEdit     = false;
+        _EditNodeId = Guid.Empty;
+        _Visible    = true;
         StateHasChanged();
     }
 
-    /// <summary>Opens the modal to edit an existing Set-variable node.</summary>
+    /// <summary>Opens the modal to edit an existing Set Variable node.</summary>
     public void ShowEdit(StorySetVariableNode node)
     {
-        _IsEdit               = true;
-        _EditNodeId           = node.Id;
-        _RefMode              = node.RefMode;
-        _RefType              = node.RefType;
-        _RegisteredVariableId = node.RegisteredVariableId;
-        _Assignment           = node.Assignment;
-        _Secret               = node.Secret;
-        _SpecificValue        = node.SpecificValue;
-        _WireValue            = node.WireValue;
-        _RandomMode           = node.RandomMode;
-        _Placement            = node.Placement;
-        _StringMode           = node.StringMode;
-        _StringValue          = node.StringValue;
-        _StringInputKind      = node.StringInputKind;
-        _MinLength            = node.MinLength;
-        _MaxLength            = node.MaxLength;
-        _LengthErrorKeyId     = node.LengthErrorKeyId;
-        _ValidationRule       = node.ValidationRule?.Clone() ?? new StoryConditionExpr { Kind = StoryConditionExprKind.Group };
-        _ValidationErrorKeyId = node.ValidationErrorKeyId;
-        _Visible              = true;
+        Reset();
+        _IsEdit             = true;
+        _EditNodeId         = node.Id;
+        _SelectedVariableId = node.SelectedVariableId;
+        _ExternalMode       = node.ExternalMode;
+        _ExternalValue      = node.ExternalValue;
+        _ValueMap           = node.ValueMap.Select(r => new StorySetExternalVariableRemap { From = r.From, To = r.To }).ToList();
+        _Assignment         = node.Assignment;
+        _Secret             = node.Secret;
+        _SpecificValue      = node.SpecificValue;
+        _RandomMode         = node.RandomMode;
+        _Placement          = node.Placement;
+        _StringMode         = node.StringMode;
+        _StringValue        = node.StringValue;
+        _StringInputKind    = node.StringInputKind;
+        _MinLength          = node.MinLength;
+        _MaxLength          = node.MaxLength;
+        _Visible            = true;
         StateHasChanged();
     }
 
-    /// <summary>The picked register — always null in ByType mode, where the target is named by a wire instead.</summary>
-    private StoryRegisterVariableNode? Selected =>
-        _RefMode == StorageVariableRefMode.ByType || _RegisteredVariableId == Guid.Empty
-            ? null
-            : EditorProjection.FindRegister(_ProjectState.CurrentProject!, _RegisteredVariableId);
-
-    /// <summary>The storage type this node writes — chosen up front in ByType mode, else the picked register's. Null when nothing is picked yet.</summary>
-    private StorageVariableType? EffectiveType =>
-        _RefMode == StorageVariableRefMode.ByType ? _RefType : Selected?.Type;
-
-    /// <summary>A ByType set can't know the target's value count, so it allows the full range its storage type can hold.</summary>
-    private int ValueMin => EffectiveType == StorageVariableType.Dial ? -7 : 1;
-    private int ValueMax => EffectiveType == StorageVariableType.Dial ? 7
-                          : Selected is StoryRegisterVariableNode sel ? StorageSlots.ToNumber(sel.ValueCount)
-                          : StorageSlots.ToNumber(NumberValueCount.Six);
-
-    /// <summary>
-    /// The target as the renderer will resolve it: the picked register, or — in ByType mode — whatever the Name wire
-    /// currently names (only on an existing node; a create has no wire yet).
-    /// </summary>
-    private StoryRegisterVariableNode? ResolvedTarget
+    private void Reset()
     {
-        get
-        {
-            if (_RefMode == StorageVariableRefMode.Specific) return Selected;
-            if (Logic is null || _ProjectState.CurrentProject is null) return null;
-            if (Logic.SetVariableNodes.Find(n => n.Id == _EditNodeId) is not StorySetVariableNode node) return null;
-
-            // Resolve against the type currently chosen in the modal, not the one last saved on the node.
-            string name = StoryLogicFlow.ResolveVariableValue(
-                _ProjectState.CurrentProject, Logic, StoryLogicFlow.FromInto(Logic, node.NameIn.Id),
-                new Dictionary<Guid, string>(), StoryRenderTarget.App);
-            return StoryLogicFlow.FindRegisterByName(_ProjectState.CurrentProject, name, _RefType);
-        }
+        _SelectedVariableId = Guid.Empty;
+        _Search             = "";
+        _ExternalMode       = StorySetExternalVariableMode.SpecificValue;
+        _ExternalValue      = "";
+        _ValueMap           = new();
+        _Assignment         = NumberAssignment.SetSpecific;
+        _Secret             = false;
+        _SpecificValue      = 0;
+        _RandomMode         = RandomMode.Saved;
+        _Placement          = StorageInstructionPlacement.Below;
+        _StringMode         = StringValueMode.Unset;
+        _StringValue        = "";
+        _StringInputKind    = StringInputKind.Text;
+        _MinLength          = 1;
+        _MaxLength          = 30;
     }
 
-    /// <summary>The <c>{token}</c> the target's slot pill fills in the instruction text — <c>{slot}</c> when the name isn't known here (mirrors <c>StoryLogicRenderer</c>).</summary>
-    private string _SlotToken =>
-        ResolvedTarget is { Name: { Length: > 0 } n } ? "{" + StoryLogicRenderer.SlotTokenName(n) + "}" : "{slot}";
-
-    /// <summary>A ByType node names its variable through a wire, so only a Specific node needs a pick before it can be saved.</summary>
-    private bool _CanConfirm =>
-        _RefMode == StorageVariableRefMode.ByType || _RegisteredVariableId != Guid.Empty;
-
-    private List<StoryRegisterVariableNode> RegisteredVariables()
+    private void Select(StoryVariable v)
     {
-        List<StoryRegisterVariableNode> list = new();
-        foreach (StoryLogicNode logic in _ProjectState.CurrentProject!.LogicNodes.Values)
-            list.AddRange(logic.RegisterVariableNodes);
-        return list.OrderBy(v => v.Name, StringComparer.OrdinalIgnoreCase).ToList();
+        _SelectedVariableId = v.Id;
+        // Default the external fixed value to the first possible value so a Bool/Options set is valid immediately.
+        if (v.Scope == StoryVariableScope.External && string.IsNullOrEmpty(_ExternalValue))
+            _ExternalValue = StoryVariableValues.PossibleValues(v).FirstOrDefault() ?? "";
     }
 
-    // ── Player-input String validation helpers ─────────────────────────────
-
-    /// <summary>
-    /// The operands the validation rule can reference: "This entry", everything wired into this node's Validation port
-    /// (only on an existing node — a create has no wires yet), and every other registered variable.
-    /// </summary>
-    private List<(Guid Id, string Name)> RuleVars()
+    private List<StoryVariable> FilteredVariables()
     {
-        List<(Guid, string)> vars = new() { (StorageValidation.ThisEntryRef, Loc.T(Localization.Common.VariableInput.thisEntry)) };
-        vars.AddRange(EditorProjection.WiredVariables(_ProjectState.CurrentProject!, Logic, ValidationInId));
-        foreach (StoryLogicNode logic in _ProjectState.CurrentProject!.LogicNodes.Values)
-            foreach (StoryRegisterVariableNode reg in logic.RegisterVariableNodes.OrderBy(v => v.Name, StringComparer.OrdinalIgnoreCase))
-                if (reg.Id != Selected?.Id)
-                    vars.Add((reg.Id, $"{(string.IsNullOrWhiteSpace(reg.Name) ? Loc.T(Localization.Common.Placeholders.unnamed) : reg.Name)} [{StorageSlots.Label(reg.Type, reg.SlotIndex)}]"));
-        return vars;
-    }
-
-    /// <summary>The Validation port of the node being edited (empty on a create — nothing can be wired into it yet).</summary>
-    private Guid ValidationInId =>
-        Logic?.SetVariableNodes.Find(n => n.Id == _EditNodeId)?.ValidationIn.Id ?? Guid.Empty;
-
-    private string KeyLabel(Guid keyId)
-    {
-        if (keyId == Guid.Empty) return Loc.T(Localization.Common.VariableInput.defaultMessage);
-        return _ProjectState.CurrentLocalization?.Keys.Find(k => k.Id == keyId)?.KeyName ?? Loc.T(Localization.Common.VariableInput.missingKey);
-    }
-
-    private void PickLengthErrorKey()
-    {
-        _PickTarget = KeyPickTarget.LengthError;
-        _KeyPicker?.Show(Guid.Empty, _LengthErrorKeyId);
-    }
-
-    private void PickValidationErrorKey()
-    {
-        _PickTarget = KeyPickTarget.ValidationError;
-        _KeyPicker?.Show(Guid.Empty, _ValidationErrorKeyId);
-    }
-
-    private void OnKeyPicked(LocalizationKeyPickerModal.LocalizationPickResult result)
-    {
-        if (_PickTarget == KeyPickTarget.LengthError) _LengthErrorKeyId     = result.KeyId;
-        else                                          _ValidationErrorKeyId = result.KeyId;
-        StateHasChanged();
+        IEnumerable<StoryVariable> all = _ProjectState.CurrentProject!.Variables.Values.Where(v => !v.IsReadOnly);
+        if (!string.IsNullOrWhiteSpace(_Search))
+            all = all.Where(v => v.Name.Contains(_Search.Trim(), StringComparison.OrdinalIgnoreCase));
+        return all.OrderBy(v => v.Name, StringComparer.OrdinalIgnoreCase).ToList();
     }
 
     private async Task Confirm()
     {
         if (!_CanConfirm) return;
         _Visible = false;
-
-        int specific = EffectiveType is null ? _SpecificValue : Math.Clamp(_SpecificValue, ValueMin, ValueMax);
-        int maxLen   = Math.Clamp(_MaxLength, 1, 500);
-        int minLen   = Math.Clamp(_MinLength, 0, maxLen);
-
-        // A ByType node takes its target from the Name wire, so it keeps no register id.
-        Guid registered = _RefMode == StorageVariableRefMode.ByType ? Guid.Empty : _RegisteredVariableId;
-
+        int min = Math.Clamp(_MinLength, 1, 30);
+        int max = Math.Clamp(_MaxLength, min, 30);
         await OnConfirm.InvokeAsync(new SetVariableArgs(
-            _EditNodeId, _RefMode, _RefType, registered, _Assignment, _Secret, specific, _RandomMode,
-            _Placement, _StringMode, _StringValue.Trim(), _StringInputKind,
-            minLen, maxLen, _LengthErrorKeyId,
-            _ValidationRule.Children.Count > 0 ? _ValidationRule.Clone() : null,
-            _ValidationErrorKeyId, _WireValue));
+            _EditNodeId, _SelectedVariableId,
+            _ExternalMode, _ExternalValue, _ValueMap,
+            _Assignment, _Secret, _SpecificValue, _RandomMode, _Placement,
+            _StringMode, _StringValue, _StringInputKind,
+            min, max, Guid.Empty, null, Guid.Empty, false));
     }
 
     private void Cancel() => _Visible = false;
 
     /// <summary>Result passed back to the parent. <see cref="EditNodeId"/> is empty for a create, set for an edit.</summary>
     public record SetVariableArgs(
-        Guid                        EditNodeId,
-        StorageVariableRefMode      RefMode,
-        StorageVariableType         RefType,
-        Guid                        RegisteredVariableId,
-        NumberAssignment            Assignment,
-        bool                        Secret,
-        int                         SpecificValue,
-        RandomMode                  RandomMode,
-        StorageInstructionPlacement Placement,
-        StringValueMode             StringMode,
-        string                      StringValue,
-        StringInputKind             StringInputKind,
-        int                         MinLength,
-        int                         MaxLength,
-        Guid                        LengthErrorKeyId,
-        StoryConditionExpr?         ValidationRule,
-        Guid                        ValidationErrorKeyId,
-        bool                        WireValue);
+        Guid                                EditNodeId,
+        Guid                                SelectedVariableId,
+        StorySetExternalVariableMode        ExternalMode,
+        string                              ExternalValue,
+        List<StorySetExternalVariableRemap> ValueMap,
+        NumberAssignment                    Assignment,
+        bool                                Secret,
+        int                                 SpecificValue,
+        RandomMode                          RandomMode,
+        StorageInstructionPlacement         Placement,
+        StringValueMode                     StringMode,
+        string                              StringValue,
+        StringInputKind                     StringInputKind,
+        int                                 MinLength,
+        int                                 MaxLength,
+        Guid                                LengthErrorKeyId,
+        StoryConditionExpr?                 ValidationRule,
+        Guid                                ValidationErrorKeyId,
+        bool                                WireValue);
 }

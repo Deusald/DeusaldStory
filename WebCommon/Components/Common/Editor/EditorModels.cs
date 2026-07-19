@@ -58,17 +58,13 @@ namespace DeusaldStoryWeb
         Icon,       // inside a logic node: picks a project icon, feeds an Icon input (orange)
         LightDarkSwitch, // inside a logic node: picks between two icons by render theme (info)
         SmartFormat,     // inside a logic node: formats a text with connected variable values (purple)
-        ExternalVariable, // inside a logic node: picks a story variable, feeds a SmartFormat/Exit variables input (teal)
-        GetVariable,      // inside a logic node: reads a registered storage variable — App value / Gamebook slot tag (teal)
+        GetVariable,      // inside a logic node: reads a global variable — App value (+ Gamebook slot tag for Internal) (teal)
         ConstantVariable, // inside a logic node: a named constant value fed into a SmartFormat/Exit input (teal)
         ConstantString,   // inside a logic node: a literal text (verbatim) fed into any text input (teal)
         RandomizedInstruction, // inside a logic node: renders a random choice — App drawn value / Gamebook D12 band table (purple)
         FlowText,         // inside a logic node: on the LFlow chain, renders a text block then continues (amber)
         SplitForApp,      // inside a logic node: on the LFlow chain, breaks the App render into a new "continue" page (purple)
-        RegisterVariable,   // inside a logic node: on the LFlow chain, claims a storage slot for a new variable (green)
-        SetVariable,        // inside a logic node: on the LFlow chain, sets an already-registered variable's value (blue)
-        UnregisterVariable, // inside a logic node: on the LFlow chain, releases a registered variable and frees its slot (red)
-        SetExternalVariable, // inside a logic node: on the LFlow chain, assigns a value to a story-wide external variable (blue)
+        SetVariable,        // inside a logic node: on the LFlow chain, sets a global variable's value (blue)
         PrevExitVariable,        // inside a logic node: exposes the upstream node's declared variables as constants (teal)
         LogicPortalIn,           // inside a logic node: a value portal's single input node (Text/Icon/Variable arrives here) (orange)
         LogicPortalOut,          // inside a logic node: a value portal's output node (the value re-emerges here) (orange)
@@ -495,54 +491,29 @@ namespace DeusaldStoryWeb
                 nodes.Add(node);
             }
 
-            // ── External Variable nodes (teal) — reference a story variable, feed a SmartFormat variables input. ──
-            foreach (StoryExternalVariableNode ev in logic.ExternalVariableNodes)
-            {
-                StoryVariable? variable = StoryBuiltInVariables.Find(ev.SelectedVariableId)
-                    ?? (project.Variables.TryGetValue(ev.SelectedVariableId, out StoryVariable? stored) ? stored : null);
-                bool found = variable is not null;
-                EdNode node = new()
-                {
-                    Id        = ev.Id,
-                    Kind      = StoryNodeKind.ExternalVariable,
-                    Title     = found ? variable!.Name : UiLang.T(Localization.Editor.Nodes.Titles.noVariable),
-                    Subtitle  = found ? variable!.Description : "",
-                    X         = ev.X,
-                    Y         = ev.Y,
-                    Deletable = true
-                };
-                bool constant = variable is not null && (variable.IsConstant || StoryBuiltInVariables.IsBuiltIn(variable.Id));
-                node.Outputs.Add(new EdPort { Id = ev.OutPoint.Id, Name = UiLang.T(Localization.Editor.Nodes.Ports.variable), Type = constant ? PortType.CVariable : PortType.Variable });
-                nodes.Add(node);
-            }
-
-            // ── Get Variable nodes (teal) — read a registered storage variable: a Value (App) and a Slot tag (Gamebook). ──
+            // ── Get Variable nodes (teal) — read a global variable: a Value port (+ a Slot tag for Internal variables). ──
             foreach (StoryGetVariableNode gv in logic.GetVariableNodes)
             {
-                // A by-type Get names its variable through the wire into its Name port, so the card resolves it the same
-                // way the renderer will — and falls back to "Any {type}" while the name doesn't reach a register.
-                StoryRegisterVariableNode? reg = StoryLogicFlow.TargetOf(project, logic, gv);
-                bool   byType = gv.RefMode == StorageVariableRefMode.ByType;
-                bool   found  = reg is not null;
-                string name   = !string.IsNullOrWhiteSpace(gv.NameOverride) ? gv.NameOverride
-                              : found ? reg!.Name : "";
+                StoryVariable? v      = StoryLogicFlow.GetTarget(project, gv);
+                bool           found  = v is not null;
+                bool           inner  = found && v!.Scope == StoryVariableScope.Internal;
+                bool           constant = found && (StoryBuiltInVariables.IsBuiltIn(v!.Id) || StoryVariableValues.IsConstant(v));
+                string         name   = !string.IsNullOrWhiteSpace(gv.NameOverride) ? gv.NameOverride : found ? v!.Name : "";
                 EdNode node = new()
                 {
                     Id        = gv.Id,
                     Kind      = StoryNodeKind.GetVariable,
-                    Title     = !string.IsNullOrWhiteSpace(name) ? name
-                              : byType ? UiLang.T(Localization.Editor.Nodes.Titles.byTypeTitle, new Dictionary<string, object> { ["type"] = gv.RefType })
-                                       : UiLang.T(Localization.Editor.Nodes.Titles.noVariable),
-                    Subtitle  = found  ? UiLang.T(Localization.Editor.Nodes.Titles.slotTypeSubtitle, new Dictionary<string, object> { ["slot"] = StorageSlots.Label(reg!.Type, reg.SlotIndex), ["type"] = reg.Type })
-                              : byType ? UiLang.T(Localization.Editor.Nodes.Titles.byTypeSubtitle, new Dictionary<string, object> { ["type"] = gv.RefType })
-                                       : UiLang.T(Localization.Editor.Nodes.Titles.unregistered),
+                    Title     = !string.IsNullOrWhiteSpace(name) ? name : UiLang.T(Localization.Editor.Nodes.Titles.noVariable),
+                    Subtitle  = inner ? UiLang.T(Localization.Editor.Nodes.Titles.slotTypeSubtitle, new Dictionary<string, object> { ["slot"] = StoryVariableSlots.Label(v!.InternalSubtype, v.SlotIndex), ["type"] = StoryVariableSlots.Bank(v.InternalSubtype) })
+                              : found ? v!.Description
+                                      : UiLang.T(Localization.Editor.Nodes.Titles.unregistered),
                     X         = gv.X,
                     Y         = gv.Y,
                     Deletable = true
                 };
-                if (byType) node.Inputs.Add(new EdPort { Id = gv.NameIn.Id, Name = UiLang.T(Localization.Editor.Nodes.Ports.name), Type = PortType.CVariable });
-                node.Outputs.Add(new EdPort { Id = gv.OutPoint.Id,     Name = UiLang.T(Localization.Editor.Nodes.Ports.value), Type = PortType.Variable });
-                node.Outputs.Add(new EdPort { Id = gv.SlotOutPoint.Id, Name = UiLang.T(Localization.Editor.Nodes.Ports.slot),  Type = PortType.CVariable });
+                node.Outputs.Add(new EdPort { Id = gv.OutPoint.Id, Name = UiLang.T(Localization.Editor.Nodes.Ports.value), Type = constant ? PortType.CVariable : PortType.Variable });
+                if (inner)
+                    node.Outputs.Add(new EdPort { Id = gv.SlotOutPoint.Id, Name = UiLang.T(Localization.Editor.Nodes.Ports.slot), Type = PortType.CVariable });
                 nodes.Add(node);
             }
 
@@ -641,55 +612,35 @@ namespace DeusaldStoryWeb
                 nodes.Add(node);
             }
 
-            // ── Register-variable nodes (green) — on the flow spine, claim a storage slot for a new variable. ──
-            foreach (StoryRegisterVariableNode reg in logic.RegisterVariableNodes)
-            {
-                EdNode node = new()
-                {
-                    Id        = reg.Id,
-                    Kind      = StoryNodeKind.RegisterVariable,
-                    Title     = string.IsNullOrWhiteSpace(reg.Name) ? UiLang.T(Localization.Common.Placeholders.unnamedVariable) : reg.Name,
-                    Subtitle  = UiLang.T(Localization.Editor.Nodes.Titles.slotTypeSubtitle, new Dictionary<string, object> { ["slot"] = StorageSlots.Label(reg.Type, reg.SlotIndex), ["type"] = reg.Type }),
-                    X         = reg.X,
-                    Y         = reg.Y,
-                    Deletable = true
-                };
-                node.Inputs.Add(new EdPort { Id = reg.FlowIn.Id, Name = UiLang.T(Localization.Editor.Nodes.Ports.flow), Type = PortType.LFlow });
-                if (reg.Type == StorageVariableType.String && reg.StringMode == StringValueMode.PlayerInput)
-                {
-                    node.Inputs.Add(new EdPort { Id = reg.InstructionIn.Id, Name = UiLang.T(Localization.Editor.Nodes.Ports.instruction), Type = PortType.Text });
-                    node.Inputs.Add(new EdPort { Id = reg.PlaceholderIn.Id, Name = UiLang.T(Localization.Editor.Nodes.Ports.placeholder), Type = PortType.Text });
-                    node.Inputs.Add(new EdPort { Id = reg.ValidationIn.Id,  Name = UiLang.T(Localization.Editor.Nodes.Ports.validation),  Type = PortType.Variable });
-                }
-                node.Outputs.Add(new EdPort { Id = reg.FlowOut.Id, Name = UiLang.T(Localization.Editor.Nodes.Ports.flow), Type = PortType.LFlow });
-                nodes.Add(node);
-            }
-
-            // ── Set-variable nodes (blue) — on the flow spine, set an already-registered variable's value. ──
+            // ── Set-variable nodes (blue) — on the flow spine, set a global variable's value. ──
             foreach (StorySetVariableNode set in logic.SetVariableNodes)
             {
-                // As with Get, a by-type Set resolves its target through the wired name; its value/instruction ports key
-                // off the chosen type so they stay put whether or not the name currently reaches a register.
-                StoryRegisterVariableNode? target = StoryLogicFlow.TargetOf(project, logic, set);
-                bool byType = set.RefMode == StorageVariableRefMode.ByType;
-                StorageVariableType? setType = byType ? set.RefType : target?.Type;
+                StoryVariable? target   = StoryLogicFlow.SetTarget(project, set);
+                bool           found    = target is not null;
+                bool           external = found && target!.Scope == StoryVariableScope.External;
+                bool           innerText = found && target!.Scope == StoryVariableScope.Internal && target.InternalSubtype == StoryInternalSubtype.Text;
+                bool           innerNum  = found && target!.Scope == StoryVariableScope.Internal
+                                        && target.InternalSubtype is StoryInternalSubtype.SmallNumber or StoryInternalSubtype.BigPublicNumber or StoryInternalSubtype.BigSecretNumber;
+                bool           remapped = external && set.ExternalMode == StorySetExternalVariableMode.RemapFromVariable;
+                bool           mapped   = external && (remapped || set.ExternalMode == StorySetExternalVariableMode.MapFromVariable);
                 EdNode node = new()
                 {
                     Id        = set.Id,
                     Kind      = StoryNodeKind.SetVariable,
-                    Title     = target is not null ? UiLang.T(Localization.Editor.Nodes.Titles.setVariable, new Dictionary<string, object> { ["name"] = NameOf(target) })
-                              : byType ? UiLang.T(Localization.Editor.Nodes.Titles.setVariable, new Dictionary<string, object> { ["name"] = UiLang.T(Localization.Editor.Nodes.Titles.byTypeTitle, new Dictionary<string, object> { ["type"] = set.RefType }) })
-                                       : UiLang.T(Localization.Editor.Nodes.Titles.setNoVariable),
-                    Subtitle  = target is not null ? StorageSlots.Label(target.Type, target.SlotIndex)
-                              : byType ? UiLang.T(Localization.Editor.Nodes.Titles.byTypeSubtitle, new Dictionary<string, object> { ["type"] = set.RefType })
-                                       : "",
+                    Title     = found ? UiLang.T(Localization.Editor.Nodes.Titles.setVariable, new Dictionary<string, object> { ["name"] = target!.Name })
+                                      : UiLang.T(Localization.Editor.Nodes.Titles.setNoVariable),
+                    Subtitle  = target is { Scope: StoryVariableScope.Internal } iv ? StoryVariableSlots.Label(iv.InternalSubtype, iv.SlotIndex)
+                              : remapped ? UiLang.T(Localization.Editor.Nodes.Titles.setExternalRemapped)
+                              : mapped   ? UiLang.T(Localization.Editor.Nodes.Titles.setExternalMapped)
+                              : external && !string.IsNullOrEmpty(set.ExternalValue) ? UiLang.T(Localization.Editor.Nodes.Titles.setExternalValue, new Dictionary<string, object> { ["value"] = set.ExternalValue })
+                              : "",
                     X         = set.X,
                     Y         = set.Y,
                     Deletable = true
                 };
                 node.Inputs.Add(new EdPort { Id = set.FlowIn.Id, Name = UiLang.T(Localization.Editor.Nodes.Ports.flow), Type = PortType.LFlow });
-                if (byType) node.Inputs.Add(new EdPort { Id = set.NameIn.Id, Name = UiLang.T(Localization.Editor.Nodes.Ports.name), Type = PortType.CVariable });
-                if (setType == StorageVariableType.String && set.StringMode == StringValueMode.PlayerInput)
+                if (mapped) node.Inputs.Add(new EdPort { Id = set.ValueIn.Id, Name = UiLang.T(Localization.Editor.Nodes.Ports.value), Type = PortType.Variable });
+                if (innerText && set.StringMode == StringValueMode.PlayerInput)
                 {
                     node.Inputs.Add(new EdPort { Id = set.InstructionIn.Id, Name = UiLang.T(Localization.Editor.Nodes.Ports.instruction), Type = PortType.Text });
                     node.Inputs.Add(new EdPort { Id = set.PlaceholderIn.Id, Name = UiLang.T(Localization.Editor.Nodes.Ports.placeholder), Type = PortType.Text });
@@ -698,56 +649,14 @@ namespace DeusaldStoryWeb
                 // A wired specific value takes it from a Variable port (the App's runtime value) and a Text port (the
                 // Gamebook display of what to write) — mirrors Get Variable's Value/Slot split, but as inputs.
                 bool wireSpecific = set.WireValue
-                                 && (setType == StorageVariableType.String
-                                        ? set.StringMode == StringValueMode.Specific
-                                        : setType is StorageVariableType.Number or StorageVariableType.Dial && set.Assignment == NumberAssignment.SetSpecific);
+                                 && ((innerText && set.StringMode == StringValueMode.Specific)
+                                  || (innerNum  && set.Assignment == NumberAssignment.SetSpecific));
                 if (wireSpecific)
                 {
                     node.Inputs.Add(new EdPort { Id = set.ValueIn.Id,     Name = UiLang.T(Localization.Editor.Nodes.Ports.appValue),     Type = PortType.Variable });
                     node.Inputs.Add(new EdPort { Id = set.ValueTextIn.Id, Name = UiLang.T(Localization.Editor.Nodes.Ports.gamebookText), Type = PortType.Text });
                 }
                 node.Outputs.Add(new EdPort { Id = set.FlowOut.Id, Name = UiLang.T(Localization.Editor.Nodes.Ports.flow), Type = PortType.LFlow });
-                nodes.Add(node);
-            }
-
-            // ── Unregister-variable nodes (red) — on the flow spine, release a registered variable and free its slot. ──
-            foreach (StoryUnregisterVariableNode unreg in logic.UnregisterVariableNodes)
-            {
-                StoryRegisterVariableNode? target = FindRegister(project, unreg.RegisteredVariableId);
-                EdNode node = new()
-                {
-                    Id        = unreg.Id,
-                    Kind      = StoryNodeKind.UnregisterVariable,
-                    Title     = target is not null ? UiLang.T(Localization.Editor.Nodes.Titles.unregisterVariable, new Dictionary<string, object> { ["name"] = NameOf(target) }) : UiLang.T(Localization.Editor.Nodes.Titles.unregisterNoVariable),
-                    Subtitle  = target is not null ? StorageSlots.Label(target.Type, target.SlotIndex) : "",
-                    X         = unreg.X,
-                    Y         = unreg.Y,
-                    Deletable = true
-                };
-                node.Inputs.Add(new EdPort { Id = unreg.FlowIn.Id, Name = UiLang.T(Localization.Editor.Nodes.Ports.flow), Type = PortType.LFlow });
-                node.Outputs.Add(new EdPort { Id = unreg.FlowOut.Id, Name = UiLang.T(Localization.Editor.Nodes.Ports.flow), Type = PortType.LFlow });
-                nodes.Add(node);
-            }
-
-            // ── Set-external-variable nodes (blue) — on the flow spine, assign a value to a story-wide external variable. ──
-            foreach (StorySetExternalVariableNode se in logic.SetExternalVariableNodes)
-            {
-                bool     found    = project.Variables.TryGetValue(se.SelectedVariableId, out StoryVariable? variable);
-                bool     remapped = se.Mode == StorySetExternalVariableMode.RemapFromVariable;
-                bool     mapped   = remapped || se.Mode == StorySetExternalVariableMode.MapFromVariable;
-                EdNode node = new()
-                {
-                    Id        = se.Id,
-                    Kind      = StoryNodeKind.SetExternalVariable,
-                    Title     = found ? UiLang.T(Localization.Editor.Nodes.Titles.setExternal, new Dictionary<string, object> { ["name"] = variable!.Name }) : UiLang.T(Localization.Editor.Nodes.Titles.setExternalNoVariable),
-                    Subtitle  = remapped ? UiLang.T(Localization.Editor.Nodes.Titles.setExternalRemapped) : mapped ? UiLang.T(Localization.Editor.Nodes.Titles.setExternalMapped) : string.IsNullOrEmpty(se.Value) ? "" : UiLang.T(Localization.Editor.Nodes.Titles.setExternalValue, new Dictionary<string, object> { ["value"] = se.Value }),
-                    X         = se.X,
-                    Y         = se.Y,
-                    Deletable = true
-                };
-                node.Inputs.Add(new EdPort { Id = se.FlowIn.Id, Name = UiLang.T(Localization.Editor.Nodes.Ports.flow), Type = PortType.LFlow });
-                if (mapped) node.Inputs.Add(new EdPort { Id = se.ValueIn.Id, Name = UiLang.T(Localization.Editor.Nodes.Ports.value), Type = PortType.Variable });
-                node.Outputs.Add(new EdPort { Id = se.FlowOut.Id, Name = UiLang.T(Localization.Editor.Nodes.Ports.flow), Type = PortType.LFlow });
                 nodes.Add(node);
             }
 
@@ -933,15 +842,12 @@ namespace DeusaldStoryWeb
              || logic.LightDarkSwitchNodes.Exists(n => n.OutPoint.Id == outputId))
                 return PortType.Icon;
 
-            if (logic.ExternalVariableNodes.Find(n => n.OutPoint.Id == outputId) is StoryExternalVariableNode ev)
+            if (logic.GetVariableNodes.Find(n => n.OutPoint.Id == outputId) is StoryGetVariableNode gvo)
             {
-                StoryVariable? v = StoryBuiltInVariables.Find(ev.SelectedVariableId)
-                    ?? (project.Variables.TryGetValue(ev.SelectedVariableId, out StoryVariable? stored) ? stored : null);
-                bool constant = v is not null && (v.IsConstant || StoryBuiltInVariables.IsBuiltIn(v.Id));
+                StoryVariable? v = StoryLogicFlow.GetTarget(project, gvo);
+                bool constant = v is not null && (StoryBuiltInVariables.IsBuiltIn(v.Id) || StoryVariableValues.IsConstant(v));
                 return constant ? PortType.CVariable : PortType.Variable;
             }
-
-            if (logic.GetVariableNodes.Exists(n => n.OutPoint.Id == outputId))     return PortType.Variable;
             if (logic.GetVariableNodes.Exists(n => n.SlotOutPoint.Id == outputId)) return PortType.CVariable;
             if (logic.ConstantVariableNodes.Exists(n => n.OutPoint.Id == outputId)) return PortType.CVariable;
             if (logic.ConstantStringNodes.Exists(n => n.OutPoint.Id == outputId))   return PortType.Text;
@@ -995,21 +901,16 @@ namespace DeusaldStoryWeb
         {
             fromPoint = logic.ResolvePortalSource(fromPoint);
 
-            if (logic.ExternalVariableNodes.Find(n => n.OutPoint.Id == fromPoint) is StoryExternalVariableNode ev)
-                return (StoryBuiltInVariables.Find(ev.SelectedVariableId)
-                        ?? (project.Variables.TryGetValue(ev.SelectedVariableId, out StoryVariable? v) ? v : null))?.Name
-                    ?? UiLang.T(Localization.Editor.Page.variableNameFallback);
-
             if (logic.GetVariableNodes.Find(n => n.OutPoint.Id == fromPoint || n.SlotOutPoint.Id == fromPoint) is StoryGetVariableNode gv)
             {
                 bool slot = gv.SlotOutPoint.Id == fromPoint;
                 if (slot && !string.IsNullOrWhiteSpace(gv.SlotNameOverride)) return gv.SlotNameOverride;
                 if (!string.IsNullOrWhiteSpace(gv.NameOverride))
                     return slot ? UiLang.T(Localization.Editor.Page.registerSlotName, new Dictionary<string, object> { ["regName"] = gv.NameOverride }) : gv.NameOverride;
-                string regName = StoryLogicFlow.TargetOf(project, logic, gv)?.Name ?? "";
-                return string.IsNullOrWhiteSpace(regName)
+                string varName = StoryLogicFlow.GetTarget(project, gv)?.Name ?? "";
+                return string.IsNullOrWhiteSpace(varName)
                     ? (slot ? UiLang.T(Localization.Editor.Page.slotNameFallback) : UiLang.T(Localization.Editor.Page.getNameFallback))
-                    : (slot ? UiLang.T(Localization.Editor.Page.registerSlotName, new Dictionary<string, object> { ["regName"] = regName }) : regName);
+                    : (slot ? UiLang.T(Localization.Editor.Page.registerSlotName, new Dictionary<string, object> { ["regName"] = varName }) : varName);
             }
 
             if (logic.ConstantVariableNodes.Find(n => n.OutPoint.Id == fromPoint) is StoryConstantVariableNode cn)
@@ -1056,22 +957,6 @@ namespace DeusaldStoryWeb
             }
             return result;
         }
-
-        /// <summary>Finds the Register-variable node with <paramref name="id"/> anywhere in the project's logic nodes.</summary>
-        public static StoryRegisterVariableNode? FindRegister(StoryProject project, Guid id)
-        {
-            if (id == Guid.Empty) return null;
-            foreach (StoryLogicNode logic in project.LogicNodes.Values)
-            {
-                StoryRegisterVariableNode? found = logic.RegisterVariableNodes.Find(n => n.Id == id);
-                if (found is not null) return found;
-            }
-            return null;
-        }
-
-        /// <summary>A registered variable's display name, falling back to a placeholder when unnamed.</summary>
-        private static string NameOf(StoryRegisterVariableNode reg) =>
-            string.IsNullOrWhiteSpace(reg.Name) ? UiLang.T(Localization.Common.Placeholders.unnamedVariable) : reg.Name;
 
         /// <summary>
         /// Subtitle for a FlowText node — the non-Normal frame style and/or a medium restriction, joined with " · ".
@@ -1148,17 +1033,13 @@ namespace DeusaldStoryWeb
             StoryNodeKind.Icon         => UiLang.T(Localization.Editor.Nodes.Labels.icon),
             StoryNodeKind.LightDarkSwitch => UiLang.T(Localization.Editor.Nodes.Labels.lightDark),
             StoryNodeKind.SmartFormat      => UiLang.T(Localization.Editor.Nodes.Labels.smartFormat),
-            StoryNodeKind.ExternalVariable => UiLang.T(Localization.Editor.Nodes.Labels.externalVariable),
             StoryNodeKind.GetVariable      => UiLang.T(Localization.Editor.Nodes.Labels.getVariable),
             StoryNodeKind.ConstantVariable => UiLang.T(Localization.Editor.Nodes.Labels.constantVariable),
             StoryNodeKind.ConstantString   => UiLang.T(Localization.Editor.Nodes.Labels.constantString),
             StoryNodeKind.RandomizedInstruction => UiLang.T(Localization.Editor.Nodes.Labels.randomizedInstruction),
             StoryNodeKind.FlowText         => UiLang.T(Localization.Editor.Nodes.Labels.flowText),
             StoryNodeKind.SplitForApp      => UiLang.T(Localization.Editor.Nodes.Labels.splitForApp),
-            StoryNodeKind.RegisterVariable   => UiLang.T(Localization.Editor.Nodes.Labels.registerVariable),
             StoryNodeKind.SetVariable        => UiLang.T(Localization.Editor.Nodes.Labels.setVariable),
-            StoryNodeKind.UnregisterVariable => UiLang.T(Localization.Editor.Nodes.Labels.unregisterVariable),
-            StoryNodeKind.SetExternalVariable => UiLang.T(Localization.Editor.Nodes.Labels.setExternalVariable),
             StoryNodeKind.PrevExitVariable        => UiLang.T(Localization.Editor.Nodes.Labels.prevExitVariables),
             StoryNodeKind.LogicPortalIn           => UiLang.T(Localization.Editor.Nodes.Labels.portalIn),
             StoryNodeKind.LogicPortalOut          => UiLang.T(Localization.Editor.Nodes.Labels.portalOut),
@@ -1204,17 +1085,13 @@ namespace DeusaldStoryWeb
             StoryNodeKind.Icon         => "bi-emoji-smile",
             StoryNodeKind.LightDarkSwitch => "bi-circle-half",
             StoryNodeKind.SmartFormat      => "bi-braces-asterisk",
-            StoryNodeKind.ExternalVariable => "bi-braces",
             StoryNodeKind.GetVariable      => "bi-box-arrow-down",
             StoryNodeKind.ConstantVariable => "bi-braces",
             StoryNodeKind.ConstantString   => "bi-fonts",
             StoryNodeKind.RandomizedInstruction => "bi-dice-5",
             StoryNodeKind.FlowText         => "bi-text-paragraph",
             StoryNodeKind.SplitForApp      => "bi-scissors",
-            StoryNodeKind.RegisterVariable   => "bi-box-seam",
             StoryNodeKind.SetVariable        => "bi-pencil-square",
-            StoryNodeKind.UnregisterVariable => "bi-box-arrow-up",
-            StoryNodeKind.SetExternalVariable => "bi-sliders",
             StoryNodeKind.PrevExitVariable        => "bi-braces",
             StoryNodeKind.LogicPortalIn           => "bi-box-arrow-in-right",
             StoryNodeKind.LogicPortalOut          => "bi-box-arrow-right",
@@ -1276,17 +1153,13 @@ namespace DeusaldStoryWeb
             StoryNodeKind.Icon         => "var(--orange)",
             StoryNodeKind.LightDarkSwitch => "var(--info)",
             StoryNodeKind.SmartFormat      => "var(--purple)",
-            StoryNodeKind.ExternalVariable => "var(--code-func)",
             StoryNodeKind.GetVariable      => "var(--code-func)",
             StoryNodeKind.ConstantVariable => "var(--code-func)",
             StoryNodeKind.ConstantString   => "var(--code-func)",
             StoryNodeKind.RandomizedInstruction => "var(--purple)",
             StoryNodeKind.FlowText         => "var(--warning)",
             StoryNodeKind.SplitForApp      => "var(--purple)",
-            StoryNodeKind.RegisterVariable   => "var(--success)",
             StoryNodeKind.SetVariable        => "var(--info)",
-            StoryNodeKind.UnregisterVariable => "var(--danger)",
-            StoryNodeKind.SetExternalVariable => "var(--info)",
             StoryNodeKind.PrevExitVariable        => "var(--code-func)",
             StoryNodeKind.LogicPortalIn           => "var(--orange)",
             StoryNodeKind.LogicPortalOut          => "var(--orange)",

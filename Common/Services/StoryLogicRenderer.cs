@@ -148,7 +148,7 @@ namespace DeusaldStoryCommon
             // always-light Gamebook, else the App preview's toggle (paper = the light/paper theme).
             values = new Dictionary<Guid, string>(values)
             {
-                [StoryBuiltInVariables.AppThemeId] = paper ? StoryBuiltInVariables.LightValue : StoryBuiltInVariables.DarkValue
+                [StoryBuiltInVariables.ThemeId] = paper ? StoryBuiltInVariables.LightValue : StoryBuiltInVariables.DarkValue
             };
 
             List<string>         errors  = new();
@@ -381,14 +381,8 @@ namespace DeusaldStoryCommon
                     }
                     else if (logic.SplitForAppNodes.Find(n => n.FlowIn.Id == target) is StorySplitForAppNode split)
                         target = FlowTargetOf(logic, split.FlowOut.Id);
-                    else if (logic.SetExternalVariableNodes.Find(n => n.FlowIn.Id == target) is StorySetExternalVariableNode se)
-                        target = FlowTargetOf(logic, se.FlowOut.Id);
-                    else if (logic.RegisterVariableNodes.Find(n => n.FlowIn.Id == target) is StoryRegisterVariableNode reg)
-                        target = FlowTargetOf(logic, reg.FlowOut.Id);
                     else if (logic.SetVariableNodes.Find(n => n.FlowIn.Id == target) is StorySetVariableNode set)
                         target = FlowTargetOf(logic, set.FlowOut.Id);
-                    else if (logic.UnregisterVariableNodes.Find(n => n.FlowIn.Id == target) is StoryUnregisterVariableNode unreg)
-                        target = FlowTargetOf(logic, unreg.FlowOut.Id);
                     else if (logic.ConditionFlowNodes.Find(n => n.FlowIn.Id == target) is StoryConditionFlowNode cf)
                     {
                         if (StoryLogicFlow.EvaluateConditionFlow(project, logic, cf, values, renderTarget))
@@ -444,25 +438,12 @@ namespace DeusaldStoryCommon
                         pages.Add(new());
                         target = FlowTargetOf(logic, split.FlowOut.Id);
                     }
-                    else if (logic.RegisterVariableNodes.Find(n => n.FlowIn.Id == target) is StoryRegisterVariableNode reg)
-                    {
-                        AddInput(page, StoryStorageInstructions.ForOp(project, localization, logic, StorageOp.For(reg), StoryRenderTarget.App));
-                        visited.Add(reg.Id);
-                        target = FlowTargetOf(logic, reg.FlowOut.Id);
-                    }
                     else if (logic.SetVariableNodes.Find(n => n.FlowIn.Id == target) is StorySetVariableNode set)
                     {
-                        AddInput(page, StoryStorageInstructions.ForOp(project, localization, logic, StorageOp.For(project, logic, set, values, StoryRenderTarget.App), StoryRenderTarget.App));
+                        AddInput(page, StoryStorageInstructions.ForSet(project, localization, logic, set, StoryRenderTarget.App));
                         visited.Add(set.Id);
                         target = FlowTargetOf(logic, set.FlowOut.Id);
                     }
-                    else if (logic.UnregisterVariableNodes.Find(n => n.FlowIn.Id == target) is StoryUnregisterVariableNode unreg)
-                    {
-                        visited.Add(unreg.Id); // the App drops the value silently — no input field
-                        target = FlowTargetOf(logic, unreg.FlowOut.Id);
-                    }
-                    else if (logic.SetExternalVariableNodes.Find(n => n.FlowIn.Id == target) is StorySetExternalVariableNode se)
-                        target = FlowTargetOf(logic, se.FlowOut.Id);
                     else if (logic.ConditionFlowNodes.Find(n => n.FlowIn.Id == target) is StoryConditionFlowNode cf)
                     {
                         if (StoryLogicFlow.EvaluateConditionFlow(project, logic, cf, values, StoryRenderTarget.App))
@@ -481,12 +462,9 @@ namespace DeusaldStoryCommon
             RenderedPage last = pages[^1];
             bool Wired(StoryConnectionPoint flowIn, StoryConnectionPoint flowOut) =>
                 logic.ContentConnections.Exists(c => c.ToPoint == flowIn.Id || c.FromPoint == flowOut.Id);
-            foreach (StoryRegisterVariableNode reg in logic.RegisterVariableNodes)
-                if (!visited.Contains(reg.Id) && !Wired(reg.FlowIn, reg.FlowOut))
-                    AddInput(last, StoryStorageInstructions.ForOp(project, localization, logic, StorageOp.For(reg), StoryRenderTarget.App));
             foreach (StorySetVariableNode set in logic.SetVariableNodes)
                 if (!visited.Contains(set.Id) && !Wired(set.FlowIn, set.FlowOut))
-                    AddInput(last, StoryStorageInstructions.ForOp(project, localization, logic, StorageOp.For(project, logic, set, values, StoryRenderTarget.App), StoryRenderTarget.App));
+                    AddInput(last, StoryStorageInstructions.ForSet(project, localization, logic, set, StoryRenderTarget.App));
 
             pages.RemoveAll(p => p.Above.Count == 0 && p.Blocks.Count == 0 && p.Below.Count == 0);
             if (pages.Count == 0) pages.Add(new());
@@ -591,32 +569,30 @@ namespace DeusaldStoryCommon
                 if (extraValues is not null)
                     foreach (KeyValuePair<string, object> kv in extraValues) vals[kv.Key] = kv.Value;
 
-                // The read-only built-ins are always available to every SmartFormat node without wiring an External
-                // Variable node — their values follow the render (medium/theme), never dimension sections, and a wired
+                // The read-only built-ins are always available to every SmartFormat node without wiring a Get Variable
+                // node — their values follow the render (medium/theme), never dimension sections, and a wired
                 // built-in below just overwrites with the same value.
                 foreach (StoryVariable builtIn in StoryBuiltInVariables.All)
                     vals[builtIn.Name] = StoryBuiltInVariables.ValueFor(builtIn.Id, target, values);
 
-                bool hasOmittedVariable = false; // a plain Variable dropped in the Gamebook (probable SmartFormat-error cause)
+                bool hasOmittedVariable = false; // a live value dropped in the Gamebook (probable SmartFormat-error cause)
                 foreach (StoryConnection c in logic.ContentConnections.Where(c => c.ToPoint == sf.VariablesIn.Id))
                 {
                     // A variable may reach the format via a portal — resolve the wire back to the real value source first.
                     Guid src = logic.ResolvePortalSource(c.FromPoint);
-                    if (logic.ExternalVariableNodes.Find(n => n.OutPoint.Id == src) is StoryExternalVariableNode ev
-                        && Variable(project, ev.SelectedVariableId) is StoryVariable v && !string.IsNullOrWhiteSpace(v.Name))
-                    {
-                        bool constant = StoryBuiltInVariables.IsBuiltIn(v.Id) || v.IsConstant;
-                        if (StoryBuiltInVariables.IsBuiltIn(v.Id)) vals[v.Name] = StoryBuiltInVariables.ValueFor(v.Id, target, values);
-                        else if (constant || target == StoryRenderTarget.App) vals[v.Name] = PreviewValue(v, values);
-                        else hasOmittedVariable = true; // plain Variable, Gamebook — leave the {token} unresolved
-                    }
-                    else if (logic.GetVariableNodes.Find(n => n.SlotOutPoint.Id == src) is StoryGetVariableNode gvSlot
+                    if (logic.GetVariableNodes.Find(n => n.SlotOutPoint.Id == src) is StoryGetVariableNode gvSlot
                         && GetVariableSlotName(project, logic, gvSlot, values, target) is { Length: > 0 } gvSlotName)
                         vals[gvSlotName] = GetVariableSlotTag(project, logic, gvSlot, values, target); // constant slot tag — resolves in both mediums
                     else if (logic.GetVariableNodes.Find(n => n.OutPoint.Id == src) is StoryGetVariableNode gv
                         && GetVariableName(project, logic, gv, values, target) is { Length: > 0 } gvName)
                     {
-                        if (target == StoryRenderTarget.App) vals[gvName] = GetVariablePreviewValue(project, logic, gv, values, target);
+                        StoryVariable? gvVar = StoryLogicFlow.GetTarget(project, gv);
+                        if (gvVar is not null && StoryBuiltInVariables.IsBuiltIn(gvVar.Id))
+                            vals[gvName] = StoryBuiltInVariables.ValueFor(gvVar.Id, target, values); // medium/theme, both mediums
+                        else if (gvVar is not null && StoryVariableValues.IsConstant(gvVar))
+                            vals[gvName] = gvVar.FixedValue; // Initial/Constant external — known before printing
+                        else if (target == StoryRenderTarget.App)
+                            vals[gvName] = GetVariablePreviewValue(project, logic, gv, values, target);
                         else hasOmittedVariable = true; // live value, unknown in the Gamebook
                     }
                     else if (logic.ConstantVariableNodes.Find(n => n.OutPoint.Id == src) is StoryConstantVariableNode cv
@@ -809,20 +785,19 @@ namespace DeusaldStoryCommon
             return key.Translations.Find(t => t.LanguageId == main)?.Text ?? "";
         }
 
-        private static string PreviewValue(StoryVariable v, IReadOnlyDictionary<Guid, string> values) =>
-            values.TryGetValue(v.Id, out string? val) ? val : v.PossibleValues.FirstOrDefault() ?? "";
+        private static string PreviewValue(StoryVariable v, IReadOnlyDictionary<Guid, string> values)
+        {
+            if (StoryVariableValues.IsConstant(v)) return v.FixedValue;
+            return values.TryGetValue(v.Id, out string? val) ? val : StoryVariableValues.PossibleValues(v).FirstOrDefault() ?? "";
+        }
 
-        private static StoryVariable? Variable(StoryProject project, Guid id) =>
-            StoryBuiltInVariables.Find(id)
-            ?? (id != Guid.Empty && project.Variables.TryGetValue(id, out StoryVariable? v) ? v : null);
-
-        /// <summary>The SmartFormat token name a Get Variable node's Value port supplies under — its override, else the target register's own name (empty when unresolved).</summary>
+        /// <summary>The SmartFormat token name a Get Variable node's Value port supplies under — its override, else the target variable's own name (empty when unresolved).</summary>
         private static string GetVariableName(
             StoryProject project, StoryLogicNode logic, StoryGetVariableNode gv,
             IReadOnlyDictionary<Guid, string> values, StoryRenderTarget target)
         {
             if (!string.IsNullOrWhiteSpace(gv.NameOverride)) return gv.NameOverride;
-            return StoryLogicFlow.TargetOf(project, logic, gv, values, target)?.Name ?? "";
+            return StoryLogicFlow.GetTarget(project, gv)?.Name ?? "";
         }
 
         /// <summary>The SmartFormat token name a Get Variable node's Slot port supplies under — its own override, else the Value token plus a <c>Slot</c> suffix, so the two ports never collide in one format (empty when unresolved).</summary>
@@ -837,24 +812,24 @@ namespace DeusaldStoryCommon
         public static string SlotTokenName(string variableName) =>
             string.IsNullOrWhiteSpace(variableName) ? "" : variableName.Trim() + "Slot";
 
-        /// <summary>The App-preview value for a Get Variable node — its own preview value, falling back to the target register's when blank.</summary>
+        /// <summary>The App-preview value for a Get Variable node — its own preview value, falling back to the target variable's default when blank.</summary>
         private static string GetVariablePreviewValue(
             StoryProject project, StoryLogicNode logic, StoryGetVariableNode gv,
             IReadOnlyDictionary<Guid, string> values, StoryRenderTarget target) =>
             !string.IsNullOrEmpty(gv.PreviewValue)
                 ? gv.PreviewValue
-                : StoryLogicFlow.TargetOf(project, logic, gv, values, target)?.PreviewValue ?? "";
+                : StoryLogicFlow.GetTarget(project, gv) is StoryVariable v ? PreviewValue(v, values) : "";
 
-        /// <summary>The Gamebook substitution for a Get Variable node's slot port — the referenced slot's styled tag (TA/NA/DA pill).</summary>
+        /// <summary>The Gamebook substitution for a Get Variable node's slot port — the referenced Internal variable's slot tag (TA/NA/DA pill); empty for External variables (no slot).</summary>
         private static string GetVariableSlotTag(
             StoryProject project, StoryLogicNode logic, StoryGetVariableNode gv,
             IReadOnlyDictionary<Guid, string> values, StoryRenderTarget target)
         {
-            StoryRegisterVariableNode? reg = StoryLogicFlow.TargetOf(project, logic, gv, values, target);
-            if (reg is null) return "";
-            return string.IsNullOrWhiteSpace(reg.Name)
-                ? PreviewHtmlSanitizer.SlotTag(StorageSlots.Label(reg.Type, reg.SlotIndex))
-                : $"<var={reg.Name}>";
+            StoryVariable? v = StoryLogicFlow.GetTarget(project, gv);
+            if (v is null || v.Scope != StoryVariableScope.Internal) return "";
+            return string.IsNullOrWhiteSpace(v.Name)
+                ? PreviewHtmlSanitizer.SlotTag(StoryVariableSlots.Label(v.InternalSubtype, v.SlotIndex))
+                : $"<var={v.Name}>";
         }
 
         // ── Icon resolution ──────────────────────────────────────────────────────

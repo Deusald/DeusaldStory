@@ -3,10 +3,10 @@
 @inject ProjectStateService _ProjectState
 
 @* ─────────────────────────────────────────────────────────────────────────
-   Creates / edits a Get Variable node: picks a registered storage variable to
-   read, optionally overrides the Value / Slot SmartFormat token names, and sets the preview
-   value shown in the App preview (the App tracks the live value at runtime; the
-   Gamebook prints the variable's slot tag instead). Used by create and edit.
+   Creates / edits a Get Variable node: picks a global variable (External or
+   Internal, including the read-only built-ins) to read, optionally overrides the
+   Value / Slot SmartFormat token names, and sets the preview value shown in the App
+   preview. The Slot token applies only to Internal variables (they own a board slot).
    ───────────────────────────────────────────────────────────────────────── *@
 
 @if (_Visible)
@@ -24,97 +24,56 @@
 
         <div class="modal-body gvm-body">
 
-            @* ── Which variable: one picked here, or one named by the wired Name port ── *@
             <div class="modal-field">
-                <label class="gvm-mode">
-                    <input type="radio"
-                           name="gvm-mode"
-                           checked="@(_RefMode == StorageVariableRefMode.Specific)"
-                           @onchange="() => _RefMode = StorageVariableRefMode.Specific"/>
-                    <span>@Loc.T(Localization.Editor.Modals.GetVariable.modeSpecific)</span>
-                </label>
-                <label class="gvm-mode">
-                    <input type="radio"
-                           name="gvm-mode"
-                           checked="@(_RefMode == StorageVariableRefMode.ByType)"
-                           @onchange="() => _RefMode = StorageVariableRefMode.ByType"/>
-                    <span>@Loc.T(Localization.Editor.Modals.GetVariable.modeByType)</span>
-                </label>
+                <label class="modal-label">@Loc.T(Localization.Editor.Modals.GetVariable.registeredVariable)</label>
+                <input class="modal-input" type="text" placeholder="Search"
+                       @bind="_Search" @bind:event="oninput"/>
+                @{
+                    List<StoryVariable> vars = FilteredVariables();
+                }
+                @if (vars.Count == 0)
+                {
+                    <div class="gvm-empty">
+                        <i class="bi bi-braces"></i>
+                        <span>@Loc.T(Localization.Common.Messages.noVariablesRegistered)</span>
+                    </div>
+                }
+                else
+                {
+                    <div class="gvm-list">
+                        @foreach (StoryVariable v in vars)
+                        {
+                            StoryVariable variable = v;
+                            <button class="gvm-item @(_SelectedVariableId == variable.Id ? "selected" : "")"
+                                    @onclick="() => _SelectedVariableId = variable.Id">
+                                <span class="gvm-item-name">@(string.IsNullOrWhiteSpace(variable.Name) ? Loc.T(Localization.Common.Placeholders.unnamed) : variable.Name)</span>
+                                <span class="gvm-item-slot">@SlotOrScope(variable)</span>
+                            </button>
+                        }
+                    </div>
+                }
             </div>
-
-            @if (_RefMode == StorageVariableRefMode.Specific)
-            {
-                <div class="modal-field">
-                    <label class="modal-label">@Loc.T(Localization.Editor.Modals.GetVariable.registeredVariable)</label>
-                    @{
-                        List<StoryRegisterVariableNode> vars = RegisteredVariables();
-                    }
-                    @if (vars.Count == 0)
-                    {
-                        <div class="gvm-empty">
-                            <i class="bi bi-box-seam"></i>
-                            <span>@Loc.T(Localization.Common.Messages.noVariablesRegistered)</span>
-                        </div>
-                    }
-                    else
-                    {
-                        <div class="gvm-list">
-                            @foreach (StoryRegisterVariableNode v in vars)
-                            {
-                                StoryRegisterVariableNode variable = v;
-                                <button class="gvm-item @(_RegisteredVariableId == variable.Id ? "selected" : "")"
-                                        @onclick="() => _RegisteredVariableId = variable.Id">
-                                    <span class="gvm-item-name">@(string.IsNullOrWhiteSpace(variable.Name) ? Loc.T(Localization.Common.Placeholders.unnamed) : variable.Name)</span>
-                                    <span class="gvm-item-slot">@StorageSlots.Label(variable.Type, variable.SlotIndex)</span>
-                                </button>
-                            }
-                        </div>
-                    }
-                </div>
-            }
-            else
-            {
-                <div class="modal-field">
-                    <label class="modal-label">@Loc.T(Localization.Editor.Modals.RegisterVariable.storageType)</label>
-                    <select class="modal-input" @bind="_RefType">
-                        <option value="@StorageVariableType.Number">@Loc.T(Localization.Editor.Modals.RegisterVariable.storageTypeNumber)</option>
-                        <option value="@StorageVariableType.Dial">@Loc.T(Localization.Common.Misc.dialRange)</option>
-                        <option value="@StorageVariableType.String">@Loc.T(Localization.Common.Misc.stringWritten)</option>
-                    </select>
-                    <span class="modal-label-hint">@Loc.T(Localization.Editor.Modals.GetVariable.byTypeHint)</span>
-                </div>
-            }
 
             <div class="modal-field">
                 <label class="modal-label">@Loc.T(Localization.Editor.Modals.GetVariable.nameOverride)</label>
-                <input class="modal-input"
-                       type="text"
-                       placeholder="@_RegisteredName"
-                       @bind="_NameOverride"
-                       @bind:event="oninput"
-                       maxlength="100"/>
-                <span class="modal-label-hint">@((MarkupString)Loc.T(Localization.Editor.Modals.GetVariable.nameOverrideHint).Replace("[slotToken]", _SlotToken))</span>
+                <input class="modal-input" type="text" placeholder="@_SelectedName"
+                       @bind="_NameOverride" @bind:event="oninput" maxlength="100"/>
             </div>
 
-            <div class="modal-field">
-                <label class="modal-label">@Loc.T(Localization.Editor.Modals.GetVariable.slotNameOverride)</label>
-                <input class="modal-input"
-                       type="text"
-                       placeholder="@_DefaultSlotName"
-                       @bind="_SlotNameOverride"
-                       @bind:event="oninput"
-                       maxlength="100"/>
-                <span class="modal-label-hint">@((MarkupString)Loc.T(Localization.Editor.Modals.GetVariable.slotNameOverrideHint).Replace("[defaultSlotToken]", "{" + _DefaultSlotName + "}"))</span>
-            </div>
+            @if (_SelectedInternal)
+            {
+                <div class="modal-field">
+                    <label class="modal-label">@Loc.T(Localization.Editor.Modals.GetVariable.slotNameOverride)</label>
+                    <input class="modal-input" type="text" placeholder="@_DefaultSlotName"
+                           @bind="_SlotNameOverride" @bind:event="oninput" maxlength="100"/>
+                </div>
+            }
 
             <div class="modal-field">
                 <label class="modal-label">@Loc.T(Localization.Common.Fields.previewValue)</label>
-                <input class="modal-input"
-                       type="text"
+                <input class="modal-input" type="text"
                        placeholder="@Loc.T(Localization.Editor.Modals.GetVariable.previewValuePlaceholder)"
-                       @bind="_PreviewValue"
-                       @bind:event="oninput"
-                       maxlength="100"/>
+                       @bind="_PreviewValue" @bind:event="oninput" maxlength="100"/>
                 <span class="modal-label-hint">@Loc.T(Localization.Editor.Modals.GetVariable.previewValueHint)</span>
             </div>
 
@@ -122,9 +81,7 @@
 
         <div class="modal-footer">
             <button class="modal-btn modal-btn-ghost" @onclick="Cancel">@Loc.T(Localization.Common.Buttons.cancel)</button>
-            <button class="modal-btn modal-btn-primary"
-                    @onclick="Confirm"
-                    disabled="@(!_CanConfirm)">
+            <button class="modal-btn modal-btn-primary" @onclick="Confirm" disabled="@(!_CanConfirm)">
                 @(_IsEdit ? Loc.T(Localization.Common.Buttons.saveChanges) : Loc.T(Localization.Editor.Modals.GetVariable.addButton))
             </button>
         </div>
@@ -135,88 +92,77 @@
 @code {
     [Parameter] public EventCallback<GetVariableArgs> OnConfirm { get; set; }
 
-    private bool                   _Visible;
-    private bool                   _IsEdit;
-    private Guid                   _EditNodeId;
-    private StorageVariableRefMode _RefMode;
-    private StorageVariableType    _RefType;
-    private Guid                   _RegisteredVariableId;
-    private string                 _NameOverride     = "";
-    private string                 _SlotNameOverride = "";
-    private string                 _PreviewValue     = "";
+    private bool   _Visible;
+    private bool   _IsEdit;
+    private Guid   _EditNodeId;
+    private Guid   _SelectedVariableId;
+    private string _Search           = "";
+    private string _NameOverride     = "";
+    private string _SlotNameOverride = "";
+    private string _PreviewValue     = "";
 
-    /// <summary>The picked register's name, used as the name-override placeholder ("" when nothing picked).</summary>
-    private string _RegisteredName =>
-        RegisteredVariables().Find(v => v.Id == _RegisteredVariableId) is { Name: { Length: > 0 } n } ? n : "variable name";
-
-    /// <summary>A ByType node names its variable through a wire, so only a Specific node needs a pick before it can be saved.</summary>
-    private bool _CanConfirm =>
-        _RefMode == StorageVariableRefMode.ByType || _RegisteredVariableId != Guid.Empty;
-
-    /// <summary>The Slot port's default token name — the Value token plus a <c>Slot</c> suffix (mirrors <c>StoryLogicRenderer.SlotTokenName</c>).</summary>
-    private string _DefaultSlotName =>
-        (string.IsNullOrWhiteSpace(_NameOverride) ? _RegisteredName : _NameOverride.Trim()) + "Slot";
-
-    /// <summary>The <c>{token}</c> the Slot port actually fills — its override, else the default (mirrors <c>StoryLogicRenderer.GetVariableSlotName</c>).</summary>
-    private string _SlotToken =>
-        "{" + (string.IsNullOrWhiteSpace(_SlotNameOverride) ? _DefaultSlotName : _SlotNameOverride.Trim()) + "}";
+    private StoryVariable? _Selected => StoryLogicFlow.Variable(_ProjectState.CurrentProject!, _SelectedVariableId);
+    private bool           _SelectedInternal => _Selected is { Scope: StoryVariableScope.Internal };
+    private string         _SelectedName => _Selected is { Name: { Length: > 0 } n } ? n : "variable name";
+    private string         _DefaultSlotName => (string.IsNullOrWhiteSpace(_NameOverride) ? _SelectedName : _NameOverride.Trim()) + "Slot";
+    private bool           _CanConfirm => _SelectedVariableId != Guid.Empty;
 
     /// <summary>Opens the modal to create a new Get Variable node.</summary>
     public void Show()
     {
-        _IsEdit               = false;
-        _EditNodeId           = Guid.Empty;
-        _RefMode              = StorageVariableRefMode.Specific;
-        _RefType              = StorageVariableType.Number;
-        _RegisteredVariableId = Guid.Empty;
-        _NameOverride         = "";
-        _SlotNameOverride     = "";
-        _PreviewValue         = "";
-        _Visible              = true;
+        _IsEdit             = false;
+        _EditNodeId         = Guid.Empty;
+        _SelectedVariableId = Guid.Empty;
+        _Search             = "";
+        _NameOverride       = "";
+        _SlotNameOverride   = "";
+        _PreviewValue       = "";
+        _Visible            = true;
         StateHasChanged();
     }
 
     /// <summary>Opens the modal to edit an existing Get Variable node.</summary>
     public void ShowEdit(StoryGetVariableNode node)
     {
-        _IsEdit               = true;
-        _EditNodeId           = node.Id;
-        _RefMode              = node.RefMode;
-        _RefType              = node.RefType;
-        _RegisteredVariableId = node.RegisteredVariableId;
-        _NameOverride         = node.NameOverride;
-        _SlotNameOverride     = node.SlotNameOverride;
-        _PreviewValue         = node.PreviewValue;
-        _Visible              = true;
+        _IsEdit             = true;
+        _EditNodeId         = node.Id;
+        _SelectedVariableId = node.SelectedVariableId;
+        _Search             = "";
+        _NameOverride       = node.NameOverride;
+        _SlotNameOverride   = node.SlotNameOverride;
+        _PreviewValue       = node.PreviewValue;
+        _Visible            = true;
         StateHasChanged();
     }
 
-    private List<StoryRegisterVariableNode> RegisteredVariables()
+    private List<StoryVariable> FilteredVariables()
     {
-        List<StoryRegisterVariableNode> list = new();
-        foreach (StoryLogicNode logic in _ProjectState.CurrentProject!.LogicNodes.Values)
-            list.AddRange(logic.RegisterVariableNodes);
-        return list.OrderBy(v => v.Name, StringComparer.OrdinalIgnoreCase).ToList();
+        IEnumerable<StoryVariable> all = _ProjectState.CurrentProject!.Variables.Values.Concat(StoryBuiltInVariables.All);
+        if (!string.IsNullOrWhiteSpace(_Search))
+            all = all.Where(v => v.Name.Contains(_Search.Trim(), StringComparison.OrdinalIgnoreCase));
+        return all.OrderBy(v => v.Name, StringComparer.OrdinalIgnoreCase).ToList();
     }
+
+    private string SlotOrScope(StoryVariable v) =>
+        v.Scope == StoryVariableScope.Internal
+            ? StoryVariableSlots.Label(v.InternalSubtype, v.SlotIndex)
+            : v.ExternalForm.ToString();
 
     private async Task Confirm()
     {
         if (!_CanConfirm) return;
         _Visible = false;
-        // A ByType node takes its target from the Name wire, so it keeps no register id.
-        Guid registered = _RefMode == StorageVariableRefMode.ByType ? Guid.Empty : _RegisteredVariableId;
-        await OnConfirm.InvokeAsync(new GetVariableArgs(_EditNodeId, _RefMode, _RefType, registered, _NameOverride.Trim(), _SlotNameOverride.Trim(), _PreviewValue.Trim()));
+        string slotOverride = _SelectedInternal ? _SlotNameOverride.Trim() : "";
+        await OnConfirm.InvokeAsync(new GetVariableArgs(_EditNodeId, _SelectedVariableId, _NameOverride.Trim(), slotOverride, _PreviewValue.Trim()));
     }
 
     private void Cancel() => _Visible = false;
 
     /// <summary>Result passed back to the parent. <see cref="EditNodeId"/> is empty for a create, set for an edit.</summary>
     public record GetVariableArgs(
-        Guid                   EditNodeId,
-        StorageVariableRefMode RefMode,
-        StorageVariableType    RefType,
-        Guid                   RegisteredVariableId,
-        string                 NameOverride,
-        string                 SlotNameOverride,
-        string                 PreviewValue);
+        Guid   EditNodeId,
+        Guid   SelectedVariableId,
+        string NameOverride,
+        string SlotNameOverride,
+        string PreviewValue);
 }

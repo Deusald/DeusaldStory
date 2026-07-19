@@ -4,9 +4,9 @@
 
 @* ─────────────────────────────────────────────────────────────────────────
    Shown in the inspector column while a logic node is in Preview mode. Lists
-   the story variables referenced by the node's External Variable nodes and lets
-   the author tweak each value; changes flow into the shared Values dictionary
-   and raise ValuesChanged so the LogicPreview re-renders its SmartFormat output.
+   the variables referenced by the node's Get Variable nodes and lets the author
+   tweak each value; changes flow into the shared Values dictionary and raise
+   ValuesChanged so the LogicPreview re-renders its SmartFormat output.
    ───────────────────────────────────────────────────────────────────────── *@
 
 <div class="pvp-root">
@@ -25,7 +25,7 @@
     </div>
 
     @{
-        List<StoryVariable> vars = Gamebook ? new List<StoryVariable>() : ReferencedVariables();
+        List<PreviewVar> vars = Gamebook ? new List<PreviewVar>() : ReferencedVariables();
     }
     <div class="pvp-body">
         @if (Gamebook)
@@ -44,17 +44,17 @@
         }
         else
         {
-            @foreach (StoryVariable v in vars)
+            @foreach (PreviewVar v in vars)
             {
-                StoryVariable variable = v;
+                PreviewVar variable = v;
                 <div class="pvp-field">
                     <label class="pvp-label">@(string.IsNullOrWhiteSpace(variable.Name) ? Loc.T(Localization.Common.Placeholders.unnamed) : variable.Name)</label>
-                    @if (variable.PossibleValues.Count > 0)
+                    @if (variable.Values.Count > 0)
                     {
                         <select class="modal-input"
                                 value="@PreviewValue(variable)"
                                 @onchange="e => OnValueChanged(variable.Id, e)">
-                            @foreach (string val in variable.PossibleValues)
+                            @foreach (string val in variable.Values)
                             {
                                 <option value="@val">@(string.IsNullOrEmpty(val) ? Loc.T(Localization.Common.Placeholders.empty) : val)</option>
                             }
@@ -92,6 +92,9 @@
     /// <summary>Gamebook preview: sections are pre-generated, so the panel shows a note instead of editable values.</summary>
     [Parameter] public bool Gamebook { get; set; }
 
+    /// <summary>A tweakable preview value row (a referenced global variable or an incoming declared variable).</summary>
+    private sealed record PreviewVar(Guid Id, string Name, string Description, List<string> Values);
+
     protected override void OnParametersSet()
     {
         // Seeding fills the shared values dictionary; the sibling LogicPreview has already rendered against the
@@ -101,21 +104,21 @@
     }
 
     /// <summary>
-    /// The variables this logic node previews: those its External Variable nodes reference (constants included, so the
-    /// author picks a value), plus the incoming declared variables handed in by an upstream Single-path node, so the
-    /// reader can pick a value and the text never renders as null.
+    /// The variables this logic node previews: those its Get Variable nodes reference (built-ins excluded — they follow
+    /// the render), plus the incoming declared variables handed in by an upstream Single-path node, so the reader can
+    /// pick a value and the text never renders as null.
     /// </summary>
-    private List<StoryVariable> ReferencedVariables()
+    private List<PreviewVar> ReferencedVariables()
     {
-        Dictionary<Guid, StoryVariable> map = new();
-        foreach (StoryExternalVariableNode n in Logic.ExternalVariableNodes)
+        Dictionary<Guid, PreviewVar> map = new();
+        foreach (StoryGetVariableNode n in Logic.GetVariableNodes)
             if (Variable(n.SelectedVariableId) is StoryVariable v)
-                map[v.Id] = v;
+                map[v.Id] = new PreviewVar(v.Id, v.Name, v.Description, StoryVariableValues.PossibleValues(v));
 
-        List<StoryVariable> ordered = map.Values.OrderBy(v => v.Name, StringComparer.OrdinalIgnoreCase).ToList();
+        List<PreviewVar> ordered = map.Values.OrderBy(v => v.Name, StringComparer.OrdinalIgnoreCase).ToList();
 
         foreach (StoryDeclaredVariable d in StorySelectionResolver.IncomingVariables(Project, Logic))
-            ordered.Add(new StoryVariable { Id = d.Id, Name = string.IsNullOrWhiteSpace(d.Name) ? Loc.T(Localization.Editor.Panels.PreviewVariables.incoming) : d.Name, PossibleValues = d.PossibleValues });
+            ordered.Add(new PreviewVar(d.Id, string.IsNullOrWhiteSpace(d.Name) ? Loc.T(Localization.Editor.Panels.PreviewVariables.incoming) : d.Name, "", d.PossibleValues));
 
         return ordered;
     }
@@ -124,17 +127,17 @@
     private bool SeedValues()
     {
         bool added = false;
-        foreach (StoryVariable v in ReferencedVariables())
+        foreach (PreviewVar v in ReferencedVariables())
             if (!Values.ContainsKey(v.Id))
             {
-                Values[v.Id] = v.PossibleValues.FirstOrDefault() ?? "";
+                Values[v.Id] = v.Values.FirstOrDefault() ?? "";
                 added        = true;
             }
         return added;
     }
 
-    private string PreviewValue(StoryVariable v) =>
-        Values.TryGetValue(v.Id, out string? val) ? val : v.PossibleValues.FirstOrDefault() ?? "";
+    private string PreviewValue(PreviewVar v) =>
+        Values.TryGetValue(v.Id, out string? val) ? val : v.Values.FirstOrDefault() ?? "";
 
     private StoryVariable? Variable(Guid id) =>
         id != Guid.Empty && Project.Variables.TryGetValue(id, out StoryVariable? v) ? v : null;

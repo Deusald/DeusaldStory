@@ -109,10 +109,7 @@ namespace DeusaldStoryCommon
         /// <summary>SmartFormat nodes placed in the inner graph (each formats a text with connected variable values).</summary>
         public List<StorySmartFormatNode> SmartFormatNodes { get; } = new();
 
-        /// <summary>External Variable nodes placed in the inner graph (each feeds a variable value into a SmartFormat/Exit input).</summary>
-        public List<StoryExternalVariableNode> ExternalVariableNodes { get; } = new();
-
-        /// <summary>Get Variable nodes placed in the inner graph (each reads a registered storage variable — App value / Gamebook slot tag).</summary>
+        /// <summary>Get Variable nodes placed in the inner graph (each reads a global variable — App value, plus the Gamebook slot tag for Internal variables).</summary>
         public List<StoryGetVariableNode> GetVariableNodes { get; } = new();
 
         /// <summary>Constant Variable nodes placed in the inner graph (each supplies a named constant value into a SmartFormat/Exit input).</summary>
@@ -127,17 +124,8 @@ namespace DeusaldStoryCommon
         /// <summary>Split-for-App nodes on the LFlow chain — each breaks the App render into a new "continue" page (ignored by the Gamebook).</summary>
         public List<StorySplitForAppNode> SplitForAppNodes { get; } = new();
 
-        /// <summary>Register-variable nodes on the LFlow chain — each claims a physical storage slot for a new variable.</summary>
-        public List<StoryRegisterVariableNode> RegisterVariableNodes { get; } = new();
-
-        /// <summary>Set-variable nodes on the LFlow chain — each assigns a value to an already-registered variable.</summary>
+        /// <summary>Set-variable nodes on the LFlow chain — each assigns a value to a global variable (External or Internal).</summary>
         public List<StorySetVariableNode> SetVariableNodes { get; } = new();
-
-        /// <summary>Unregister-variable nodes on the LFlow chain — each releases a registered variable and frees its slot.</summary>
-        public List<StoryUnregisterVariableNode> UnregisterVariableNodes { get; } = new();
-
-        /// <summary>Set-external-variable nodes on the LFlow chain — each assigns a value to a story-wide external variable.</summary>
-        public List<StorySetExternalVariableNode> SetExternalVariableNodes { get; } = new();
 
         /// <summary>Portal pairs on the inner graph — one-in / many-out relays that carry a Text/Icon/Variable value across the graph.</summary>
         public List<StoryLogicPortalNode> LogicPortalNodes { get; } = new();
